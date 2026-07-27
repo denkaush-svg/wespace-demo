@@ -889,11 +889,15 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
 .prompt.composer { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 14px 12px; position: relative; }
 .prompt.composer .prompt-top { display: flex; align-items: center; gap: 12px; }
 .prompt.composer .prompt-top input { padding: 6px 0; }
+.prompt.composer .cg-actions .voice { width: 32px; height: 32px; }
+.prompt.composer .cg-actions .voice svg { width: 17px; height: 17px; }
+.prompt.composer .cg-actions .send { width: 34px; height: 34px; }
+.prompt.composer .cg-actions .send svg { width: 17px; height: 17px; }
 .cg-bar { position: static; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .cg-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .cg-tool-wrap { position: static; flex: 0 0 auto; }
-.cg-tool { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line, #e2dacb); background: var(--card, #fff); color: var(--ink, #211d16); cursor: pointer; font-size: 12.5px; font-weight: 600; transition: .15s; white-space: nowrap; }
-.cg-tool svg { width: 16px; height: 16px; color: var(--mut, #6e6456); flex: 0 0 auto; }
+.cg-tool { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line, #e2dacb); background: var(--card, #fff); color: var(--ink, #211d16); cursor: pointer; font-size: 12px; font-weight: 600; transition: .15s; white-space: nowrap; }
+.cg-tool svg { width: 15px; height: 15px; color: var(--mut, #6e6456); flex: 0 0 auto; }
 .cg-tool .cv { color: var(--mut, #6e6456); font-size: 10px; margin-left: -2px; }
 .cg-tool:hover { border-color: var(--acc, #cf5a25); color: var(--acc, #cf5a25); }
 .cg-tool:hover svg, .cg-tool:hover .cv { color: var(--acc, #cf5a25); }
@@ -904,14 +908,16 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
 .cg-tool.mode svg, .cg-tool.mode .cv { color: var(--acc, #cf5a25); }
 .cg-tool.has { border-color: var(--acc, #cf5a25); }
 /* depth segment (Быстро · Размышление · Глубоко) */
-.cg-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface-2, #f1ece1); border: 1px solid var(--line, #e2dacb); flex: 0 0 auto; }
-.cg-seg-btn { border: 0; background: transparent; cursor: pointer; height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--mut, #6e6456); transition: .15s; white-space: nowrap; }
+.cg-seg { display: inline-flex; padding: 2px; gap: 2px; border-radius: 999px; background: var(--surface-2, #f1ece1); border: 1px solid var(--line, #e2dacb); flex: 0 0 auto; }
+.cg-seg-btn { border: 0; background: transparent; cursor: pointer; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: var(--mut, #6e6456); transition: .15s; white-space: nowrap; }
 .cg-seg-btn:hover { color: var(--ink, #211d16); }
 .cg-seg-btn.on { background: var(--card, #fff); color: var(--acc, #cf5a25); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 /* popover shared by attach / mode / context */
-.cg-pop { position: absolute; bottom: calc(100% + 10px); left: 0; width: 340px; max-width: min(340px, calc(100vw - 40px)); max-height: 380px; overflow: auto; background: var(--card, #fff); border: 1px solid var(--line, #e2dacb); border-radius: 16px; box-shadow: 0 16px 48px -12px rgba(0,0,0,.4); padding: 6px; z-index: 60; -webkit-overflow-scrolling: touch; }
-.cg-sec { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--mut, #6e6456); padding: 9px 10px 4px; font-weight: 700; }
-.cg-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; background: transparent; border-radius: 10px; cursor: pointer; font-size: 13px; color: var(--ink, #211d16); text-align: left; font-weight: 500; }
+.cg-pop { position: absolute; top: calc(100% + 8px); bottom: auto; left: 0; width: 314px; max-width: min(314px, calc(100vw - 40px)); max-height: min(264px, calc(var(--app-h, 100dvh) - 176px)); overflow: auto; background: var(--card, #fff); border: 1px solid var(--line, #e2dacb); border-radius: 14px; box-shadow: 0 16px 48px -12px rgba(0,0,0,.4); padding: 5px; z-index: 60; -webkit-overflow-scrolling: touch; }
+/* in the sticky chat dock the composer sits at the screen bottom → open upward */
+.dock .cg-pop { top: auto; bottom: calc(100% + 8px); }
+.cg-sec { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--mut, #6e6456); padding: 7px 9px 2px; font-weight: 700; }
+.cg-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: 0; background: transparent; border-radius: 9px; cursor: pointer; font-size: 12.5px; color: var(--ink, #211d16); text-align: left; font-weight: 500; }
 .cg-item:hover { background: var(--acc-weak, rgba(207,90,37,.10)); }
 .cg-item > span:not(.ck):not(.cg-soon) { flex: 1; min-width: 0; }
 .cg-item svg { width: 16px; height: 16px; color: var(--mut, #6e6456); flex: 0 0 auto; }
@@ -921,12 +927,13 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
 .cg-item .ck svg { width: 15px; height: 15px; color: var(--acc, #cf5a25); }
 /* two-line mode row: title + one-line description */
 .cg-item-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.cg-item-tx b { font-weight: 650; font-size: 13px; line-height: 1.25; }
-.cg-item-tx i { font-style: normal; font-size: 11px; color: var(--mut, #6e6456); line-height: 1.3; white-space: normal; }
+.cg-item-tx b { font-weight: 650; font-size: 12.5px; line-height: 1.2; }
+.cg-item-tx i { font-style: normal; font-size: 10.5px; color: var(--mut, #6e6456); line-height: 1.25; white-space: normal; }
 .mode-row { align-items: flex-start; }
-.mode-row svg { margin-top: 2px; }
-.cg-item.soon { cursor: default; opacity: .6; }
+.mode-row svg { margin-top: 1px; }
+.cg-item.soon { cursor: default; opacity: .6; align-items: center; }
 .cg-item.soon:hover { background: transparent; }
+.cg-item.soon .cg-item-tx i { display: none; }
 .cg-soon { flex: 0 0 auto; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--mut, #6e6456); border: 1px solid var(--line, #e2dacb); border-radius: 999px; padding: 2px 7px; }
 /* active context / attachment chips */
 .cg-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; width: 100%; }
@@ -5010,6 +5017,29 @@ body:has(.player:target) #runmode { display: none !important; }
     if (store.cgMenu && e.target.closest && !e.target.closest('.cg-bar')) { store.cgMenu = null; api.emit(); }
   });
 
+  // The composer sits anywhere (Пульс mid-page, home below the tiles, chat dock at the
+  // bottom), so flip the popover to whichever side has room and cap it to the viewport.
+  function placeCgPop() {
+    const pop = document.querySelector('.cg-pop');
+    if (!pop) return;
+    const box = pop.closest('.prompt');
+    if (!box) return;
+    const r = box.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const vh = (vv && vv.height) ? vv.height : window.innerHeight;
+    const M = 12;
+    const below = vh - r.bottom - M;
+    const above = r.top - M;
+    const DESIRED = 264;
+    const openUp = below < Math.min(DESIRED, above) && above > below;
+    const space = Math.max(openUp ? above : below, 150);
+    pop.style.maxHeight = Math.min(DESIRED, space) + 'px';
+    if (openUp) { pop.style.top = 'auto'; pop.style.bottom = 'calc(100% + 8px)'; }
+    else { pop.style.bottom = 'auto'; pop.style.top = 'calc(100% + 8px)'; }
+  }
+  window.addEventListener('resize', () => { if (store.cgMenu) placeCgPop(); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (store.cgMenu) placeCgPop(); });
+
   // ---- boot (guarded: any failure shows a message instead of a blank screen) ----
   try {
     api.boot();
@@ -5017,6 +5047,7 @@ body:has(.player:target) #runmode { display: none !important; }
     if (store._threads && Object.keys(store._threads).length) WS.engine.importThreads(store._threads);
     else WS.engine.seedThreads();
     api.subscribe(() => WS.ui.render());
+    api.subscribe(placeCgPop);
     WS.ui.render();
   } catch (e) {
     var a = document.getElementById('app');
