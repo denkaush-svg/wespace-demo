@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:29</title>
+  <title>WESPACE · сборка 23:39</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:29';
+    window.WS_BUILD='23:39';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -808,6 +808,9 @@ button { font-family: inherit; cursor: pointer; }
 .mb > .fld, .mb .match-grid + .fld, label.fld { display: flex; flex-direction: column; gap: 5px; }
 label.fld > span { font-size: 12px; color: var(--mut); font-weight: 600; }
 label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
+/* textareas had no rule and fell back to the browser's monospace default */
+label.fld textarea { padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; resize: vertical; }
+label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width: 860px) { .match-grid, .pchecks { grid-template-columns: 1fr; } }
 /* branded WeSpace document (КП / бриф / договоры) — красивое оформление в pop-up (items 4/5) */
 .wsdoc { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface); box-shadow: var(--shadow-sm); }
@@ -1074,6 +1077,10 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
 .tl-ic-btn { border: 0; background: transparent; color: var(--mut); cursor: pointer; padding: 4px; border-radius: 6px; flex: none; }
 .tl-ic-btn:hover { color: var(--stop, #c0392b); background: rgba(0,0,0,.05); }
 .tl-ic-btn svg { width: 13px; height: 13px; }
+/* origin label when a feed merges entries from another entity (contact feed <- deal channels) */
+.tl-src { color: var(--acc-ink); background: var(--acc-soft); border: 1px solid var(--acc-line); border-radius: var(--r-pill); padding: 0 7px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* selected state for chip groups used as a type picker */
+.chip.on { border-color: var(--acc); background: var(--acc-soft); color: var(--acc-ink); }
 /* R2 funnel switcher */
 .funnel-switch { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; -webkit-overflow-scrolling: touch; }
 .fn-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: .15s; }
@@ -2051,23 +2058,86 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
 
   // Per-deal timeline (R4) — channel history. kind:'raw' immutable source event; 'note' editable;
   // 'ai' agent-written. capture:true = call/message recording (consent-gated, A7).
+  // `ord` = sort key DDHHMM (demo week is 11–17 мая, "сегодня" = 14 мая). Ordering metadata only:
+  // the deal card renders in array order; the contact feed merges channels and sorts on `ord`.
   const dealTimeline = {
     d_anna: [
-      { at: '14 мая · 09:05', ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Голосовое: ищу инвест-квартиру до 2 млн, Business Bay.', capture: true },
-      { at: '14 мая · 09:12', ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Извлечены параметры заявки, создана сделка (уверенность 0,86).' },
-      { at: '14 мая · 09:20', ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Просила график первого платежа — приоритет доходность.' },
+      { at: '14 мая · 09:05', ord: 140905, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Голосовое: ищу инвест-квартиру до 2 млн, Business Bay.', capture: true },
+      { at: '14 мая · 09:12', ord: 140912, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Извлечены параметры заявки, создана сделка (уверенность 0,86).' },
+      { at: '14 мая · 09:20', ord: 140920, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Просила график первого платежа — приоритет доходность.' },
     ],
     d_igor: [
-      { at: '10 мая · 11:00', ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 4:12 — обсудили перепродажу Bayline.', capture: true },
-      { at: '12 мая', ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Обещано КП 12 мая — не отправлено. Касание просрочено.' },
+      { at: '10 мая · 11:00', ord: 101100, ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 4:12 — обсудили перепродажу Bayline.', capture: true },
+      { at: '12 мая', ord: 120000, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Обещано КП 12 мая — не отправлено. Касание просрочено.' },
     ],
     d_viktor: [
-      { at: '13 мая · 15:30', ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлен черновик договора бронирования.', capture: true },
-      { at: '13 мая · 16:10', ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Ждём подтверждение ипотеки от банка.' },
+      { at: '13 мая · 15:30', ord: 131530, ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлен черновик договора бронирования.', capture: true },
+      { at: '13 мая · 16:10', ord: 131610, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Ждём подтверждение ипотеки от банка.' },
     ],
     d_karim: [
-      { at: '14 мая · 08:40', ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Нужен объект в Downtown, бюджет до 2,6 млн.', capture: true },
-      { at: '14 мая · 09:00', ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Своего инвентаря нет — предложено подключить клубного партнёра.' },
+      { at: '14 мая · 08:40', ord: 140840, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Нужен объект в Downtown, бюджет до 2,6 млн.', capture: true },
+      { at: '14 мая · 09:00', ord: 140900, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Своего инвентаря нет — предложено подключить клубного партнёра.' },
+    ],
+    d_lease: [
+      { at: '14 мая · 02:14', ord: 140214, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Ночное сообщение: ищу 1BR в JVC под аренду, бюджет до 95 тыс. в год.', capture: true },
+      { at: '14 мая · 07:30', ord: 140730, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Ночная заявка квалифицирована: аренда 1BR, JVC, годовой чек. Заведена сделка.' },
+      { at: '14 мая · 08:05', ord: 140805, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Клиент пишет по-английски — отвечать на английском.' },
+    ],
+    d_fitout: [
+      { at: '09 мая · 12:20', ord: 91220, ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 6:40 — отделка офиса 210 м² под сдачу в аренду.', capture: true },
+      { at: '10 мая · 10:15', ord: 101015, ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлена смета fit-out по трём подрядчикам.' },
+      { at: '11 мая · 17:40', ord: 111740, ch: 'note', kind: 'note', by: 'Лина Хассан', text: 'Просит поэтапную оплату — согласовать с Meydan.' },
+    ],
+    d_rentbiz: [
+      { at: '11 мая · 09:50', ord: 110950, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Запрос по готовому арендному бизнесу в DIFC — интересует доходность.', capture: true },
+      { at: '12 мая · 14:05', ord: 121405, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Собрана финмодель по DIFC Gate District: доходность и срок окупаемости.' },
+      { at: '13 мая · 11:30', ord: 131130, ch: 'note', kind: 'note', by: 'Омар Рахман', text: 'Пакет на проверку — ждём подтверждение действующих арендных договоров.' },
+    ],
+  };
+
+  // Per-contact timeline — the contact-level event feed (создание, согласие, звонки, встречи, заметки).
+  // Deal-level channel history is NOT duplicated here: the contact feed merges `dealTimeline` of the
+  // contact's deals at render time. Same entry shape as dealTimeline; `ch: 'meet'|'crm'` are contact-only.
+  const contactTimeline = {
+    c_anna: [
+      { at: '06 мая · 18:40', ord: 61840, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт создан из Instagram Direct.' },
+      { at: '07 мая · 10:15', ord: 71015, ch: 'crm', kind: 'raw', by: 'Система', text: 'Получено согласие на переписку (PDPL).' },
+      { at: '08 мая · 19:05', ord: 81905, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Первичный разговор 8:30 — цель инвестиция, горизонт 1–3 месяца.', capture: true },
+      { at: '11 мая · 12:00', ord: 111200, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча в офисе — разобрали подборку по Business Bay.' },
+      { at: '13 мая · 20:10', ord: 132010, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Считать доходность в AED — в долларах путается.' },
+    ],
+    c_lead15: [
+      { at: '14 мая · 07:50', ord: 140750, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Ищу инвестиционную квартиру в Дубае до 1,5 млн.', capture: true },
+      { at: '14 мая · 07:52', ord: 140752, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Лид не квалифицирован: не указаны район и срок. Поставлена задача уточнить.' },
+    ],
+    c_night: [
+      { at: '13 мая · 22:05', ord: 132205, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт создан из заявки на Bayut.' },
+      { at: '14 мая · 07:28', ord: 140728, ch: 'crm', kind: 'raw', by: 'Система', text: 'Согласие на переписку получено при первом контакте.' },
+    ],
+    c_overdue: [
+      { at: '03 мая · 16:20', ord: 31620, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт создан по реферальной рекомендации.' },
+      { at: '05 мая · 11:40', ord: 51140, ch: 'call', kind: 'raw', by: 'Ахмед Салех', text: 'Знакомство 5:10 — интересует перепродажа, важен эксклюзивный доступ.', capture: true },
+      { at: '08 мая · 09:15', ord: 80915, ch: 'meet', kind: 'raw', by: 'Ахмед Салех', text: 'Встреча в Business Bay — смотрели Bayline Terraces.' },
+      { at: '14 мая · 08:00', ord: 140800, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Касание просрочено на 2 дня — сделка поднята руководителю.' },
+    ],
+    c_noconsent: [
+      { at: '09 мая · 13:30', ord: 91330, ch: 'crm', kind: 'raw', by: 'Марина Волкова', text: 'Контакт заведён вручную после звонка на общий номер.' },
+      { at: '09 мая · 13:35', ord: 91335, ch: 'crm', kind: 'raw', by: 'Система', text: 'Согласие не оформлено — контакт исключён из адресных отправок.' },
+      { at: '12 мая · 10:00', ord: 121000, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Звонок 2:05 — просил варианты у воды; согласие всё ещё не подписано.', capture: true },
+    ],
+    c_ambig: [
+      { at: '07 мая · 15:10', ord: 71510, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт создан по реферальной рекомендации.' },
+      { at: '08 мая · 11:25', ord: 81125, ch: 'meet', kind: 'raw', by: 'Лина Хассан', text: 'Осмотр помещения в Business Bay — 210 м², под сдачу.' },
+      { at: '13 мая · 09:40', ord: 130940, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Заметка из переписки не привязалась однозначно — подтвердите сделку.' },
+    ],
+    c_docs: [
+      { at: '04 мая · 10:05', ord: 41005, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт создан из заявки на Property Finder.' },
+      { at: '06 мая · 14:50', ord: 61450, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Звонок 7:20 — ипотека, нужно предодобрение банка.', capture: true },
+      { at: '09 мая · 16:30', ord: 91630, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча — подписан лист бронирования по Bayline Terraces.' },
+    ],
+    c_partner: [
+      { at: '12 мая · 10:30', ord: 121030, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт пришёл из клубного канала.' },
+      { at: '13 мая · 18:15', ord: 131815, ch: 'meet', kind: 'raw', by: 'Лина Хассан', text: 'Встреча с представителем фонда Altura — обсудили Downtown.' },
     ],
   };
 
@@ -2133,7 +2203,7 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
     version: 1,
     DEMO_NOW, tenant, users, clients, objects, refModel,
     deals, tasks, events, inbox, analytics,
-    FUNNELS, companies, dealTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, companies, dealTimeline, contactTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
 
@@ -2556,7 +2626,7 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 6; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct.
+  const SCHEMA = 7; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -2599,6 +2669,7 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
       refModel: clone(f.refModel),
       companies: clone(f.companies),
       dealTimeline: clone(f.dealTimeline),
+      contactTimeline: clone(f.contactTimeline),
       conflicts: clone(f.conflicts),
       attribution: clone(f.attribution),
       clientSignals: clone(f.clientSignals),
@@ -4834,9 +4905,11 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
         '<div style="margin-top:14px">' + dxSec('doc', 'Документы по сделкам', '', docsRows(docsFor((x) => x.client === c.id), 'по этому контакту документов пока нет')) + '</div>';
     }
     if (tab === 'history') {
-      const clientEvents = (c.id === 'c_anna') ? S().events.slice(0, 6) : [];
-      const evs = clientEvents.map((e) => '<div class="feed-row"><div class="fi i-mut">' + I('dot') + '</div><div class="ft"><div class="t">' + e.action + '</div><div class="m">' + e.time + ' · ' + e.user + '</div></div></div>').join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">пока нет событий по контакту</div>';
-      return dxSec('clock', 'История изменений', '', '<div class="feed">' + evs + '</div>');
+      // Session action log (what the demo operator did) stays available under the event feed —
+      // it is a different thing from the contact's own history and must not masquerade as it.
+      const acts = S().events.slice(0, 8).map((e) => '<div class="feed-row"><div class="fi i-mut">' + I('dot') + '</div><div class="ft"><div class="t">' + escAttr(e.action) + '</div><div class="m">' + escAttr(e.time) + ' · ' + escAttr(e.user) + '</div></div></div>').join('');
+      return contactFeedBlock(c) +
+        (acts ? '<div style="margin-top:14px">' + dxSec('clock', 'Журнал действий в сессии', '', '<div class="feed">' + acts + '</div>') + '</div>' : '');
     }
     // overview
     const s = (D().clientSignals || {})[c.id];
@@ -4858,7 +4931,8 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
     return contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
-      '<div style="margin-top:14px">' + actions + '</div>';
+      '<div style="margin-top:14px">' + actions + '</div>' +
+      '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
@@ -4949,27 +5023,104 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
   function nbaBlock(d) {
     return '<div class="section-label" style="margin-top:16px">Следующий шаг <span class="badge ai-b">' + I('sparkle') + 'AI</span></div>' + nbaInner(d);
   }
-  function chIcon(ch) { return ({ whatsapp: 'whatsapp', call: 'phone', email: 'mail', note: 'pencil', system: 'sparkle' })[ch] || 'dot'; }
+  function chIcon(ch) {
+    return ({ whatsapp: 'whatsapp', call: 'phone', email: 'mail', note: 'pencil', system: 'sparkle',
+      meet: 'calendar', crm: 'clock', task: 'checkCircle', doc: 'doc' })[ch] || 'dot';
+  }
+  // One timeline row shared by every feed (deal card, contact card).
+  // `del` = the full data-attribute of the delete control, empty when the entry is not a removable note.
+  // `e.src` = originating entity label, shown when a feed merges entries from elsewhere.
+  function tlRow(e, del) {
+    const lock = e.kind === 'raw' ? '<span class="tl-lock" title="Сырьё канала — неизменяемо">' + I('lock') + '</span>' : '';
+    const edit = del ? '<button class="tl-ic-btn" ' + del + ' title="Удалить заметку">' + I('x') + '</button>' : '';
+    const ai = e.kind === 'ai' ? ' <span class="badge ai-b">' + I('sparkle') + 'AI</span>' : '';
+    const src = e.src ? ' · <span class="tl-src">' + escAttr(e.src) + '</span>' : '';
+    return '<div class="tl-row ' + e.kind + '"><div class="tl-ic">' + I(chIcon(e.ch)) + '</div>' +
+      '<div class="tl-b"><div class="tl-t">' + escAttr(e.text) + ai + '</div>' +
+      '<div class="tl-m">' + escAttr(e.at) + ' · ' + escAttr(e.by) + (e.capture ? ' · <span class="cap-tag">запись</span>' : '') + src + lock + '</div></div>' + edit + '</div>';
+  }
   function dealTimelineInner(d) {
     const tl = (D().dealTimeline || {})[d.id] || [];
     const cap = S().capture || {};
     const on = (d.id in cap) ? cap[d.id] : true;
-    const rows = tl.map((e, i) => {
-      const lock = e.kind === 'raw' ? '<span class="tl-lock" title="Сырьё канала — неизменяемо">' + I('lock') + '</span>' : '';
-      const edit = e.kind === 'note' ? '<button class="tl-ic-btn" data-notedel="' + d.id + ':' + i + '" title="Удалить заметку">' + I('x') + '</button>' : '';
-      const ai = e.kind === 'ai' ? ' <span class="badge ai-b">' + I('sparkle') + 'AI</span>' : '';
-      return '<div class="tl-row ' + e.kind + '"><div class="tl-ic">' + I(chIcon(e.ch)) + '</div>' +
-        '<div class="tl-b"><div class="tl-t">' + e.text + ai + '</div>' +
-        '<div class="tl-m">' + e.at + ' · ' + e.by + (e.capture ? ' · <span class="cap-tag">запись</span>' : '') + lock + '</div></div>' + edit + '</div>';
-    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">пока нет истории по каналам</div>';
+    // Deal feed keeps array order (append-only) — index addressing stays valid for note deletion.
+    const rows = tl.map((e, i) => tlRow(e, e.kind === 'note' ? 'data-notedel="' + d.id + ':' + i + '"' : ''))
+      .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">пока нет истории по каналам</div>';
     const privacy = '<div class="cap-toggle"><span>' + I('lock') + 'Запись разговоров по сделке (A7)</span>' +
       '<button class="switch' + (on ? ' on' : '') + '" data-act="capToggle" data-deal="' + d.id + '" role="switch" aria-checked="' + on + '"><i></i></button></div>';
     return privacy + '<div class="timeline">' + rows + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:4px">Сырьё канала (звонок/письмо/сообщение) не меняется. Заметки правятся и удаляются. Внешняя отправка — имитируется.</div>';
   }
   function dealTimelineBlock(d) {
-    return '<div class="section-label" style="margin-top:16px">История каналов' +
-      '<button class="btn xs" data-act="addNote" data-deal="' + d.id + '">' + I('plus') + 'Заметка</button></div>' + dealTimelineInner(d);
+    return '<div class="section-label" style="margin-top:16px">Лента событий' +
+      '<button class="btn xs" data-act="addEvent" data-scope="deal" data-deal="' + d.id + '">' + I('plus') + 'Событие</button></div>' + dealTimelineInner(d);
+  }
+
+  // ---- Contact event feed — the chronological ribbon of everything that happened with a contact.
+  // Sources: contact-level history, the channel history of the contact's deals, tasks and planned
+  // meetings. `ord` (DDHHMM, demo week 11–17 мая) is the single sort key; entries without one sink
+  // to the bottom as "just added".
+  // Everything is anchored to the demo clock, never to the wall clock, so ordering is stable.
+  const NOW = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, h: 9, mi: 12 };
+  const ORD = (d, h, mi) => d * 10000 + h * 100 + mi;
+  const NOW_ORD = ORD(NOW.d, NOW.h, NOW.mi);
+  const LATER_ORD = ORD(99, 0, 0); // undated ("позже — по согласованию") sinks to the end of the feed
+  const DAY_WORD = { 'сегодня': NOW.d, 'завтра': NOW.d + 1, 'вчера': NOW.d - 1, 'просрочено': NOW.d - 1 };
+  // Task `when` is an internal enum, not a Russian phrase — map it explicitly.
+  const TASK_ORD = { overdue: ORD(NOW.d - 1, 10, 0), today: ORD(NOW.d, 10, 0), tomorrow: ORD(NOW.d + 1, 10, 0) };
+  // Demo dates are written as words ("сегодня 16:00"), not timestamps — resolve them against the demo day.
+  function ordFromWhen(w, fallback) {
+    const s = String(w || '');
+    const day = Object.keys(DAY_WORD).find((k) => s.indexOf(k) >= 0);
+    const tm = s.match(/(\d{1,2}):(\d{2})/);
+    if (!day && !tm) return fallback;
+    return ORD(day ? DAY_WORD[day] : NOW.d, tm ? +tm[1] : 12, tm ? +tm[2] : 0);
+  }
+  // Deal label for a contact feed: deal titles repeat the client name, so fall back to the subtitle.
+  function dealFeedLabel(d, c) {
+    return (d.title && c && d.title !== c.name) ? d.title : (d.sub || d.title || 'сделка');
+  }
+  function contactFeedEntries(c) {
+    const data = D();
+    const out = [];
+    // Contact-level history — the only editable source, so entries keep their array index.
+    ((data.contactTimeline || {})[c.id] || []).forEach((e, i) => out.push(Object.assign({}, e, { _ci: i })));
+    // Channel history of the contact's deals, labelled with the deal it came from.
+    (data.deals || []).filter((d) => d.clientId === c.id).forEach((d) => {
+      const lbl = dealFeedLabel(d, c);
+      ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: lbl })));
+    });
+    // Tasks and planned meetings — the feed is the place where "что было и что предстоит" meet.
+    (data.tasks || []).filter((t) => t.clientId === c.id).forEach((t) => {
+      out.push({ at: 'срок: ' + t.due, ord: TASK_ORD[t.when] != null ? TASK_ORD[t.when] : ordFromWhen(t.due, TASK_ORD.today),
+        ch: 'task', kind: 'raw', by: 'Задача', text: t.title + (t.status === 'done' ? ' — выполнена' : '') });
+    });
+    (data.events || []).filter((ev) => ev.clientId === c.id).forEach((ev) => {
+      const off = ev.status === 'canceled';
+      // "позже — по согласованию" carries no date: it belongs at the end, not at midday today.
+      out.push({ at: ev.when, ord: ordFromWhen(ev.when, LATER_ORD),
+        ch: ev.kind === 'call' ? 'call' : 'meet', kind: 'raw', by: off ? 'Отменено' : 'Запланировано',
+        text: ev.title + (off ? ' — отменён' : '') });
+    });
+    return out.sort((a, b) => (a.ord == null ? NOW_ORD : a.ord) - (b.ord == null ? NOW_ORD : b.ord));
+  }
+  function contactFeedInner(c, limit) {
+    let list = contactFeedEntries(c);
+    const total = list.length;
+    // Preview keeps the tail — the most recent events are the ones worth seeing first.
+    if (limit && total > limit) list = list.slice(total - limit);
+    const rows = list.map((e) => tlRow(e, (e.kind === 'note' && e._ci != null) ? 'data-cnotedel="' + c.id + ':' + e._ci + '"' : ''))
+      .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">по контакту пока нет событий</div>';
+    const more = (limit && total > limit)
+      ? '<button class="btn xs" data-etab="contact~' + c.id + '~history" style="margin-top:8px">' + I('clock') + 'Вся лента · ' + total + '</button>' : '';
+    return '<div class="timeline">' + rows + '</div>' + more;
+  }
+  // limit set -> compact preview for the overview tab; unset -> the full ribbon on the history tab.
+  function contactFeedBlock(c, limit) {
+    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="contact" data-cid="' + c.id + '">' + I('plus') + 'Событие</button>';
+    const foot = limit ? '' :
+      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Звонки, встречи, сообщения по каналам, заметки и задачи — одной лентой. Сырьё канала неизменяемо; заметки правятся и удаляются.</div>';
+    return dxSec('clock', limit ? 'Лента событий · последние' : 'Лента событий', addBtn, contactFeedInner(c, limit) + foot);
   }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
   const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
@@ -5145,8 +5296,8 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
       return dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
     }
     if (tab === 'history') {
-      const addNote = '<button class="btn xs" data-act="addNote" data-deal="' + d.id + '">' + I('plus') + 'Заметка</button>';
-      return dxSec('clock', 'История каналов', addNote, dealTimelineInner(d));
+      const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="deal" data-deal="' + d.id + '">' + I('plus') + 'Событие</button>';
+      return dxSec('clock', 'Лента событий', addBtn, dealTimelineInner(d));
     }
     if (tab === 'tasks') {
       const list = (D().tasks || []).filter((t) => t.clientId === d.clientId);
@@ -5270,21 +5421,86 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
   }
-  function openNoteForm(id) {
-    const d = D().deals.find((x) => x.id === id); if (!d) return;
-    openModal('Заметка по сделке · ' + d.title,
-      '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Заметка — производное: правится и удаляется. Сырьё канала остаётся неизменяемым.</p>' +
-      '<label class="fld"><span>Текст заметки</span><textarea id="note_txt" rows="3" placeholder="Напр.: перезвонить после 18:00, интересует вид на воду"></textarea></label>',
-      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveNote" data-deal="' + id + '">' + I('check') + 'Добавить</button>');
+  // Event types an agent can log by hand (IA §6.2 «Примечания / События»).
+  // ch = channel icon bucket; kind 'note' stays editable, logged facts are immutable like channel raw.
+  const FEED_TYPES = [
+    ['note', 'Примечание', 'note', 'note', 'Напр.: перезвонить после 18:00, интересует вид на воду'],
+    ['call', 'Звонок', 'call', 'raw', 'Напр.: звонок 6:10 — согласовали график платежей'],
+    ['meet', 'Встреча', 'meet', 'raw', 'Напр.: встреча в офисе — показали две планировки'],
+    ['msg', 'Сообщение', 'whatsapp', 'raw', 'Напр.: WhatsApp — прислал требования по планировке'],
+    ['mail', 'Письмо', 'email', 'raw', 'Напр.: отправлено КП с тремя объектами'],
+    ['task', 'Задача', 'task', 'raw', 'Напр.: подготовить КП к четвергу'],
+  ];
+  const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  // An event is usually logged after the fact — «вчера созвонились» must land on yesterday,
+  // not on the moment the agent typed it. Offsets are relative to the demo day.
+  const FEED_WHEN = [['now', 'Сейчас'], ['0', 'Сегодня'], ['1', 'Вчера'], ['2', 'Позавчера'], ['3', '3 дня назад']];
+  function feedTypeChips(sel) {
+    return '<div class="qa-row" id="fe_types">' + FEED_TYPES.map((t) =>
+      '<button type="button" class="chip' + (t[0] === sel ? ' on' : '') + '" data-fetype="' + t[0] + '">' + I(chIcon(t[2])) + t[1] + '</button>').join('') + '</div>';
   }
-  function saveNoteForm(id) {
+  // scope: 'deal' | 'contact'. One form, two owners — the entry lands in that entity's own timeline.
+  function openEventForm(scope, id) {
+    const data = D();
+    const ent = scope === 'contact' ? (data.clients || []).find((x) => x.id === id) : (data.deals || []).find((x) => x.id === id);
+    if (!ent) return;
+    const title = scope === 'contact' ? ent.name : ent.title;
+    S().feedType = 'note';
+    const hhmm = String(NOW.h).padStart(2, '0') + ':' + String(NOW.mi).padStart(2, '0');
+    openModal('Событие · ' + title,
+      '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Примечание правится и удаляется. Звонок, встреча, сообщение и задача записываются как факт — как сырьё канала.</p>' +
+      '<label class="fld"><span>Тип события</span></label>' + feedTypeChips('note') +
+      '<div class="form-grid" style="margin-top:10px">' +
+      '<label class="fld"><span>Когда</span><select id="fe_day">' +
+      FEED_WHEN.map((w) => '<option value="' + w[0] + '">' + w[1] + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Время</span><input id="fe_time" type="time" value="' + hhmm + '"></label></div>' +
+      '<label class="fld" style="margin-top:10px"><span>Описание</span><textarea id="note_txt" rows="3" placeholder="' + escAttr(FEED_TYPES[0][4]) + '"></textarea></label>',
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveEventEntry" data-scope="' + scope + '" data-eid="' + escAttr(id) + '">' + I('check') + 'Добавить</button>');
+  }
+  // Chip selection lives in store state so the modal survives a re-render.
+  function setFeedType(t) {
+    S().feedType = t;
+    const box = document.getElementById('fe_types');
+    if (box) box.querySelectorAll('[data-fetype]').forEach((b) => b.classList.toggle('on', b.getAttribute('data-fetype') === t));
+    const ta = document.getElementById('note_txt');
+    const spec = FEED_TYPES.find((x) => x[0] === t);
+    if (ta && spec) ta.setAttribute('placeholder', spec[4]);
+  }
+  function saveEventEntry(scope, id) {
     const el = document.getElementById('note_txt'); const txt = el ? el.value.trim() : '';
-    if (!txt) { dealCard(id); return; }
+    const t = S().feedType || 'note';
+    const spec = FEED_TYPES.find((x) => x[0] === t) || FEED_TYPES[0];
+    if (!txt) { closeModal(); return; }
     const data = D(); const who = (data.users[WS.store.role] || {}).name || 'Агент';
-    data.dealTimeline = data.dealTimeline || {};
-    (data.dealTimeline[id] = data.dealTimeline[id] || []).push({ at: 'сейчас', ch: 'note', kind: 'note', by: who, text: txt });
-    WS.storeApi.toast('Заметка добавлена', 'ok');
-    dealCard(id);
+    const bag = scope === 'contact'
+      ? (data.contactTimeline = data.contactTimeline || {})
+      : (data.dealTimeline = data.dealTimeline || {});
+    const list = (bag[id] = bag[id] || []);
+    const dayEl = document.getElementById('fe_day');
+    const timeEl = document.getElementById('fe_time');
+    const dayVal = dayEl ? dayEl.value : 'now';
+    let at, ord;
+    if (dayVal === 'now') {
+      // The deal card renders in array order, the contact card sorts on `ord` — a "сейчас" entry has
+      // to be last in BOTH, so stamp it past the newest entry already in this timeline.
+      at = 'сейчас';
+      ord = list.reduce((m, e) => (e.ord != null && e.ord > m ? e.ord : m), NOW_ORD) + 1;
+    } else {
+      const tm = (timeEl && timeEl.value ? timeEl.value : '').match(/^(\d{1,2}):(\d{2})$/);
+      const h = tm ? +tm[1] : NOW.h, mi = tm ? +tm[2] : NOW.mi;
+      const day = Math.max(1, NOW.d - (parseInt(dayVal, 10) || 0));
+      at = String(day).padStart(2, '0') + ' ' + MONTHS_GEN[NOW.mo - 1] + ' · ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+      ord = ORD(day, h, mi);
+    }
+    // Back-dated entries must slot into history, not jump to the end — the deal card renders in
+    // array order, so insert at the position `ord` dictates instead of appending blindly.
+    const entry = { at: at, ord: ord, ch: spec[2], kind: spec[3], by: who, text: txt };
+    let pos = list.length;
+    while (pos > 0 && list[pos - 1].ord != null && list[pos - 1].ord > ord) pos--;
+    list.splice(pos, 0, entry);
+    WS.storeApi.save(); // direct data mutation — persist it, F5 must not drop the entry
+    WS.storeApi.toast(spec[1] + ' добавлено в ленту', 'ok');
+    if (scope === 'contact') clientCard(id); else dealCard(id);
   }
 
   // ---------------- OBJECTS & CLUB ----------------
@@ -7658,7 +7874,7 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, openNoteForm, saveNoteForm, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup };
 })(window.WS = window.WS || {});
 
@@ -7700,7 +7916,7 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -7771,7 +7987,9 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
     if (d.cgdepth) { store.cgDepth = d.cgdepth; return api.emit(); }
     if (d.dfconfirm) { const p = d.dfconfirm.split(':'); const dl = store.data.deals.find((x) => x.id === p[0]); if (dl) { dl.prov = dl.prov || {}; dl.prov[p[1]] = 'confirmed'; } api.toast('Поле подтверждено', 'ok'); return WS.ui.dealCard(p[0]); }
     if (d.conflict) { const p = d.conflict.split(':'); const cf = (store.data.conflicts || {})[p[0]]; if (cf) { cf.chosen = p[1]; const dl = store.data.deals.find((x) => x.id === p[0]); const v = cf[p[1] + 'v']; if (dl && v) dl.amount = v; } api.toast('Значение выбрано; альтернатива сохранена', 'ok'); return WS.ui.dealCard(p[0]); }
-    if (d.notedel) { const p = d.notedel.split(':'); const arr = (store.data.dealTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.toast('Заметка удалена'); return WS.ui.dealCard(p[0]); }
+    if (d.notedel) { const p = d.notedel.split(':'); const arr = (store.data.dealTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.dealCard(p[0]); }
+    if (d.cnotedel) { const p = d.cnotedel.split(':'); const arr = (store.data.contactTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.clientCard(p[0]); }
+    if (d.fetype) return WS.ui.setFeedType(d.fetype);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
     if (d.funnel) { store.dealFunnel = d.funnel; return api.emit(); }
@@ -7828,8 +8046,8 @@ label.fld input { height: 38px; padding: 0 11px; border: 1px solid var(--line); 
       case 'auditLog': WS.ui.openAuditLog(); break;
       case 'editDeal': WS.ui.openDealEdit(t.dataset.deal); break;
       case 'saveDeal': WS.ui.saveDealEdit(t.dataset.deal); break;
-      case 'addNote': WS.ui.openNoteForm(t.dataset.deal); break;
-      case 'saveNote': WS.ui.saveNoteForm(t.dataset.deal); break;
+      case 'addEvent': WS.ui.openEventForm(t.dataset.scope || 'deal', t.dataset.scope === 'contact' ? t.dataset.cid : t.dataset.deal); break;
+      case 'saveEventEntry': WS.ui.saveEventEntry(t.dataset.scope || 'deal', t.dataset.eid); break;
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
       case 'saveDealContact': WS.ui.saveDealContact(t.dataset.deal, +t.dataset.idx); break;
       case 'capToggle': { const id = t.dataset.deal; store.capture = store.capture || {}; const cur = (id in store.capture) ? store.capture[id] : true; store.capture[id] = !cur; api.toast('Запись разговоров: ' + (store.capture[id] ? 'включена' : 'выключена'), 'ok'); WS.ui.dealCard(id); break; }
