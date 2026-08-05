@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WESPACE — демо-стенд (preview · old-CRM палитра)</title>
+  <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
+  <meta name="theme-color" content="#FFFFFF">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    window.WS_BUILD=window.WS_BUILD||'DEV';
+    window.__WS_STAGE='head';window.__WS_ERR=null;
+    window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
+    setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
+  </script>
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+  <div id="app"><div id="bootmsg" style="padding:24px;font:16px 'Manrope',-apple-system,sans-serif;color:#737373">WeSpace загружается…</div></div>
+  <div class="modal-wrap" id="modal"></div>
+  <div class="toasts" id="toasts"></div>
+  <button class="fab-w" title="Консьерж — чат" data-act="cgDock">W</button>
+
+  <script src="js/icons.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/viz.js"></script>
+  <script src="js/fixtures.js"></script>
+  <script src="js/scenarios.js"></script>
+  <script src="js/finance.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

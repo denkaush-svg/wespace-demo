@@ -1,0 +1,62 @@
+/* ============================================================
+   Direction B — "Layered light"
+   All-light grey system; depth from elevation + surface steps,
+   not from a dark frame. White cards float on a grey canvas;
+   the Concierge composer is the tinted focal element.
+   Fixes "flat white": layering + type, staying airy.
+   ============================================================ */
+:root{
+  --bg:#F1F2F4; --bg-2:#E9EBEE; --surface:#FFFFFF; --surface-2:#F6F7F9; --surface-3:#EDEFF2;
+  --line:#E4E7EB; --line-2:#D5D9DF; --hair:#EEF0F3;
+  --ink:#181B21; --ink-2:#3D424B; --mut:#6B7280; --faint:#9AA1AB;
+
+  --acc:#F17E3D; --acc-2:#E06A28; --acc-deep:#C6591C;
+  --acc-soft:#FDEBDE; --acc-line:#F6C9A7; --acc-ink:#B0521E; --acc-weak:rgba(241,126,61,.12);
+
+  --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px;
+  --shadow-sm:0 1px 3px rgba(20,26,40,.07), 0 1px 0 rgba(20,26,40,.03);
+  --shadow:0 8px 24px -8px rgba(20,26,40,.16), 0 2px 6px rgba(20,26,40,.07);
+  --shadow-lg:0 24px 54px -12px rgba(20,26,40,.24), 0 8px 18px rgba(20,26,40,.10);
+
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-disp:'Bebas Neue','Manrope',-apple-system,sans-serif;
+}
+
+/* ---- light frame with a distinct rail surface + grey content canvas ---- */
+.brand{ background:var(--surface); }
+.brand .logo{ box-shadow:0 4px 12px -3px rgba(241,126,61,.4); }
+.topbar{ background:var(--surface); }
+.nav{ background:var(--surface); }
+.nav-item.on{ background:var(--acc-soft); color:var(--acc-ink); border-color:var(--acc-line); }
+.nav-item.on svg{ color:var(--acc); }
+.main{ background:var(--bg); }               /* grey canvas so white cards float */
+
+/* ---- white cards get real elevation (float off the grey) ---- */
+.card, .tile, .obj-card, .digest-row, .mtile, .preview, .kpi{
+  box-shadow:0 6px 20px -10px rgba(20,26,40,.20), 0 1px 2px rgba(20,26,40,.06); }
+.tile:hover, .obj-card:hover{ box-shadow:0 14px 30px -12px rgba(20,26,40,.26); }
+.tile.accent{ background:linear-gradient(150deg, var(--acc-soft), #FFFFFF); border-color:var(--acc-line); }
+
+/* ---- shared visual enrichment (numbers pop, composer focus, FAB) ---- */
+.greet .eyebrow{ color:var(--acc-2); }
+.tile .val{ font-family:var(--font-disp); font-size:42px; letter-spacing:.02em; line-height:.9; }
+.tile .val .u{ font-family:var(--font); font-size:14px; }
+.kpi .kv{ font-family:var(--font-disp); font-size:34px; }
+.fn-n{ font-family:var(--font-disp); font-size:28px; }
+.cal-date{ font-family:var(--font-disp); font-size:22px; }
+.digest-row .dvv{ font-family:var(--font-disp); font-weight:400; font-size:24px; }
+.mtile .mv{ font-family:var(--font-disp); font-weight:400; font-size:30px; letter-spacing:.02em; }
+
+/* concierge composer = tinted focal element (volume + focus) */
+.prompt.composer{ background:linear-gradient(180deg,#FFFFFF,#FFF7F1); border:1.5px solid var(--acc-line);
+  box-shadow:0 12px 34px -12px rgba(241,126,61,.30), 0 2px 8px rgba(20,26,40,.07); }
+.prompt.composer:focus-within{ border-color:var(--acc); box-shadow:0 14px 38px -12px rgba(241,126,61,.42), 0 0 0 4px var(--acc-weak); }
+.prompt.composer .ico svg{ width:22px; height:22px; }
+
+/* floating round Concierge button — black W on orange */
+.fab-w{ position:fixed; right:26px; bottom:26px; width:60px; height:60px; border-radius:50%;
+  background:var(--acc); color:#141414; border:0; font-family:'Bebas Neue',sans-serif; font-size:31px; line-height:1;
+  display:grid; place-items:center; cursor:pointer; z-index:95; transition:.16s cubic-bezier(.2,.7,.2,1);
+  box-shadow:0 14px 28px -8px rgba(241,126,61,.55), 0 4px 10px rgba(0,0,0,.16); }
+.fab-w:hover{ background:var(--acc-2); transform:translateY(-2px); }
+.fab-w:active{ transform:translateY(0); }

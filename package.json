@@ -1,0 +1,16 @@
+{
+  "name": "wespace-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WESPACE — interactive demo stand. Sources in src/, built to a single-file index.html served by GitHub Pages.",
+  "scripts": {
+    "build": "node src/build.js",
+    "test": "node src/test/smoke.js",
+    "shots": "node src/test/shots.js",
+    "check": "npm test && npm run build"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "puppeteer": "^22.0.0"
+  }
+}

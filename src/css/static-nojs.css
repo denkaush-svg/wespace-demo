@@ -1,0 +1,225 @@
+/* ============================================================
+   iOS / touch hardening  (added for iPhone adaptation)
+   ============================================================ */
+
+/* --- real viewport height: 100dvh is unreliable while Safari's toolbars
+       animate, so the shell is driven by visualViewport via --app-h --- */
+/* the static layer styles itself with --card / --acc-weak, which this
+   palette never defines: without the aliases it falls back to hard-coded
+   #fff and the bottom nav renders white on top of the dark theme */
+:root { --card: var(--surface); --acc-weak: var(--acc-soft); }
+
+html { -webkit-text-size-adjust: 100%; }
+html, body { height: 100%; overflow-x: hidden; overscroll-behavior-y: none; }
+body > #app { height: 100%; }
+.app { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); }
+.drawer { height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); }
+.main { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+/* --- modal layer: `inset:0` resolves against the layout viewport on iOS,
+       which is taller than what you see, so centred dialogs land below the
+       fold. Pin the layer to the real viewport instead. --- */
+.modal-wrap { height: var(--app-h, 100dvh); }
+.modal { max-height: calc(var(--app-h, 100dvh) - 24px); }
+
+/* --- flex items default to min-width:auto, so a single unbreakable card
+       (approval bar, prompt dock) pushes the Concierge wider than the phone
+       and .main clips the overflow: the right edge becomes unreachable --- */
+.cg-shell, .concierge, .chat, .chat > *, .msg, .msg .bubble, .msg .who,
+.preview, .preview .pb, .preview .ph, .approval, .approval .note,
+.dock, .dock .prompt, .prompt, .prompt input, .thread-bar, .thread-bar > *,
+.view, .start, .main > * { min-width: 0; }
+.concierge { max-width: min(860px, 100%); }
+.ev-row, .ev-row .ev-t, .ev-row .ev-t .t, .ev-row .ev-t .m,
+.feed, .feed-row, .feed-row > *, .fin > *, .card, .tile, .kh, .chg-row,
+.task-row, .task-row > *, .obj-card, .pod-row, .doc-row { min-width: 0; }
+.msg .bubble, .msg .who { overflow-wrap: anywhere; }
+
+@media (max-width: 860px) {
+  .concierge { padding-left: 14px; padding-right: 14px; }
+  /* approval bar: note on its own line, actions full width and thumb-sized */
+  .approval { flex-wrap: wrap; align-items: stretch; }
+  .approval .note { flex: 1 1 100%; }
+  .approval .acts { width: 100%; display: flex; gap: 8px; }
+  .approval .acts .btn { flex: 1 1 auto; min-height: 44px; }
+  .thread-bar { flex-wrap: wrap; gap: 8px; padding: 9px 14px; }
+  .prompt { padding-left: 12px; gap: 8px; }
+  .preview .ph { flex-wrap: wrap; }
+  /* rows whose trailing action would otherwise be pushed off the screen */
+  .ev-row { flex-wrap: wrap; row-gap: 8px; }
+  .ev-row .ev-t { flex: 1 1 100%; }
+  .ev-row .btn { flex: 1 1 100%; min-height: 44px; }
+  .feed-row { flex-wrap: wrap; row-gap: 8px; }
+  .feed-row .btn, .feed-row .btn.sm { flex: 1 1 auto; }
+  .task-row { flex-wrap: wrap; row-gap: 8px; }
+  .task-row .task-acts { width: 100%; display: flex; gap: 6px; }
+  .task-row .task-acts .btn { flex: 1 1 auto; }
+  /* the kanban board scrolls horizontally on purpose — make that discoverable */
+  .kanban { scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .kanban .kcol { scroll-snap-align: start; }
+  /* action clusters pinned to the right edge used to overflow to the left */
+  .radar-row .ra { flex-wrap: wrap; justify-content: flex-start; flex-shrink: 1; }
+  .radar-row .ra .btn { flex: 1 1 auto; }
+  .pod-act { flex-wrap: wrap; }
+  .pod-act .btn { flex: 1 1 auto; }
+  .btn, .btn > span, .chip, .chip > span { min-width: 0; }
+}
+
+/* --- closed drawer must not be hit-testable and must not widen the page --- */
+.drawer { visibility: hidden; }
+.drawer.show { visibility: visible; }
+
+/* --- WebKit only delivers click events from non-native elements when they
+       look clickable; every delegated handle gets an explicit pointer --- */
+[data-act], [data-nav], [data-scn], [data-chain], [data-thread], [data-newthread],
+[data-replay], [data-scenereset], [data-role], [data-objfilter], [data-objarea],
+[data-shortlist], [data-podbor], [data-fin], [data-scen], [data-artopen],
+[data-taskdone], [data-taskreopen], [data-tasksnooze], [data-taskreassign],
+[data-taskassign], [data-deal], [data-dealmove], [data-dealstage], [data-event],
+[data-evplay], [data-fb], [data-client], [data-obj], [data-doc], [data-eng],
+[data-tab], .obj-card, .deal, .thread-row, .task-row, .feed-row[data-event] {
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(207, 90, 37, .16);
+}
+button, a, label, summary, input, select, textarea { touch-action: manipulation; }
+
+/* visible tap feedback — a demo that does not answer the finger reads as broken */
+@media (hover: none) {
+  .btn:active, .chip:active, .tb-btn:active, .tb-icon:active,
+  .mini-btn:active, .tabbar button:active,
+  .obj-card:active, .deal:active, .thread-row:active { opacity: .62; }
+}
+
+@media (max-width: 860px) {
+  /* Apple HIG: 44pt minimum hit area */
+  .btn { min-height: 44px; }
+  .btn.sm { min-height: 40px; padding: 0 13px; }
+  .chip { min-height: 40px; }
+  .mini-btn { min-height: 34px; padding: 7px 11px; font-size: 12px; }
+  .tb-icon { width: 40px; height: 40px; }
+  .tb-btn { height: 40px; }
+
+  .field .fx .mini-btn { flex: 1 1 auto; text-align: center; justify-content: center; }
+  /* segmented controls, role switch and kanban arrows were 26-28px tall */
+  .role-switch button { min-height: 38px; padding: 0 11px; }
+  .seg button { min-height: 38px; padding: 0 13px; }
+  .dmove .kmv { width: 38px; height: 38px; }
+  .obj-card .obj-body .btn.sm { min-height: 40px; }
+
+  /* top bar: scroll it instead of letting controls fall off the right edge */
+  .topbar { overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+            padding-left: max(14px, env(safe-area-inset-left));
+            padding-right: max(14px, env(safe-area-inset-right)); }
+  .topbar::-webkit-scrollbar { display: none; }
+  .topbar > * { flex: 0 0 auto; }
+  .tb-spacer { flex: 1 1 auto; min-width: 0; }
+
+  /* bottom bar: always inside the safe area, never wider than the screen */
+  .tabbar { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .tabbar button { min-width: 0; padding: 6px 0; }
+  .tabbar button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+  /* modal footers stack when three or more actions do not fit one row */
+  .modal .mf { flex-wrap: wrap; }
+  .modal .mf .btn { min-height: 44px; }
+
+  /* nothing may push the page sideways */
+  .view, .start, .concierge { overflow-x: hidden; }
+  .prompt input { min-width: 0; }
+}
+
+/* --- static (no-JS) fallback: the CSS-only screens shipped with the file --- */
+@media (max-width: 860px) {
+  .screen .tabbar-static { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .screen .tabbar-static a { flex: 1 1 0; min-width: 0; padding: 6px 2px; font-size: 9.5px; }
+  .screen .tabbar-static a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .screen .app { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .player .pcard { height: var(--app-h, 100dvh); }
+  .player .fr { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .pbtn { min-height: 44px; }
+}
+
+@media (max-width: 380px) {
+  /* iPhone SE / mini: shed the last labels so the top bar fits without scrolling */
+  .tb-btn[data-act="presenter"] .txt { display: none; }
+  .tb-btn[data-act="presenter"] { padding: 0 11px; }
+  .role-switch button { padding: 0 8px; }
+}
+
+/* ============================================================
+   STATIC (no-JavaScript) MODE
+   iOS previews HTML files with scripting disabled, so the shipped
+   snapshot is what the phone actually shows. It must survive on its
+   own: no JS means no --app-h, so the shell falls back to normal
+   document flow, where Safari's own toolbar handling works correctly.
+   ============================================================ */
+html:not([data-js]), html:not([data-js]) body { height: auto; overflow: visible; }
+html:not([data-js]) body > #app { height: auto; }
+html:not([data-js]) .app { display: block; height: auto; min-height: 0; }
+html:not([data-js]) .main { overflow: visible; height: auto; }
+html:not([data-js]) .topbar { position: sticky; top: 0; z-index: 40; }
+
+/* bottom nav: sticky follows the visible scrollport on iOS, fixed does not */
+html:not([data-js]) .screen .tabbar-static {
+  position: sticky; position: -webkit-sticky; bottom: 0; left: auto; right: auto;
+  overflow: visible; flex-wrap: nowrap;
+}
+html:not([data-js]) .screen .tabbar-static a { flex: 1 1 0; min-width: 0; padding: 7px 1px; }
+html:not([data-js]) .screen .tabbar-static a span {
+  font-size: 8.6px; letter-spacing: -.01em; line-height: 1.1;
+  white-space: normal; overflow-wrap: anywhere; text-align: center;
+}
+html:not([data-js]) .screen .tabbar-static a svg { width: 19px; height: 19px; }
+html:not([data-js]) .screen .app { padding-bottom: 0; }
+
+/* controls that need JS: make it obvious they are not the way forward,
+   so the stand does not read as broken. Links and the scenario player stay live. */
+html:not([data-js]) button[data-act], html:not([data-js]) button[data-nav],
+html:not([data-js]) button[data-scn], html:not([data-js]) button[data-obj],
+html:not([data-js]) button[data-deal], html:not([data-js]) button[data-client],
+html:not([data-js]) button[data-doc], html:not([data-js]) button[data-fin],
+html:not([data-js]) button[data-role], html:not([data-js]) button[data-tab],
+html:not([data-js]) button[data-shortlist], html:not([data-js]) button[data-taskdone],
+html:not([data-js]) button[data-objfilter], html:not([data-js]) button[data-eng],
+html:not([data-js]) .prompt, html:not([data-js]) select, html:not([data-js]) input[type="search"] {
+  opacity: .42; filter: saturate(.35);
+}
+html:not([data-js]) a, html:not([data-js]) label[for], html:not([data-js]) .tabbar-static a { opacity: 1; filter: none; }
+
+/* scenario player: keep "Далее" pinned above Safari's toolbar */
+html:not([data-js]) .player .pcard { height: 100%; }
+html:not([data-js]) .player .fr { -webkit-overflow-scrolling: touch; padding-bottom: 12px; }
+html:not([data-js]) .player .fnav {
+  position: sticky; position: -webkit-sticky; bottom: 0; z-index: 5;
+  background: var(--bg, #f6f2ea); margin-top: 4px;
+  padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line, #e2dacb);
+}
+html:not([data-js]) .player .pbtn { min-height: 44px; }
+html:not([data-js]) .player .phead { position: sticky; top: 0; z-index: 5; }
+
+/* --- runtime-mode banner: only ever visible when the live app did not start --- */
+#runmode { display: none; }
+html:not([data-js]) #runmode,
+html[data-late]:not([data-app]) #runmode {
+  display: block; position: fixed; left: 0; right: 0; top: 0; z-index: 200;
+  padding: 8px 12px;
+  background: #7c3a18; color: #fff; font: 600 11.5px/1.35 var(--font, sans-serif);
+  text-align: left; padding-top: calc(8px + env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 10px;
+}
+#rm-x:checked ~ #runmode { display: none !important; }
+#rm-x:checked ~ #app .screen .app { padding-top: 0; }
+#rm-close { flex: none; width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 8px; background: rgba(255,255,255,.16); color: #fff; font-size: 13px; cursor: pointer; }
+html:not([data-js]) .screen .app,
+html[data-late]:not([data-app]) .screen .app { padding-top: calc(46px + env(safe-area-inset-top)); }
+#runmode b { color: #ffd9c4; }
+
+/* in static mode the banner rides in the document flow (the page scrolls
+   normally there), and it must never cover the scenario player */
+html:not([data-js]) #runmode { position: static; padding-top: 10px; }
+html:not([data-js]) .screen .app { padding-top: 0; }
+.player { z-index: 300; }
+body:has(.player:target) #runmode { display: none !important; }

@@ -1,0 +1,80 @@
+/* ============================================================
+   Direction A — "Ink frame"
+   Cool-grey canvas + dark anchored rail (brand/topbar/sidebar).
+   White cards float on grey; orange is the single accent.
+   Fixes "flat white": the dark frame gives the eye an anchor.
+   ============================================================ */
+:root{
+  --bg:#EEF0F2; --bg-2:#E6E9ED; --surface:#FFFFFF; --surface-2:#F5F6F8; --surface-3:#EBEEF1;
+  --line:#E1E4E9; --line-2:#D0D5DC; --hair:#EBEDF1;
+  --ink:#15171C; --ink-2:#3B404A; --mut:#697080; --faint:#98A0AD;
+
+  --acc:#F17E3D; --acc-2:#E06A28; --acc-deep:#C6591C;
+  --acc-soft:#FDEBDE; --acc-line:#F6C9A7; --acc-ink:#B0521E; --acc-weak:rgba(241,126,61,.12);
+
+  --r-xs:6px; --r-sm:8px; --r:12px; --r-lg:16px;
+  --shadow-sm:0 1px 2px rgba(20,26,40,.06), 0 1px 0 rgba(20,26,40,.03);
+  --shadow:0 6px 20px -6px rgba(20,26,40,.14), 0 2px 6px rgba(20,26,40,.06);
+  --shadow-lg:0 20px 48px -10px rgba(20,26,40,.24), 0 6px 16px rgba(20,26,40,.10);
+
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-disp:'Bebas Neue','Manrope',-apple-system,sans-serif;
+}
+
+/* ---- dark anchored frame ---- */
+.brand{ background:#1B1E24; border-right-color:#25282F; border-bottom-color:#25282F; }
+.brand .logo{ box-shadow:0 4px 12px -3px rgba(241,126,61,.5); }
+.brand .wm{ color:#fff; letter-spacing:.06em; } .brand .wm span{ color:var(--acc); }
+.brand .sub{ color:#8A93A1; }
+.topbar{ background:#1B1E24; border-bottom-color:#25282F; }
+.tb-tenant{ color:#AEB6C2; }
+.tb-clock{ background:#23272E; border-color:#2E323A; color:#D5DAE1; }
+.tb-clock .lbl{ color:#7E8896; }
+.tb-btn{ background:#23272E; border-color:#2E323A; color:#D5DAE1; }
+.tb-btn:hover{ background:#2A2F37; border-color:#3A4049; }
+.tb-btn.accent{ background:var(--acc); border-color:var(--acc); color:#fff; }
+.tb-icon{ background:#23272E; border-color:#2E323A; color:#D5DAE1; }
+.tb-icon:hover{ background:#2A2F37; }
+.tb-icon .badge-dot{ border-color:#1B1E24; }
+.role-switch{ background:#23272E; border-color:#2E323A; }
+.role-switch button{ color:#AEB6C2; }
+.role-switch button.on{ background:#0F1114; color:#fff; }
+.role-switch button .av{ background:#3A4049; color:#D5DAE1; }
+.nav{ background:#1B1E24; border-right-color:#25282F; }
+.nav-group-label{ color:#7E8896; }
+.nav-item{ color:#C4CBD5; }
+.nav-item svg{ color:#8A93A1; }
+.nav-item:hover{ background:#23272E; }
+.nav-item.on{ background:var(--acc); color:#fff; border-color:transparent; box-shadow:0 6px 16px -6px rgba(241,126,61,.6); }
+.nav-item.on svg{ color:#fff; }
+.nav-item .count{ background:#23272E; border-color:#2E323A; color:#AEB6C2; }
+.nav-item.on .count{ background:rgba(0,0,0,.22); border-color:transparent; color:#fff; }
+.nav-foot{ border-top-color:#25282F; }
+.nav-foot .demo-mode{ color:#AEB6C2; }
+
+/* ---- shared visual enrichment (numbers pop, composer focus, tiles, FAB) ---- */
+.greet .eyebrow{ color:var(--acc); }
+.tile .val{ font-family:var(--font-disp); font-size:42px; letter-spacing:.02em; line-height:.9; }
+.tile .val .u{ font-family:var(--font); font-size:14px; }
+.kpi .kv{ font-family:var(--font-disp); font-size:34px; }
+.fn-n{ font-family:var(--font-disp); font-size:28px; }
+.cal-date{ font-family:var(--font-disp); font-size:22px; }
+.digest-row .dvv{ font-family:var(--font-disp); font-weight:400; font-size:24px; }
+.mtile .mv{ font-family:var(--font-disp); font-weight:400; font-size:30px; letter-spacing:.02em; }
+.tile{ box-shadow:0 2px 8px -3px rgba(20,26,40,.12), 0 1px 2px rgba(20,26,40,.05); }
+.tile:hover{ box-shadow:0 10px 24px -8px rgba(20,26,40,.18); }
+.tile.accent{ background:linear-gradient(150deg, var(--acc-soft), #FFFFFF); border-color:var(--acc-line); }
+
+/* concierge composer = focal element (volume + focus) */
+.prompt.composer{ background:linear-gradient(180deg,#FFFFFF,#FFFAF6); border:1.5px solid var(--acc-line);
+  box-shadow:0 10px 30px -12px rgba(241,126,61,.34), 0 2px 8px rgba(20,26,40,.06); }
+.prompt.composer:focus-within{ border-color:var(--acc); box-shadow:0 12px 34px -10px rgba(241,126,61,.44), 0 0 0 4px var(--acc-weak); }
+.prompt.composer .ico svg{ width:22px; height:22px; }
+
+/* floating round Concierge button — black W on orange */
+.fab-w{ position:fixed; right:26px; bottom:26px; width:60px; height:60px; border-radius:50%;
+  background:var(--acc); color:#141414; border:0; font-family:'Bebas Neue',sans-serif; font-size:31px; line-height:1;
+  display:grid; place-items:center; cursor:pointer; z-index:95; transition:.16s cubic-bezier(.2,.7,.2,1);
+  box-shadow:0 14px 28px -8px rgba(241,126,61,.6), 0 4px 10px rgba(0,0,0,.2); }
+.fab-w:hover{ background:var(--acc-2); transform:translateY(-2px); }
+.fab-w:active{ transform:translateY(0); }
