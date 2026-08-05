@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:39</title>
+  <title>WESPACE · сборка 00:38</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:39';
+    window.WS_BUILD='00:38';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1078,7 +1078,37 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .tl-ic-btn:hover { color: var(--stop, #c0392b); background: rgba(0,0,0,.05); }
 .tl-ic-btn svg { width: 13px; height: 13px; }
 /* origin label when a feed merges entries from another entity (contact feed <- deal channels) */
-.tl-src { color: var(--acc-ink); background: var(--acc-soft); border: 1px solid var(--acc-line); border-radius: var(--r-pill); padding: 0 7px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-src { color: var(--acc-ink); background: var(--acc-soft); border: 1px solid var(--acc-line); border-radius: var(--r-pill); padding: 1px 8px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.tl-src svg { width: 11px; height: 11px; flex: none; }
+
+/* ---- Event card — one event in a feed: тип · источник · дата, then the description.
+   Newest first; the left rail is colour-coded by who the source is. ---- */
+.timeline { gap: 8px; }
+.evc { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 10px 12px 10px 14px; overflow: hidden; transition: .14s var(--ease); }
+.evc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line-2); }
+.evc:hover { border-color: var(--line-2); box-shadow: var(--shadow-sm); }
+.evc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.evc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--surface-3); color: var(--mut); }
+.evc-ic svg { width: 14px; height: 14px; }
+.evc-name { font-size: 12.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.evc-by { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+  background: var(--surface-2); border: 1px solid var(--hair); border-radius: var(--r-pill); padding: 2px 9px; min-width: 0; }
+.evc-by svg { width: 12px; height: 12px; flex: none; }
+.evc-by i { font-style: normal; font-weight: 500; color: var(--faint); }
+.evc-by i::before { content: '· '; }
+.evc-when { margin-left: auto; font-size: 11px; color: var(--faint); white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.evc-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin-top: 7px; }
+.evc-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px; font-size: 11px; }
+.evc .tl-ic-btn { margin-left: 2px; }
+/* source colouring: AI agent, client, system, human */
+.evc-ic.ai, .evc-by.ai { background: var(--acc-soft); color: var(--acc-ink); border-color: var(--acc-line); }
+.evc-ic.client, .evc-by.client { background: var(--info-soft); color: var(--info); border-color: var(--info-line); }
+.evc-ic.sys, .evc-by.sys { background: var(--surface-3); color: var(--mut); }
+.evc.ai::before { background: var(--acc); }
+.evc.note::before { background: var(--warn); }
+@media (max-width: 640px) {
+  .evc-when { margin-left: 0; width: 100%; }
+}
 /* selected state for chip groups used as a type picker */
 .chip.on { border-color: var(--acc); background: var(--acc-soft); color: var(--acc-ink); }
 /* R2 funnel switcher */
@@ -2095,6 +2125,31 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     ],
   };
 
+  // Per-company timeline — company-level events (соглашения, комиссия, KYC, встречи с представителем).
+  // Deal-level channel history is merged in at render time, same as for contacts.
+  const companyTimeline = {
+    co_emaar: [
+      { at: '02 мая · 11:00', ord: 21100, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: застройщик, эскроу-счета DLD.' },
+      { at: '05 мая · 15:20', ord: 51520, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча с Fatima Al Nuaimi — аллокация в Bayline Terraces.' },
+      { at: '07 мая · 10:40', ord: 71040, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Получен прайс-лист и график платежей по проекту.' },
+      { at: '11 мая · 09:30', ord: 110930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Комиссия 4% подтверждена на квартал — фиксируем в сделках.' },
+    ],
+    co_altura: [
+      { at: '04 мая · 13:15', ord: 41315, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: инвестфонд DIFC, портфельные сделки.' },
+      { at: '09 мая · 16:00', ord: 91600, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 12:30 — мандат фонда на доходные активы в DIFC.', capture: true },
+      { at: '12 мая · 11:45', ord: 121145, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Два запроса фонда сведены в один портфель — предложено вести как пакет.' },
+    ],
+    co_meydan: [
+      { at: '06 мая · 09:50', ord: 60950, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: корпоративный арендатор.' },
+      { at: '06 мая · 10:05', ord: 61005, ch: 'crm', kind: 'raw', by: 'Система', text: 'KYC на проверке: TRN не предоставлен.' },
+      { at: '10 мая · 14:30', ord: 101430, ch: 'meet', kind: 'raw', by: 'Лина Хассан', text: 'Встреча с Ahmed Rashid — требования к отделке офиса.' },
+    ],
+    co_harbour: [
+      { at: '01 мая · 09:00', ord: 10900, ch: 'crm', kind: 'raw', by: 'Система', text: 'Наше агентство: RERA ORN 28114, тенант демо-стенда.' },
+      { at: '08 мая · 18:20', ord: 81820, ch: 'note', kind: 'note', by: 'Омар Рахман', text: 'Со-брокинг 50/50 — базовые условия для партнёрских сделок.' },
+    ],
+  };
+
   // Per-contact timeline — the contact-level event feed (создание, согласие, звонки, встречи, заметки).
   // Deal-level channel history is NOT duplicated here: the contact feed merges `dealTimeline` of the
   // contact's deals at render time. Same entry shape as dealTimeline; `ch: 'meet'|'crm'` are contact-only.
@@ -2203,7 +2258,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     version: 1,
     DEMO_NOW, tenant, users, clients, objects, refModel,
     deals, tasks, events, inbox, analytics,
-    FUNNELS, companies, dealTimeline, contactTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
 
@@ -2626,7 +2681,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 7; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys.
+  const SCHEMA = 8; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[].
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -2670,6 +2725,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       companies: clone(f.companies),
       dealTimeline: clone(f.dealTimeline),
       contactTimeline: clone(f.contactTimeline),
+      companyTimeline: clone(f.companyTimeline),
       conflicts: clone(f.conflicts),
       attribution: clone(f.attribution),
       clientSignals: clone(f.clientSignals),
@@ -4692,6 +4748,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const rows = deals.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>').join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">связанных сделок нет</div>';
       return dxSec('briefcase', 'Связанные сделки · ' + deals.length, '', '<div class="feed">' + rows + '</div>');
     }
+    if (tab === 'history') return companyFeedBlock(co);
     // overview
     const key = dxSec('building', 'Ключевое', '', '<div class="dfields">' +
       dfPair('Тип', co.kind) + dfPair('Условия комиссии', co.commission) + dfPair('Сделок', String(deals.length)) + '</div>' +
@@ -4699,7 +4756,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const contact = dxSec('users', 'Контактное лицо', '', '<div class="dfields">' +
       dfPair(co.contactPerson || 'Контакт', co.contactRole || '—') + dfPair('Телефон', co.phone) +
       dfPair('Email', co.email) + dfPair('Адрес', co.address) + '</div>');
-    return '<div class="dx-grid2">' + key + contact + '</div>';
+    return '<div class="dx-grid2">' + key + contact + '</div>' +
+      '<div style="margin-top:14px">' + companyFeedBlock(co, 5) + '</div>';
   }
   function companyCard(id) {
     const co = (D().companies || []).find((x) => x.id === id); if (!co) return;
@@ -4710,7 +4768,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const dealsCount = (D().deals || []).filter((d) => d.companyId === id).length;
     entityCard({
       type: 'company', id: id, title: co.name, status: statusChip(chips),
-      tabs: [['overview', 'Обзор'], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount]],
+      tabs: [['overview', 'Обзор'], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
       footer: '<button class="btn" data-act="closeModal">Закрыть</button>' +
@@ -5027,24 +5085,53 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return ({ whatsapp: 'whatsapp', call: 'phone', email: 'mail', note: 'pencil', system: 'sparkle',
       meet: 'calendar', crm: 'clock', task: 'checkCircle', doc: 'doc' })[ch] || 'dot';
   }
-  // One timeline row shared by every feed (deal card, contact card).
+  // Event name = what happened, shown as the card headline. `e.t` overrides for derived entries.
+  const EV_TITLE = { call: 'Звонок', meet: 'Встреча', whatsapp: 'Сообщение · WhatsApp', email: 'Письмо',
+    note: 'Заметка', task: 'Задача', crm: 'Событие CRM', system: 'Разбор Консьержа', doc: 'Документ' };
+  function evTitle(e) { return e.t || EV_TITLE[e.ch] || 'Событие'; }
+  // Source of the event: who put it there — a person, the AI agent, the client, or the system.
+  function evSource(e) {
+    const by = e.by || '—';
+    if (e.kind === 'ai' || by === 'Консьерж') return { cls: 'ai', icon: 'sparkle', name: by, role: 'AI-агент' };
+    if (by === 'Клиент') return { cls: 'client', icon: 'users', name: 'Клиент', role: 'входящее' };
+    if (by === 'Система') return { cls: 'sys', icon: 'shield', name: 'Система', role: 'CRM' };
+    // `_role` carries a role the caller already knows (executor strings ship as "Имя · роль").
+    // A generic "Агент" is its own role — don't render "Агент · агент".
+    const role = e._role != null ? e._role : (by.toLowerCase() === 'агент' ? '' : 'агент');
+    return { cls: 'human', icon: 'users', name: by, role: role };
+  }
+  // One event card shared by every feed (deal, contact, company).
   // `del` = the full data-attribute of the delete control, empty when the entry is not a removable note.
   // `e.src` = originating entity label, shown when a feed merges entries from elsewhere.
   function tlRow(e, del) {
-    const lock = e.kind === 'raw' ? '<span class="tl-lock" title="Сырьё канала — неизменяемо">' + I('lock') + '</span>' : '';
+    const s = evSource(e);
+    // The "immutable" lock belongs to real channel material only — a task or a planned viewing is
+    // pulled from elsewhere in the demo, so marking it as untouchable channel raw would be a lie.
+    const lock = (e.kind === 'raw' && !e._d) ? '<span class="tl-lock" title="Сырьё канала — неизменяемо">' + I('lock') + '</span>' : '';
     const edit = del ? '<button class="tl-ic-btn" ' + del + ' title="Удалить заметку">' + I('x') + '</button>' : '';
-    const ai = e.kind === 'ai' ? ' <span class="badge ai-b">' + I('sparkle') + 'AI</span>' : '';
-    const src = e.src ? ' · <span class="tl-src">' + escAttr(e.src) + '</span>' : '';
-    return '<div class="tl-row ' + e.kind + '"><div class="tl-ic">' + I(chIcon(e.ch)) + '</div>' +
-      '<div class="tl-b"><div class="tl-t">' + escAttr(e.text) + ai + '</div>' +
-      '<div class="tl-m">' + escAttr(e.at) + ' · ' + escAttr(e.by) + (e.capture ? ' · <span class="cap-tag">запись</span>' : '') + src + lock + '</div></div>' + edit + '</div>';
+    // The lock sits with the timestamp; the tag row carries only real labels, so it never
+    // renders as a lone stray icon under the text.
+    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') +
+      (e.src ? '<span class="tl-src">' + I('briefcase') + escAttr(e.src) + '</span>' : '');
+    return '<div class="evc ' + e.kind + '">' +
+      '<div class="evc-top"><span class="evc-ic ' + s.cls + '">' + I(chIcon(e.ch)) + '</span>' +
+      '<span class="evc-name">' + escAttr(evTitle(e)) + '</span>' +
+      '<span class="evc-by ' + s.cls + '">' + I(s.icon) + escAttr(s.name) + (s.role ? '<i>' + s.role + '</i>' : '') + '</span>' +
+      '<span class="evc-when">' + escAttr(e.at) + lock + '</span>' + edit + '</div>' +
+      '<div class="evc-text">' + escAttr(e.text) + '</div>' +
+      (tags ? '<div class="evc-tags">' + tags + '</div>' : '') + '</div>';
+  }
+  // Newest first — a broker opens a card to see what just happened, not how it started.
+  // Sort is applied to a (entry, originalIndex) pair so index-addressed note deletion stays correct.
+  function feedSortDesc(pairs) {
+    return pairs.sort((a, b) => ((b.e.ord == null ? 0 : b.e.ord) - (a.e.ord == null ? 0 : a.e.ord)) || (b.i - a.i));
   }
   function dealTimelineInner(d) {
     const tl = (D().dealTimeline || {})[d.id] || [];
     const cap = S().capture || {};
     const on = (d.id in cap) ? cap[d.id] : true;
-    // Deal feed keeps array order (append-only) — index addressing stays valid for note deletion.
-    const rows = tl.map((e, i) => tlRow(e, e.kind === 'note' ? 'data-notedel="' + d.id + ':' + i + '"' : ''))
+    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i })))
+      .map((p) => tlRow(p.e, p.e.kind === 'note' ? 'data-notedel="' + d.id + ':' + p.i + '"' : ''))
       .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">пока нет истории по каналам</div>';
     const privacy = '<div class="cap-toggle"><span>' + I('lock') + 'Запись разговоров по сделке (A7)</span>' +
       '<button class="switch' + (on ? ' on' : '') + '" data-act="capToggle" data-deal="' + d.id + '" role="switch" aria-checked="' + on + '"><i></i></button></div>';
@@ -5064,7 +5151,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const NOW = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, h: 9, mi: 12 };
   const ORD = (d, h, mi) => d * 10000 + h * 100 + mi;
   const NOW_ORD = ORD(NOW.d, NOW.h, NOW.mi);
-  const LATER_ORD = ORD(99, 0, 0); // undated ("позже — по согласованию") sinks to the end of the feed
+  // Undated ("позже — по согласованию") is not news: with a newest-first feed it must sink to the
+  // bottom, never head the ribbon and never push a real event out of the overview preview.
+  const UNDATED_ORD = 0;
   const DAY_WORD = { 'сегодня': NOW.d, 'завтра': NOW.d + 1, 'вчера': NOW.d - 1, 'просрочено': NOW.d - 1 };
   // Task `when` is an internal enum, not a Russian phrase — map it explicitly.
   const TASK_ORD = { overdue: ORD(NOW.d - 1, 10, 0), today: ORD(NOW.d, 10, 0), tomorrow: ORD(NOW.d + 1, 10, 0) };
@@ -5080,48 +5169,64 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealFeedLabel(d, c) {
     return (d.title && c && d.title !== c.name) ? d.title : (d.sub || d.title || 'сделка');
   }
-  function contactFeedEntries(c) {
+  // One builder for contact and company: own history + the channel history of the related deals,
+  // plus (contacts only) tasks and planned meetings. `_ci` = index into the entity's OWN timeline,
+  // the only editable source — it survives merge+sort so note deletion always hits the right entry.
+  function entityFeedEntries(kind, ent) {
     const data = D();
     const out = [];
-    // Contact-level history — the only editable source, so entries keep their array index.
-    ((data.contactTimeline || {})[c.id] || []).forEach((e, i) => out.push(Object.assign({}, e, { _ci: i })));
-    // Channel history of the contact's deals, labelled with the deal it came from.
-    (data.deals || []).filter((d) => d.clientId === c.id).forEach((d) => {
-      const lbl = dealFeedLabel(d, c);
+    const isContact = kind === 'contact';
+    const own = isContact ? (data.contactTimeline || {}) : (data.companyTimeline || {});
+    (own[ent.id] || []).forEach((e, i) => out.push(Object.assign({}, e, { _ci: i })));
+    const deals = (data.deals || []).filter((d) => isContact ? d.clientId === ent.id : d.companyId === ent.id);
+    deals.forEach((d) => {
+      const lbl = isContact ? dealFeedLabel(d, ent) : (d.title || d.sub || 'сделка');
       ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: lbl })));
     });
-    // Tasks and planned meetings — the feed is the place where "что было и что предстоит" meet.
-    (data.tasks || []).filter((t) => t.clientId === c.id).forEach((t) => {
-      out.push({ at: 'срок: ' + t.due, ord: TASK_ORD[t.when] != null ? TASK_ORD[t.when] : ordFromWhen(t.due, TASK_ORD.today),
-        ch: 'task', kind: 'raw', by: 'Задача', text: t.title + (t.status === 'done' ? ' — выполнена' : '') });
-    });
-    (data.events || []).filter((ev) => ev.clientId === c.id).forEach((ev) => {
-      const off = ev.status === 'canceled';
-      // "позже — по согласованию" carries no date: it belongs at the end, not at midday today.
-      out.push({ at: ev.when, ord: ordFromWhen(ev.when, LATER_ORD),
-        ch: ev.kind === 'call' ? 'call' : 'meet', kind: 'raw', by: off ? 'Отменено' : 'Запланировано',
-        text: ev.title + (off ? ' — отменён' : '') });
-    });
-    return out.sort((a, b) => (a.ord == null ? NOW_ORD : a.ord) - (b.ord == null ? NOW_ORD : b.ord));
+    if (isContact) {
+      // Tasks and planned meetings — the feed is where "что было и что предстоит" meet.
+      (data.tasks || []).filter((t) => t.clientId === ent.id).forEach((t) => {
+        out.push({ at: 'срок: ' + t.due, ord: TASK_ORD[t.when] != null ? TASK_ORD[t.when] : ordFromWhen(t.due, TASK_ORD.today),
+          ch: 'task', kind: 'raw', _d: true, by: 'Консьерж', t: 'Задача', text: t.title + (t.status === 'done' ? ' — выполнена' : '') });
+      });
+      (data.events || []).filter((ev) => ev.clientId === ent.id).forEach((ev) => {
+        const off = ev.status === 'canceled';
+        const what = ev.kind === 'call' ? 'Звонок' : 'Показ';
+        // Executor is stored as "Имя · роль" — split it so the source badge doesn't repeat the role.
+        const ex = String(ev.executor || 'Марина Волкова · агент').split(' · ');
+        // "позже — по согласованию" carries no date: it is not news, so it sits at the end.
+        out.push({ at: ev.when, ord: ordFromWhen(ev.when, UNDATED_ORD),
+          ch: ev.kind === 'call' ? 'call' : 'meet', kind: 'raw', _d: true, by: ex[0], _role: ex[1] || 'агент',
+          t: what + (off ? ' · отменён' : ' · запланирован'),
+          text: ev.title + (off ? ' — отменён' : '') });
+      });
+    }
+    return feedSortDesc(out.map((e, i) => ({ e: e, i: i }))).map((p) => p.e);
   }
-  function contactFeedInner(c, limit) {
-    let list = contactFeedEntries(c);
+  function entityFeedInner(kind, ent, limit) {
+    const list = entityFeedEntries(kind, ent);
     const total = list.length;
-    // Preview keeps the tail — the most recent events are the ones worth seeing first.
-    if (limit && total > limit) list = list.slice(total - limit);
-    const rows = list.map((e) => tlRow(e, (e.kind === 'note' && e._ci != null) ? 'data-cnotedel="' + c.id + ':' + e._ci + '"' : ''))
-      .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">по контакту пока нет событий</div>';
+    // Newest first, so the preview is simply the head of the list.
+    const shown = (limit && total > limit) ? list.slice(0, limit) : list;
+    const delAttr = kind === 'contact' ? 'data-cnotedel' : 'data-conotedel';
+    const rows = shown.map((e) => tlRow(e, (e.kind === 'note' && e._ci != null) ? delAttr + '="' + ent.id + ':' + e._ci + '"' : ''))
+      .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">' + (kind === 'contact' ? 'по контакту пока нет событий' : 'по компании пока нет событий') + '</div>';
     const more = (limit && total > limit)
-      ? '<button class="btn xs" data-etab="contact~' + c.id + '~history" style="margin-top:8px">' + I('clock') + 'Вся лента · ' + total + '</button>' : '';
+      ? '<button class="btn xs" data-etab="' + kind + '~' + ent.id + '~history" style="margin-top:8px">' + I('clock') + 'Вся лента · ' + total + '</button>' : '';
     return '<div class="timeline">' + rows + '</div>' + more;
   }
+  function contactFeedEntries(c) { return entityFeedEntries('contact', c); }
+  function contactFeedInner(c, limit) { return entityFeedInner('contact', c, limit); }
   // limit set -> compact preview for the overview tab; unset -> the full ribbon on the history tab.
-  function contactFeedBlock(c, limit) {
-    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="contact" data-cid="' + c.id + '">' + I('plus') + 'Событие</button>';
+  function entityFeedBlock(kind, ent, limit) {
+    const idAttr = kind === 'contact' ? 'data-cid="' : 'data-coid="';
+    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="' + kind + '" ' + idAttr + ent.id + '">' + I('plus') + 'Событие</button>';
     const foot = limit ? '' :
-      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Звонки, встречи, сообщения по каналам, заметки и задачи — одной лентой. Сырьё канала неизменяемо; заметки правятся и удаляются.</div>';
-    return dxSec('clock', limit ? 'Лента событий · последние' : 'Лента событий', addBtn, contactFeedInner(c, limit) + foot);
+      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Новое сверху. Звонки, встречи, сообщения по каналам и заметки — одной лентой. Сырьё канала неизменяемо; заметки правятся и удаляются.</div>';
+    return dxSec('clock', limit ? 'Лента событий · последние' : 'Лента событий', addBtn, entityFeedInner(kind, ent, limit) + foot);
   }
+  function contactFeedBlock(c, limit) { return entityFeedBlock('contact', c, limit); }
+  function companyFeedBlock(co, limit) { return entityFeedBlock('company', co, limit); }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
   const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
   const CONTACT_RATINGS = ['A', 'B', 'C'];
@@ -5439,12 +5544,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="qa-row" id="fe_types">' + FEED_TYPES.map((t) =>
       '<button type="button" class="chip' + (t[0] === sel ? ' on' : '') + '" data-fetype="' + t[0] + '">' + I(chIcon(t[2])) + t[1] + '</button>').join('') + '</div>';
   }
-  // scope: 'deal' | 'contact'. One form, two owners — the entry lands in that entity's own timeline.
-  function openEventForm(scope, id) {
+  // scope: 'deal' | 'contact' | 'company'. One form — the entry lands in that entity's own timeline.
+  function feedOwner(scope, id) {
     const data = D();
-    const ent = scope === 'contact' ? (data.clients || []).find((x) => x.id === id) : (data.deals || []).find((x) => x.id === id);
+    if (scope === 'contact') return (data.clients || []).find((x) => x.id === id);
+    if (scope === 'company') return (data.companies || []).find((x) => x.id === id);
+    return (data.deals || []).find((x) => x.id === id);
+  }
+  function openEventForm(scope, id) {
+    const ent = feedOwner(scope, id);
     if (!ent) return;
-    const title = scope === 'contact' ? ent.name : ent.title;
+    const title = ent.name || ent.title;
     S().feedType = 'note';
     const hhmm = String(NOW.h).padStart(2, '0') + ':' + String(NOW.mi).padStart(2, '0');
     openModal('Событие · ' + title,
@@ -5474,15 +5584,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const data = D(); const who = (data.users[WS.store.role] || {}).name || 'Агент';
     const bag = scope === 'contact'
       ? (data.contactTimeline = data.contactTimeline || {})
-      : (data.dealTimeline = data.dealTimeline || {});
+      : scope === 'company'
+        ? (data.companyTimeline = data.companyTimeline || {})
+        : (data.dealTimeline = data.dealTimeline || {});
     const list = (bag[id] = bag[id] || []);
     const dayEl = document.getElementById('fe_day');
     const timeEl = document.getElementById('fe_time');
     const dayVal = dayEl ? dayEl.value : 'now';
     let at, ord;
     if (dayVal === 'now') {
-      // The deal card renders in array order, the contact card sorts on `ord` — a "сейчас" entry has
-      // to be last in BOTH, so stamp it past the newest entry already in this timeline.
+      // Every feed sorts on `ord` (newest first), so a "сейчас" entry has to out-rank the newest
+      // entry already in this timeline to land at the very top.
       at = 'сейчас';
       ord = list.reduce((m, e) => (e.ord != null && e.ord > m ? e.ord : m), NOW_ORD) + 1;
     } else {
@@ -5492,15 +5604,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       at = String(day).padStart(2, '0') + ' ' + MONTHS_GEN[NOW.mo - 1] + ' · ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
       ord = ORD(day, h, mi);
     }
-    // Back-dated entries must slot into history, not jump to the end — the deal card renders in
-    // array order, so insert at the position `ord` dictates instead of appending blindly.
+    // Keep the stored array chronological even for back-dated entries: rendering sorts anyway, but
+    // an ordered array keeps the audit trail readable and `_ci` addressing intuitive.
     const entry = { at: at, ord: ord, ch: spec[2], kind: spec[3], by: who, text: txt };
     let pos = list.length;
     while (pos > 0 && list[pos - 1].ord != null && list[pos - 1].ord > ord) pos--;
     list.splice(pos, 0, entry);
     WS.storeApi.save(); // direct data mutation — persist it, F5 must not drop the entry
     WS.storeApi.toast(spec[1] + ' добавлено в ленту', 'ok');
-    if (scope === 'contact') clientCard(id); else dealCard(id);
+    if (scope === 'contact') clientCard(id);
+    else if (scope === 'company') companyCard(id);
+    else dealCard(id);
   }
 
   // ---------------- OBJECTS & CLUB ----------------
@@ -7916,7 +8030,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -7989,6 +8103,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.conflict) { const p = d.conflict.split(':'); const cf = (store.data.conflicts || {})[p[0]]; if (cf) { cf.chosen = p[1]; const dl = store.data.deals.find((x) => x.id === p[0]); const v = cf[p[1] + 'v']; if (dl && v) dl.amount = v; } api.toast('Значение выбрано; альтернатива сохранена', 'ok'); return WS.ui.dealCard(p[0]); }
     if (d.notedel) { const p = d.notedel.split(':'); const arr = (store.data.dealTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.dealCard(p[0]); }
     if (d.cnotedel) { const p = d.cnotedel.split(':'); const arr = (store.data.contactTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.clientCard(p[0]); }
+    if (d.conotedel) { const p = d.conotedel.split(':'); const arr = (store.data.companyTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.companyCard(p[0]); }
     if (d.fetype) return WS.ui.setFeedType(d.fetype);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
@@ -8046,7 +8161,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'auditLog': WS.ui.openAuditLog(); break;
       case 'editDeal': WS.ui.openDealEdit(t.dataset.deal); break;
       case 'saveDeal': WS.ui.saveDealEdit(t.dataset.deal); break;
-      case 'addEvent': WS.ui.openEventForm(t.dataset.scope || 'deal', t.dataset.scope === 'contact' ? t.dataset.cid : t.dataset.deal); break;
+      case 'addEvent': { const sc = t.dataset.scope || 'deal'; WS.ui.openEventForm(sc, sc === 'contact' ? t.dataset.cid : sc === 'company' ? t.dataset.coid : t.dataset.deal); break; }
       case 'saveEventEntry': WS.ui.saveEventEntry(t.dataset.scope || 'deal', t.dataset.eid); break;
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
       case 'saveDealContact': WS.ui.saveDealContact(t.dataset.deal, +t.dataset.idx); break;
