@@ -190,6 +190,41 @@
     const closed = deals.filter((d) => d.stage === 'done');
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
   }
+  // ---- Named metrics over the real demo state ----
+  // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
+  // never computes its own. Each entry: a value plus a human label, addressable by a stable key.
+  function metricsSnapshot() {
+    const data = D();
+    const deals = data.deals || [], tasks = data.tasks || [], clients = data.clients || [];
+    const m = computeMetrics();
+    const active = deals.filter((d) => d.stage !== 'done');
+    const sum = (list) => list.reduce((s, d) => s + (d.amount || 0), 0);
+    const byStage = {};
+    active.forEach((d) => {
+      const k = stageLabel(d.stage);
+      (byStage[k] = byStage[k] || { count: 0, sum: 0 }).count++;
+      byStage[k].sum += d.amount || 0;
+    });
+    const bySource = {};
+    deals.forEach((d) => { if (d.source) bySource[d.source] = (bySource[d.source] || 0) + 1; });
+    const out = {
+      deals_active: { v: active.length, label: 'активных сделок' },
+      deals_active_sum: { v: sum(active), money: true, label: 'сумма активных сделок' },
+      deals_closed: { v: m.closedCount, label: 'закрытых сделок' },
+      deals_closed_sum: { v: m.closedSum, money: true, label: 'сумма закрытых сделок' },
+      deals_hot: { v: deals.filter((d) => d.hot).length, label: 'горячих сделок (SLA < 2 ч)' },
+      deals_stuck: { v: active.filter((d) => (d.stageDays || 0) >= 5).length, label: 'сделок застряло в стадии 5+ дней' },
+      expected_commission: { v: m.expectedComm, money: true, label: 'ожидаемая комиссия по активным' },
+      conversion: { v: m.conv, pct: true, label: 'конверсия лид → сделка' },
+      leads: { v: m.leads, label: 'лидов' },
+      tasks_open: { v: tasks.filter((t) => t.status !== 'done').length, label: 'открытых задач' },
+      tasks_overdue: { v: tasks.filter((t) => t.status !== 'done' && t.when === 'overdue').length, label: 'просроченных задач' },
+      clients_total: { v: clients.length, label: 'контактов' },
+      clients_no_consent: { v: clients.filter((c) => !c.consent).length, label: 'контактов без согласия на переписку' },
+      companies_total: { v: (data.companies || []).length, label: 'компаний' },
+    };
+    return { metrics: out, byStage: byStage, bySource: bySource };
+  }
   function digestBlock() {
     const tasks = D().tasks || []; const events = D().events || []; const deals = D().deals || [];
     const overdue = tasks.filter((t) => t.status !== 'done' && t.when === 'overdue').length;
@@ -1713,31 +1748,37 @@
     const spec = FEED_TYPES.find((x) => x[0] === t);
     if (ta && spec) ta.setAttribute('placeholder', spec[4]);
   }
-  function saveEventEntry(scope, id) {
-    const el = document.getElementById('note_txt'); const txt = el ? el.value.trim() : '';
-    const t = S().feedType || 'note';
-    const spec = FEED_TYPES.find((x) => x[0] === t) || FEED_TYPES[0];
-    if (!txt) { closeModal(); return; }
-    const data = D(); const who = (data.users[WS.store.role] || {}).name || 'Агент';
-    const bag = scope === 'contact'
-      ? (data.contactTimeline = data.contactTimeline || {})
-      : scope === 'company'
-        ? (data.companyTimeline = data.companyTimeline || {})
-        : (data.dealTimeline = data.dealTimeline || {});
+  // Which timeline a scope writes into. One place, so callers can't disagree.
+  const TIMELINE_KEY = { contact: 'contactTimeline', company: 'companyTimeline', deal: 'dealTimeline' };
+  function timelineFor(scope) {
+    const data = D(); const key = TIMELINE_KEY[scope];
+    if (!key) return null;
+    return (data[key] = data[key] || {});
+  }
+  // Headless core of "add an event to a feed" — no DOM, so the Concierge can drive it too.
+  // when: 'now' | { daysAgo: 0..N, h, mi }. Returns the stored entry, or null if the input is
+  // not valid (unknown scope / unknown entity / empty text) — never writes a half-formed record.
+  function addEventEntry(scope, id, opts) {
+    const o = opts || {};
+    const txt = String(o.text == null ? '' : o.text).trim();
+    if (!txt) return null;
+    const bag = timelineFor(scope);
+    if (!bag) return null;
+    if (!feedOwner(scope, id)) return null;          // refuse to write against an unknown id
+    const spec = FEED_TYPES.find((x) => x[0] === o.type) || FEED_TYPES[0];
+    const who = o.by || (D().users[WS.store.role] || {}).name || 'Агент';
     const list = (bag[id] = bag[id] || []);
-    const dayEl = document.getElementById('fe_day');
-    const timeEl = document.getElementById('fe_time');
-    const dayVal = dayEl ? dayEl.value : 'now';
+    const when = o.when || 'now';
     let at, ord;
-    if (dayVal === 'now') {
+    if (when === 'now') {
       // Every feed sorts on `ord` (newest first), so a "сейчас" entry has to out-rank the newest
       // entry already in this timeline to land at the very top.
       at = 'сейчас';
       ord = list.reduce((m, e) => (e.ord != null && e.ord > m ? e.ord : m), NOW_ORD) + 1;
     } else {
-      const tm = (timeEl && timeEl.value ? timeEl.value : '').match(/^(\d{1,2}):(\d{2})$/);
-      const h = tm ? +tm[1] : NOW.h, mi = tm ? +tm[2] : NOW.mi;
-      const day = Math.max(1, NOW.d - (parseInt(dayVal, 10) || 0));
+      const h = when.h != null ? +when.h : NOW.h;
+      const mi = when.mi != null ? +when.mi : NOW.mi;
+      const day = Math.max(1, NOW.d - (parseInt(when.daysAgo, 10) || 0));
       at = String(day).padStart(2, '0') + ' ' + MONTHS_GEN[NOW.mo - 1] + ' · ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
       ord = ORD(day, h, mi);
     }
@@ -1748,6 +1789,23 @@
     while (pos > 0 && list[pos - 1].ord != null && list[pos - 1].ord > ord) pos--;
     list.splice(pos, 0, entry);
     WS.storeApi.save(); // direct data mutation — persist it, F5 must not drop the entry
+    return entry;
+  }
+  // DOM adapter: reads the modal's fields and delegates. Behaviour is unchanged.
+  function saveEventEntry(scope, id) {
+    const el = document.getElementById('note_txt'); const txt = el ? el.value.trim() : '';
+    const t = S().feedType || 'note';
+    const spec = FEED_TYPES.find((x) => x[0] === t) || FEED_TYPES[0];
+    if (!txt) { closeModal(); return; }
+    const dayEl = document.getElementById('fe_day');
+    const timeEl = document.getElementById('fe_time');
+    const dayVal = dayEl ? dayEl.value : 'now';
+    let when = 'now';
+    if (dayVal !== 'now') {
+      const tm = (timeEl && timeEl.value ? timeEl.value : '').match(/^(\d{1,2}):(\d{2})$/);
+      when = { daysAgo: parseInt(dayVal, 10) || 0, h: tm ? +tm[1] : NOW.h, mi: tm ? +tm[2] : NOW.mi };
+    }
+    if (!addEventEntry(scope, id, { type: t, text: txt, when: when })) { closeModal(); return; }
     WS.storeApi.toast(spec[1] + ' добавлено в ленту', 'ok');
     if (scope === 'contact') clientCard(id);
     else if (scope === 'company') companyCard(id);
@@ -4125,6 +4183,8 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
+    // headless seams for the Concierge — no DOM, safe to drive programmatically
+    addEventEntry, metricsSnapshot, feedOwner, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup };
 })(window.WS = window.WS || {});

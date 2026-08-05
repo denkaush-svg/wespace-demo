@@ -313,6 +313,46 @@ setTimeout(() => {
   // ---- schema was bumped so stale localStorage cannot mask the new fixtures (codex finding 1) ----
   check('store schema bumped past 6', WS.store.schema >= 7, 'schema=' + WS.store.schema);
 
+  // ---- headless seams for the Concierge: write without any DOM, refuse bad input ----
+  {
+    const before = (data.contactTimeline['c_night'] || []).length;
+    const e = WS.ui.addEventEntry('contact', 'c_night', { type: 'call', text: 'АГЕНТ: звонок из инструмента', when: 'now' });
+    check('addEventEntry writes headlessly', !!e && (data.contactTimeline['c_night'] || []).length === before + 1);
+    check('headless entry carries the requested type', e && e.ch === 'call' && e.kind === 'raw', JSON.stringify(e && e.ch));
+    check('headless entry lands newest', e && e.ord >= N.d * 10000 + N.h * 100 + N.mi, 'ord=' + (e && e.ord));
+
+    const back = WS.ui.addEventEntry('deal', 'd_igor', { type: 'meet', text: 'АГЕНТ: встреча позавчера', when: { daysAgo: 2, h: 15, mi: 30 } });
+    check('headless back-dating works', back && back.ord === (N.d - 2) * 10000 + 1530, 'ord=' + (back && back.ord));
+
+    const co = WS.ui.addEventEntry('company', 'co_meydan', { type: 'note', text: 'АГЕНТ: заметка по компании' });
+    check('headless write works for companies too', !!co);
+
+    // refusals — a tool must never write a half-formed record
+    check('refuses unknown scope', WS.ui.addEventEntry('object', 'o_creekline', { text: 'x' }) === null);
+    check('refuses unknown entity id', WS.ui.addEventEntry('contact', 'c_does_not_exist', { text: 'x' }) === null);
+    check('refuses empty text', WS.ui.addEventEntry('contact', 'c_night', { text: '   ' }) === null);
+    check('refuses missing opts', WS.ui.addEventEntry('contact', 'c_night') === null);
+
+    // and the write is visible in the rendered feed
+    WS.ui.clientCard('c_night'); WS.ui.setEntityTab('contact', 'c_night', 'history');
+    check('headless entry shows up in the card', doc.getElementById('app').innerHTML.indexOf('АГЕНТ: звонок из инструмента') >= 0);
+  }
+
+  // ---- metrics the Concierge answers from must match the data on screen ----
+  {
+    const snap = WS.ui.metricsSnapshot();
+    check('metricsSnapshot returns named metrics', !!(snap && snap.metrics && snap.metrics.deals_active));
+    const activeReal = data.deals.filter((d) => d.stage !== 'done').length;
+    check('deals_active matches the real data', snap.metrics.deals_active.v === activeReal, snap.metrics.deals_active.v + ' vs ' + activeReal);
+    const closedReal = data.deals.filter((d) => d.stage === 'done').length;
+    check('deals_closed matches the real data', snap.metrics.deals_closed.v === closedReal, snap.metrics.deals_closed.v + ' vs ' + closedReal);
+    const noConsentReal = data.clients.filter((c) => !c.consent).length;
+    check('clients_no_consent matches the real data', snap.metrics.clients_no_consent.v === noConsentReal);
+    check('every metric carries a value and a label',
+      Object.keys(snap.metrics).every((k) => snap.metrics[k] && typeof snap.metrics[k].v === 'number' && snap.metrics[k].label));
+    check('stage breakdown is populated', Object.keys(snap.byStage).length > 0);
+  }
+
   // ---- regression: main screens still render ----
   ['start', 'concierge', 'clients', 'objects', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
     try {
