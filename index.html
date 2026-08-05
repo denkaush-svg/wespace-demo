@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:16</title>
+  <title>WESPACE · сборка 01:40</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:16';
+    window.WS_BUILD='01:40';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -341,6 +341,9 @@ button { font-family: inherit; cursor: pointer; }
    ============================================================ */
 .concierge { max-width: 860px; margin: 0 auto; padding: 20px 24px 40px; display: flex; flex-direction: column; min-height: 100%; }
 .chat { flex: 1; display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
+/* One slot per message so a streamed reply can be repainted on its own. `contents`
+   keeps the message itself as the flex item, so .msg.me still aligns right. */
+.msg-slot { display: contents; }
 .msg { max-width: 88%; }
 .msg .who { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .msg .bubble { border-radius: var(--r); padding: 13px 15px; font-size: 13.5px; line-height: 1.55; }
@@ -3297,6 +3300,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return engine.threads[id];
   }
   function items() { const t = engine.threads[engine.activeThreadId]; return t ? t.items : []; }
+
+  // Messages are addressed by id, never by position. A streamed reply is updated many
+  // times while tool writes redraw the app around it; "replace the last item" would
+  // clobber whatever arrived in between.
+  let midSeq = 0;
+  function nextMid() { midSeq++; return 'm' + midSeq; }
+  function item(html) { return { id: nextMid(), html: html }; }
+  const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESCAPES[c]); }
   // strip HTML → plain-text preview for the thread list
   function stripHtml(html) { return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); }
   function markSeen(id) { const t = engine.threads[id]; if (t) t.seen = t.items.length; }
@@ -3305,8 +3317,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function seedThreads() {
     const t = ensureThread('lead:sarah');
     if (!t.items.length) {
-      t.items.push(msg('user', 'Sarah Mansour · ' + chanIcon('whatsapp') + ' · 02:14',
-        'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?'));
+      t.items.push(item(msg('user', 'Sarah Mansour · ' + chanIcon('whatsapp') + ' · 02:14',
+        'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?')));
       t.updatedAt = '02:14';
       t.seen = 0; // → unread = 1
     }
@@ -3317,7 +3329,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function pushEvent(threadId, label, icon, html) {
     const t = ensureThread(threadId);
     if (label) t.label = label; if (icon) t.icon = icon;
-    t.items.push(html);
+    t.items.push(item(html));
     t.updatedAt = WS.storeApi.clockLabel().time;
     if (engine.onUpdate && engine.activeThreadId === threadId) engine.onUpdate();
   }
@@ -3325,8 +3337,42 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   function el() { return engine.container; }
   function scrollDown() { const c = el(); if (c) requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; }); }
-  function push(html) { const it = items(); it.push(html); const t = engine.threads[engine.activeThreadId]; if (t) t.updatedAt = WS.storeApi.clockLabel().time; if (engine.onUpdate) engine.onUpdate(); scrollDown(); }
-  function replaceLast(html) { const it = items(); if (it.length) it[it.length - 1] = html; if (engine.onUpdate) engine.onUpdate(); scrollDown(); }
+  // Append to a named thread and return the id of the message, so a later chunk can
+  // find it again even if the agent has walked off to another conversation.
+  function pushMsg(html, threadId) {
+    const tid = threadId || engine.activeThreadId || 'general';
+    const t = ensureThread(tid);
+    const m = item(html);
+    t.items.push(m);
+    t.updatedAt = WS.storeApi.clockLabel().time;
+    if (engine.onUpdate && engine.activeThreadId === tid) engine.onUpdate();
+    scrollDown();
+    return m.id;
+  }
+  // Refuses rather than falling through to another message when the target is gone.
+  function updateMsg(id, html, threadId) {
+    const tid = threadId || engine.activeThreadId;
+    const t = engine.threads[tid];
+    if (!t) return false;
+    const m = t.items.find((x) => x.id === id);
+    if (!m) return false;
+    m.html = html;
+    if (engine.onUpdate && engine.activeThreadId === tid) engine.onUpdate();
+    return true;
+  }
+  // `who` is our own composed label (icons, channel); `text` is not ours - a client's
+  // wording, a model's reply, a pasted transcript - so it is shown as text, not markup.
+  function pushText(role, who, text, threadId) { return pushMsg(msg(role, who, esc(text)), threadId); }
+
+  function push(html) { return pushMsg(html); }
+  function replaceLast(html) {
+    const it = items();
+    if (!it.length) return false;
+    it[it.length - 1].html = html;
+    if (engine.onUpdate) engine.onUpdate();
+    scrollDown();
+    return true;
+  }
 
   // ---------- renderers ----------
   function msg(role, who, body) {
@@ -3568,7 +3614,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function threadList() {
     return Object.keys(engine.threads).map((k) => engine.threads[k]).filter((t) => t.items.length)
       .map((t) => Object.assign({}, t, {
-        preview: stripHtml(t.items[t.items.length - 1]).slice(0, 68),
+        preview: stripHtml(t.items[t.items.length - 1].html).slice(0, 68),
         unread: Math.max(0, t.items.length - (t.seen || 0)),
       }));
   }
@@ -3606,17 +3652,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       engine._skip = false;
       const dur = DUR[step.kind] || DUR.simple;
       const per = Math.max(180, dur / step.steps.length);
-      push(processCard(step, 0, false));
-      const it = items(); const idx = it.length - 1;
+      const mid = pushMsg(processCard(step, 0, false));
+      const tid = engine.activeThreadId;
       for (let i = 0; i < step.steps.length; i++) {
-        it[idx] = processCard(step, i, false);
-        if (engine.onUpdate) engine.onUpdate();
+        updateMsg(mid, processCard(step, i, false), tid);
         scrollDown();
         if (!engine._skip) await delay(per);
         if (!alive()) return;
       }
-      it[idx] = processCard(step, step.steps.length, true);
-      if (engine.onUpdate) engine.onUpdate();
+      updateMsg(mid, processCard(step, step.steps.length, true), tid);
       s.flowIndex++; await delay(200); if (!alive()) return; return advance();
     }
     if (step.type === 'preview') {
@@ -3680,10 +3724,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const step = s.pending; const res = step.result;
       WS.storeApi.applyEffects(res.effects);
       res.events.forEach((e) => WS.storeApi.logEvent({ scenario: s.scenarioId, action: e, result: 'EXECUTED', level: step.level || 'A3' }));
-      { const it = items(); it[it.length - 1] =
-        '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено</div>' +
-        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено</span></div></div>'; }
-      if (engine.onUpdate) engine.onUpdate();
+      replaceLast('<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено</div>' +
+        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено</span></div></div>');
       push(resultCard(res));
       WS.storeApi.setScenarioStatus(s.scenarioId, 'done');
       WS.store.tour.done = true;
@@ -3708,10 +3750,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // mark confirmed: replace preview with a confirmed compact version
       const rejectedCount = s.rejected.size;
       const confirmedNote = rejectedCount ? (' · отклонено полей: ' + rejectedCount) : '';
-      { const it = items(); it[it.length - 1] =
-        '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено' + confirmedNote + '</div>' +
-        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено' + (rejectedCount ? ' (' + rejectedCount + ' полей отклонено)' : '') + '</span></div></div>'; }
-      if (engine.onUpdate) engine.onUpdate();
+      replaceLast('<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено' + confirmedNote + '</div>' +
+        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено' + (rejectedCount ? ' (' + rejectedCount + ' полей отклонено)' : '') + '</span></div></div>');
       WS.storeApi.logEvent({ scenario: s.scenarioId, action: step.title, result: 'EXECUTED', level: step.level });
       s.pending = null; s.flowIndex++;
       setTimeout(() => advance(), 260);
@@ -3720,9 +3760,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (action === 'rollback') {
       const id = s.scenarioId;
       WS.storeApi.resetScene(id);
-      items().push('<div class="msg ai fadeup"><div class="who">' + I('replay') + ' Откат</div>' +
+      pushMsg('<div class="msg ai fadeup"><div class="who">' + I('replay') + ' Откат</div>' +
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge stop">' + I('reset') + 'Пакет отменён — исходные данные восстановлены</span></div></div>');
-      if (engine.onUpdate) engine.onUpdate();
       WS.storeApi.toast('Пакет отменён, данные восстановлены', 'ok');
       return;
     }
@@ -3737,17 +3776,40 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function reset() { engine.session = null; engine.threads = {}; engine.activeThreadId = null; seedThreads(); }
   // persistence hooks (audit P0-6): threads survive a page reload
   function exportThreads() { return engine.threads; }
-  function importThreads(obj) { if (obj && typeof obj === 'object') engine.threads = obj; }
+  // Threads come back from localStorage and are then written into the DOM, so they are
+  // treated as input: anything that is not a well-formed thread is dropped rather than
+  // trusted. Without this, a tampered or half-written snapshot becomes persistent markup.
+  function importThreads(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    const clean = {};
+    Object.keys(obj).forEach((k) => {
+      const t = obj[k];
+      if (!t || typeof t !== 'object' || !Array.isArray(t.items)) return;
+      const list = t.items
+        .map((m) => (m && typeof m === 'object' && typeof m.html === 'string')
+          ? { id: typeof m.id === 'string' && m.id ? m.id : nextMid(), html: m.html }
+          : null)
+        .filter(Boolean);
+      clean[k] = {
+        id: String(t.id || k), label: String(t.label || k), icon: String(t.icon || 'chat'),
+        items: list, updatedAt: t.updatedAt || null, seen: Number(t.seen) || 0,
+      };
+    });
+    engine.threads = clean;
+  }
 
   async function freeReply(text) {
     const threadId = engine.activeThreadId || 'general';
-    ensureThread(threadId); engine.activeThreadId = threadId; engine.session = null;
+    ensureThread(threadId); engine.activeThreadId = threadId;
+    // A scripted run waiting on a confirmation is not discarded just because a question
+    // was typed: dropping it would strand the pending approval with no way back to it.
+    if (engine.session && !engine.session.pending) engine.session = null;
     const same = () => engine.activeThreadId === threadId;
     if (!WS.store.cgDock) WS.router.go('concierge'); else if (WS.ui && WS.ui.renderCgDock) WS.ui.renderCgDock();
     await delay(60); if (!same()) return;
-    push(msg('me', chanIcon('text'), text));
+    pushText('me', chanIcon('text'), text, threadId);
     await delay(500); if (!same()) return;
-    push(processCard({ steps: ['Разбираю запрос', 'Ищу контекст'] }, 1, false));
+    const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Ищу контекст'] }, 1, false), threadId);
     await delay(700); if (!same()) return;
     // Wizard-of-Oz: minimal context binding (recognise a client the demo knows),
     // honest «подготовлено близкое», плашка намерений, и запись запроса как сигнала.
@@ -3756,7 +3818,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const ctx = known ? ' По <b>' + known.name + '</b> контекст подхватил.' : '';
     // log the free request as a research signal (what brokers actually ask)
     (WS.store.signals || (WS.store.signals = [])).push(text);
-    replaceLast(msg('ai', I('sparkle') + ' Консьерж',
+    updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
       'Понял поручение.' + ctx + ' В стенде подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
       (known ? '<button class="chip" data-scn="S8">' + I('sparkle') + 'Подготовить к встрече</button>' +
@@ -3766,7 +3828,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
                '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
                '<button class="chip" data-scn="S15">' + I('flame') + 'Ответить лиду</button>') +
       '</div>' +
-      '<div style="font-size:11px;color:var(--faint);margin-top:8px">' + (WS.events ? WS.events.SIM : 'симуляция') + ' · ваш запрос сохранён как сигнал для доработки.</div>'));
+      '<div style="font-size:11px;color:var(--faint);margin-top:8px">' + (WS.events ? WS.events.SIM : 'симуляция') + ' · ваш запрос сохранён как сигнал для доработки.</div>'), threadId);
   }
 
   function restartScene() {
@@ -3778,6 +3840,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+    pushMsg, updateMsg, pushText, escape: esc,
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     activeThreadId: () => engine.activeThreadId,
@@ -4295,8 +4358,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function renderDockMsgs() {
     const c = document.getElementById('cgdockmsgs'); if (!c) return;
     const t = WS.engine.activeThread();
-    if (t && t.items.length) { c.innerHTML = t.items.join(''); WS.engine.markSeen(t.id); }
-    else c.innerHTML = cgDockWelcome();
+    syncMessages(c, t, cgDockWelcome());
+    if (t && t.items.length) WS.engine.markSeen(t.id);
     requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
   }
   function renderCgDock() {
@@ -4827,10 +4890,41 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     const main = document.getElementById('main'); if (main) main.scrollTop = main.scrollHeight;
   }
+  // Paints messages by id instead of rebuilding the thread. A streamed reply updates one
+  // message many times a second; re-parsing every message on each chunk would be wasteful
+  // and would drop scroll position, focus and node identity along the way.
+  // Slots are `display: contents` so the message itself stays the flex item and keeps its
+  // alignment — see .msg-slot in app.css.
+  function syncMessages(container, thread, emptyHtml) {
+    const list = (thread && thread.items) || [];
+    if (!list.length) { container.innerHTML = emptyHtml; return; }
+    const first = container.firstElementChild;
+    if (!first || !first.hasAttribute('data-mid')) container.innerHTML = '';
+    const wanted = {};
+    list.forEach((m) => {
+      wanted[m.id] = true;
+      let node = container.querySelector('[data-mid="' + m.id + '"]');
+      if (!node) {
+        node = document.createElement('div');
+        node.className = 'msg-slot';
+        node.setAttribute('data-mid', m.id);
+        node.innerHTML = m.html;
+        node.setAttribute('data-h', m.html);
+        container.appendChild(node);
+      } else if (node.getAttribute('data-h') !== m.html) {
+        node.innerHTML = m.html;
+        node.setAttribute('data-h', m.html);
+      }
+    });
+    Array.prototype.slice.call(container.querySelectorAll('[data-mid]')).forEach((n) => {
+      if (!wanted[n.getAttribute('data-mid')]) n.parentNode.removeChild(n);
+    });
+  }
+
   function mountConcierge() {
     const chat = document.getElementById('chat');
     if (!chat) return;
-    const renderItems = () => { const c = document.getElementById('chat'); if (!c) return; const t = WS.engine.activeThread(); c.innerHTML = (t && t.items.length) ? t.items.join('') : conciergeThreadEmpty(); if (t) WS.engine.markSeen(t.id); requestAnimationFrame(scrollConciergeBottom); };
+    const renderItems = () => { const c = document.getElementById('chat'); if (!c) return; const t = WS.engine.activeThread(); syncMessages(c, t, conciergeThreadEmpty()); if (t) WS.engine.markSeen(t.id); requestAnimationFrame(scrollConciergeBottom); };
     WS.engine.mount(chat, renderItems);
     renderItems();
   }
@@ -8399,18 +8493,31 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   };
 
   // ---- free-text routing ----
+  // Shortcuts match the WHOLE phrase, not a fragment of it. The previous substring
+  // rules meant a typed question never reached the Concierge at all: "какой объект даёт
+  // лучший ROI?" matched /объект/ and opened a selection screen, and anything mentioning
+  // доходность opened the calculator. Questions are for the Concierge; these are only
+  // the spoken equivalents of the buttons already on screen.
+  const PROMPT_SHORTCUTS = {
+    'g1': () => WS.engine.startScenario('G1'),
+    'g2': () => WS.engine.startScenario('G2'),
+    'g3': () => WS.engine.startScenario('G3'),
+    'разобрать входящее': () => WS.engine.startScenario('G1'),
+    'подобрать объект': () => WS.engine.startScenario('G2'),
+    'итоги показа': () => WS.engine.startScenario('G3'),
+    'ответить лиду': () => WS.engine.startScenario('S15'),
+    'бриф к звонку': () => WS.engine.startScenario('S8'),
+    'финмодель': () => WS.router.go('calc'),
+    'оценка объекта': () => WS.router.go('valuation'),
+  };
   function routePrompt(text) {
-    const t = (text || '').toLowerCase().trim();
+    const t = (text || '').toLowerCase().trim().replace(/[.!?…]+$/, '');
     if (!t) return;
-    if (/голос|звонок|входящ|разбер/.test(t)) return WS.engine.startScenario('G1');
-    if (/подбер|подбор|объект|вариант|квартир/.test(t)) return WS.engine.startScenario('G2');
-    if (/показ|итог|заметк/.test(t)) return WS.engine.startScenario('G3');
-    if (/оцен|стоимост|сколько.*стои|привлекательн/.test(t)) return WS.router.go('valuation');
-    if (/доходн|roi|ирр|irr|финмодел|расч|npv/.test(t)) return WS.router.go('calc');
-    if (/1[.,]5|холодн|новый лид/.test(t)) return WS.engine.startScenario('S15');
-    if (/бриф|переговор/.test(t)) return WS.engine.startScenario('S8');
+    const shortcut = PROMPT_SHORTCUTS[t];
+    if (shortcut) return shortcut();
     return WS.engine.freeReply(text);
   }
+  WS.router.routePrompt = routePrompt;
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
 

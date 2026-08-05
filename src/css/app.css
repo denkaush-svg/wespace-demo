@@ -199,6 +199,9 @@ button { font-family: inherit; cursor: pointer; }
    ============================================================ */
 .concierge { max-width: 860px; margin: 0 auto; padding: 20px 24px 40px; display: flex; flex-direction: column; min-height: 100%; }
 .chat { flex: 1; display: flex; flex-direction: column; gap: 14px; padding-bottom: 16px; }
+/* One slot per message so a streamed reply can be repainted on its own. `contents`
+   keeps the message itself as the flex item, so .msg.me still aligns right. */
+.msg-slot { display: contents; }
 .msg { max-width: 88%; }
 .msg .who { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .msg .bubble { border-radius: var(--r); padding: 13px 15px; font-size: 13.5px; line-height: 1.55; }

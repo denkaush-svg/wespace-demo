@@ -42,6 +42,15 @@
     return engine.threads[id];
   }
   function items() { const t = engine.threads[engine.activeThreadId]; return t ? t.items : []; }
+
+  // Messages are addressed by id, never by position. A streamed reply is updated many
+  // times while tool writes redraw the app around it; "replace the last item" would
+  // clobber whatever arrived in between.
+  let midSeq = 0;
+  function nextMid() { midSeq++; return 'm' + midSeq; }
+  function item(html) { return { id: nextMid(), html: html }; }
+  const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESCAPES[c]); }
   // strip HTML → plain-text preview for the thread list
   function stripHtml(html) { return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); }
   function markSeen(id) { const t = engine.threads[id]; if (t) t.seen = t.items.length; }
@@ -50,8 +59,8 @@
   function seedThreads() {
     const t = ensureThread('lead:sarah');
     if (!t.items.length) {
-      t.items.push(msg('user', 'Sarah Mansour · ' + chanIcon('whatsapp') + ' · 02:14',
-        'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?'));
+      t.items.push(item(msg('user', 'Sarah Mansour · ' + chanIcon('whatsapp') + ' · 02:14',
+        'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?')));
       t.updatedAt = '02:14';
       t.seen = 0; // → unread = 1
     }
@@ -62,7 +71,7 @@
   function pushEvent(threadId, label, icon, html) {
     const t = ensureThread(threadId);
     if (label) t.label = label; if (icon) t.icon = icon;
-    t.items.push(html);
+    t.items.push(item(html));
     t.updatedAt = WS.storeApi.clockLabel().time;
     if (engine.onUpdate && engine.activeThreadId === threadId) engine.onUpdate();
   }
@@ -70,8 +79,42 @@
 
   function el() { return engine.container; }
   function scrollDown() { const c = el(); if (c) requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; }); }
-  function push(html) { const it = items(); it.push(html); const t = engine.threads[engine.activeThreadId]; if (t) t.updatedAt = WS.storeApi.clockLabel().time; if (engine.onUpdate) engine.onUpdate(); scrollDown(); }
-  function replaceLast(html) { const it = items(); if (it.length) it[it.length - 1] = html; if (engine.onUpdate) engine.onUpdate(); scrollDown(); }
+  // Append to a named thread and return the id of the message, so a later chunk can
+  // find it again even if the agent has walked off to another conversation.
+  function pushMsg(html, threadId) {
+    const tid = threadId || engine.activeThreadId || 'general';
+    const t = ensureThread(tid);
+    const m = item(html);
+    t.items.push(m);
+    t.updatedAt = WS.storeApi.clockLabel().time;
+    if (engine.onUpdate && engine.activeThreadId === tid) engine.onUpdate();
+    scrollDown();
+    return m.id;
+  }
+  // Refuses rather than falling through to another message when the target is gone.
+  function updateMsg(id, html, threadId) {
+    const tid = threadId || engine.activeThreadId;
+    const t = engine.threads[tid];
+    if (!t) return false;
+    const m = t.items.find((x) => x.id === id);
+    if (!m) return false;
+    m.html = html;
+    if (engine.onUpdate && engine.activeThreadId === tid) engine.onUpdate();
+    return true;
+  }
+  // `who` is our own composed label (icons, channel); `text` is not ours - a client's
+  // wording, a model's reply, a pasted transcript - so it is shown as text, not markup.
+  function pushText(role, who, text, threadId) { return pushMsg(msg(role, who, esc(text)), threadId); }
+
+  function push(html) { return pushMsg(html); }
+  function replaceLast(html) {
+    const it = items();
+    if (!it.length) return false;
+    it[it.length - 1].html = html;
+    if (engine.onUpdate) engine.onUpdate();
+    scrollDown();
+    return true;
+  }
 
   // ---------- renderers ----------
   function msg(role, who, body) {
@@ -313,7 +356,7 @@
   function threadList() {
     return Object.keys(engine.threads).map((k) => engine.threads[k]).filter((t) => t.items.length)
       .map((t) => Object.assign({}, t, {
-        preview: stripHtml(t.items[t.items.length - 1]).slice(0, 68),
+        preview: stripHtml(t.items[t.items.length - 1].html).slice(0, 68),
         unread: Math.max(0, t.items.length - (t.seen || 0)),
       }));
   }
@@ -351,17 +394,15 @@
       engine._skip = false;
       const dur = DUR[step.kind] || DUR.simple;
       const per = Math.max(180, dur / step.steps.length);
-      push(processCard(step, 0, false));
-      const it = items(); const idx = it.length - 1;
+      const mid = pushMsg(processCard(step, 0, false));
+      const tid = engine.activeThreadId;
       for (let i = 0; i < step.steps.length; i++) {
-        it[idx] = processCard(step, i, false);
-        if (engine.onUpdate) engine.onUpdate();
+        updateMsg(mid, processCard(step, i, false), tid);
         scrollDown();
         if (!engine._skip) await delay(per);
         if (!alive()) return;
       }
-      it[idx] = processCard(step, step.steps.length, true);
-      if (engine.onUpdate) engine.onUpdate();
+      updateMsg(mid, processCard(step, step.steps.length, true), tid);
       s.flowIndex++; await delay(200); if (!alive()) return; return advance();
     }
     if (step.type === 'preview') {
@@ -425,10 +466,8 @@
       const step = s.pending; const res = step.result;
       WS.storeApi.applyEffects(res.effects);
       res.events.forEach((e) => WS.storeApi.logEvent({ scenario: s.scenarioId, action: e, result: 'EXECUTED', level: step.level || 'A3' }));
-      { const it = items(); it[it.length - 1] =
-        '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено</div>' +
-        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено</span></div></div>'; }
-      if (engine.onUpdate) engine.onUpdate();
+      replaceLast('<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено</div>' +
+        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено</span></div></div>');
       push(resultCard(res));
       WS.storeApi.setScenarioStatus(s.scenarioId, 'done');
       WS.store.tour.done = true;
@@ -453,10 +492,8 @@
       // mark confirmed: replace preview with a confirmed compact version
       const rejectedCount = s.rejected.size;
       const confirmedNote = rejectedCount ? (' · отклонено полей: ' + rejectedCount) : '';
-      { const it = items(); it[it.length - 1] =
-        '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено' + confirmedNote + '</div>' +
-        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено' + (rejectedCount ? ' (' + rejectedCount + ' полей отклонено)' : '') + '</span></div></div>'; }
-      if (engine.onUpdate) engine.onUpdate();
+      replaceLast('<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Подтверждено' + confirmedNote + '</div>' +
+        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + step.title + ' — применено' + (rejectedCount ? ' (' + rejectedCount + ' полей отклонено)' : '') + '</span></div></div>');
       WS.storeApi.logEvent({ scenario: s.scenarioId, action: step.title, result: 'EXECUTED', level: step.level });
       s.pending = null; s.flowIndex++;
       setTimeout(() => advance(), 260);
@@ -465,9 +502,8 @@
     if (action === 'rollback') {
       const id = s.scenarioId;
       WS.storeApi.resetScene(id);
-      items().push('<div class="msg ai fadeup"><div class="who">' + I('replay') + ' Откат</div>' +
+      pushMsg('<div class="msg ai fadeup"><div class="who">' + I('replay') + ' Откат</div>' +
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge stop">' + I('reset') + 'Пакет отменён — исходные данные восстановлены</span></div></div>');
-      if (engine.onUpdate) engine.onUpdate();
       WS.storeApi.toast('Пакет отменён, данные восстановлены', 'ok');
       return;
     }
@@ -482,17 +518,40 @@
   function reset() { engine.session = null; engine.threads = {}; engine.activeThreadId = null; seedThreads(); }
   // persistence hooks (audit P0-6): threads survive a page reload
   function exportThreads() { return engine.threads; }
-  function importThreads(obj) { if (obj && typeof obj === 'object') engine.threads = obj; }
+  // Threads come back from localStorage and are then written into the DOM, so they are
+  // treated as input: anything that is not a well-formed thread is dropped rather than
+  // trusted. Without this, a tampered or half-written snapshot becomes persistent markup.
+  function importThreads(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    const clean = {};
+    Object.keys(obj).forEach((k) => {
+      const t = obj[k];
+      if (!t || typeof t !== 'object' || !Array.isArray(t.items)) return;
+      const list = t.items
+        .map((m) => (m && typeof m === 'object' && typeof m.html === 'string')
+          ? { id: typeof m.id === 'string' && m.id ? m.id : nextMid(), html: m.html }
+          : null)
+        .filter(Boolean);
+      clean[k] = {
+        id: String(t.id || k), label: String(t.label || k), icon: String(t.icon || 'chat'),
+        items: list, updatedAt: t.updatedAt || null, seen: Number(t.seen) || 0,
+      };
+    });
+    engine.threads = clean;
+  }
 
   async function freeReply(text) {
     const threadId = engine.activeThreadId || 'general';
-    ensureThread(threadId); engine.activeThreadId = threadId; engine.session = null;
+    ensureThread(threadId); engine.activeThreadId = threadId;
+    // A scripted run waiting on a confirmation is not discarded just because a question
+    // was typed: dropping it would strand the pending approval with no way back to it.
+    if (engine.session && !engine.session.pending) engine.session = null;
     const same = () => engine.activeThreadId === threadId;
     if (!WS.store.cgDock) WS.router.go('concierge'); else if (WS.ui && WS.ui.renderCgDock) WS.ui.renderCgDock();
     await delay(60); if (!same()) return;
-    push(msg('me', chanIcon('text'), text));
+    pushText('me', chanIcon('text'), text, threadId);
     await delay(500); if (!same()) return;
-    push(processCard({ steps: ['Разбираю запрос', 'Ищу контекст'] }, 1, false));
+    const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Ищу контекст'] }, 1, false), threadId);
     await delay(700); if (!same()) return;
     // Wizard-of-Oz: minimal context binding (recognise a client the demo knows),
     // honest «подготовлено близкое», плашка намерений, и запись запроса как сигнала.
@@ -501,7 +560,7 @@
     const ctx = known ? ' По <b>' + known.name + '</b> контекст подхватил.' : '';
     // log the free request as a research signal (what brokers actually ask)
     (WS.store.signals || (WS.store.signals = [])).push(text);
-    replaceLast(msg('ai', I('sparkle') + ' Консьерж',
+    updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
       'Понял поручение.' + ctx + ' В стенде подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
       (known ? '<button class="chip" data-scn="S8">' + I('sparkle') + 'Подготовить к встрече</button>' +
@@ -511,7 +570,7 @@
                '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
                '<button class="chip" data-scn="S15">' + I('flame') + 'Ответить лиду</button>') +
       '</div>' +
-      '<div style="font-size:11px;color:var(--faint);margin-top:8px">' + (WS.events ? WS.events.SIM : 'симуляция') + ' · ваш запрос сохранён как сигнал для доработки.</div>'));
+      '<div style="font-size:11px;color:var(--faint);margin-top:8px">' + (WS.events ? WS.events.SIM : 'симуляция') + ' · ваш запрос сохранён как сигнал для доработки.</div>'), threadId);
   }
 
   function restartScene() {
@@ -523,6 +582,7 @@
   }
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+    pushMsg, updateMsg, pushText, escape: esc,
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     activeThreadId: () => engine.activeThreadId,

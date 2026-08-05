@@ -509,6 +509,87 @@ setTimeout(() => {
       dd().tasks.some((t) => (t.title || '').indexOf('графику платежей') >= 0));
   }
 
+  // ============================================================
+  //  Chat plane — messages must be addressable, not positional.
+  //  A streamed reply arrives in pieces while tool writes redraw the app, so
+  //  "replace the last thing in the list" is not a safe way to update a message.
+  // ============================================================
+  const eng = WS.engine;
+  check('chat · engine exposes addressable messages', typeof eng.pushMsg === 'function' && typeof eng.updateMsg === 'function');
+
+  if (typeof eng.pushMsg === 'function' && typeof eng.updateMsg === 'function') {
+    eng.openThread('probe:chat', 'Проверка', 'chat');
+    WS.router.go('concierge');
+
+    const idA = eng.pushMsg('<div class="msg ai"><div class="bubble">первое</div></div>');
+    const idB = eng.pushMsg('<div class="msg ai"><div class="bubble">второе</div></div>');
+    check('chat · every message gets its own id', !!idA && !!idB && idA !== idB, idA + ' / ' + idB);
+
+    const chatEl = doc.getElementById('chat');
+    check('chat · messages are rendered as separate nodes',
+      !!chatEl && chatEl.querySelectorAll('[data-mid]').length === 2,
+      chatEl ? 'nodes=' + chatEl.querySelectorAll('[data-mid]').length : 'no #chat');
+
+    // Mark the first node, then update the SECOND one. The first must be the same
+    // DOM node afterwards — that is what makes token-by-token updates affordable.
+    const nodeA = chatEl.querySelector('[data-mid="' + idA + '"]');
+    nodeA.setAttribute('data-probe', 'kept');
+    eng.updateMsg(idB, '<div class="msg ai"><div class="bubble">второе, дополнено</div></div>');
+    const nodeAAfter = chatEl.querySelector('[data-mid="' + idA + '"]');
+    check('chat · updating one message does not rebuild the others',
+      !!nodeAAfter && nodeAAfter.getAttribute('data-probe') === 'kept');
+    check('chat · the update landed in the addressed message',
+      chatEl.innerHTML.indexOf('второе, дополнено') >= 0 && chatEl.innerHTML.indexOf('первое') >= 0);
+
+    // An update aimed at a message that is gone must not silently hit another one.
+    const wrote = eng.updateMsg('mid_nonexistent', '<div class="msg ai">подмена</div>');
+    check('chat · update against an unknown id is refused', wrote === false);
+    check('chat · nothing was overwritten by the refused update', chatEl.innerHTML.indexOf('подмена') < 0);
+
+    // A reply belongs to the thread it was started in, even if the agent walks away.
+    const idC = eng.pushMsg('<div class="msg ai">для probe:chat</div>', 'probe:chat');
+    eng.openThread('probe:other', 'Другой', 'chat');
+    eng.updateMsg(idC, '<div class="msg ai">дополнено в своей ветке</div>', 'probe:chat');
+    eng.openThread('probe:chat', 'Проверка', 'chat');
+    check('chat · a message updates in its own thread after switching away',
+      doc.getElementById('chat').innerHTML.indexOf('дополнено в своей ветке') >= 0);
+
+    // Untrusted text — a client's note, a model's reply — is text, not markup.
+    const idD = eng.pushText('me', 'Клиент', '<img src=x onerror="window.__pwn=1">Привет');
+    const chatNow = doc.getElementById('chat');
+    // The tag must survive as characters on screen, not as an element in the tree.
+    check('chat · untrusted text creates no element', chatNow.querySelectorAll('img').length === 0, 'id=' + idD);
+    check('chat · untrusted text is escaped', chatNow.innerHTML.indexOf('&lt;img') >= 0);
+    check('chat · but the text itself is still shown', (chatNow.textContent || '').indexOf('Привет') >= 0);
+    check('chat · no injected script ran', win.__pwn === undefined);
+
+    // Stored conversations come back from localStorage — treat them as input.
+    eng.importThreads('not an object');
+    check('chat · malformed stored threads are refused', typeof eng.threadList === 'function' && Array.isArray(eng.threadList()));
+    eng.importThreads({ good: { id: 'good', label: 'x', items: [{ id: 'm1', html: '<div>ok</div>' }] }, bad: { id: 'bad', items: 'nope' } });
+    const names = eng.threadList().map((t) => t.id);
+    check('chat · a stored thread with a broken item list is dropped', names.indexOf('bad') < 0, names.join(','));
+  }
+
+  // ---- free text reaches the Concierge instead of being intercepted ----
+  if (typeof WS.router.routePrompt === 'function') {
+    let landed = null;
+    const realFree = eng.freeReply;
+    eng.freeReply = (t) => { landed = t; };
+    WS.router.routePrompt('какой объект даёт лучший ROI?');
+    check('routing · an analytical question goes to the Concierge, not the calculator',
+      landed === 'какой объект даёт лучший ROI?', 'landed=' + landed);
+    landed = null;
+    WS.router.routePrompt('сколько у меня активных сделок и на какую сумму');
+    check('routing · a metrics question goes to the Concierge', landed !== null, 'landed=' + landed);
+    landed = null;
+    WS.router.routePrompt('запиши, что созвонился с Анной');
+    check('routing · a write instruction goes to the Concierge', landed !== null, 'landed=' + landed);
+    eng.freeReply = realFree;
+  } else {
+    check('routing · routePrompt is reachable for testing', false, 'not exported');
+  }
+
   // ---- regression: main screens still render ----
   ['start', 'concierge', 'clients', 'objects', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
     try {

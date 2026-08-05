@@ -152,8 +152,8 @@
   function renderDockMsgs() {
     const c = document.getElementById('cgdockmsgs'); if (!c) return;
     const t = WS.engine.activeThread();
-    if (t && t.items.length) { c.innerHTML = t.items.join(''); WS.engine.markSeen(t.id); }
-    else c.innerHTML = cgDockWelcome();
+    syncMessages(c, t, cgDockWelcome());
+    if (t && t.items.length) WS.engine.markSeen(t.id);
     requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
   }
   function renderCgDock() {
@@ -684,10 +684,41 @@
     }
     const main = document.getElementById('main'); if (main) main.scrollTop = main.scrollHeight;
   }
+  // Paints messages by id instead of rebuilding the thread. A streamed reply updates one
+  // message many times a second; re-parsing every message on each chunk would be wasteful
+  // and would drop scroll position, focus and node identity along the way.
+  // Slots are `display: contents` so the message itself stays the flex item and keeps its
+  // alignment — see .msg-slot in app.css.
+  function syncMessages(container, thread, emptyHtml) {
+    const list = (thread && thread.items) || [];
+    if (!list.length) { container.innerHTML = emptyHtml; return; }
+    const first = container.firstElementChild;
+    if (!first || !first.hasAttribute('data-mid')) container.innerHTML = '';
+    const wanted = {};
+    list.forEach((m) => {
+      wanted[m.id] = true;
+      let node = container.querySelector('[data-mid="' + m.id + '"]');
+      if (!node) {
+        node = document.createElement('div');
+        node.className = 'msg-slot';
+        node.setAttribute('data-mid', m.id);
+        node.innerHTML = m.html;
+        node.setAttribute('data-h', m.html);
+        container.appendChild(node);
+      } else if (node.getAttribute('data-h') !== m.html) {
+        node.innerHTML = m.html;
+        node.setAttribute('data-h', m.html);
+      }
+    });
+    Array.prototype.slice.call(container.querySelectorAll('[data-mid]')).forEach((n) => {
+      if (!wanted[n.getAttribute('data-mid')]) n.parentNode.removeChild(n);
+    });
+  }
+
   function mountConcierge() {
     const chat = document.getElementById('chat');
     if (!chat) return;
-    const renderItems = () => { const c = document.getElementById('chat'); if (!c) return; const t = WS.engine.activeThread(); c.innerHTML = (t && t.items.length) ? t.items.join('') : conciergeThreadEmpty(); if (t) WS.engine.markSeen(t.id); requestAnimationFrame(scrollConciergeBottom); };
+    const renderItems = () => { const c = document.getElementById('chat'); if (!c) return; const t = WS.engine.activeThread(); syncMessages(c, t, conciergeThreadEmpty()); if (t) WS.engine.markSeen(t.id); requestAnimationFrame(scrollConciergeBottom); };
     WS.engine.mount(chat, renderItems);
     renderItems();
   }

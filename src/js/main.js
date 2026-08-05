@@ -17,18 +17,31 @@
   };
 
   // ---- free-text routing ----
+  // Shortcuts match the WHOLE phrase, not a fragment of it. The previous substring
+  // rules meant a typed question never reached the Concierge at all: "какой объект даёт
+  // лучший ROI?" matched /объект/ and opened a selection screen, and anything mentioning
+  // доходность opened the calculator. Questions are for the Concierge; these are only
+  // the spoken equivalents of the buttons already on screen.
+  const PROMPT_SHORTCUTS = {
+    'g1': () => WS.engine.startScenario('G1'),
+    'g2': () => WS.engine.startScenario('G2'),
+    'g3': () => WS.engine.startScenario('G3'),
+    'разобрать входящее': () => WS.engine.startScenario('G1'),
+    'подобрать объект': () => WS.engine.startScenario('G2'),
+    'итоги показа': () => WS.engine.startScenario('G3'),
+    'ответить лиду': () => WS.engine.startScenario('S15'),
+    'бриф к звонку': () => WS.engine.startScenario('S8'),
+    'финмодель': () => WS.router.go('calc'),
+    'оценка объекта': () => WS.router.go('valuation'),
+  };
   function routePrompt(text) {
-    const t = (text || '').toLowerCase().trim();
+    const t = (text || '').toLowerCase().trim().replace(/[.!?…]+$/, '');
     if (!t) return;
-    if (/голос|звонок|входящ|разбер/.test(t)) return WS.engine.startScenario('G1');
-    if (/подбер|подбор|объект|вариант|квартир/.test(t)) return WS.engine.startScenario('G2');
-    if (/показ|итог|заметк/.test(t)) return WS.engine.startScenario('G3');
-    if (/оцен|стоимост|сколько.*стои|привлекательн/.test(t)) return WS.router.go('valuation');
-    if (/доходн|roi|ирр|irr|финмодел|расч|npv/.test(t)) return WS.router.go('calc');
-    if (/1[.,]5|холодн|новый лид/.test(t)) return WS.engine.startScenario('S15');
-    if (/бриф|переговор/.test(t)) return WS.engine.startScenario('S8');
+    const shortcut = PROMPT_SHORTCUTS[t];
+    if (shortcut) return shortcut();
     return WS.engine.freeReply(text);
   }
+  WS.router.routePrompt = routePrompt;
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
 
