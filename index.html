@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:04</title>
+  <title>WESPACE · сборка 01:16</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:04';
+    window.WS_BUILD='01:16';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1916,6 +1916,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     partner: { id: 'u_yusef',  name: 'Юсеф Хаддад',     role: 'Клубный партнёр', init: 'ЮХ' },
   };
 
+  // Everyone a record can point at. `users` above is only the three switchable
+  // roles; deals are also assigned to colleagues, and every one of those ids has
+  // to resolve to a name — otherwise a question about the team hits a blank.
+  const roster = [
+    users.agent, users.manager, users.partner,
+    { id: 'u_ahmed', name: 'Ахмед Саид',  role: 'Агент', init: 'АС' },
+    { id: 'u_lina',  name: 'Лина Хаддад', role: 'Агент', init: 'ЛХ' },
+  ];
+
   const clients = [
     {
       id: 'c_anna', name: 'Анна Петрова', tag: 'main', lang: 'RU', channel: 'whatsapp',
@@ -2243,20 +2252,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   ];
 
   // Analytics for the start screen tiles.
+  // Deliberately holds no counter that is derivable from deals: `dealsActive` and
+  // `pipelineValue` used to live here, were never read (the screen recomputes them),
+  // and only sat waiting to contradict the real figure in an answer.
   const analytics = {
     hotClients: 3,
     kpPending: 1,
     savedHours: 14.5,
-    dealsActive: 4,
     weekTouches: { done: 11, total: 14 },
-    pipelineValue: 8.86, // млн AED
     sparks: [4, 6, 5, 8, 7, 9, 12], // deals/day trend
     coverage: 0.86,     // lead coverage
   };
 
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, clients, objects, refModel,
+    DEMO_NOW, tenant, users, roster, clients, objects, refModel,
     deals, tasks, events, inbox, analytics,
     FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
@@ -2681,7 +2691,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 8; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[].
+  const SCHEMA = 9; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -2693,6 +2703,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
+    dataRevision: 0,      // bumped by every write; a proposal built against an older one is stale
     events: [],           // event log (spec §14.2)
     unsaved: 0,
     toasts: [],
@@ -2721,6 +2732,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       events: clone(f.events),
       inbox: clone(f.inbox),
       analytics: clone(f.analytics),
+      roster: clone(f.roster),
       refModel: clone(f.refModel),
       companies: clone(f.companies),
       dealTimeline: clone(f.dealTimeline),
@@ -2911,7 +2923,148 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         Object.assign(d.analytics, e.patch);
       }
     });
+    store.dataRevision++;
     save();
+  }
+
+  // ============================================================
+  //  The one way anything writes to the data.
+  //  Scenario effects above are authored by us and trusted; everything that
+  //  comes from a conversation goes through here instead, where each operation
+  //  is checked BEFORE any of them is applied. A batch is all-or-nothing, so a
+  //  half-understood instruction cannot leave the deal half-changed.
+  // ============================================================
+
+  // Writable surface, tiered by consequence rather than by convenience.
+  //   safe    — applies straight away and is obvious on sight (wording, tags, notes)
+  //   guarded — needs an explicit confirmation (money, stage, ownership, status)
+  //   absent  — not writable here at all: identity fields, provenance, and consent,
+  //             which is a legal fact recorded from the client, not ours to grant
+  const WRITABLE = {
+    deals: {
+      safe: ['tags', 'sub', 'title', 'updated', 'note', 'nextStep', 'consideredProjects'],
+      guarded: ['stage', 'amount', 'hot', 'funnel', 'dealType', 'objectType', 'goal', 'paymentForm',
+        'vat', 'source', 'agent', 'partnerAgent', 'companyId', 'stageDays', 'contacts'],
+    },
+    clients: {
+      safe: ['note', 'goal', 'areas', 'horizon', 'viewed'],
+      guarded: ['budget', 'tag', 'channel', 'lang', 'name', 'phone', 'psych'],
+    },
+    objects: {
+      safe: ['match'],
+      guarded: ['price', 'verified', 'checkedAt', 'source', 'sourceLabel', 'commissionPct',
+        'size', 'br', 'area', 'name', 'address', 'purpose'],
+    },
+    tasks: {
+      safe: ['title', 'due', 'kind', 'assignee'],
+      guarded: ['status', 'when'],
+    },
+  };
+
+  const OP_SPEC = {
+    updateDeal: { coll: 'deals', kind: 'patch' },
+    updateClient: { coll: 'clients', kind: 'patch' },
+    updateObject: { coll: 'objects', kind: 'patch' },
+    setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
+    updateTask: { coll: 'tasks', kind: 'patch' },
+    dealStage: { coll: 'deals', kind: 'stage' },
+    addTask: { coll: 'tasks', kind: 'add' },
+    removeTask: { coll: 'tasks', kind: 'remove' },
+  };
+
+  function fail(code, message, extra) {
+    return Object.assign({ ok: false, code: code, error: message }, extra || {});
+  }
+
+  // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
+  function planOp(o, i) {
+    const at = 'операция ' + (i + 1) + ': ';
+    if (!o || !o.op) return fail('bad_op', at + 'не указана операция');
+    const spec = OP_SPEC[o.op];
+    if (!spec) return fail('unknown_op', at + 'неизвестная операция «' + o.op + '»', { available: Object.keys(OP_SPEC) });
+    const coll = store.data[spec.coll];
+    if (!Array.isArray(coll)) return fail('no_collection', at + 'нет коллекции ' + spec.coll);
+
+    if (spec.kind === 'add') {
+      const rec = o.task || o.obj || o.record;
+      if (!rec || !rec.id) return fail('bad_record', at + 'нет записи или её id');
+      if (coll.some((x) => x.id === rec.id)) return fail('duplicate', at + 'запись ' + rec.id + ' уже есть');
+      return { ok: true, tier: 'safe', summary: o.op + ' ' + rec.id, run: () => { coll.unshift(rec); } };
+    }
+    if (spec.kind === 'remove') {
+      const idx = coll.findIndex((x) => x.id === o.id);
+      if (idx < 0) return fail('not_found', at + 'нет записи ' + o.id + ' в ' + spec.coll);
+      return { ok: true, tier: 'guarded', summary: o.op + ' ' + o.id, run: () => { coll.splice(idx, 1); } };
+    }
+
+    const rec = coll.find((x) => x.id === o.id);
+    if (!rec) return fail('not_found', at + 'нет записи ' + o.id + ' в ' + spec.coll, { collection: spec.coll, id: o.id });
+
+    if (spec.kind === 'stage') {
+      if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
+    }
+
+    const patch = o.patch;
+    if (!patch || typeof patch !== 'object') return fail('bad_patch', at + 'нет полей для изменения');
+    const keys = Object.keys(patch);
+    if (!keys.length) return fail('bad_patch', at + 'пустой набор полей');
+    const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
+    let tier = 'safe';
+    for (let k = 0; k < keys.length; k++) {
+      const f = keys[k];
+      if (rules.safe.indexOf(f) >= 0) continue;
+      if (rules.guarded.indexOf(f) >= 0) { tier = 'guarded'; continue; }
+      return fail('field_not_writable', at + 'поле «' + f + '» нельзя изменить через этот слой',
+        { field: f, collection: spec.coll, writable: rules.safe.concat(rules.guarded) });
+    }
+    return {
+      ok: true, tier: tier,
+      summary: spec.coll + ' ' + o.id + ': ' + keys.join(', '),
+      run: () => { Object.assign(rec, patch); },
+    };
+  }
+
+  // apply(ops, { confirmed, expectedRevision, silent })
+  //   → { ok:true, tier, revision, applied[] }  |  { ok:false, code, error, ... }
+  function apply(ops, opts) {
+    opts = opts || {};
+    if (!Array.isArray(ops) || !ops.length) return fail('empty', 'нечего применять');
+    if (opts.expectedRevision != null && opts.expectedRevision !== store.dataRevision) {
+      return fail('stale', 'данные изменились с момента предложения', { revision: store.dataRevision, expected: opts.expectedRevision });
+    }
+    const plan = [];
+    let tier = 'safe';
+    for (let i = 0; i < ops.length; i++) {
+      const p = planOp(ops[i], i);
+      if (!p.ok) return p;                       // nothing has been touched yet
+      if (p.tier === 'guarded') tier = 'guarded';
+      plan.push(p);
+    }
+    if (tier === 'guarded' && !opts.confirmed) {
+      return fail('needs_confirmation', 'изменение требует подтверждения',
+        { tier: tier, pending: plan.map((p) => p.summary), revision: store.dataRevision });
+    }
+    plan.forEach((p) => p.run());
+    store.dataRevision++;
+    save();
+    if (opts.silent !== true) emit();
+    return { ok: true, tier: tier, revision: store.dataRevision, applied: plan.map((p) => p.summary) };
+  }
+
+  // Dry run: what would happen, without happening. Used to render the diff a
+  // person confirms, so the preview and the write cannot disagree.
+  function preview(ops) {
+    if (!Array.isArray(ops) || !ops.length) return fail('empty', 'нечего применять');
+    const plan = [];
+    let tier = 'safe';
+    for (let i = 0; i < ops.length; i++) {
+      const p = planOp(ops[i], i);
+      if (!p.ok) return p;
+      if (p.tier === 'guarded') tier = 'guarded';
+      plan.push(p);
+    }
+    return { ok: true, tier: tier, revision: store.dataRevision, pending: plan.map((p) => p.summary) };
   }
 
   // ---- task queue mutations (Radar → work queue, batch 2)
@@ -2924,14 +3077,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     else if (action === 'reopen') { t.status = 'open'; if (t.when === 'done') t.when = 'today'; }
     else if (action === 'snooze') { t.status = 'open'; t.when = 'tomorrow'; t.due = payload || 'завтра'; t.snoozed = true; }
     else if (action === 'reassign') { t.assignee = payload; t.status = 'open'; }
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
   // Event edit (batch 5). Events live in data.events → restored by reset.
   function updateEvent(id, patch) {
     const ev = store.data.events.find((x) => x.id === id);
     if (!ev) return;
     Object.assign(ev, patch);
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
 
   // Manual kanban move (batch 4). Stage is restored by resetAll/resetScene.
@@ -2939,13 +3092,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const dl = store.data.deals.find((x) => x.id === id);
     if (!dl || dl.stage === stage) return;
     dl.stage = stage;
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
 
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
 
   function logEvent(ev) {
@@ -2967,8 +3120,135 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   WS.store = store;
   WS.storeApi = {
     boot, subscribe, emit, save, resetAll, resetScene,
-    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
+    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
   };
+})(window.WS = window.WS || {});
+
+</script>
+  <script>
+/* ============================================================
+   Declarative reads over the demo state.
+   The Concierge never counts anything itself: it describes the question, this
+   file answers it. Every result carries the records the number came from and
+   the revision it was computed at — so a figure in a reply can be opened and
+   checked against the same rows the screen draws from.
+   ============================================================ */
+(function (WS) {
+  // The addressable surface. A name that is not here is refused, so a question
+  // can never reach into internals by guessing a collection name.
+  const COLLECTIONS = {
+    clients: 'контакты',
+    deals: 'сделки',
+    objects: 'объекты',
+    tasks: 'задачи',
+    events: 'события календаря',
+    companies: 'компании',
+    inbox: 'входящие',
+  };
+
+  const num = (v) => (typeof v === 'number' ? v : parseFloat(v));
+  const str = (v) => String(v == null ? '' : v).toLowerCase();
+
+  const OPS = {
+    eq: (a, b) => a === b,
+    ne: (a, b) => a !== b,
+    gt: (a, b) => num(a) > num(b),
+    gte: (a, b) => num(a) >= num(b),
+    lt: (a, b) => num(a) < num(b),
+    lte: (a, b) => num(a) <= num(b),
+    in: (a, b) => Array.isArray(b) && b.indexOf(a) >= 0,
+    has: (a, b) => Array.isArray(a) && a.indexOf(b) >= 0,
+    contains: (a, b) => str(a).indexOf(str(b)) >= 0,
+    truthy: (a) => !!a,
+    falsy: (a) => !a,
+    exists: (a) => a !== undefined && a !== null,
+  };
+
+  const AGGS = ['count', 'sum', 'avg', 'min', 'max'];
+
+  function err(code, message, extra) {
+    return Object.assign({ ok: false, code: code, error: message }, extra || {});
+  }
+  function rev() { return WS.store.dataRevision; }
+
+  function aggregate(list, agg) {
+    const fn = (agg && agg.fn) || 'count';
+    if (fn === 'count') return list.length;
+    const vals = list.map((r) => num(r[agg.field])).filter((v) => !isNaN(v));
+    if (fn === 'sum') return vals.reduce((s, v) => s + v, 0);
+    if (fn === 'avg') return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    if (fn === 'min') return vals.length ? Math.min.apply(null, vals) : null;
+    return vals.length ? Math.max.apply(null, vals) : null;
+  }
+
+  // spec: { from, where:[{field,op,value}], groupBy, aggregate:{fn,field}, sort:{field,dir}, limit }
+  function run(spec) {
+    spec = spec || {};
+    const from = spec.from;
+    if (!COLLECTIONS[from]) {
+      return err('unknown_collection', 'нет такой коллекции: ' + from, { available: Object.keys(COLLECTIONS) });
+    }
+    const src = (WS.store.data || {})[from];
+    if (!Array.isArray(src)) return err('unknown_collection', 'коллекция недоступна: ' + from);
+
+    const agg = spec.aggregate;
+    if (agg && AGGS.indexOf(agg.fn || 'count') < 0) {
+      return err('unknown_aggregate', 'неизвестная функция: ' + agg.fn, { available: AGGS });
+    }
+    if (agg && agg.fn && agg.fn !== 'count' && !agg.field) {
+      return err('missing_field', 'функции ' + agg.fn + ' нужно поле');
+    }
+
+    let out = src.slice();
+    const where = spec.where || [];
+    for (let i = 0; i < where.length; i++) {
+      const w = where[i] || {};
+      const fn = OPS[w.op || 'eq'];
+      if (!fn) return err('unknown_operator', 'неизвестное условие: ' + w.op, { available: Object.keys(OPS) });
+      if (!w.field) return err('missing_field', 'в условии не указано поле');
+      out = out.filter((r) => fn(r[w.field], w.value));
+    }
+
+    if (spec.sort && spec.sort.field) {
+      const f = spec.sort.field;
+      const dir = spec.sort.dir === 'asc' ? 1 : -1;
+      out.sort((a, b) => {
+        const x = a[f], y = b[f];
+        if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+        return String(x == null ? '' : x).localeCompare(String(y == null ? '' : y)) * dir;
+      });
+    }
+
+    if (spec.groupBy) {
+      const groups = {};
+      out.forEach((r) => {
+        const k = String(r[spec.groupBy]);
+        (groups[k] = groups[k] || { rows: [] }).rows.push(r);
+      });
+      Object.keys(groups).forEach((k) => { groups[k].value = aggregate(groups[k].rows, agg); });
+      return { ok: true, from: from, where: where, groupBy: spec.groupBy, groups: groups, count: out.length, revision: rev() };
+    }
+
+    const res = {
+      ok: true, from: from, where: where,
+      rows: spec.limit > 0 ? out.slice(0, spec.limit) : out,
+      count: out.length, revision: rev(),
+    };
+    if (agg) res.value = aggregate(out, agg);
+    return res;
+  }
+
+  // What can be asked about, and with which fields — so the answer to an unusual
+  // question is a different query, not an apology.
+  function collections() {
+    const d = WS.store.data || {};
+    return Object.keys(COLLECTIONS).map((k) => {
+      const arr = Array.isArray(d[k]) ? d[k] : [];
+      return { name: k, label: COLLECTIONS[k], count: arr.length, fields: arr.length ? Object.keys(arr[0]) : [] };
+    });
+  }
+
+  WS.query = { run: run, collections: collections, operators: () => Object.keys(OPS), aggregates: () => AGGS.slice() };
 })(window.WS = window.WS || {});
 
 </script>
@@ -4043,13 +4323,34 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     { r: 'Цена выше рынка', n: 4 }, { r: 'Выбрали у конкурента', n: 3 },
     { r: 'Долго решается', n: 2 }, { r: 'Финансирование не одобрено', n: 2 }, { r: 'Не прошёл проверку KYC', n: 1 },
   ];
+  // Anyone a record points at, by id — the three switchable roles plus colleagues.
+  function userById(id) {
+    if (!id) return null;
+    const data = D();
+    const inRoster = (data.roster || []).find((u) => u.id === id);
+    if (inRoster) return inRoster;
+    const roles = data.users || {};
+    return Object.keys(roles).map((k) => roles[k]).find((u) => u && u.id === id) || null;
+  }
+
+  // The commission on a deal, one definition, used by the screens and by any answer.
+  // It follows the rate on the linked object, because that is the rate shown on the
+  // object card; a flat guess here is exactly the discrepancy a broker spots first.
+  const DEFAULT_COMM_PCT = 2;
+  function dealCommission(deal) {
+    if (!deal) return 0;
+    const obj = (D().objects || []).find((o) => o.id === deal.objectId);
+    const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
+    return Math.round((deal.amount || 0) * pct / 100);
+  }
+
   function computeMetrics() {
     const A = D().attribution || []; const deals = D().deals || [];
     const leads = A.reduce((s, x) => s + x.leads, 0);
     const won = A.reduce((s, x) => s + x.deals, 0);
     const saleFunnels = ['sale_offplan', 'sale_ready', 'rental_biz', 'referral'];
     const activeSales = deals.filter((d) => d.stage !== 'done' && saleFunnels.indexOf(d.funnel) >= 0);
-    const expectedComm = Math.round(activeSales.reduce((s, d) => s + d.amount * 0.02, 0));
+    const expectedComm = Math.round(activeSales.reduce((s, d) => s + dealCommission(d), 0));
     const closed = deals.filter((d) => d.stage === 'done');
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
   }
@@ -4060,7 +4361,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const data = D();
     const deals = data.deals || [], tasks = data.tasks || [], clients = data.clients || [];
     const m = computeMetrics();
-    const active = deals.filter((d) => d.stage !== 'done');
+    // Goes through the query layer rather than filtering here, so the headline number
+    // and the records a person can open behind it are produced by the same code path.
+    const ACTIVE = [{ field: 'stage', op: 'ne', value: 'done' }];
+    const qActive = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } });
+    const qActiveSum = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } });
+    const active = qActive.rows;
     const sum = (list) => list.reduce((s, d) => s + (d.amount || 0), 0);
     const byStage = {};
     active.forEach((d) => {
@@ -4071,8 +4377,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const bySource = {};
     deals.forEach((d) => { if (d.source) bySource[d.source] = (bySource[d.source] || 0) + 1; });
     const out = {
-      deals_active: { v: active.length, label: 'активных сделок' },
-      deals_active_sum: { v: sum(active), money: true, label: 'сумма активных сделок' },
+      deals_active: { v: qActive.value, label: 'активных сделок' },
+      deals_active_sum: { v: qActiveSum.value, money: true, label: 'сумма активных сделок' },
       deals_closed: { v: m.closedCount, label: 'закрытых сделок' },
       deals_closed_sum: { v: m.closedSum, money: true, label: 'сумма закрытых сделок' },
       deals_hot: { v: deals.filter((d) => d.hot).length, label: 'горячих сделок (SLA < 2 ч)' },
@@ -5621,14 +5927,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Headless core of "add an event to a feed" — no DOM, so the Concierge can drive it too.
   // when: 'now' | { daysAgo: 0..N, h, mi }. Returns the stored entry, or null if the input is
   // not valid (unknown scope / unknown entity / empty text) — never writes a half-formed record.
+  let taskSeq = 0;   // ids for tasks the Concierge creates; stable within a session
   function addEventEntry(scope, id, opts) {
     const o = opts || {};
     const txt = String(o.text == null ? '' : o.text).trim();
     if (!txt) return null;
     const bag = timelineFor(scope);
     if (!bag) return null;
-    if (!feedOwner(scope, id)) return null;          // refuse to write against an unknown id
-    const spec = FEED_TYPES.find((x) => x[0] === o.type) || FEED_TYPES[0];
+    const owner = feedOwner(scope, id);
+    if (!owner) return null;                         // refuse to write against an unknown id
+    // An unrecognised type is a mistake on the caller's side. Quietly filing it as a note
+    // would hide that from whoever asked, so refuse instead.
+    const spec = o.type ? FEED_TYPES.find((x) => x[0] === o.type) : FEED_TYPES[0];
+    if (!spec) return null;
     const who = o.by || (D().users[WS.store.role] || {}).name || 'Агент';
     const list = (bag[id] = bag[id] || []);
     const when = o.when || 'now';
@@ -5651,7 +5962,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     let pos = list.length;
     while (pos > 0 && list[pos - 1].ord != null && list[pos - 1].ord > ord) pos--;
     list.splice(pos, 0, entry);
+    WS.store.dataRevision++;
     WS.storeApi.save(); // direct data mutation — persist it, F5 must not drop the entry
+    // A task is a commitment, not a line in a feed. Recording only the feed entry would
+    // let an answer claim the task exists while Задачи stays empty — the kind of gap a
+    // person discovers after the meeting, not during it.
+    if (spec[0] === 'task') {
+      entry.taskId = 't_cg_' + (++taskSeq);
+      WS.storeApi.addTask({
+        id: entry.taskId,
+        clientId: scope === 'contact' ? id : (owner.clientId || null),
+        title: txt,
+        due: o.due || 'сегодня',
+        when: o.dueWhen || 'today',
+        kind: 'manual',
+      });
+    }
     return entry;
   }
   // DOM adapter: reads the modal's fields and delegates. Behaviour is unchanged.
@@ -8048,7 +8374,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup };
 })(window.WS = window.WS || {});
 

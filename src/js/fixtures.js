@@ -15,6 +15,15 @@
     partner: { id: 'u_yusef',  name: 'Юсеф Хаддад',     role: 'Клубный партнёр', init: 'ЮХ' },
   };
 
+  // Everyone a record can point at. `users` above is only the three switchable
+  // roles; deals are also assigned to colleagues, and every one of those ids has
+  // to resolve to a name — otherwise a question about the team hits a blank.
+  const roster = [
+    users.agent, users.manager, users.partner,
+    { id: 'u_ahmed', name: 'Ахмед Саид',  role: 'Агент', init: 'АС' },
+    { id: 'u_lina',  name: 'Лина Хаддад', role: 'Агент', init: 'ЛХ' },
+  ];
+
   const clients = [
     {
       id: 'c_anna', name: 'Анна Петрова', tag: 'main', lang: 'RU', channel: 'whatsapp',
@@ -342,20 +351,21 @@
   ];
 
   // Analytics for the start screen tiles.
+  // Deliberately holds no counter that is derivable from deals: `dealsActive` and
+  // `pipelineValue` used to live here, were never read (the screen recomputes them),
+  // and only sat waiting to contradict the real figure in an answer.
   const analytics = {
     hotClients: 3,
     kpPending: 1,
     savedHours: 14.5,
-    dealsActive: 4,
     weekTouches: { done: 11, total: 14 },
-    pipelineValue: 8.86, // млн AED
     sparks: [4, 6, 5, 8, 7, 9, 12], // deals/day trend
     coverage: 0.86,     // lead coverage
   };
 
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, clients, objects, refModel,
+    DEMO_NOW, tenant, users, roster, clients, objects, refModel,
     deals, tasks, events, inbox, analytics,
     FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };

@@ -180,13 +180,34 @@
     { r: 'Цена выше рынка', n: 4 }, { r: 'Выбрали у конкурента', n: 3 },
     { r: 'Долго решается', n: 2 }, { r: 'Финансирование не одобрено', n: 2 }, { r: 'Не прошёл проверку KYC', n: 1 },
   ];
+  // Anyone a record points at, by id — the three switchable roles plus colleagues.
+  function userById(id) {
+    if (!id) return null;
+    const data = D();
+    const inRoster = (data.roster || []).find((u) => u.id === id);
+    if (inRoster) return inRoster;
+    const roles = data.users || {};
+    return Object.keys(roles).map((k) => roles[k]).find((u) => u && u.id === id) || null;
+  }
+
+  // The commission on a deal, one definition, used by the screens and by any answer.
+  // It follows the rate on the linked object, because that is the rate shown on the
+  // object card; a flat guess here is exactly the discrepancy a broker spots first.
+  const DEFAULT_COMM_PCT = 2;
+  function dealCommission(deal) {
+    if (!deal) return 0;
+    const obj = (D().objects || []).find((o) => o.id === deal.objectId);
+    const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
+    return Math.round((deal.amount || 0) * pct / 100);
+  }
+
   function computeMetrics() {
     const A = D().attribution || []; const deals = D().deals || [];
     const leads = A.reduce((s, x) => s + x.leads, 0);
     const won = A.reduce((s, x) => s + x.deals, 0);
     const saleFunnels = ['sale_offplan', 'sale_ready', 'rental_biz', 'referral'];
     const activeSales = deals.filter((d) => d.stage !== 'done' && saleFunnels.indexOf(d.funnel) >= 0);
-    const expectedComm = Math.round(activeSales.reduce((s, d) => s + d.amount * 0.02, 0));
+    const expectedComm = Math.round(activeSales.reduce((s, d) => s + dealCommission(d), 0));
     const closed = deals.filter((d) => d.stage === 'done');
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
   }
@@ -197,7 +218,12 @@
     const data = D();
     const deals = data.deals || [], tasks = data.tasks || [], clients = data.clients || [];
     const m = computeMetrics();
-    const active = deals.filter((d) => d.stage !== 'done');
+    // Goes through the query layer rather than filtering here, so the headline number
+    // and the records a person can open behind it are produced by the same code path.
+    const ACTIVE = [{ field: 'stage', op: 'ne', value: 'done' }];
+    const qActive = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } });
+    const qActiveSum = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } });
+    const active = qActive.rows;
     const sum = (list) => list.reduce((s, d) => s + (d.amount || 0), 0);
     const byStage = {};
     active.forEach((d) => {
@@ -208,8 +234,8 @@
     const bySource = {};
     deals.forEach((d) => { if (d.source) bySource[d.source] = (bySource[d.source] || 0) + 1; });
     const out = {
-      deals_active: { v: active.length, label: 'активных сделок' },
-      deals_active_sum: { v: sum(active), money: true, label: 'сумма активных сделок' },
+      deals_active: { v: qActive.value, label: 'активных сделок' },
+      deals_active_sum: { v: qActiveSum.value, money: true, label: 'сумма активных сделок' },
       deals_closed: { v: m.closedCount, label: 'закрытых сделок' },
       deals_closed_sum: { v: m.closedSum, money: true, label: 'сумма закрытых сделок' },
       deals_hot: { v: deals.filter((d) => d.hot).length, label: 'горячих сделок (SLA < 2 ч)' },
@@ -1758,14 +1784,19 @@
   // Headless core of "add an event to a feed" — no DOM, so the Concierge can drive it too.
   // when: 'now' | { daysAgo: 0..N, h, mi }. Returns the stored entry, or null if the input is
   // not valid (unknown scope / unknown entity / empty text) — never writes a half-formed record.
+  let taskSeq = 0;   // ids for tasks the Concierge creates; stable within a session
   function addEventEntry(scope, id, opts) {
     const o = opts || {};
     const txt = String(o.text == null ? '' : o.text).trim();
     if (!txt) return null;
     const bag = timelineFor(scope);
     if (!bag) return null;
-    if (!feedOwner(scope, id)) return null;          // refuse to write against an unknown id
-    const spec = FEED_TYPES.find((x) => x[0] === o.type) || FEED_TYPES[0];
+    const owner = feedOwner(scope, id);
+    if (!owner) return null;                         // refuse to write against an unknown id
+    // An unrecognised type is a mistake on the caller's side. Quietly filing it as a note
+    // would hide that from whoever asked, so refuse instead.
+    const spec = o.type ? FEED_TYPES.find((x) => x[0] === o.type) : FEED_TYPES[0];
+    if (!spec) return null;
     const who = o.by || (D().users[WS.store.role] || {}).name || 'Агент';
     const list = (bag[id] = bag[id] || []);
     const when = o.when || 'now';
@@ -1788,7 +1819,22 @@
     let pos = list.length;
     while (pos > 0 && list[pos - 1].ord != null && list[pos - 1].ord > ord) pos--;
     list.splice(pos, 0, entry);
+    WS.store.dataRevision++;
     WS.storeApi.save(); // direct data mutation — persist it, F5 must not drop the entry
+    // A task is a commitment, not a line in a feed. Recording only the feed entry would
+    // let an answer claim the task exists while Задачи stays empty — the kind of gap a
+    // person discovers after the meeting, not during it.
+    if (spec[0] === 'task') {
+      entry.taskId = 't_cg_' + (++taskSeq);
+      WS.storeApi.addTask({
+        id: entry.taskId,
+        clientId: scope === 'contact' ? id : (owner.clientId || null),
+        title: txt,
+        due: o.due || 'сегодня',
+        when: o.dueWhen || 'today',
+        kind: 'manual',
+      });
+    }
     return entry;
   }
   // DOM adapter: reads the modal's fields and delegates. Behaviour is unchanged.
@@ -4185,6 +4231,6 @@
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup };
 })(window.WS = window.WS || {});

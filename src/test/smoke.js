@@ -8,7 +8,11 @@ const D = path.join(__dirname, '..');          // sources live in src/
 const { JSDOM } = require('jsdom');
 
 const read = (p) => fs.readFileSync(path.join(D, p), 'utf8').replace(/\r\n/g, '\n');
-const jsFiles = ['icons', 'photos', 'viz', 'fixtures', 'scenarios', 'finance', 'store', 'engine', 'events', 'ui', 'main'];
+// Module list comes from the dev entry point, exactly like the builder reads it — so a module
+// added to index.html can never be silently missing from the test run.
+const jsFiles = (read('index.html').match(/<script src="js\/([^"]+)\.js"><\/script>/g) || [])
+  .map((m) => m.replace(/.*js\/([^"]+)\.js.*/, '$1'));
+if (!jsFiles.length) throw new Error('no module scripts found in src/index.html');
 const scripts = jsFiles.map((f) => '<script>' + read('js/' + f + '.js') + '</script>').join('\n');
 const html = '<!DOCTYPE html><html><head>' +
   '<script>if(!window.structuredClone){window.structuredClone=function(o){return JSON.parse(JSON.stringify(o))}}</script>' +
@@ -351,6 +355,158 @@ setTimeout(() => {
     check('every metric carries a value and a label',
       Object.keys(snap.metrics).every((k) => snap.metrics[k] && typeof snap.metrics[k].v === 'number' && snap.metrics[k].label));
     check('stage breakdown is populated', Object.keys(snap.byStage).length > 0);
+  }
+
+  // ============================================================
+  //  Data plane — the only way the Concierge is allowed to read and write.
+  //  Read: declarative queries that return the number AND the records behind it.
+  //  Write: one transactional entry point that validates, applies all-or-nothing,
+  //         bumps a revision and refreshes the screen.
+  // ============================================================
+  const sapi = WS.storeApi;
+  const QRY = WS.query;
+  const dd = () => WS.store.data;
+  const dealBy = (id) => dd().deals.find((x) => x.id === id);
+
+  check('data plane · storeApi.apply exists', typeof sapi.apply === 'function');
+  check('data plane · WS.query.run exists', !!QRY && typeof QRY.run === 'function');
+
+  if (typeof sapi.apply === 'function' && QRY && typeof QRY.run === 'function') {
+    // ---- revision ----
+    const rev0 = WS.store.dataRevision;
+    check('revision · exists and is a number', typeof rev0 === 'number', 'rev=' + rev0);
+
+    // ---- a safe field applies without confirmation ----
+    const r1 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { tags: ['G1', 'проверка'] } }]);
+    check('apply · safe patch succeeds', !!r1 && r1.ok === true, JSON.stringify(r1));
+    check('apply · safe patch reported as tier=safe', !!r1 && r1.tier === 'safe', r1 && r1.tier);
+    check('apply · revision bumped by one', WS.store.dataRevision === rev0 + 1, WS.store.dataRevision + ' vs ' + (rev0 + 1));
+    check('apply · the value actually changed', (dealBy('d_anna').tags || []).indexOf('проверка') >= 0);
+
+    // ---- unknown entity is refused ----
+    const revA = WS.store.dataRevision;
+    const r2 = sapi.apply([{ op: 'updateDeal', id: 'd_does_not_exist', patch: { tags: ['x'] } }]);
+    check('apply · unknown entity refused', !!r2 && r2.ok === false, JSON.stringify(r2));
+    check('apply · refused write leaves revision alone', WS.store.dataRevision === revA);
+
+    // ---- identity fields are not writable at all ----
+    const r3 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { clientId: 'c_night' } }], { confirmed: true });
+    check('apply · identity field refused even when confirmed', !!r3 && r3.ok === false, JSON.stringify(r3));
+    check('apply · deal still points at its own client', dealBy('d_anna').clientId === 'c_anna');
+
+    // ---- consent can never be granted through the layer (legal boundary, not a preference) ----
+    const noC = dd().clients.find((c) => c.consent === false);
+    if (noC) {
+      const r4 = sapi.apply([{ op: 'updateClient', id: noC.id, patch: { consent: true } }], { confirmed: true });
+      check('apply · consent is not writable, even confirmed', !!r4 && r4.ok === false, JSON.stringify(r4));
+      check('apply · client remains without consent', dd().clients.find((c) => c.id === noC.id).consent !== true);
+    }
+
+    // ---- a guarded field needs explicit confirmation ----
+    const stageWas = dealBy('d_anna').stage;
+    const revB = WS.store.dataRevision;
+    const r5 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'work' } }]);
+    check('apply · guarded field refused without confirmation', !!r5 && r5.ok === false && r5.code === 'needs_confirmation', JSON.stringify(r5));
+    check('apply · unconfirmed guarded write changes nothing', dealBy('d_anna').stage === stageWas);
+    check('apply · unconfirmed guarded write leaves revision alone', WS.store.dataRevision === revB);
+    const r6 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'work' } }], { confirmed: true });
+    check('apply · guarded field applies once confirmed', !!r6 && r6.ok === true && dealBy('d_anna').stage === 'work', JSON.stringify(r6));
+    check('apply · guarded patch reported as tier=guarded', !!r6 && r6.tier === 'guarded', r6 && r6.tier);
+
+    // ---- a batch is all-or-nothing ----
+    const tagsWas = (dealBy('d_anna').tags || []).join(',');
+    const revC = WS.store.dataRevision;
+    const r7 = sapi.apply([
+      { op: 'updateDeal', id: 'd_anna', patch: { tags: ['атомарность'] } },
+      { op: 'updateDeal', id: 'd_does_not_exist', patch: { tags: ['x'] } },
+    ]);
+    check('apply · batch with one bad op is refused', !!r7 && r7.ok === false);
+    check('apply · nothing from a refused batch is applied', (dealBy('d_anna').tags || []).join(',') === tagsWas, 'now=' + (dealBy('d_anna').tags || []).join(','));
+    check('apply · refused batch leaves revision alone', WS.store.dataRevision === revC);
+
+    // ---- a proposal built against older data is refused ----
+    const r8 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { tags: ['устарело'] } }], { expectedRevision: rev0 });
+    check('apply · stale proposal refused', !!r8 && r8.ok === false && r8.code === 'stale', JSON.stringify(r8));
+
+    // ---- a successful write refreshes the screen, not just the data ----
+    let notified = 0;
+    sapi.subscribe(() => { notified++; });
+    sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { sub: 'проверка уведомления' } }]);
+    check('apply · success notifies subscribers', notified > 0, 'notified=' + notified);
+
+    // ---- multi-op batch applies together ----
+    const tasksWas = dd().tasks.length;
+    const r9 = sapi.apply([
+      { op: 'updateDeal', id: 'd_anna', patch: { tags: ['пакет'] } },
+      { op: 'addTask', task: { id: 't_batch_probe', clientId: 'c_anna', title: 'Проверка пакета', due: 'завтра', when: 'tomorrow', kind: 'manual' } },
+    ]);
+    check('apply · valid multi-op batch succeeds', !!r9 && r9.ok === true, JSON.stringify(r9));
+    check('apply · both ops of the batch landed',
+      (dealBy('d_anna').tags || []).indexOf('пакет') >= 0 && dd().tasks.length === tasksWas + 1);
+    check('apply · one batch is one revision', typeof r9.revision === 'number');
+
+    // ---- queries ----
+    const qAll = QRY.run({ from: 'deals' });
+    check('query · returns all rows of a collection', !!qAll && qAll.ok === true && qAll.rows.length === dd().deals.length, JSON.stringify(qAll && qAll.rows && qAll.rows.length));
+    check('query · result carries the revision it was computed at', qAll.revision === WS.store.dataRevision);
+
+    const expectActive = dd().deals.filter((d) => d.stage !== 'done').length;
+    const qActive = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } });
+    check('query · count matches an independent computation', qActive.value === expectActive, qActive.value + ' vs ' + expectActive);
+    check('query · the number comes with the records behind it', qActive.rows.length === expectActive, 'rows=' + qActive.rows.length);
+
+    const expectSum = dd().deals.filter((d) => d.stage !== 'done').reduce((s, d) => s + (d.amount || 0), 0);
+    const qSum = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'sum', field: 'amount' } });
+    check('query · sum matches an independent computation', qSum.value === expectSum, qSum.value + ' vs ' + expectSum);
+
+    const qGroup = QRY.run({ from: 'deals', groupBy: 'stage', aggregate: { fn: 'count' } });
+    const stagesSeen = Object.keys(qGroup.groups || {});
+    check('query · groupBy returns one entry per distinct value', stagesSeen.length > 0 &&
+      stagesSeen.every((k) => qGroup.groups[k].value === dd().deals.filter((d) => d.stage === k).length), stagesSeen.join(','));
+
+    const qTop = QRY.run({ from: 'deals', sort: { field: 'amount', dir: 'desc' }, limit: 2 });
+    check('query · sort + limit', qTop.rows.length === 2 && qTop.rows[0].amount >= qTop.rows[1].amount);
+
+    const qBad = QRY.run({ from: 'secrets' });
+    check('query · unknown collection returns an error instead of throwing', !!qBad && qBad.ok === false);
+
+    const revD = WS.store.dataRevision;
+    QRY.run({ from: 'deals', aggregate: { fn: 'count' } });
+    check('query · reading never mutates state', WS.store.dataRevision === revD);
+
+    check('query · the available collections are discoverable', Array.isArray(QRY.collections()) && QRY.collections().length > 0);
+
+    // ---- metrics have exactly one source ----
+    const snap = WS.ui.metricsSnapshot();
+    check('metrics · deals_active equals the query count', snap.metrics.deals_active.v === qActive.value,
+      snap.metrics.deals_active.v + ' vs ' + qActive.value);
+    check('metrics · no dead hardcoded dealsActive to contradict it', dd().analytics.dealsActive === undefined,
+      'analytics.dealsActive=' + dd().analytics.dealsActive);
+    check('metrics · no dead hardcoded pipelineValue', dd().analytics.pipelineValue === undefined,
+      'analytics.pipelineValue=' + dd().analytics.pipelineValue);
+
+    // ---- commission follows the linked object's rate, not a flat guess ----
+    const dKarim = dealBy('d_karim');
+    if (dKarim) {
+      const oKarim = dd().objects.find((o) => o.id === dKarim.objectId);
+      const expectComm = Math.round(dKarim.amount * (oKarim.commissionPct || 2) / 100);
+      check('commission · a deal uses its object\'s rate', WS.ui.dealCommission(dKarim) === expectComm,
+        WS.ui.dealCommission(dKarim) + ' vs ' + expectComm);
+    }
+
+    // ---- every agent referenced by a deal is a real person ----
+    check('roster · every deal agent resolves to a named person',
+      dd().deals.every((d) => !d.agent || !!WS.ui.userById(d.agent)),
+      dd().deals.filter((d) => d.agent && !WS.ui.userById(d.agent)).map((d) => d.agent).join(','));
+    check('roster · the agents deals point at are present', !!WS.ui.userById('u_ahmed') && !!WS.ui.userById('u_lina'));
+
+    // ---- a "task" written into a feed becomes a real task, not just a line ----
+    const tasksBefore = dd().tasks.length;
+    WS.ui.addEventEntry('contact', 'c_anna', { type: 'task', text: 'Позвонить по графику платежей' });
+    check('event type task · creates a real task in the queue', dd().tasks.length === tasksBefore + 1,
+      'before=' + tasksBefore + ' after=' + dd().tasks.length);
+    check('event type task · the task carries the text',
+      dd().tasks.some((t) => (t.title || '').indexOf('графику платежей') >= 0));
   }
 
   // ---- regression: main screens still render ----

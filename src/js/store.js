@@ -4,7 +4,7 @@
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 8; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[].
+  const SCHEMA = 9; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -16,6 +16,7 @@
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
+    dataRevision: 0,      // bumped by every write; a proposal built against an older one is stale
     events: [],           // event log (spec §14.2)
     unsaved: 0,
     toasts: [],
@@ -44,6 +45,7 @@
       events: clone(f.events),
       inbox: clone(f.inbox),
       analytics: clone(f.analytics),
+      roster: clone(f.roster),
       refModel: clone(f.refModel),
       companies: clone(f.companies),
       dealTimeline: clone(f.dealTimeline),
@@ -234,7 +236,148 @@
         Object.assign(d.analytics, e.patch);
       }
     });
+    store.dataRevision++;
     save();
+  }
+
+  // ============================================================
+  //  The one way anything writes to the data.
+  //  Scenario effects above are authored by us and trusted; everything that
+  //  comes from a conversation goes through here instead, where each operation
+  //  is checked BEFORE any of them is applied. A batch is all-or-nothing, so a
+  //  half-understood instruction cannot leave the deal half-changed.
+  // ============================================================
+
+  // Writable surface, tiered by consequence rather than by convenience.
+  //   safe    — applies straight away and is obvious on sight (wording, tags, notes)
+  //   guarded — needs an explicit confirmation (money, stage, ownership, status)
+  //   absent  — not writable here at all: identity fields, provenance, and consent,
+  //             which is a legal fact recorded from the client, not ours to grant
+  const WRITABLE = {
+    deals: {
+      safe: ['tags', 'sub', 'title', 'updated', 'note', 'nextStep', 'consideredProjects'],
+      guarded: ['stage', 'amount', 'hot', 'funnel', 'dealType', 'objectType', 'goal', 'paymentForm',
+        'vat', 'source', 'agent', 'partnerAgent', 'companyId', 'stageDays', 'contacts'],
+    },
+    clients: {
+      safe: ['note', 'goal', 'areas', 'horizon', 'viewed'],
+      guarded: ['budget', 'tag', 'channel', 'lang', 'name', 'phone', 'psych'],
+    },
+    objects: {
+      safe: ['match'],
+      guarded: ['price', 'verified', 'checkedAt', 'source', 'sourceLabel', 'commissionPct',
+        'size', 'br', 'area', 'name', 'address', 'purpose'],
+    },
+    tasks: {
+      safe: ['title', 'due', 'kind', 'assignee'],
+      guarded: ['status', 'when'],
+    },
+  };
+
+  const OP_SPEC = {
+    updateDeal: { coll: 'deals', kind: 'patch' },
+    updateClient: { coll: 'clients', kind: 'patch' },
+    updateObject: { coll: 'objects', kind: 'patch' },
+    setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
+    updateTask: { coll: 'tasks', kind: 'patch' },
+    dealStage: { coll: 'deals', kind: 'stage' },
+    addTask: { coll: 'tasks', kind: 'add' },
+    removeTask: { coll: 'tasks', kind: 'remove' },
+  };
+
+  function fail(code, message, extra) {
+    return Object.assign({ ok: false, code: code, error: message }, extra || {});
+  }
+
+  // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
+  function planOp(o, i) {
+    const at = 'операция ' + (i + 1) + ': ';
+    if (!o || !o.op) return fail('bad_op', at + 'не указана операция');
+    const spec = OP_SPEC[o.op];
+    if (!spec) return fail('unknown_op', at + 'неизвестная операция «' + o.op + '»', { available: Object.keys(OP_SPEC) });
+    const coll = store.data[spec.coll];
+    if (!Array.isArray(coll)) return fail('no_collection', at + 'нет коллекции ' + spec.coll);
+
+    if (spec.kind === 'add') {
+      const rec = o.task || o.obj || o.record;
+      if (!rec || !rec.id) return fail('bad_record', at + 'нет записи или её id');
+      if (coll.some((x) => x.id === rec.id)) return fail('duplicate', at + 'запись ' + rec.id + ' уже есть');
+      return { ok: true, tier: 'safe', summary: o.op + ' ' + rec.id, run: () => { coll.unshift(rec); } };
+    }
+    if (spec.kind === 'remove') {
+      const idx = coll.findIndex((x) => x.id === o.id);
+      if (idx < 0) return fail('not_found', at + 'нет записи ' + o.id + ' в ' + spec.coll);
+      return { ok: true, tier: 'guarded', summary: o.op + ' ' + o.id, run: () => { coll.splice(idx, 1); } };
+    }
+
+    const rec = coll.find((x) => x.id === o.id);
+    if (!rec) return fail('not_found', at + 'нет записи ' + o.id + ' в ' + spec.coll, { collection: spec.coll, id: o.id });
+
+    if (spec.kind === 'stage') {
+      if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
+    }
+
+    const patch = o.patch;
+    if (!patch || typeof patch !== 'object') return fail('bad_patch', at + 'нет полей для изменения');
+    const keys = Object.keys(patch);
+    if (!keys.length) return fail('bad_patch', at + 'пустой набор полей');
+    const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
+    let tier = 'safe';
+    for (let k = 0; k < keys.length; k++) {
+      const f = keys[k];
+      if (rules.safe.indexOf(f) >= 0) continue;
+      if (rules.guarded.indexOf(f) >= 0) { tier = 'guarded'; continue; }
+      return fail('field_not_writable', at + 'поле «' + f + '» нельзя изменить через этот слой',
+        { field: f, collection: spec.coll, writable: rules.safe.concat(rules.guarded) });
+    }
+    return {
+      ok: true, tier: tier,
+      summary: spec.coll + ' ' + o.id + ': ' + keys.join(', '),
+      run: () => { Object.assign(rec, patch); },
+    };
+  }
+
+  // apply(ops, { confirmed, expectedRevision, silent })
+  //   → { ok:true, tier, revision, applied[] }  |  { ok:false, code, error, ... }
+  function apply(ops, opts) {
+    opts = opts || {};
+    if (!Array.isArray(ops) || !ops.length) return fail('empty', 'нечего применять');
+    if (opts.expectedRevision != null && opts.expectedRevision !== store.dataRevision) {
+      return fail('stale', 'данные изменились с момента предложения', { revision: store.dataRevision, expected: opts.expectedRevision });
+    }
+    const plan = [];
+    let tier = 'safe';
+    for (let i = 0; i < ops.length; i++) {
+      const p = planOp(ops[i], i);
+      if (!p.ok) return p;                       // nothing has been touched yet
+      if (p.tier === 'guarded') tier = 'guarded';
+      plan.push(p);
+    }
+    if (tier === 'guarded' && !opts.confirmed) {
+      return fail('needs_confirmation', 'изменение требует подтверждения',
+        { tier: tier, pending: plan.map((p) => p.summary), revision: store.dataRevision });
+    }
+    plan.forEach((p) => p.run());
+    store.dataRevision++;
+    save();
+    if (opts.silent !== true) emit();
+    return { ok: true, tier: tier, revision: store.dataRevision, applied: plan.map((p) => p.summary) };
+  }
+
+  // Dry run: what would happen, without happening. Used to render the diff a
+  // person confirms, so the preview and the write cannot disagree.
+  function preview(ops) {
+    if (!Array.isArray(ops) || !ops.length) return fail('empty', 'нечего применять');
+    const plan = [];
+    let tier = 'safe';
+    for (let i = 0; i < ops.length; i++) {
+      const p = planOp(ops[i], i);
+      if (!p.ok) return p;
+      if (p.tier === 'guarded') tier = 'guarded';
+      plan.push(p);
+    }
+    return { ok: true, tier: tier, revision: store.dataRevision, pending: plan.map((p) => p.summary) };
   }
 
   // ---- task queue mutations (Radar → work queue, batch 2)
@@ -247,14 +390,14 @@
     else if (action === 'reopen') { t.status = 'open'; if (t.when === 'done') t.when = 'today'; }
     else if (action === 'snooze') { t.status = 'open'; t.when = 'tomorrow'; t.due = payload || 'завтра'; t.snoozed = true; }
     else if (action === 'reassign') { t.assignee = payload; t.status = 'open'; }
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
   // Event edit (batch 5). Events live in data.events → restored by reset.
   function updateEvent(id, patch) {
     const ev = store.data.events.find((x) => x.id === id);
     if (!ev) return;
     Object.assign(ev, patch);
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
 
   // Manual kanban move (batch 4). Stage is restored by resetAll/resetScene.
@@ -262,13 +405,13 @@
     const dl = store.data.deals.find((x) => x.id === id);
     if (!dl || dl.stage === stage) return;
     dl.stage = stage;
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
 
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
-    save(); emit();
+    store.dataRevision++; save(); emit();
   }
 
   function logEvent(ev) {
@@ -290,6 +433,6 @@
   WS.store = store;
   WS.storeApi = {
     boot, subscribe, emit, save, resetAll, resetScene,
-    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
+    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});
