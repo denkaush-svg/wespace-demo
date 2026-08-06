@@ -551,8 +551,18 @@
     await delay(60); if (!same()) return;
     pushText('me', chanIcon('text'), text, threadId);
     await delay(500); if (!same()) return;
-    const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Ищу контекст'] }, 1, false), threadId);
-    await delay(700); if (!same()) return;
+    // The request is kept as a research signal regardless of how it is answered —
+    // what brokers actually type is the most useful thing this stand collects.
+    (WS.store.signals || (WS.store.signals = [])).push(text);
+    const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Считаю по данным'] }, 1, false), threadId);
+    await delay(560); if (!same()) return;
+    const reply = WS.agent.ask(text);
+    engine.lastReply = reply;
+    updateMsg(workMid, agentCard(reply), threadId);
+  }
+
+  function freeReplyLegacy(text) {
+    const threadId = engine.activeThreadId || 'general';
     // Wizard-of-Oz: minimal context binding (recognise a client the demo knows),
     // honest «подготовлено близкое», плашка намерений, и запись запроса как сигнала.
     const lc = (text || '').toLowerCase();
@@ -573,6 +583,90 @@
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">' + (WS.events ? WS.events.SIM : 'симуляция') + ' · ваш запрос сохранён как сигнал для доработки.</div>'), threadId);
   }
 
+
+  // ---------- agent replies ----------
+  // Every reply the Concierge gives is one of these four shapes. Numbers arrive
+  // with the query that produced them, so a figure can be opened; anything that
+  // writes arrives as a proposal with the change spelled out, never as a fait
+  // accompli; and an action we cannot actually perform arrives as the artifact
+  // itself, labelled, rather than as an apology.
+  function evChips(ev) {
+    if (!ev || !ev.length) return '';
+    return '<div class="ev-cap">' + I('source') + 'откуда это число</div>' +
+      '<div class="qa-row" style="margin-top:5px">' + ev.map((e, i) =>
+      '<button class="chip src" data-agev="' + i + '" title="показать записи, из которых это посчитано">' +
+      (e.money ? WS.AED(e.value) : e.value) + ' ' + esc(e.label) + '</button>').join('') + '</div>';
+  }
+  function nextChips(next) {
+    if (!next || !next.length) return '';
+    return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
+      '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
+  }
+  function answerCard(r) {
+    return msg('ai', I('sparkle') + ' Консьерж', esc(r.text) + evChips(r.evidence) + nextChips(r.next));
+  }
+  function proposalCard(p) {
+    const lines = (p.lines || []).map((l) =>
+      '<div class="field"><div class="k">Изменение</div><div class="v"><span class="now">' + esc(l) + '</span></div></div>').join('');
+    const badge = p.tier === 'guarded'
+      ? '<span class="lvl-tag a3 lvl">нужно подтверждение</span>'
+      : '<span class="lvl-tag a1 lvl">безопасное</span>';
+    return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
+      '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
+      '<div class="t">' + esc(p.title) + '</div>' + badge + '</div>' +
+      '<div class="pb">' + lines + '</div>' +
+      '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
+      '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +
+      '<button class="btn primary cta-hint" data-agok="' + p.id + '">' + I('check') + 'Подтвердить</button></div>' +
+      '</div></div></div>';
+  }
+  function draftCard(r) {
+    const a = r.artifact || {};
+    return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · черновик</div>' +
+      '<div class="card pad"><div style="font-weight:650;color:var(--ink)">' + esc(a.title || 'Черновик') + '</div>' +
+      '<div style="margin-top:8px;white-space:pre-wrap;font-size:13px;line-height:1.55;color:var(--ink-2)">' + esc(a.body || '') + '</div>' +
+      '<div class="prov" style="margin-top:10px"><span class="badge demo">' + I('lock') + esc(a.note || '') + '</span></div>' +
+      nextChips(r.next) + '</div></div>';
+  }
+  function agentCard(r) {
+    if (!r) return msg('ai', I('sparkle') + ' Консьерж', 'Слушаю.');
+    if (r.kind === 'proposal') return proposalCard(r);
+    if (r.kind === 'draft') return draftCard(r);
+    if (r.kind === 'error') return msg('ai', I('warn') + ' Консьерж', esc(r.text) + nextChips(r.next));
+    return answerCard(r);
+  }
+
+  function agentConfirm(id) {
+    const p = WS.agent.pendingProposal(id);
+    const res = WS.agent.confirm(id);
+    if (res.ok) {
+      pushMsg('<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Применено</div>' +
+        '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + esc((p && p.title) || 'Изменение') + '</span>' +
+        '<div style="margin-top:7px;font-size:12px;color:var(--mut)">' + ((p && p.lines) || []).map(esc).join('<br>') + '</div></div></div>');
+      WS.storeApi.toast('Применено', 'ok');
+      WS.storeApi.logEvent({ scenario: 'agent', action: (p && p.title) || 'изменение', result: 'EXECUTED', level: p && p.tier === 'guarded' ? 'A3' : 'A1' });
+    } else {
+      const why = res.code === 'stale' ? 'данные изменились с момента предложения — спросите ещё раз, соберу заново'
+        : res.code === 'used' ? 'это предложение уже применено'
+        : (res.error || 'применить не вышло');
+      pushMsg('<div class="msg ai fadeup"><div class="who">' + I('warn') + ' Не применил</div>' +
+        '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge warn">' + I('warn') + esc(why) + '</span></div></div>');
+    }
+  }
+  function agentCancel() {
+    pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
+  }
+  // Chips under a reply: either another question, or a card to open.
+  function agentNext(i) {
+    const r = engine.lastReply;
+    const n = r && r.next && r.next[i];
+    if (!n) return;
+    if (n.ask) return freeReply(n.ask);
+    if (n.open === 'contact') return WS.ui.clientCard(n.id);
+    if (n.open === 'company') return WS.ui.companyCard(n.id);
+    if (n.open === 'deal') return WS.ui.dealCard(n.id);
+  }
+
   function restartScene() {
     const s = engine.session; if (!s || !s.scenarioId) return;
     const id = s.scenarioId;
@@ -583,6 +677,8 @@
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
+    agentConfirm, agentCancel, agentNext, agentCard,
+    get lastReply() { return engine.lastReply; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     activeThreadId: () => engine.activeThreadId,

@@ -31,7 +31,7 @@ function check(name, cond, detail) {
   if (!cond) failed++;
 }
 
-setTimeout(() => {
+setTimeout(async () => {
   const WS = win.WS;
   const doc = win.document;
   check('app boots (WS.ui present)', WS && WS.ui, WS ? 'ui=' + !!WS.ui : 'no WS');
@@ -590,6 +590,93 @@ setTimeout(() => {
     check('routing · routePrompt is reachable for testing', false, 'not exported');
   }
 
+  // ============================================================
+  //  Agent — the hands, and a head that can be swapped for a live model.
+  //  Answers are computed from the store, never invented. Nothing is written
+  //  without a visible proposal. And no request ends in "I can't".
+  // ============================================================
+  const AG = WS.agent;
+  check('agent · module present', !!AG && typeof AG.ask === 'function' && !!AG.tools);
+
+  if (AG && typeof AG.ask === 'function') {
+    const revStart = WS.store.dataRevision;
+    AG.openThread('probe:agent');
+
+    // ---- an analytical question is answered from the store ----
+    const a1 = AG.ask('сколько у меня активных сделок и на какую сумму');
+    const expectN = dd().deals.filter((d) => d.stage !== 'done').length;
+    const expectSum = dd().deals.filter((d) => d.stage !== 'done').reduce((s, d) => s + (d.amount || 0), 0);
+    check('agent · answers an analytics question', !!a1 && a1.kind === 'answer', JSON.stringify(a1 && a1.kind));
+    check('agent · the number is the real one', (a1.text || '').indexOf(String(expectN)) >= 0, 'expected ' + expectN + ' in: ' + (a1.text || '').slice(0, 120));
+    check('agent · the money figure is the real one', !!(a1.evidence || []).find((e) => e.value === expectSum), 'sum=' + expectSum);
+    check('agent · the answer carries openable evidence', (a1.evidence || []).length > 0 && (a1.evidence || []).every((e) => !!e.query));
+    check('agent · answering writes nothing', WS.store.dataRevision === revStart);
+
+    // ---- a request to record something proposes, and does not write ----
+    const annaBefore = (dd().contactTimeline['c_anna'] || []).length;
+    const p1 = AG.ask('запиши, что созвонился с Анной, просила график платежей');
+    check('agent · a write request produces a proposal', !!p1 && p1.kind === 'proposal', JSON.stringify(p1 && p1.kind));
+    check('agent · the proposal names the entity it found', (p1.subject || '') === 'c_anna', 'subject=' + (p1 && p1.subject));
+    check('agent · nothing is written before confirmation',
+      (dd().contactTimeline['c_anna'] || []).length === annaBefore && WS.store.dataRevision === revStart);
+    check('agent · the proposal shows what will change', Array.isArray(p1.lines) && p1.lines.length > 0);
+
+    const c1 = AG.confirm(p1.id);
+    check('agent · confirming applies it', !!c1 && c1.ok === true, JSON.stringify(c1));
+    check('agent · the event is now in the contact feed',
+      (dd().contactTimeline['c_anna'] || []).length === annaBefore + 1);
+    check('agent · confirming the same proposal twice is refused', AG.confirm(p1.id).ok === false);
+
+    // ---- a guarded change still needs the confirmation, through the agent too ----
+    const dealStageWas = dealBy('d_anna').stage;
+    const p2 = AG.ask('переведи сделку Анны в стадию документы');
+    check('agent · a stage change is proposed, not applied', !!p2 && p2.kind === 'proposal' && dealBy('d_anna').stage === dealStageWas);
+    check('agent · the proposal is marked as needing confirmation', p2.tier === 'guarded', 'tier=' + (p2 && p2.tier));
+    AG.confirm(p2.id);
+    check('agent · confirmed stage change lands', dealBy('d_anna').stage === 'docs', 'stage=' + dealBy('d_anna').stage);
+
+    // ---- a task request creates a task, once confirmed ----
+    const tasksWas2 = dd().tasks.length;
+    const p3 = AG.ask('поставь задачу позвонить Игорю завтра');
+    check('agent · a task request is proposed', !!p3 && p3.kind === 'proposal');
+    AG.confirm(p3.id);
+    check('agent · the task is in the queue', dd().tasks.length === tasksWas2 + 1, 'before=' + tasksWas2 + ' after=' + dd().tasks.length);
+
+    // ---- a proposal built before someone else changed the data is refused ----
+    const p4 = AG.ask('запиши заметку по Анне: проверка устаревания');
+    WS.storeApi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { tags: ['сдвиг ревизии'] } }]);
+    const c4 = AG.confirm(p4.id);
+    check('agent · a proposal against stale data is refused', !!c4 && c4.ok === false && c4.code === 'stale', JSON.stringify(c4));
+
+    // ---- never a dead end ----
+    const REFUSALS = ['не могу', 'не умею', 'обратитесь', 'недоступно', 'не поддерживается'];
+    const odd = [
+      'какой статус RERA у этих объектов',
+      'покажи сделки DLD по этой башне за месяц',
+      'отправь Анне письмо со сравнением',
+      'что вообще происходит',
+      'ыыы',
+    ];
+    odd.forEach((q) => {
+      const r = AG.ask(q);
+      const said = ((r && (r.text || '')) + ' ' + ((r && r.lines) || []).join(' ')).toLowerCase();
+      check('agent · "' + q.slice(0, 28) + '…" gets a real reply', !!r && !!r.kind, JSON.stringify(r && r.kind));
+      check('agent · "' + q.slice(0, 28) + '…" is not a refusal',
+        !REFUSALS.some((w) => said.indexOf(w) >= 0), said.slice(0, 110));
+      check('agent · "' + q.slice(0, 28) + '…" offers a way forward', !!r && Array.isArray(r.next) && r.next.length > 0);
+    });
+
+    // ---- an out-of-scope action produces the artifact instead of an apology ----
+    const d1 = AG.ask('отправь Анне письмо со сравнением двух объектов');
+    check('agent · an unwired channel yields a draft', d1.kind === 'draft' || (d1.artifact && d1.artifact.body), JSON.stringify(d1.kind));
+    check('agent · the draft is labelled as not connected', /не подключ/i.test(JSON.stringify(d1)), JSON.stringify(d1).slice(0, 160));
+
+    // ---- the head is swappable, and the hands do not change with it ----
+    check('agent · the head is replaceable', typeof AG.setHead === 'function' && !!AG.head);
+    check('agent · tools are declared for a model to read',
+      Array.isArray(AG.toolSchema()) && AG.toolSchema().length >= 4 && AG.toolSchema().every((t) => t.name && t.description));
+  }
+
   // ---- regression: main screens still render ----
   ['start', 'concierge', 'clients', 'objects', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
     try {
@@ -598,6 +685,50 @@ setTimeout(() => {
       check('screen ' + v + ' renders', h && h.length > 400, 'len=' + (h || '').length);
     } catch (e) { check('screen ' + v + ' renders', false, e.message); }
   });
+
+  // ============================================================
+  //  End to end: what actually happens when a person types into the Concierge.
+  //  The module tests above prove the reasoning; this proves the wiring.
+  // ============================================================
+  const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
+  if (WS.agent && typeof WS.router.routePrompt === 'function') {
+    WS.engine.openThread('probe:e2e', 'Сквозная', 'chat');
+    WS.router.go('concierge');
+
+    WS.router.routePrompt('сколько сделок в работе и на какую сумму');
+    await wait(1500);
+    const chat1 = doc.getElementById('chat');
+    const html1 = chat1 ? chat1.innerHTML : '';
+    const liveActive = dd().deals.filter((d) => d.stage !== 'done').length;
+    check('e2e · a typed question produces an answer in the chat', html1.indexOf(String(liveActive)) >= 0, 'looking for ' + liveActive);
+    check('e2e · the answer offers openable evidence', (chat1 && chat1.querySelectorAll('[data-agev]').length) > 0);
+    check('e2e · no Wizard-of-Oz fallback left', html1.indexOf('Wizard-of-Oz') < 0 && html1.indexOf('подготовлены близкие результаты') < 0);
+
+    // Clicking the evidence chip opens the records the number came from.
+    const chip = chat1.querySelector('[data-agev]');
+    chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    await wait(80);
+    const modalHtml = doc.getElementById('modal').innerHTML;
+    check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
+    WS.ui.closeModal();
+
+    // A write instruction reaches a proposal, and only a click applies it.
+    const feedWas = (dd().contactTimeline['c_anna'] || []).length;
+    WS.router.routePrompt('запиши по Анне: проверка сквозного пути');
+    await wait(1500);
+    const chat2 = doc.getElementById('chat');
+    const okBtn = chat2.querySelector('[data-agok]');
+    check('e2e · a write instruction produces a confirm button', !!okBtn);
+    check('e2e · still nothing written before the click',
+      (dd().contactTimeline['c_anna'] || []).length === feedWas);
+    if (okBtn) {
+      okBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await wait(120);
+      check('e2e · the click writes it', (dd().contactTimeline['c_anna'] || []).length === feedWas + 1,
+        'before=' + feedWas + ' after=' + (dd().contactTimeline['c_anna'] || []).length);
+      check('e2e · the chat reports it applied', doc.getElementById('chat').innerHTML.indexOf('Применено') >= 0);
+    }
+  }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();

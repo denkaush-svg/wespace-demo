@@ -283,6 +283,10 @@
     dealStage: { coll: 'deals', kind: 'stage' },
     addTask: { coll: 'tasks', kind: 'add' },
     removeTask: { coll: 'tasks', kind: 'remove' },
+    // Feed writes live in ui.js, where the ordering rules for a timeline are.
+    // Routed through here anyway so a conversation has exactly one way to write,
+    // and a batch that mixes a note with a stage change is still all-or-nothing.
+    addEvent: { coll: null, kind: 'event' },
   };
 
   function fail(code, message, extra) {
@@ -295,6 +299,19 @@
     if (!o || !o.op) return fail('bad_op', at + 'не указана операция');
     const spec = OP_SPEC[o.op];
     if (!spec) return fail('unknown_op', at + 'неизвестная операция «' + o.op + '»', { available: Object.keys(OP_SPEC) });
+
+    if (spec.kind === 'event') {
+      const txt = String(o.text == null ? '' : o.text).trim();
+      if (!txt) return fail('bad_value', at + 'пустой текст события');
+      if (!WS.ui || !WS.ui.feedOwner || !WS.ui.feedOwner(o.scope, o.id)) {
+        return fail('not_found', at + 'нет сущности ' + o.scope + ' ' + o.id);
+      }
+      return {
+        ok: true, tier: 'safe', summary: 'событие в ' + o.scope + ' ' + o.id,
+        run: () => { WS.ui.addEventEntry(o.scope, o.id, { type: o.type, text: txt, when: o.when, due: o.due, dueWhen: o.dueWhen }); },
+      };
+    }
+
     const coll = store.data[spec.coll];
     if (!Array.isArray(coll)) return fail('no_collection', at + 'нет коллекции ' + spec.coll);
 

@@ -47,7 +47,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -122,6 +122,10 @@
     if (d.cnotedel) { const p = d.cnotedel.split(':'); const arr = (store.data.contactTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.clientCard(p[0]); }
     if (d.conotedel) { const p = d.conotedel.split(':'); const arr = (store.data.companyTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.companyCard(p[0]); }
     if (d.fetype) return WS.ui.setFeedType(d.fetype);
+    if (d.agok) return WS.engine.agentConfirm(d.agok);
+    if (d.agcancel) return WS.engine.agentCancel(d.agcancel);
+    if (d.agev != null) return WS.ui.openAgentEvidence(+d.agev);
+    if (d.agnext != null) return WS.engine.agentNext(+d.agnext);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
     if (d.funnel) { store.dealFunnel = d.funnel; return api.emit(); }

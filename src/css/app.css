@@ -202,6 +202,15 @@ button { font-family: inherit; cursor: pointer; }
 /* One slot per message so a streamed reply can be repainted on its own. `contents`
    keeps the message itself as the flex item, so .msg.me still aligns right. */
 .msg-slot { display: contents; }
+/* Evidence behind a figure vs. a follow-up question: two different actions, so they
+   must not read as the same button. Evidence is quiet and captioned — it explains
+   where a number came from; suggestions stay as ordinary chips. */
+.ev-cap { display: flex; align-items: center; gap: 5px; margin-top: 11px; font-size: 10px;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--faint); font-weight: 700; }
+.ev-cap svg { width: 12px; height: 12px; }
+.chip.src { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc-ink);
+  font-variant-numeric: tabular-nums; }
+.chip.src:hover { border-color: var(--acc); }
 .msg { max-width: 88%; }
 .msg .who { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .msg .bubble { border-radius: var(--r); padding: 13px 15px; font-size: 13.5px; line-height: 1.55; }

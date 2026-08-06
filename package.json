@@ -8,6 +8,7 @@
     "test": "node src/test/smoke.js",
     "shots": "node src/test/shots.js",
     "layout": "node src/test/chat-layout.js",
+    "agent": "node src/test/agent-shot.js",
     "check": "npm test && npm run build"
   },
   "devDependencies": {

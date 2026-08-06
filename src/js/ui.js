@@ -214,6 +214,31 @@
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
   // never computes its own. Each entry: a value plus a human label, addressable by a stable key.
+
+  // Opens the records a figure was computed from. This is what makes an answer
+  // checkable in the room: the number is not asserted, it is shown with its rows.
+  function openAgentEvidence(i) {
+    const r = WS.engine.lastReply && WS.engine.lastReply.evidence;
+    const e = r && r[i];
+    if (!e) return;
+    const res = WS.query.run(Object.assign({}, e.query, { aggregate: null }));
+    const rows = (res.rows || []).map((x) => {
+      const title = x.title || x.name || x.id;
+      const sub = [x.stage, x.due, x.area, x.amount ? WS.AED(x.amount) : null].filter(Boolean).join(' · ');
+      return '<div class="feed-row"><div class="fi i-acc">' + I('source') + '</div><div class="ft">' +
+        '<div class="t">' + escAttr(title) + '</div>' +
+        (sub ? '<div class="m">' + escAttr(sub) + '</div>' : '') + '</div></div>';
+    }).join('');
+    openModal('Откуда это число · ' + escAttr(e.label),
+      '<div class="card pad" style="margin-bottom:10px"><span class="badge acc">' + I('calc') +
+      (e.money ? WS.AED(e.value) : e.value) + ' ' + escAttr(e.label) + '</span>' +
+      '<div style="margin-top:6px;font-size:12px;color:var(--mut)">Посчитано из ' + (res.rows || []).length +
+      ' записей коллекции «' + escAttr(res.from || '') + '» на ревизии ' + res.revision + '.</div></div>' +
+      (rows ? '<div class="card"><div class="feed" style="padding:2px 16px">' + rows + '</div></div>'
+            : '<div class="card pad" style="color:var(--faint)">нет записей</div>'),
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+
   function metricsSnapshot() {
     const data = D();
     const deals = data.deals || [], tasks = data.tasks || [], clients = data.clients || [];
@@ -4262,6 +4287,6 @@
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup };
 })(window.WS = window.WS || {});
