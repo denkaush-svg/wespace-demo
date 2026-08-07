@@ -1319,14 +1319,19 @@
       '<div class="hf-row">' + I('handshake') + '<span>Партнёр: ' + agentName(d.partnerAgent) + '</span></div>' +
       '<div class="hf-row">' + I('check') + '<span>История, обещания и документы приложены; следующий шаг — подтвердить объект.</span></div></div>';
   }
-  // A5: next-best-action with reason and an explicit "exclude" (downside).
-  function nbaInner(d) {
+  // Next-best-action rules — shared by the overview NBA block and the deal-header "now" summary.
+  function nbaActions(d) {
     const doIt = []; let why = '';
     if (d.stageDays >= 5) { doIt.push('Вернуться к сделке: позвонить, предложить следующий шаг'); why = 'застряла ' + d.stageDays + ' дн. в стадии'; }
     if (d.hot) { doIt.push('Ответить в течение 2 часов (SLA)'); why = why || 'горячий клиент'; }
     if (d.partnerAgent) doIt.push('Согласовать co-broking и сплит с партнёром');
     if (d.stage === 'new') doIt.push('Подобрать 3 объекта и назначить показ');
     if (!doIt.length) doIt.push('Двигать к следующей вехе воронки');
+    return { doIt: doIt, why: why };
+  }
+  // A5: next-best-action with reason and an explicit "exclude" (downside).
+  function nbaInner(d) {
+    const a = nbaActions(d); const doIt = a.doIt; const why = a.why;
     const skip = d.goal && /Инвест|Доход|Перепрод/.test(d.goal) ? 'Не давить эмоциями — клиент решает по цифрам' : 'Не перегружать вариантами';
     const rows = doIt.map((x) => '<div class="chg-row">' + I('check') + '<span>' + x + '</span></div>').join('');
     return '<div class="chg-list">' + rows + '</div>' +
@@ -1665,15 +1670,22 @@
     }
     // overview
     const p = d.prov || {};
-    const key = dxSec('briefcase', 'Ключевое', '', '<div class="dfields">' +
+    const o0 = dealLots(d)[0];
+    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
+    const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
+    const key = dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
       dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
-      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
       dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
-      dealField('Источник', d.source, p.source, d.id + ':source') + '</div>');
+      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
+      dealField('Тип сделки', d.dealType, p.dealType) +
+      dealField('Комиссия', comm, 'confirmed') +
+      dealField('Co-broking', cobro, 'confirmed') + '</div>');
     const next = dxSec('sparkle', 'Следующий шаг', '<span class="badge ai-b">' + I('sparkle') + 'AI</span>', nbaInner(d));
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
     return '<div class="dx-grid2">' + key + next + '</div>' +
+      '<div style="margin-top:14px">' + dealLotsBlock(d) + '</div>' +
+      '<div style="margin-top:14px">' + dealEventsPreview(d) + '</div>' +
       (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
       (ho ? '<div style="margin-top:14px">' + ho + '</div>' : '');
   }
@@ -1697,25 +1709,91 @@
       '<div class="chero-content"><div class="chero-avatar">' + init + '</div>' +
       '<div class="chero-info"><h1 class="chero-name">' + c.name + '</h1>' + factsHtml + '</div></div></div>';
   }
-  function dealHeroEmpty(d) {
-    const s = funnelSteps(d);
-    const c = D().clients.find((x) => x.id === d.clientId) || {};
-    return '<div class="dhero-empty"><div class="dhero-empty-icon">' + I('briefcase') + '</div>' +
-      '<div class="dhero-empty-title">' + d.title + '</div>' +
-      '<div class="dhero-empty-meta">' + (c.name || 'Без клиента') + ' · ' + s.label + '</div></div>';
+  // ---- Deal header v2: the DEAL reads first — a plain-language sentence, the client (callable),
+  // and a "now" summary. The object is demoted to a compact card in the overview (dealLotsBlock).
+  function dealActionWord(d) {
+    return ({ sale_offplan: 'Покупка', sale_ready: 'Покупка', rent: 'Аренда',
+      fitout: 'Fit-out', rental_biz: 'Доходный актив', referral: 'Передача партнёру' })[d.funnel] || 'Сделка';
   }
-  function dealHero(d, page) {
-    const o = dealObject(d);
-    if (!o) return dealHeroEmpty(d);
+  // A deal may hold several lots under one contract (Part B). Falls back to the single object.
+  function dealLots(d) {
+    const ids = (Array.isArray(d.lots) && d.lots.length) ? d.lots : (d.objectId ? [d.objectId] : []);
+    return ids.map((id) => D().objects.find((o) => o.id === id)).filter(Boolean);
+  }
+  function dealLotsLabel(d) {
+    const lots = dealLots(d);
+    if (!lots.length) return 'объект не выбран';
+    if (lots.length === 1) return lots[0].name;
+    return lots.length + ' лота · ' + lots[0].name.split(',')[0] + ' +' + (lots.length - 1);
+  }
+  // One-line deal formulation: "Покупка: {объект}" + "{Клиент} · {сумма} · {стадия}".
+  function dealSentence(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
     const s = funnelSteps(d);
-    const ctx = '<div class="dhero-ctx"><div><div class="dhero-ctx-label">Объект сделки</div>' +
-      '<div class="dhero-ctx-meta">' +
-      (c.name ? '<span>' + I('users') + c.name + '</span>' : '') +
-      '<span>' + I('briefcase') + s.label + '</span>' +
-      (d.amount ? '<span>' + I('money') + WS.AED(d.amount) + '</span>' : '') +
-      '</div></div><span class="dhero-ctx-badge">' + I('check') + 'привязан</span></div>';
-    return '<div class="' + (page ? 'dhero-page' : 'dhero-modal') + '">' + objHero(o) + ctx + objSummary(o) + '</div>';
+    const sub = [c.name || 'без клиента', d.amount ? WS.AED(d.amount) : null, s.cols[s.idx]].filter(Boolean).join(' · ');
+    return '<div class="deal-hd"><div class="deal-hd-main">' + I('briefcase') + dealActionWord(d) + ': ' + dealLotsLabel(d) + '</div>' +
+      '<div class="deal-hd-sub">' + sub + '</div></div>';
+  }
+  // Client bar — surfaced ON the deal so the agent can call / write without hunting the contact card.
+  function dealClientBar(d) {
+    const c = D().clients.find((x) => x.id === d.clientId);
+    if (!c) return '';
+    const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const vals = clientContactVals(c);
+    const meta = [c.goal, c.budget ? 'бюджет ' + WS.AED(c.budget) : '', c.horizon ? 'срок ' + c.horizon : ''].filter(Boolean).join(' · ');
+    const chans = '<div class="dcli-chans">' + ['phone', 'whatsapp', 'telegram', 'email'].map((ch) =>
+      '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
+    const acts = '<div class="dcli-acts">' +
+      '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
+      '<button class="btn sm" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
+      '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
+    return '<div class="dcli"><div class="dcli-av">' + init + '</div>' +
+      '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
+      '<div class="dcli-meta">' + meta + '</div>' + chans + '</div>' + acts + '</div>';
+  }
+  // "Now" summary — one glance: stage + days, last event, next step; turns red when it needs action.
+  function dealNowSummary(d) {
+    const tl = (D().dealTimeline || {})[d.id] || [];
+    const last = tl.length ? tl[tl.length - 1] : null;
+    const s = funnelSteps(d);
+    const urgent = !!d.hot || (d.stageDays || 0) >= 5;
+    const a = nbaActions(d);
+    const line1 = '<div class="dnow-line">' + I(urgent ? 'warn' : 'trend') + '<span><b>' + s.cols[s.idx] + '</b> · ' + (d.stageDays || 0) + ' дн. в стадии</span></div>';
+    const lastLine = last ? '<div class="dnow-line dnow-mut">' + I('clock') + '<span>Последнее: ' + last.text + '</span></div>' : '';
+    const nextLine = '<div class="dnow-line dnow-next">' + I('arrowRight') + '<span>Дальше: ' + a.doIt[0] + (a.why ? ' · ' + a.why : '') + '</span></div>';
+    return '<div class="dnow' + (urgent ? ' dnow-urgent' : '') + '"><div class="dnow-cap">Сейчас</div>' + line1 + lastLine + nextLine + '</div>';
+  }
+  // Compact object card — the demoted hero. Opens the full object on click.
+  function dealObjectMini(o) {
+    if (!o) return '';
+    const ph = (WS.photos && WS.photos[o.id]) || '';
+    const avail = o.availability === 'available'
+      ? '<span class="badge ok">' + I('check') + 'доступен</span>'
+      : '<span class="badge warn">' + I('clock') + 'проверить</span>';
+    return '<div class="obj-mini" data-obj="' + o.id + '">' +
+      (ph ? '<div class="obj-mini-ph" style="background-image:url(' + ph + ')"></div>' : '<div class="obj-mini-ph">' + I('building') + '</div>') +
+      '<div class="obj-mini-b"><div class="obj-mini-n">' + o.name + '</div>' +
+      '<div class="obj-mini-m">' + o.area + ' · ' + WS.AED(o.price) + ' · ' + o.br + '</div>' +
+      '<div class="obj-mini-badges">' + avail + '<span class="badge">' + I('money') + 'комиссия ' + (o.commissionPct || '—') + '%</span></div></div>' +
+      I('arrowRight') + '</div>';
+  }
+  function dealLotsBlock(d) {
+    const lots = dealLots(d);
+    const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
+    return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
+  }
+  // Recent events surfaced on the overview (the full ribbon stays in the История tab).
+  function dealEventsPreview(d) {
+    const tl = (D().dealTimeline || {})[d.id] || [];
+    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
+      '<div class="feed-row"><div class="fi i-mut">' + I('dot') + '</div><div class="ft"><div class="t">' + p.e.text + '</div>' +
+      '<div class="m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
+      '<div style="font-size:12px;color:var(--faint);padding:6px 0">событий пока нет</div>';
+    const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
+    return dxSec('clock', 'Последние события', more, '<div class="feed">' + rows + '</div>');
+  }
+  function dealHeader(d) {
+    return dealSentence(d) + dealClientBar(d) + dealNowSummary(d);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -1740,7 +1818,7 @@
       '<span class="badge' + (d.stageDays >= 5 ? ' warn' : '') + '">' + I('clock') + 'в стадии ' + (d.stageDays || 0) + ' дн.</span>' + tags + consent + '</div>';
     return {
       type: 'deal', id: id, title: d.title,
-      status: dealHero(d, true) + statusBar + '<div class="deal-stepper-wrap">' + dealStepperSection(d) + '</div>',
+      status: dealHeader(d) + statusBar + '<div class="deal-stepper-wrap">' + dealStepperSection(d) + '</div>',
       tabs: [['overview', 'Обзор'], ['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),
@@ -1749,6 +1827,11 @@
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
+  // Call affordance on the deal card — the client is reachable without opening the contact card.
+  function callClient(id) {
+    const c = D().clients.find((x) => x.id === id); if (!c) return;
+    WS.storeApi.toast('Набираю: ' + c.name + ' · ' + (c.phone || '—'), 'ok');
+  }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
   const DEAL_ENUMS = {
     dealType: ['Продажа · off-plan', 'Продажа · готовое', 'Аренда', 'Fit-out', 'Готовый арендный бизнес', 'Передано партнёру'],
@@ -4288,5 +4371,5 @@
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient };
 })(window.WS = window.WS || {});

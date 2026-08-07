@@ -208,6 +208,7 @@
       case 'nextDay': WS.ui.closeModal(); WS.eventEngine.nextDay(); break;
       case 'sessionResults': WS.eventEngine.sessionResults(); break;
       case 'callSelf': WS.eventEngine.callSelf(); break;
+      case 'callClient': WS.ui.callClient(t.dataset.cid); break;
       case 'callAi': WS.eventEngine.callAi(); break;
       case 'failHuman': WS.eventEngine.failResolve('human'); break;
       case 'failPick': WS.eventEngine.failResolve(t.dataset.deal); break;
