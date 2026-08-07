@@ -691,33 +691,48 @@ setTimeout(async () => {
   //  The module tests above prove the reasoning; this proves the wiring.
   // ============================================================
   const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
+  // The Concierge answers on a scripted delay, so waiting a fixed span races it
+  // on a busy machine — and a race here used to surface as a TypeError three
+  // lines later rather than as a failed check. Wait for the thing itself.
+  async function waitFor(cond, ms) {
+    const until = Date.now() + (ms || 6000);
+    while (Date.now() < until) {
+      try { if (cond()) return true; } catch (e) { /* not there yet */ }
+      await wait(60);
+    }
+    return false;
+  }
   if (WS.agent && typeof WS.router.routePrompt === 'function') {
     WS.engine.openThread('probe:e2e', 'Сквозная', 'chat');
     WS.router.go('concierge');
 
     WS.router.routePrompt('сколько сделок в работе и на какую сумму');
-    await wait(1500);
+    await waitFor(() => doc.getElementById('chat').querySelector('[data-agev]'));
     const chat1 = doc.getElementById('chat');
     const html1 = chat1 ? chat1.innerHTML : '';
     const liveActive = dd().deals.filter((d) => d.stage !== 'done').length;
     check('e2e · a typed question produces an answer in the chat', html1.indexOf(String(liveActive)) >= 0, 'looking for ' + liveActive);
-    check('e2e · the answer offers openable evidence', (chat1 && chat1.querySelectorAll('[data-agev]').length) > 0);
+    const chip = chat1 && chat1.querySelector('[data-agev]');
+    check('e2e · the answer offers openable evidence', !!chip);
     check('e2e · no Wizard-of-Oz fallback left', html1.indexOf('Wizard-of-Oz') < 0 && html1.indexOf('подготовлены близкие результаты') < 0);
 
     // Clicking the evidence chip opens the records the number came from.
-    const chip = chat1.querySelector('[data-agev]');
-    chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    await wait(80);
-    const modalHtml = doc.getElementById('modal').innerHTML;
-    check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
-    WS.ui.closeModal();
+    if (chip) {
+      chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await waitFor(() => doc.getElementById('modal').innerHTML.indexOf('Откуда это число') >= 0, 1000);
+      const modalHtml = doc.getElementById('modal').innerHTML;
+      check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
+      WS.ui.closeModal();
+    } else {
+      check('e2e · evidence opens the underlying records', false, 'no evidence chip to click');
+    }
 
     // A write instruction reaches a proposal, and only a click applies it.
     const feedWas = (dd().contactTimeline['c_anna'] || []).length;
     WS.router.routePrompt('запиши по Анне: проверка сквозного пути');
-    await wait(1500);
+    await waitFor(() => doc.getElementById('chat').querySelector('[data-agok]'));
     const chat2 = doc.getElementById('chat');
-    const okBtn = chat2.querySelector('[data-agok]');
+    const okBtn = chat2 && chat2.querySelector('[data-agok]');
     check('e2e · a write instruction produces a confirm button', !!okBtn);
     check('e2e · still nothing written before the click',
       (dd().contactTimeline['c_anna'] || []).length === feedWas);
