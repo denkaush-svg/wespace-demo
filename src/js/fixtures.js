@@ -123,7 +123,7 @@
       title: 'Анна Петрова', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
-      consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0,
+      consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
       contacts: [
         { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
         { name: 'Пётр Петров', role: 'Супруг — со-решение', rating: 'B', phone: '+971 55 210 6642' },
@@ -139,7 +139,7 @@
       title: 'Виктор Орлов', sub: 'Договор бронирования', tags: ['документ'], updated: 'вчера',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция',
       paymentForm: 'Ипотека', vat: false, source: 'Property Finder', partnerAgent: null, companyId: 'co_emaar',
-      consideredProjects: ['Bayline Terraces'], stageDays: 3,
+      consideredProjects: ['Bayline Terraces'], stageDays: 3, requestId: 'r_viktor',
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'work',
       title: 'Karim Aziz', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня',
@@ -168,8 +168,21 @@
       title: 'Портфель · готовый арендный', sub: 'Готовый арендный бизнес · DIFC', tags: ['портфель'], updated: 'вчера',
       funnel: 'rental_biz', dealType: 'Готовый арендный бизнес', objectType: 'офис', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
-      consideredProjects: ['DIFC Gate District'], stageDays: 2,
+      consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_bayline', 'o_creekline'],
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+  ];
+
+  // Requests (Part B / V2) — the client inquiry that GROUPS deals. One request → many deals
+  // (one contract = one deal); several units under one contract stay as lots inside a deal.
+  const requests = [
+    { id: 'r_anna', clientId: 'c_anna', title: 'Инвест-квартира до 2 млн', createdAt: '06 мая', channel: 'whatsapp',
+      goal: 'Инвестиция под аренду', budget: 2000000, areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
+      objectsShown: ['o_creekline', 'o_palmcourt', 'o_bayline'],
+      note: 'Голосовое из WhatsApp; показано 3 объекта, в работе один (Creekline — цепочка G1–G3).' },
+    { id: 'r_viktor', clientId: 'c_docs', title: 'Квартира Bayline + портфель DIFC', createdAt: '04 мая', channel: 'email',
+      goal: 'Инвестиция', budget: 6150000, areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
+      objectsShown: ['o_bayline', 'o_creekline'],
+      note: 'Одна заявка → две сделки: бронирование Bayline (свой договор) и портфель DIFC на 2 лота (свой договор).' },
   ];
 
   // Funnels (R2) — each is the same 4-column board; columns = milestone projection of that funnel.
@@ -366,7 +379,7 @@
   WS.fixtures = {
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, refModel,
-    deals, tasks, events, inbox, analytics,
+    deals, requests, tasks, events, inbox, analytics,
     FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});

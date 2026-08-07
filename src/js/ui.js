@@ -1683,7 +1683,9 @@
     const next = dxSec('sparkle', 'Следующий шаг', '<span class="badge ai-b">' + I('sparkle') + 'AI</span>', nbaInner(d));
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    return '<div class="dx-grid2">' + key + next + '</div>' +
+    const req = dealRequestBlock(d);
+    return (req ? req + '<div style="height:14px"></div>' : '') +
+      '<div class="dx-grid2">' + key + next + '</div>' +
       '<div style="margin-top:14px">' + dealLotsBlock(d) + '</div>' +
       '<div style="margin-top:14px">' + dealEventsPreview(d) + '</div>' +
       (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
@@ -1831,6 +1833,48 @@
   function callClient(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return;
     WS.storeApi.toast('Набираю: ' + c.name + ' · ' + (c.phone || '—'), 'ok');
+  }
+  // ---- Part B / V2: Заявка (client request) groups deals — 1 заявка → M сделок; lots live inside a deal ----
+  function requestById(id) { return (D().requests || []).find((r) => r.id === id); }
+  function dealsOfRequest(id) { return (D().deals || []).filter((d) => d.requestId === id); }
+  // The "Заявка" block on a deal: which request it belongs to + its sibling deals.
+  function dealRequestBlock(d) {
+    if (!d.requestId) return '';
+    const r = requestById(d.requestId); if (!r) return '';
+    const sibs = dealsOfRequest(r.id);
+    const shown = (r.objectsShown || []).length;
+    const sibChips = sibs.map((s) => '<button class="chip' + (s.id === d.id ? ' on' : '') + '" data-deal="' + s.id + '">' +
+      I('briefcase') + dealActionWord(s) + ' · ' + dealLotsLabel(s) + '</button>').join('');
+    return dxSec('mail', 'Заявка', '<button class="btn xs" data-request="' + r.id + '">' + I('arrowRight') + 'Открыть заявку</button>',
+      '<div style="font-size:12.5px;color:var(--ink)"><b>' + r.title + '</b></div>' +
+      '<div style="font-size:12px;color:var(--mut);margin-top:2px">Показано объектов: ' + shown + ' · сделок в заявке: ' + sibs.length + '</div>' +
+      (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки этой заявки</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
+  }
+  function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  function viewRequestDetail(id) {
+    const r = requestById(id);
+    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>';
+    if (!r) return back + '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const summary = dxSec('mail', 'Заявка · ' + r.title, '', '<div class="dfields">' +
+      dfPair('Клиент', c.name || '—') + dfPair('Цель', r.goal) +
+      dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') + dfPair('Районы', (r.areas || []).join(', ')) +
+      dfPair('Срок', r.horizon) + dfPair('Канал', r.channel || '—') + '</div>' +
+      (r.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + r.note + '</div>' : ''));
+    const shownObjs = (r.objectsShown || []).map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    const objsBlock = dxSec('building', 'Показанные объекты · ' + shownObjs.length, '',
+      shownObjs.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты не показаны</div>');
+    const deals = dealsOfRequest(r.id);
+    const dealRows = deals.map((d) => {
+      const s = funnelSteps(d);
+      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
+        '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
+        '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет</div>';
+    const dealsBlock = dxSec('briefcase', 'Сделки заявки · ' + deals.length, '',
+      '<div class="feed">' + dealRows + '</div>' +
+      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
+    return back + summary + '<div style="margin-top:14px">' + objsBlock + '</div><div style="margin-top:14px">' + dealsBlock + '</div>';
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
   const DEAL_ENUMS = {
@@ -3704,9 +3748,17 @@
         '<div class="m">' + it.text + '</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span>' + act + '</div></div>';
     }).join('');
+    const reqRows = (D().requests || []).map((r) => {
+      const rc = D().clients.find((x) => x.id === r.clientId) || {};
+      const dn = dealsOfRequest(r.id).length;
+      return '<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('mail') + '</div>' +
+        '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
+        '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · показано объектов: ' + ((r.objectsShown || []).length) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">активных заявок нет</div>';
     return head('Заявки', 'Входящие обращения из всех каналов: ночные лиды, голосовые, исключения (дубли, объект вне инвентаря, ошибки доставки). «Разобрать» запускает сценарий Консьержа — разобранная заявка становится сделкой.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Входящие · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Входящие · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   function viewCompanies() {
@@ -4314,6 +4366,7 @@
       case 'shows': return wrap(viewShows());
       case 'docs': return wrap(viewDocs());
       case 'requests': return wrap(viewRequests());
+      case 'requestDetail': return wrap(viewRequestDetail(S().requestId));
       case 'companies': return wrap(viewCompanies());
       case 'analytics': return wrap(viewAnalytics());
       case 'valuation': return wrap(viewValuation());
@@ -4371,5 +4424,5 @@
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard };
 })(window.WS = window.WS || {});

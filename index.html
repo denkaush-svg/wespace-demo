@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:56</title>
+  <title>WESPACE · сборка 18:06</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:56';
+    window.WS_BUILD='18:06';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2068,7 +2068,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       title: 'Анна Петрова', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
-      consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0,
+      consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
       contacts: [
         { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
         { name: 'Пётр Петров', role: 'Супруг — со-решение', rating: 'B', phone: '+971 55 210 6642' },
@@ -2084,7 +2084,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       title: 'Виктор Орлов', sub: 'Договор бронирования', tags: ['документ'], updated: 'вчера',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция',
       paymentForm: 'Ипотека', vat: false, source: 'Property Finder', partnerAgent: null, companyId: 'co_emaar',
-      consideredProjects: ['Bayline Terraces'], stageDays: 3,
+      consideredProjects: ['Bayline Terraces'], stageDays: 3, requestId: 'r_viktor',
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'work',
       title: 'Karim Aziz', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня',
@@ -2113,8 +2113,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       title: 'Портфель · готовый арендный', sub: 'Готовый арендный бизнес · DIFC', tags: ['портфель'], updated: 'вчера',
       funnel: 'rental_biz', dealType: 'Готовый арендный бизнес', objectType: 'офис', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
-      consideredProjects: ['DIFC Gate District'], stageDays: 2,
+      consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_bayline', 'o_creekline'],
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+  ];
+
+  // Requests (Part B / V2) — the client inquiry that GROUPS deals. One request → many deals
+  // (one contract = one deal); several units under one contract stay as lots inside a deal.
+  const requests = [
+    { id: 'r_anna', clientId: 'c_anna', title: 'Инвест-квартира до 2 млн', createdAt: '06 мая', channel: 'whatsapp',
+      goal: 'Инвестиция под аренду', budget: 2000000, areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
+      objectsShown: ['o_creekline', 'o_palmcourt', 'o_bayline'],
+      note: 'Голосовое из WhatsApp; показано 3 объекта, в работе один (Creekline — цепочка G1–G3).' },
+    { id: 'r_viktor', clientId: 'c_docs', title: 'Квартира Bayline + портфель DIFC', createdAt: '04 мая', channel: 'email',
+      goal: 'Инвестиция', budget: 6150000, areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
+      objectsShown: ['o_bayline', 'o_creekline'],
+      note: 'Одна заявка → две сделки: бронирование Bayline (свой договор) и портфель DIFC на 2 лота (свой договор).' },
   ];
 
   // Funnels (R2) — each is the same 4-column board; columns = milestone projection of that funnel.
@@ -2311,7 +2324,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   WS.fixtures = {
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, refModel,
-    deals, tasks, events, inbox, analytics,
+    deals, requests, tasks, events, inbox, analytics,
     FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
@@ -2735,7 +2748,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 9; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed.
+  const SCHEMA = 10; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -2772,6 +2785,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       clients: clone(f.clients),
       objects: clone(f.objects),
       deals: clone(f.deals),
+      requests: clone(f.requests),
       tasks: clone(f.tasks),
       events: clone(f.events),
       inbox: clone(f.inbox),
@@ -6043,7 +6057,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const next = dxSec('sparkle', 'Следующий шаг', '<span class="badge ai-b">' + I('sparkle') + 'AI</span>', nbaInner(d));
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    return '<div class="dx-grid2">' + key + next + '</div>' +
+    const req = dealRequestBlock(d);
+    return (req ? req + '<div style="height:14px"></div>' : '') +
+      '<div class="dx-grid2">' + key + next + '</div>' +
       '<div style="margin-top:14px">' + dealLotsBlock(d) + '</div>' +
       '<div style="margin-top:14px">' + dealEventsPreview(d) + '</div>' +
       (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
@@ -6191,6 +6207,48 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function callClient(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return;
     WS.storeApi.toast('Набираю: ' + c.name + ' · ' + (c.phone || '—'), 'ok');
+  }
+  // ---- Part B / V2: Заявка (client request) groups deals — 1 заявка → M сделок; lots live inside a deal ----
+  function requestById(id) { return (D().requests || []).find((r) => r.id === id); }
+  function dealsOfRequest(id) { return (D().deals || []).filter((d) => d.requestId === id); }
+  // The "Заявка" block on a deal: which request it belongs to + its sibling deals.
+  function dealRequestBlock(d) {
+    if (!d.requestId) return '';
+    const r = requestById(d.requestId); if (!r) return '';
+    const sibs = dealsOfRequest(r.id);
+    const shown = (r.objectsShown || []).length;
+    const sibChips = sibs.map((s) => '<button class="chip' + (s.id === d.id ? ' on' : '') + '" data-deal="' + s.id + '">' +
+      I('briefcase') + dealActionWord(s) + ' · ' + dealLotsLabel(s) + '</button>').join('');
+    return dxSec('mail', 'Заявка', '<button class="btn xs" data-request="' + r.id + '">' + I('arrowRight') + 'Открыть заявку</button>',
+      '<div style="font-size:12.5px;color:var(--ink)"><b>' + r.title + '</b></div>' +
+      '<div style="font-size:12px;color:var(--mut);margin-top:2px">Показано объектов: ' + shown + ' · сделок в заявке: ' + sibs.length + '</div>' +
+      (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки этой заявки</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
+  }
+  function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  function viewRequestDetail(id) {
+    const r = requestById(id);
+    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>';
+    if (!r) return back + '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const summary = dxSec('mail', 'Заявка · ' + r.title, '', '<div class="dfields">' +
+      dfPair('Клиент', c.name || '—') + dfPair('Цель', r.goal) +
+      dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') + dfPair('Районы', (r.areas || []).join(', ')) +
+      dfPair('Срок', r.horizon) + dfPair('Канал', r.channel || '—') + '</div>' +
+      (r.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + r.note + '</div>' : ''));
+    const shownObjs = (r.objectsShown || []).map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    const objsBlock = dxSec('building', 'Показанные объекты · ' + shownObjs.length, '',
+      shownObjs.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты не показаны</div>');
+    const deals = dealsOfRequest(r.id);
+    const dealRows = deals.map((d) => {
+      const s = funnelSteps(d);
+      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
+        '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
+        '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет</div>';
+    const dealsBlock = dxSec('briefcase', 'Сделки заявки · ' + deals.length, '',
+      '<div class="feed">' + dealRows + '</div>' +
+      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
+    return back + summary + '<div style="margin-top:14px">' + objsBlock + '</div><div style="margin-top:14px">' + dealsBlock + '</div>';
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
   const DEAL_ENUMS = {
@@ -8064,9 +8122,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="m">' + it.text + '</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span>' + act + '</div></div>';
     }).join('');
+    const reqRows = (D().requests || []).map((r) => {
+      const rc = D().clients.find((x) => x.id === r.clientId) || {};
+      const dn = dealsOfRequest(r.id).length;
+      return '<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('mail') + '</div>' +
+        '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
+        '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · показано объектов: ' + ((r.objectsShown || []).length) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">активных заявок нет</div>';
     return head('Заявки', 'Входящие обращения из всех каналов: ночные лиды, голосовые, исключения (дубли, объект вне инвентаря, ошибки доставки). «Разобрать» запускает сценарий Консьержа — разобранная заявка становится сделкой.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Входящие · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Входящие · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   function viewCompanies() {
@@ -8674,6 +8740,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'shows': return wrap(viewShows());
       case 'docs': return wrap(viewDocs());
       case 'requests': return wrap(viewRequests());
+      case 'requestDetail': return wrap(viewRequestDetail(S().requestId));
       case 'companies': return wrap(viewCompanies());
       case 'analytics': return wrap(viewAnalytics());
       case 'valuation': return wrap(viewValuation());
@@ -8731,7 +8798,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard };
 })(window.WS = window.WS || {});
 
 </script>
@@ -9092,7 +9159,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -9141,6 +9208,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.etab) { const p = d.etab.split('~'); return WS.ui.setEntityTab(p[0], p[1], p[2], t); }
     if (d.dealstage) return api.setDealStage(d.dealstage, d.stage);
     if (d.task) return WS.ui.taskCard(d.task);
+    if (d.request) return WS.ui.requestCard(d.request);
     if (d.deal && !d.act) return WS.ui.dealCard(d.deal);
     if (d.evplay) { WS.ui.closeModal(); return WS.eventEngine.play(d.evplay); }
     if (d.fb) return WS.eventEngine.recordFb(d.fb, d.fbval);
