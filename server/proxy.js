@@ -38,6 +38,18 @@ const CFG = {
   // Extra CLI flags, space-separated. Kept configurable because the right
   // set is verified against the installed CLI, not guessed.
   extraArgs: (process.env.WESPACE_PROXY_CLI_ARGS || '').split(' ').filter(Boolean),
+  // Taken out of the session rather than left to be refused. Printing mode
+  // already denies a tool call with nobody to approve it, but that is a
+  // permission answer — this makes the tools absent, which is a different
+  // and better thing for an endpoint anyone can reach. Verified against the
+  // installed CLI: with this list the model reports it has no Read or Bash
+  // at all, instead of reporting that it was not approved.
+  denyTools: (process.env.WESPACE_PROXY_DENY_TOOLS ||
+    'Bash Read Glob Grep Write Edit NotebookEdit Task Skill Workflow ToolSearch ' +
+    'WebFetch WebSearch CronCreate CronDelete CronList ScheduleWakeup RemoteTrigger ' +
+    'TaskCreate TaskUpdate TaskStop TaskGet TaskList TaskOutput Monitor DesignSync ' +
+    'PushNotification AskUserQuestion EnterPlanMode ExitPlanMode EnterWorktree ExitWorktree'
+  ).split(' ').filter(Boolean),
   // Arguments placed BEFORE ours — lets the executable be a wrapper (and lets
   // the tests stand a fake CLI in front of the real one).
   cliPrefix: (process.env.WESPACE_PROXY_CLI_PREFIX || '').split(' ').filter(Boolean),
@@ -176,10 +188,11 @@ function buildPrompt(body) {
 // ---------- the model ----------
 
 function cliArgs() {
-  return CFG.cliPrefix.concat(
-    ['--print', '--model', CFG.model,
-      '--output-format', 'stream-json', '--verbose', '--include-partial-messages'],
-    CFG.extraArgs);
+  const args = ['--print', '--model', CFG.model,
+    '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+    '--strict-mcp-config'];
+  if (CFG.denyTools.length) args.push('--disallowed-tools', ...CFG.denyTools);
+  return CFG.cliPrefix.concat(args, CFG.extraArgs);
 }
 
 /* Runs one CLI call and reports text as it arrives.
@@ -234,7 +247,13 @@ function callModel(prompt, onDelta) {
         return;
       }
       if (ev.type === 'result') {
-        if (ev.subtype && ev.subtype !== 'success') { finish(new Error('cli:' + ev.subtype)); return; }
+        // The CLI stamps a failed call `subtype: "success"` and flags it with
+        // is_error / api_error_status instead — an expired token arrives
+        // looking like an answer unless all three are checked.
+        if (ev.is_error || ev.api_error_status || (ev.subtype && ev.subtype !== 'success')) {
+          finish(new Error('cli:' + String(ev.result || ev.subtype || 'error').slice(0, 200)));
+          return;
+        }
         if (typeof ev.result === 'string') result = ev.result;
       }
     }
@@ -407,4 +426,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CFG, buildPrompt, splitReply, takeToken, state, server, SYSTEM };
+module.exports = { CFG, buildPrompt, splitReply, takeToken, cliArgs, state, server, SYSTEM };

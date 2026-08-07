@@ -38,6 +38,13 @@ function run() {
     process.stderr.write('fake failure\n');
     process.exit(2);
   }
+  // What an expired token actually looks like: exit 0, subtype "success",
+  // the failure carried only by is_error / api_error_status.
+  if (MODE === 'apierr') {
+    line({ type: 'result', subtype: 'success', is_error: true, api_error_status: 401,
+      result: 'Failed to authenticate. API Error: 401 OAuth access token has expired.' });
+    return process.exit(0);
+  }
   if (MODE === 'echo') {
     const t = 'PROMPT>>>' + stdin;
     delta(t);

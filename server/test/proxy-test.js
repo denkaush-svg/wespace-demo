@@ -99,6 +99,14 @@ function pureChecks() {
   for (let i = 0; i < CFG.perIpBurst + 3; i++) if (takeToken('1.2.3.4')) taken++;
   ok('the address bucket stops at its burst', taken === CFG.perIpBurst, 'taken=' + taken);
   ok('a different address is unaffected', takeToken('5.6.7.8') === true);
+
+  // The stand's data is untrusted input reaching a model that runs on our
+  // server: the dangerous tools have to be absent by default, not by config.
+  const args = P.cliArgs();
+  const di = args.indexOf('--disallowed-tools');
+  ok('server tools are taken out of the session', di >= 0 &&
+    args.indexOf('Bash') > di && args.indexOf('Read') > di && args.indexOf('Write') > di, args.join(' '));
+  ok('no MCP servers are loaded', args.indexOf('--strict-mcp-config') >= 0);
 }
 
 // ---------- http ----------
@@ -163,6 +171,18 @@ async function modelChecks() {
   res = await ask({ text: 'вопрос' }, 'fail');
   const err = events(res.body).find((e) => e.event === 'error');
   ok('a failing model reports an error rather than silence', !!err && err.data.code === 'model');
+
+  // An expired token exits 0 and calls itself a success — if that slips
+  // through, the stand shows the auth message to a visitor as an answer.
+  refill();
+  res = await ask({ text: 'вопрос' }, 'apierr');
+  const evsA = events(res.body);
+  const errA = evsA.find((e) => e.event === 'error');
+  const doneA = evsA.find((e) => e.event === 'done');
+  ok('a failed call flagged as "success" is still an error', !!errA && !doneA,
+    JSON.stringify(doneA ? doneA.data : errA && errA.data));
+  ok('the auth message never reaches the visitor as an answer',
+    !doneA || (doneA.data.say || '').indexOf('authenticate') < 0);
 
   refill();
   res = await ask({ text: 'проверка', digest: { показатели: { deals_active: 4 } } }, 'echo');
