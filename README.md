@@ -85,3 +85,26 @@ cmp /tmp/published.html /tmp/rebuilt.html      # обязано совпасть
 3. `npm run build`.
 4. Коммит вместе с пересобранным `index.html`.
 5. Push в `master` — GitHub Pages обновится сам за ~1 минуту.
+
+## Второй стенд: скин WEWALL
+
+`index-wewall.html` — тот же стенд в визуальном языке посадочной страницы WeWall
+(библиотека `@wewall/vibe-ui`, 17 компонентов). Проба направления, а не замена: острые углы,
+плоские поверхности вместо теней, крупные числа Bebas Neue, направляющие с точками,
+кнопки с заливкой слева.
+
+Сборка строго аддитивная — `src/build-wewall.js` берёт уже собранный `index.html` байт в байт
+и дописывает перед `</head>` единственный файл `src/css/theme-wewall.css`. Ни `app.css`,
+ни `theme.css`, ни один модуль `js/` не тронуты, поэтому две версии не могут разойтись
+в поведении — только в оформлении.
+
+`kit-wewall.html` — витрина компонентов: примитивы библиотеки, переписанные с React/SCSS
+на чистый CSS и наполненные содержимым стенда, с разбором «берём / берём с оговоркой / не берём».
+
+```bash
+npm run build          # базовый стенд
+npm run build:wewall   # -> index-wewall.html   (после build)
+npm run build:kit      # -> kit-wewall.html
+npm run shots:skin     # сравнительные рендеры двух версий -> .shots/skin/
+npm run shots:kit      # витрина на 1440 / 834 / 390 px -> .shots/kit/
+```

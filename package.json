@@ -5,6 +5,10 @@
   "description": "WESPACE — interactive demo stand. Sources in src/, built to a single-file index.html served by GitHub Pages.",
   "scripts": {
     "build": "node src/build.js",
+    "build:wewall": "node src/build-wewall.js",
+    "build:kit": "node src/build-kit.js",
+    "shots:skin": "node src/test/skin-shots.js",
+    "shots:kit": "node src/test/kit-shots.js",
     "test": "node src/test/smoke.js",
     "shots": "node src/test/shots.js",
     "layout": "node src/test/chat-layout.js",

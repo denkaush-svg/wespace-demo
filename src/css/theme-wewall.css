@@ -1,0 +1,370 @@
+/* ============================================================
+   Skin "WEWALL" — the landing design language applied to the product.
+
+   Source: @wewall/vibe-ui (17 golden components extracted from
+   landing.zip). This file transliterates that language — tokens,
+   shapes, chrome — into the stand's existing CSS variables and
+   class vocabulary. It is ADDITIVE: loaded last, it overrides,
+   it never edits app.css / theme.css / any module.
+
+   The five moves that make it read as WeWall and not as a CRM:
+     1. sharp — every corner squared, pills abolished
+     2. flat  — hairlines carry depth, shadows are gone
+     3. loud  — Bebas display numbers, oversized and anchored
+     4. ruled — guide rails with terminal dots open each section
+     5. wiped — buttons fill from the left on hover, not tint
+   ============================================================ */
+
+/* ---------- 1. tokens: exact --ww-* values from the library ---------- */
+:root {
+  --bg:        #fdfdfd;
+  --bg-2:      #f3f3f3;
+  --surface:   #ffffff;
+  --surface-2: #f3f3f3;
+  --surface-3: #ececec;
+  --line:      #dadada;
+  --line-2:    #c4c4c4;
+  --hair:      #ececec;
+
+  --ink:   #222222;
+  --ink-2: #3a3a3a;
+  --mut:   #737373;
+  --faint: #a5a5a5;
+
+  --acc:      #f17e3d;
+  --acc-2:    #e06a28;
+  --acc-deep: #c85a1e;
+  --acc-soft: #ffe8d2;
+  --acc-line: #f3c9a4;
+  --acc-ink:  #a8531f;
+  --acc-weak: rgba(241, 126, 61, .10);
+
+  --ok:   #2e9d58; --ok-soft:#eef7f1;   --ok-line:#c6e2d0;
+  --warn: #b7791f; --warn-soft:#fbf3e2; --warn-line:#e9d8ad;
+  --stop: #de3030; --stop-soft:#fcecec; --stop-line:#f2c6c6;
+  --info: #2b6c8f; --info-soft:#e8f1f6; --info-line:#c1dae5;
+  --beta: #6a4bb0; --beta-soft:#eeeaf8; --beta-line:#cfc3ea;
+
+  /* flat by contract: depth comes from lines, never from blur */
+  --shadow-sm: none;
+  --shadow:    none;
+  --shadow-lg: 0 24px 80px rgba(34, 34, 34, .16);
+
+  --r-xs: 0; --r-sm: 0; --r: 0; --r-lg: 0; --r-pill: 0;
+
+  --font:      'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-disp: 'Bebas Neue', Impact, 'Manrope', sans-serif;
+
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --ease-out: cubic-bezier(.2, 0, 0, 1);
+}
+
+:root[data-theme="dark"] {
+  --bg:#222222; --bg-2:#282828; --surface:#222222; --surface-2:#303030; --surface-3:#383838;
+  --line:rgba(253,253,253,.28); --line-2:rgba(253,253,253,.45); --hair:rgba(253,253,253,.16);
+  --ink:#fdfdfd; --ink-2:#e4e4e4; --mut:#c5c5c5; --faint:#a5a5a5;
+  --acc:#f17e3d; --acc-2:#ff9057; --acc-deep:#c85a1e;
+  --acc-soft:rgba(241,126,61,.16); --acc-line:rgba(241,126,61,.42); --acc-ink:#ffb488;
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, .45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#222222; --bg-2:#282828; --surface:#222222; --surface-2:#303030; --surface-3:#383838;
+    --line:rgba(253,253,253,.28); --line-2:rgba(253,253,253,.45); --hair:rgba(253,253,253,.16);
+    --ink:#fdfdfd; --ink-2:#e4e4e4; --mut:#c5c5c5; --faint:#a5a5a5;
+    --acc-soft:rgba(241,126,61,.16); --acc-line:rgba(241,126,61,.42); --acc-ink:#ffb488;
+    --shadow-lg: 0 24px 80px rgba(0, 0, 0, .45);
+  }
+}
+
+/* ---------- 2. sharp: squash every corner, restore only true circles ---------- */
+*,
+*::before,
+*::after { border-radius: 0 !important; }
+
+.tb-tenant .dot,
+.greet .eyebrow .live,
+.dot,
+.spinner { border-radius: 50% !important; }
+
+/* ---------- 3. flat: strip the elevation the CRM skin leaned on ---------- */
+.card, .tile, .kpi, .obj-card, .cg-card, .mtile, .pod-row {
+  background: transparent;
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.card.pad { padding: 24px; }
+.tile:hover, .obj-card:hover, .cg-card:hover, .mtile:hover {
+  border-color: var(--acc);
+  box-shadow: none;
+  transform: translateY(-2px);
+  transition: border-color .3s var(--ease), transform .3s var(--ease);
+}
+.tile.accent {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: #fdfdfd;
+}
+.tile.accent .th, .tile.accent .sub, .tile.accent .val { color: #fdfdfd; }
+.tile.accent .th svg { color: #fdfdfd; }
+.doc-page { box-shadow: 0 24px 80px rgba(34, 34, 34, .16); }
+.modal, .modal--wide, .drawer, .cgdock { box-shadow: var(--shadow-lg); }
+
+/* ---------- 4. loud: display numerals carry the page ---------- */
+.tile .val, .kpi .kv, .mtile .mv, .fn-n, .cal-date {
+  font-family: var(--font-disp);
+  font-weight: 400;
+  letter-spacing: .01em;
+  line-height: .88;
+}
+.tile .val { font-size: 44px; color: var(--ink); margin-top: 16px; }
+.tile.accent .val { color: #fdfdfd; }
+.tile .val .u { font-family: var(--font); font-size: 14px; font-weight: 500; }
+.kpi { padding: 20px 16px; text-align: left; }
+.kpi .kv { font-size: 38px; }
+.kpi .kk { font-size: 11px; letter-spacing: .09em; margin-top: 10px; }
+
+h1, .view-head h1, .cg-hero-head h1 {
+  font-weight: 500;
+  letter-spacing: -.025em;
+  line-height: 1.02;
+}
+.view-head h1 { font-size: 34px; }
+.greet h1 { font-size: clamp(38px, 4.4vw, 58px); }
+.greet .eyebrow {
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 500;
+}
+
+/* ---------- 5. ruled: the GuideLines motif opens each section ---------- */
+.view-head, .greet {
+  position: relative;
+  padding-top: 26px;
+}
+.view-head::before, .greet::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -30px; right: -30px;
+  height: 3px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--line), var(--line))      left  top / 100% 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink))        left  top / 3px 3px no-repeat,
+    linear-gradient(var(--ink), var(--ink))        right top / 3px 3px no-repeat;
+}
+
+/* numbered sections, the way the landing indexes its blocks */
+.view, .start { counter-reset: wwsec; }
+.section-label {
+  counter-increment: wwsec;
+  font-size: 11px;
+  letter-spacing: .09em;
+  color: var(--mut);
+  font-weight: 500;
+}
+.section-label::before {
+  content: counter(wwsec, decimal-leading-zero) " / ";
+  color: var(--acc);
+  font-weight: 600;
+}
+
+/* ---------- 6. wiped: the button fills from the left ---------- */
+.btn, .tb-btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: 40px;
+  padding: 0 20px;
+  font-weight: 500;
+  font-size: 13.5px;
+  border-color: var(--ink);
+  color: var(--ink);
+  background: transparent;
+  transition: color .3s var(--ease), border-color .3s var(--ease);
+}
+.btn::before, .tb-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--acc);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .5s var(--ease);
+}
+.btn:hover, .tb-btn:hover { color: #fdfdfd; border-color: var(--acc); background: transparent; }
+.btn:hover::before, .tb-btn:hover::before { transform: scaleX(1); }
+.btn:active { transform: none; }
+
+.btn.primary, .tb-btn.accent {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: #fdfdfd;
+}
+.btn.primary::before, .tb-btn.accent::before { background: var(--ink); }
+.btn.primary:hover, .tb-btn.accent:hover { border-color: var(--ink); color: var(--bg); }
+
+.btn.ghost { border-color: transparent; color: var(--mut); }
+.btn.ghost::before { background: var(--surface-2); }
+.btn.ghost:hover { color: var(--ink); border-color: transparent; }
+.btn.sm, .btn.xs { height: 32px; padding: 0 14px; }
+.btn.danger { border-color: var(--stop); color: var(--stop); background: transparent; }
+.btn.danger::before { background: var(--stop); }
+.btn.danger:hover { color: #fdfdfd; }
+
+/* ---------- 7. tags: hairline rectangles, no soft fills ---------- */
+.chip, .badge, .fn-pill, .view-pill, .lvl-tag, .prov-b {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mut);
+  font-weight: 500;
+}
+.chip { height: 30px; padding: 0 12px; }
+.chip:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
+.chip.on, .chip.src, .fn-pill.on, .view-pill.on {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: #fdfdfd;
+}
+.chip.on svg, .chip.src svg, .fn-pill.on svg { color: #fdfdfd; }
+.badge { padding: 4px 10px; min-height: 26px; }
+.badge.ok   { color: var(--ok);   border-color: var(--ok-line);   background: transparent; }
+.badge.warn { color: var(--warn); border-color: var(--warn-line); background: transparent; }
+.badge.stop { color: var(--stop); border-color: var(--stop-line); background: transparent; }
+.badge.info { color: var(--info); border-color: var(--info-line); background: transparent; }
+.badge.acc, .badge.ai-b { color: #fdfdfd; background: var(--acc); border-color: var(--acc); }
+.badge.beta { color: var(--beta); border-color: var(--beta-line); background: transparent; }
+.fn-pill.on .fn-n, .view-pill.on .vp-n { background: transparent; color: #fdfdfd; }
+.fn-pill .fn-n, .view-pill .vp-n { background: transparent; border-left: 1px solid var(--line); padding-left: 8px; }
+
+/* ---------- 8. tabs: the underline replaces the segmented pill ---------- */
+.seg {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+  gap: 0;
+}
+.seg button, .seg .seg-b {
+  position: relative;
+  min-height: 44px;
+  padding: 10px 18px;
+  background: transparent;
+  color: var(--mut);
+  font-weight: 500;
+  box-shadow: none;
+}
+.seg button::after, .seg .seg-b::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 2px;
+  background: var(--acc);
+  transform: scaleX(0);
+  transition: transform .3s var(--ease);
+}
+.seg button.on, .seg .seg-b.on { background: transparent; color: var(--ink); box-shadow: none; }
+.seg button.on::after, .seg .seg-b.on::after { transform: scaleX(1); }
+
+/* ---------- 9. chrome: white frame, hairlines, a black mark ---------- */
+.brand, .topbar, .nav { background: var(--surface); }
+.brand .logo {
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: none;
+  font-weight: 600;
+}
+/* theme.css hardcodes the wordmark to #111, which vanishes in dark mode —
+   the skin re-binds it to the ink token. The base stand still carries that bug. */
+.brand .wm { font-family: var(--font-disp); font-weight: 400; font-size: 22px; letter-spacing: .06em; color: var(--ink); }
+.tb-clock, .tb-icon { background: transparent; border-color: var(--line); }
+
+.nav-item {
+  border: 0;
+  border-left: 2px solid transparent;
+  padding: 9px 12px;
+  font-weight: 500;
+  transition: color .16s var(--ease), border-color .16s var(--ease);
+}
+.nav-item:hover { background: transparent; color: var(--ink); }
+.nav-item.on {
+  background: transparent;
+  border-left-color: var(--acc);
+  color: var(--ink);
+  font-weight: 600;
+}
+.nav-item.on svg { color: var(--acc); }
+.nav-item .count { background: transparent; border: 1px solid var(--line); color: var(--mut); }
+.nav-item.on .count { background: var(--acc); border-color: var(--acc); color: #fdfdfd; }
+.nav-foot .demo-mode .pill { background: transparent; border-color: var(--line); color: var(--mut); }
+
+/* ---------- 10. surfaces that used tint now use rules ---------- */
+.msg .bubble { padding: 14px 16px; }
+.msg.ai .bubble { background: var(--surface); border: 1px solid var(--line); box-shadow: none; }
+.msg.me .bubble { background: var(--acc); border-color: var(--acc); color: #fdfdfd; }
+.msg.me .who { color: var(--mut); }
+.deal-hd { background: transparent; border-color: var(--ink); }
+.conflict-card { background: transparent; border-color: var(--warn-line); }
+.dcli-av { background: var(--ink); color: var(--bg); font-weight: 500; }
+.meter { background: var(--surface-2); height: 4px; }
+.meter i { background: var(--acc); }
+.spark i { background: var(--line); }
+.spark i.on { background: var(--acc); }
+.feed-row:hover, .obj-row:hover, .nba-row:hover, .cg-rail-row:hover { background: var(--surface-2); }
+.fab-w {
+  background: var(--acc);
+  color: #fdfdfd;
+  box-shadow: none;
+  border: 1px solid var(--acc);
+  font-family: var(--font-disp);
+  font-size: 22px;
+}
+.fab-w:hover { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+/* ---------- 11. the composer: a framed control, not a tinted blob ----------
+   The old skin made it focal by flooding it with accent. WeWall gets focus
+   from an ink frame and one saturated square — the send button. */
+.prompt {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: none;
+  padding: 6px 6px 6px 16px;
+}
+.prompt:focus-within { border-color: var(--acc); box-shadow: none; }
+.prompt.composer, .prompt.prompt-lead, .cgdock-foot .prompt.composer {
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  box-shadow: none;
+}
+.prompt.composer:focus-within { border-color: var(--acc); box-shadow: none; }
+.prompt.composer .ico { background: var(--ink); color: var(--bg); }
+.prompt .voice { background: transparent; border-color: var(--line); }
+.prompt .voice:hover { background: transparent; border-color: var(--ink); color: var(--ink); }
+.prompt .send { background: var(--acc); box-shadow: none; }
+.prompt .send:hover { background: var(--ink); color: var(--bg); transform: none; }
+
+/* depth selector reads as tabs, matching the rest of the skin */
+.cg-seg { background: transparent; border: 1px solid var(--line); padding: 0; gap: 0; }
+.cg-seg-btn { height: 30px; padding: 0 14px; font-weight: 500; box-shadow: none; }
+.cg-seg-btn.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+
+/* filters whose active state is set inline in JS — the skin still owns the look */
+.chip[data-objfilter][style],
+.chip[data-dealsrc][style] {
+  border-color: var(--acc) !important;
+  background: var(--acc) !important;
+  color: #fdfdfd !important;
+}
+.chip[data-objfilter][style] svg,
+.chip[data-dealsrc][style] svg { color: #fdfdfd !important; }
+
+/* ---------- 12. focus: the library's accessibility contract ---------- */
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn::before, .tb-btn::before, .seg button::after, .tile, .obj-card { transition-duration: .01ms; }
+}
