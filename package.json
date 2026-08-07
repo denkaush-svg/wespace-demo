@@ -9,7 +9,9 @@
     "shots": "node src/test/shots.js",
     "layout": "node src/test/chat-layout.js",
     "agent": "node src/test/agent-shot.js",
-    "check": "npm test && npm run build"
+    "proxy": "node server/proxy.js",
+    "test:proxy": "node server/test/proxy-test.js",
+    "check": "npm test && npm run test:proxy && npm run build"
   },
   "devDependencies": {
     "jsdom": "^24.0.0",
