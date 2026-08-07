@@ -11,10 +11,12 @@
   // Escape user-derived values placed into HTML attributes (search text, custom task titles).
   const escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  // v3 first level (by frequency): Пульс · Консьерж · Сделки · Контакты · Объекты · Документы
+  // v3 first level (by frequency): Пульс · Консьерж · Заявки · Сделки · Клиенты · Объекты · Оценка
   const NAV = [
     { id: 'start', label: 'Пульс', icon: 'pulse' },
     { id: 'concierge', label: 'Консьерж', icon: 'sparkle' },
+    // Заявки → Сделки: the funnel entry sits next to deals (CRM convention: Pipedrive / HubSpot / amoCRM).
+    { id: 'requests', label: 'Заявки', icon: 'mail', count: () => ((D().requests || []).length + (D().inbox || []).length) },
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'clients', tab: 'contacts', label: 'Клиенты', icon: 'users', count: () => (D().clients || []).length },
@@ -24,7 +26,6 @@
   // "Ещё" group — full v3 framework. Подбор/Доходность are contextual (reached from
   // object/deal cards), so they are not first-level nav items.
   const NAV_MORE = [
-    { id: 'requests', label: 'Заявки', icon: 'mail' },
     { id: 'partners', label: 'Сеть', icon: 'handshake' },
     { id: 'companies', label: 'Компании', icon: 'building' },
     { id: 'shows', label: 'Календарь', icon: 'calendar' },
@@ -1668,24 +1669,13 @@
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    // overview
-    const p = d.prov || {};
-    const o0 = dealLots(d)[0];
-    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
-    const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
-    const key = dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
-      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
-      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
-      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
-      dealField('Тип сделки', d.dealType, p.dealType) +
-      dealField('Комиссия', comm, 'confirmed') +
-      dealField('Co-broking', cobro, 'confirmed') + '</div>');
+    // overview — key params now live in the header (dealKeyCard); overview carries the detail.
     const next = dxSec('sparkle', 'Следующий шаг', '<span class="badge ai-b">' + I('sparkle') + 'AI</span>', nbaInner(d));
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
     const req = dealRequestBlock(d);
     return (req ? req + '<div style="height:14px"></div>' : '') +
-      '<div class="dx-grid2">' + key + next + '</div>' +
+      next +
       '<div style="margin-top:14px">' + dealLotsBlock(d) + '</div>' +
       '<div style="margin-top:14px">' + dealEventsPreview(d) + '</div>' +
       (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
@@ -1728,42 +1718,50 @@
     if (lots.length === 1) return lots[0].name;
     return lots.length + ' лота · ' + lots[0].name.split(',')[0] + ' +' + (lots.length - 1);
   }
-  // One-line deal formulation: "Покупка: {объект}" + "{Клиент} · {сумма} · {стадия}".
+  // Small hero — client-first deal formulation with a compact object thumbnail.
+  // "{Клиент}" headline + "{действие} · {объект} · {сумма}" sub.
   function dealSentence(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const s = funnelSteps(d);
-    const sub = [c.name || 'без клиента', d.amount ? WS.AED(d.amount) : null, s.cols[s.idx]].filter(Boolean).join(' · ');
-    return '<div class="deal-hd"><div class="deal-hd-main">' + I('briefcase') + dealActionWord(d) + ': ' + dealLotsLabel(d) + '</div>' +
-      '<div class="deal-hd-sub">' + sub + '</div></div>';
+    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.amount ? WS.AED(d.amount) : null].filter(Boolean).join(' · ');
+    const o0 = dealLots(d)[0];
+    const ph = o0 && WS.photos && WS.photos[o0.id];
+    const thumb = ph ? '<div class="deal-hd-thumb" style="background-image:url(' + ph + ')"></div>' : '';
+    return '<div class="deal-hd"><div class="deal-hd-t"><div class="deal-hd-main">' + I('briefcase') + (c.name || 'Без клиента') + '</div>' +
+      '<div class="deal-hd-sub">' + sub + '</div></div>' + thumb + '</div>';
   }
-  // Client bar — surfaced ON the deal so the agent can call / write without hunting the contact card.
-  function dealClientBar(d) {
+  // Client card (left of the facing pair) — call / write without hunting the contact card.
+  function dealClientCard(d) {
     const c = D().clients.find((x) => x.id === d.clientId);
-    if (!c) return '';
+    if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан к сделке</div>');
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
     const meta = [c.goal, c.budget ? 'бюджет ' + WS.AED(c.budget) : '', c.horizon ? 'срок ' + c.horizon : ''].filter(Boolean).join(' · ');
+    const head = '<div class="dcli-head"><div class="dcli-av">' + init + '</div>' +
+      '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
+      '<div class="dcli-meta">' + meta + '</div></div></div>';
     const chans = '<div class="dcli-chans">' + ['phone', 'whatsapp', 'telegram', 'email'].map((ch) =>
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
       '<button class="btn sm" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
-    return '<div class="dcli"><div class="dcli-av">' + init + '</div>' +
-      '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
-      '<div class="dcli-meta">' + meta + '</div>' + chans + '</div>' + acts + '</div>';
+    return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
-  // "Now" summary — one glance: stage + days, last event, next step; turns red when it needs action.
+  // "Что сейчас" — a prominent prose status composed from several deal params (stage, days,
+  // last event, next step, urgency). Reads as 3–4 sentences, not a field dump.
   function dealNowSummary(d) {
     const tl = (D().dealTimeline || {})[d.id] || [];
     const last = tl.length ? tl[tl.length - 1] : null;
     const s = funnelSteps(d);
-    const urgent = !!d.hot || (d.stageDays || 0) >= 5;
     const a = nbaActions(d);
-    const line1 = '<div class="dnow-line">' + I(urgent ? 'warn' : 'trend') + '<span><b>' + s.cols[s.idx] + '</b> · ' + (d.stageDays || 0) + ' дн. в стадии</span></div>';
-    const lastLine = last ? '<div class="dnow-line dnow-mut">' + I('clock') + '<span>Последнее: ' + last.text + '</span></div>' : '';
-    const nextLine = '<div class="dnow-line dnow-next">' + I('arrowRight') + '<span>Дальше: ' + a.doIt[0] + (a.why ? ' · ' + a.why : '') + '</span></div>';
-    return '<div class="dnow' + (urgent ? ' dnow-urgent' : '') + '"><div class="dnow-cap">Сейчас</div>' + line1 + lastLine + nextLine + '</div>';
+    const urgent = !!d.hot || (d.stageDays || 0) >= 5;
+    const sent = [];
+    sent.push('Сделка на стадии «' + s.cols[s.idx] + '» — ' + (d.stageDays || 0) + ' дн. в этом этапе.');
+    if (last) sent.push('Последнее: ' + last.text + ' (' + last.at + ').');
+    sent.push('Дальше — ' + a.doIt[0] + (a.why ? ', ' + a.why : '') + '.');
+    return '<div class="dstatus' + (urgent ? ' dstatus-urgent' : '') + '">' +
+      '<div class="dstatus-cap">' + I(urgent ? 'warn' : 'trend') + 'Что сейчас со сделкой</div>' +
+      '<p class="dstatus-body">' + sent.join(' ') + '</p></div>';
   }
   // Compact object card — the demoted hero. Opens the full object on click.
   function dealObjectMini(o) {
@@ -1794,8 +1792,27 @@
     const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
     return dxSec('clock', 'Последние события', more, '<div class="feed">' + rows + '</div>');
   }
+  // Key params, lifted into the header (right of the facing pair).
+  function dealKeyCard(d) {
+    const p = d.prov || {};
+    const o0 = dealLots(d)[0];
+    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
+    const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
+    return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
+      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
+      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
+      dealField('Тип сделки', d.dealType, p.dealType) +
+      dealField('Комиссия', comm, 'confirmed') +
+      dealField('Co-broking', cobro, 'confirmed') + '</div>');
+  }
+  // Header: small client-first hero, two facing cards (client contacts ↔ key params),
+  // then the prominent "что сейчас" prose status.
   function dealHeader(d) {
-    return dealSentence(d) + dealClientBar(d) + dealNowSummary(d);
+    return dealSentence(d) +
+      '<div class="deal-top"><div class="deal-top-cell">' + dealClientCard(d) + '</div>' +
+      '<div class="deal-top-cell">' + dealKeyCard(d) + '</div></div>' +
+      dealNowSummary(d);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -3755,10 +3772,10 @@
         '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
         '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · показано объектов: ' + ((r.objectsShown || []).length) + '</div></div>' + I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">активных заявок нет</div>';
-    return head('Заявки', 'Входящие обращения из всех каналов: ночные лиды, голосовые, исключения (дубли, объект вне инвентаря, ошибки доставки). «Разобрать» запускает сценарий Консьержа — разобранная заявка становится сделкой.',
+    return head('Заявки', 'Два потока: активные заявки клиентов (клик по строке — карточка заявки со сделками и показанными объектами) и входящие обращения из каналов, которые ещё нужно разобрать. «Разобрать» запускает Консьержа — разобранная заявка становится сделкой.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Входящие · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' +
-      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>';
+      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
+      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   function viewCompanies() {
