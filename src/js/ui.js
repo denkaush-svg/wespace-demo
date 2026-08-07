@@ -4417,7 +4417,7 @@
       '<button class="btn" data-act="closeModal">Оставить как есть</button><button class="btn primary" data-act="reset">Безопасный сброс</button>');
   }
 
-  WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+  WS.ui = { render, stageLabel, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

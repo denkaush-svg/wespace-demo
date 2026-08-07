@@ -11,6 +11,7 @@
     "agent": "node src/test/agent-shot.js",
     "proxy": "node server/proxy.js",
     "test:proxy": "node server/test/proxy-test.js",
+    "live": "node src/test/live-shot.js",
     "check": "npm test && npm run test:proxy && npm run build"
   },
   "devDependencies": {

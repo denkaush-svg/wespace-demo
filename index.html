@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:06</title>
+  <title>WESPACE · сборка 19:12</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:06';
+    window.WS_BUILD='19:12';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3886,9 +3886,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     (WS.store.signals || (WS.store.signals = [])).push(text);
     const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Считаю по данным'] }, 1, false), threadId);
     await delay(560); if (!same()) return;
-    const reply = WS.agent.ask(text);
+    // The live head streams; the offline one returns at once. Both land in the
+    // same message, so the card simply fills in rather than being replaced.
+    const reply = await WS.agent.askAsync(text, {
+      onText: (partial) => {
+        if (!same() || !partial) return;
+        updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
+      },
+    });
+    if (!same()) return;
     engine.lastReply = reply;
     updateMsg(workMid, agentCard(reply), threadId);
+    if (reply && reply.open && reply.open.view) navigateTo(reply.open);
   }
 
   function freeReplyLegacy(text) {
@@ -3941,14 +3950,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const badge = p.tier === 'guarded'
       ? '<span class="lvl-tag a3 lvl">нужно подтверждение</span>'
       : '<span class="lvl-tag a1 lvl">безопасное</span>';
+    // The live head says something before it proposes; the offline one does not.
+    const said = p.text ? '<div style="margin:0 0 9px;line-height:1.5">' + esc(p.text) + '</div>' : '';
     return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
+      said +
       '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
       '<div class="t">' + esc(p.title) + '</div>' + badge + '</div>' +
       '<div class="pb">' + lines + '</div>' +
       '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
       '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +
       '<button class="btn primary cta-hint" data-agok="' + p.id + '">' + I('check') + 'Подтвердить</button></div>' +
-      '</div></div></div>';
+      '</div></div>' + nextChips(p.next) + '</div>';
   }
   function draftCard(r) {
     const a = r.artifact || {};
@@ -3986,6 +3998,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
   }
+  // Screens the Concierge may open on its own. A whitelist rather than
+  // whatever string came back, so a wrong guess is ignored instead of
+  // navigating the stand somewhere that does not render.
+  const OPENABLE = ['start', 'concierge', 'clients', 'objects', 'calc', 'finance',
+    'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'];
+  function navigateTo(o) {
+    if (!o) return;
+    const v = String(o.view || '');
+    if (v === 'contact' && o.id) return WS.ui.clientCard(o.id);
+    if (v === 'company' && o.id) return WS.ui.companyCard(o.id);
+    if (v === 'deal' && o.id) return WS.ui.dealCard(o.id);
+    if (OPENABLE.indexOf(v) >= 0) return WS.router.go(v);
+  }
+
   // Chips under a reply: either another question, or a card to open.
   function agentNext(i) {
     const r = engine.lastReply;
@@ -8791,7 +8817,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn" data-act="closeModal">Оставить как есть</button><button class="btn primary" data-act="reset">Безопасный сброс</button>');
   }
 
-  WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+  WS.ui = { render, stageLabel, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
@@ -8828,17 +8854,30 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // Named readings, each paired with the query that produced it so the number
   // stays openable rather than merely asserted.
+  // A count declines the noun after it: 1 задача, 2 задачи, 5 задач. Printing
+  // one fixed form gives «3 открытых задач», which no Russian speaker writes —
+  // and these labels go straight onto the chips under an answer.
+  function plural(n, forms) {
+    if (typeof forms === 'string') return forms;
+    const a = Math.abs(Math.round(Number(n) || 0)) % 100;
+    const b = a % 10;
+    if (a > 10 && a < 20) return forms[2];
+    if (b === 1) return forms[0];
+    if (b > 1 && b < 5) return forms[1];
+    return forms[2];
+  }
+
   const READINGS = {
-    deals_active: { label: 'сделок в работе', q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
+    deals_active: { label: ['сделка в работе', 'сделки в работе', 'сделок в работе'], q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
     deals_active_sum: { label: 'на сумму', money: true, q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } } },
-    deals_hot: { label: 'горячих сделок', q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
-    deals_closed: { label: 'закрытых сделок', q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'done' }], aggregate: { fn: 'count' } } },
-    tasks_open: { label: 'открытых задач', q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
-    tasks_overdue: { label: 'просроченных задач', q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
-    clients_total: { label: 'контактов', q: { from: 'clients', aggregate: { fn: 'count' } } },
-    clients_no_consent: { label: 'контактов без согласия', q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
-    objects_total: { label: 'объектов', q: { from: 'objects', aggregate: { fn: 'count' } } },
-    companies_total: { label: 'компаний', q: { from: 'companies', aggregate: { fn: 'count' } } },
+    deals_hot: { label: ['горячая сделка', 'горячие сделки', 'горячих сделок'], q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
+    deals_closed: { label: ['закрытая сделка', 'закрытые сделки', 'закрытых сделок'], q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'done' }], aggregate: { fn: 'count' } } },
+    tasks_open: { label: ['открытая задача', 'открытые задачи', 'открытых задач'], q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
+    tasks_overdue: { label: ['просроченная задача', 'просроченные задачи', 'просроченных задач'], q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
+    clients_total: { label: ['контакт', 'контакта', 'контактов'], q: { from: 'clients', aggregate: { fn: 'count' } } },
+    clients_no_consent: { label: ['контакт без согласия', 'контакта без согласия', 'контактов без согласия'], q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
+    objects_total: { label: ['объект', 'объекта', 'объектов'], q: { from: 'objects', aggregate: { fn: 'count' } } },
+    companies_total: { label: ['компания', 'компании', 'компаний'], q: { from: 'companies', aggregate: { fn: 'count' } } },
   };
 
   function read(key) {
@@ -8846,7 +8885,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!spec) return null;
     const res = WS.query.run(spec.q);
     if (!res.ok) return null;
-    return { key: key, label: spec.label, value: res.value, money: !!spec.money, count: res.count, query: spec.q, revision: res.revision };
+    return { key: key, label: plural(res.value, spec.label), value: res.value, money: !!spec.money, count: res.count, query: spec.q, revision: res.revision };
   }
 
   // Metrics the screens show, so an answer cannot drift from a tile.
@@ -9070,6 +9109,32 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   let head = deterministicHead;
   function setHead(fn) { head = typeof fn === 'function' ? fn : deterministicHead; }
 
+  // The live head is asynchronous and may simply not be there. It is held
+  // apart from the synchronous one so that everything which calls ask() keeps
+  // working untouched, and so that a failure has an obvious place to land.
+  let asyncHead = null;
+  function setAsyncHead(fn) { asyncHead = typeof fn === 'function' ? fn : null; }
+  function hasAsyncHead() { return !!asyncHead; }
+
+  // Falls back on ANY failure, silently. A visitor is never shown a transport
+  // problem: the offline planner answers the same question, more plainly.
+  async function askAsync(text, opts) {
+    const clean = String(text == null ? '' : text).trim();
+    if (!clean) return ask(clean);
+    if (asyncHead) {
+      try {
+        const reply = await asyncHead(clean, opts || {});
+        if (reply && reply.kind) {
+          if (!Array.isArray(reply.next) || !reply.next.length) reply.next = suggestions();
+          return reply;
+        }
+      } catch (e) {
+        if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e));
+      }
+    }
+    return ask(clean);
+  }
+
   // Synchronous for the deterministic head. When the live model is wired in it
   // will stream, and the streaming entry point lands beside this one rather
   // than changing its shape — the hands and the proposal flow stay identical.
@@ -9101,10 +9166,234 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.agent = {
-    ask, confirm, setHead, openThread, toolSchema, pendingProposal,
-    tools: { read, metrics, findEntity, propose, query: (s) => WS.query.run(s), inventory },
+    ask, askAsync, confirm, setHead, setAsyncHead, hasAsyncHead, openThread, toolSchema, pendingProposal,
+    tools: { read, metrics, findEntity, propose, query: (s) => WS.query.run(s), inventory, plural },
     get head() { return head; },
     READINGS,
+  };
+})(window.WS = window.WS || {});
+
+</script>
+  <script>
+/* ============================================================
+   The live head.
+
+   Everything here is transport. The model gets the question, a digest this
+   file assembles from the stand's own query layer, and the list of names and
+   ids it may refer to — and it gets nothing else. It answers with narration
+   plus a small plan; the plan is turned back into the same reply shape the
+   offline planner produces, so the chat, the evidence chips and the
+   confirmation flow do not know or care which head spoke.
+
+   Numbers never come back from the model. It narrates using figures the code
+   handed it, and names which readings it leaned on; the chips under the reply
+   are then re-read here, from the store, at the current revision. A model that
+   invents a figure cannot get it onto a chip.
+
+   Any failure — unreachable, throttled, switched off, malformed — falls back
+   to the offline planner without saying so. A visitor gets a plainer
+   Concierge, never a broken one.
+   ============================================================ */
+(function (WS) {
+  const DEFAULT_URL = 'https://wespace.201-51-22-106.sslip.io';
+
+  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0 };
+  const GIVE_UP_AFTER = 2;
+
+  // ?api=… for a demo against another host, ?api=off to force the planner.
+  function configuredUrl() {
+    let q = '';
+    try { q = (WS.env && WS.env.search) || (typeof location !== 'undefined' ? location.search : ''); } catch (e) { q = ''; }
+    const m = /[?&]api=([^&]*)/.exec(q || '');
+    if (m) return decodeURIComponent(m[1]);
+    return DEFAULT_URL;
+  }
+
+  // ---------- what the model is allowed to see ----------
+
+  // Readings come from the query layer, so a figure in the prompt and a figure
+  // on a tile are the same figure by construction.
+  function readings() {
+    const out = {};
+    Object.keys(WS.agent.READINGS).forEach((k) => {
+      const r = WS.agent.tools.read(k);
+      if (r) out[k] = { label: r.label, value: r.value, деньги: !!r.money };
+    });
+    return out;
+  }
+
+  function digest() {
+    const d = (WS.store && WS.store.data) || {};
+    const take = (list, fn) => (list || []).map(fn);
+    return {
+      показатели: readings(),
+      контакты: take(d.clients, (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
+      компании: take(d.companies, (c) => ({ id: c.id, имя: c.name })),
+      // Both the label and the code: the label is what a reply should say out
+      // loud, the code is what a stage change has to be written with. Sending
+      // only the code got «две сделки на стадии docs» into an answer.
+      сделки: take(d.deals, (x) => ({
+        id: x.id, название: x.title, сумма: x.amount,
+        стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
+        контакт: x.clientId, компания: x.companyId, объект: x.objectId, горячая: !!x.hot,
+      })),
+      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate })),
+      задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
+      инвентарь: WS.agent.tools.inventory(),
+      ревизия: WS.store.dataRevision,
+    };
+  }
+
+  function history() {
+    const th = WS.engine && WS.engine.threads && WS.engine.threads[WS.engine.activeThreadId];
+    const items = (th && th.items) || [];
+    return items.slice(-8)
+      .map((m) => ({
+        role: /class="msg me/.test(m.html || '') ? 'user' : 'agent',
+        text: String(m.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
+      }))
+      .filter((m) => m.text);
+  }
+
+  // ---------- what comes back ----------
+
+  function normNext(list) {
+    if (!Array.isArray(list)) return null;
+    const out = [];
+    for (let i = 0; i < list.length && out.length < 3; i++) {
+      const n = list[i];
+      if (!n || typeof n !== 'object') continue;
+      const label = String(n.label || '').slice(0, 40);
+      if (!label) continue;
+      if (n.ask) out.push({ label: label, ask: String(n.ask).slice(0, 200) });
+      else if (n.open && n.id) out.push({ label: label, open: String(n.open), id: String(n.id) });
+    }
+    return out.length ? out : null;
+  }
+
+  // Chips are re-read here rather than taken from the model, so a figure it
+  // invented has nowhere to land.
+  function evidenceFor(keys) {
+    if (!Array.isArray(keys)) return [];
+    return keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
+      .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count }));
+  }
+
+  function toReply(say, plan) {
+    const text = String(say || '').trim();
+    const evidence = evidenceFor(plan.read);
+    const next = normNext(plan.next);
+
+    if (plan.act) {
+      const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
+      const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next });
+      if (p && p.kind === 'proposal') { p.text = text; return p; }
+      // The store refused the dry run — say so plainly instead of pretending.
+      return {
+        kind: 'answer',
+        text: text + (p && p.text ? ' Записать не выйдет: ' + p.text : ''),
+        evidence: evidence, next: next,
+      };
+    }
+    if (!text) return null;
+    return { kind: 'answer', text: text, evidence: evidence, next: next, open: plan.open || null };
+  }
+
+  // ---------- transport ----------
+
+  async function stream(text, onText) {
+    const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: text, digest: digest(), history: history() }),
+    });
+    if (!res.ok || !res.body) throw new Error('http ' + res.status);
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let raw = '';
+    let done = null;
+
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buf += dec.decode(chunk.value, { stream: true });
+      let cut;
+      while ((cut = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, cut);
+        buf = buf.slice(cut + 2);
+        const ev = /^event: (.+)$/m.exec(block);
+        const dt = /^data: (.+)$/m.exec(block);
+        if (!ev || !dt) continue;
+        let data = null;
+        try { data = JSON.parse(dt[1]); } catch (e) { continue; }
+        if (ev[1] === 'delta' && data && typeof data.t === 'string') {
+          raw += data.t;
+          // The plan rides at the end of the same text; show only what precedes it.
+          if (onText) onText(raw.split('```')[0].trim());
+        } else if (ev[1] === 'done') {
+          done = data;
+        } else if (ev[1] === 'error') {
+          throw new Error(String((data && data.error) || 'model'));
+        }
+      }
+    }
+    if (!done) throw new Error('stream ended without a reply');
+    return done;
+  }
+
+  async function ask(text, opts) {
+    if (!cfg.ready) throw new Error('offline');
+    const done = await stream(text, opts && opts.onText);
+    const reply = toReply(done.say, done.plan || {});
+    if (!reply) throw new Error('empty reply');
+    cfg.misses = 0;
+    return reply;
+  }
+
+  // ---------- availability ----------
+
+  async function probe() {
+    if (cfg.checking) return cfg.ready;
+    cfg.checking = true;
+    cfg.url = configuredUrl();
+    if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') {
+      cfg.ready = false; cfg.checking = false; return false;
+    }
+    try {
+      const res = await fetch(cfg.url.replace(/\/+$/, '') + '/health', { method: 'GET' });
+      const h = await res.json();
+      cfg.ready = !!(h && h.ok);
+      cfg.lastError = cfg.ready ? null : 'health: off';
+    } catch (e) {
+      cfg.ready = false;
+      cfg.lastError = String(e.message || e);
+    }
+    cfg.checking = false;
+    if (cfg.ready && WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(ask);
+    return cfg.ready;
+  }
+
+  // One hiccup should not cost the session its live head, and a service that
+  // is genuinely down should not be retried on every message the visitor types.
+  function noteFailure(why) {
+    cfg.lastError = why || 'error';
+    cfg.misses += 1;
+    if (cfg.misses >= GIVE_UP_AFTER) disable(why);
+  }
+  function disable(why) {
+    cfg.ready = false;
+    cfg.lastError = why || 'disabled';
+    if (WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(null);
+  }
+
+  WS.live = {
+    ask, probe, digest, toReply, normNext, evidenceFor, noteFailure, disable,
+    get ready() { return cfg.ready; },
+    get url() { return cfg.url; },
+    get misses() { return cfg.misses; },
+    get lastError() { return cfg.lastError; },
   };
 })(window.WS = window.WS || {});
 
@@ -9459,6 +9748,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     api.subscribe(() => WS.ui.render());
     api.subscribe(placeCgPop);
     WS.ui.render();
+    // Ask once whether the live head is reachable. Failure is silent and the
+    // offline planner keeps answering, so the stand renders the same either way.
+    if (WS.live && WS.live.probe) WS.live.probe().catch(() => {});
   } catch (e) {
     var a = document.getElementById('app');
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';

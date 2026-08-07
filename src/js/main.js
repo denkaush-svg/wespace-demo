@@ -347,6 +347,9 @@
     api.subscribe(() => WS.ui.render());
     api.subscribe(placeCgPop);
     WS.ui.render();
+    // Ask once whether the live head is reachable. Failure is silent and the
+    // offline planner keeps answering, so the stand renders the same either way.
+    if (WS.live && WS.live.probe) WS.live.probe().catch(() => {});
   } catch (e) {
     var a = document.getElementById('app');
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';

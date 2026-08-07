@@ -23,17 +23,30 @@
 
   // Named readings, each paired with the query that produced it so the number
   // stays openable rather than merely asserted.
+  // A count declines the noun after it: 1 задача, 2 задачи, 5 задач. Printing
+  // one fixed form gives «3 открытых задач», which no Russian speaker writes —
+  // and these labels go straight onto the chips under an answer.
+  function plural(n, forms) {
+    if (typeof forms === 'string') return forms;
+    const a = Math.abs(Math.round(Number(n) || 0)) % 100;
+    const b = a % 10;
+    if (a > 10 && a < 20) return forms[2];
+    if (b === 1) return forms[0];
+    if (b > 1 && b < 5) return forms[1];
+    return forms[2];
+  }
+
   const READINGS = {
-    deals_active: { label: 'сделок в работе', q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
+    deals_active: { label: ['сделка в работе', 'сделки в работе', 'сделок в работе'], q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
     deals_active_sum: { label: 'на сумму', money: true, q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } } },
-    deals_hot: { label: 'горячих сделок', q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
-    deals_closed: { label: 'закрытых сделок', q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'done' }], aggregate: { fn: 'count' } } },
-    tasks_open: { label: 'открытых задач', q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
-    tasks_overdue: { label: 'просроченных задач', q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
-    clients_total: { label: 'контактов', q: { from: 'clients', aggregate: { fn: 'count' } } },
-    clients_no_consent: { label: 'контактов без согласия', q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
-    objects_total: { label: 'объектов', q: { from: 'objects', aggregate: { fn: 'count' } } },
-    companies_total: { label: 'компаний', q: { from: 'companies', aggregate: { fn: 'count' } } },
+    deals_hot: { label: ['горячая сделка', 'горячие сделки', 'горячих сделок'], q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
+    deals_closed: { label: ['закрытая сделка', 'закрытые сделки', 'закрытых сделок'], q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'done' }], aggregate: { fn: 'count' } } },
+    tasks_open: { label: ['открытая задача', 'открытые задачи', 'открытых задач'], q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
+    tasks_overdue: { label: ['просроченная задача', 'просроченные задачи', 'просроченных задач'], q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
+    clients_total: { label: ['контакт', 'контакта', 'контактов'], q: { from: 'clients', aggregate: { fn: 'count' } } },
+    clients_no_consent: { label: ['контакт без согласия', 'контакта без согласия', 'контактов без согласия'], q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
+    objects_total: { label: ['объект', 'объекта', 'объектов'], q: { from: 'objects', aggregate: { fn: 'count' } } },
+    companies_total: { label: ['компания', 'компании', 'компаний'], q: { from: 'companies', aggregate: { fn: 'count' } } },
   };
 
   function read(key) {
@@ -41,7 +54,7 @@
     if (!spec) return null;
     const res = WS.query.run(spec.q);
     if (!res.ok) return null;
-    return { key: key, label: spec.label, value: res.value, money: !!spec.money, count: res.count, query: spec.q, revision: res.revision };
+    return { key: key, label: plural(res.value, spec.label), value: res.value, money: !!spec.money, count: res.count, query: spec.q, revision: res.revision };
   }
 
   // Metrics the screens show, so an answer cannot drift from a tile.
@@ -265,6 +278,32 @@
   let head = deterministicHead;
   function setHead(fn) { head = typeof fn === 'function' ? fn : deterministicHead; }
 
+  // The live head is asynchronous and may simply not be there. It is held
+  // apart from the synchronous one so that everything which calls ask() keeps
+  // working untouched, and so that a failure has an obvious place to land.
+  let asyncHead = null;
+  function setAsyncHead(fn) { asyncHead = typeof fn === 'function' ? fn : null; }
+  function hasAsyncHead() { return !!asyncHead; }
+
+  // Falls back on ANY failure, silently. A visitor is never shown a transport
+  // problem: the offline planner answers the same question, more plainly.
+  async function askAsync(text, opts) {
+    const clean = String(text == null ? '' : text).trim();
+    if (!clean) return ask(clean);
+    if (asyncHead) {
+      try {
+        const reply = await asyncHead(clean, opts || {});
+        if (reply && reply.kind) {
+          if (!Array.isArray(reply.next) || !reply.next.length) reply.next = suggestions();
+          return reply;
+        }
+      } catch (e) {
+        if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e));
+      }
+    }
+    return ask(clean);
+  }
+
   // Synchronous for the deterministic head. When the live model is wired in it
   // will stream, and the streaming entry point lands beside this one rather
   // than changing its shape — the hands and the proposal flow stay identical.
@@ -296,8 +335,8 @@
   }
 
   WS.agent = {
-    ask, confirm, setHead, openThread, toolSchema, pendingProposal,
-    tools: { read, metrics, findEntity, propose, query: (s) => WS.query.run(s), inventory },
+    ask, askAsync, confirm, setHead, setAsyncHead, hasAsyncHead, openThread, toolSchema, pendingProposal,
+    tools: { read, metrics, findEntity, propose, query: (s) => WS.query.run(s), inventory, plural },
     get head() { return head; },
     READINGS,
   };

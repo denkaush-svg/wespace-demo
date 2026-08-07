@@ -687,6 +687,103 @@ setTimeout(async () => {
   });
 
   // ============================================================
+  //  The live head: a model may speak, but it may not supply a number, write
+  //  anything, or take the stand down when it fails.
+  // ============================================================
+  if (WS.live) {
+    const L = WS.live;
+
+    check('live · a plain reply becomes an answer',
+      L.toReply('Четыре сделки.', {}).kind === 'answer');
+
+    // A count declines the noun after it, and these labels are the chip text.
+    {
+      const pl = WS.agent.tools.plural;
+      const F = ['задача', 'задачи', 'задач'];
+      const got = [0, 1, 2, 4, 5, 11, 12, 21, 22, 25, 101, 111].map((n) => n + ' ' + pl(n, F)).join(', ');
+      const want = '0 задач, 1 задача, 2 задачи, 4 задачи, 5 задач, 11 задач, 12 задач, ' +
+        '21 задача, 22 задачи, 25 задач, 101 задача, 111 задач';
+      check('live · counted nouns are declined, not left in one form', got === want, got);
+      check('live · a label that is not a count is left alone', pl(3, 'на сумму') === 'на сумму');
+      const one = WS.agent.READINGS.tasks_overdue.label;
+      check('live · reading labels carry all three forms', Array.isArray(one) && one.length === 3);
+    }
+
+    // Evidence is re-read from the store, so the figure on a chip is the
+    // store's figure whatever the model said around it.
+    const ev = L.evidenceFor(['deals_active']);
+    const truth = WS.query.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } });
+    check('live · evidence values come from the store, not the model',
+      ev.length === 1 && ev[0].value === truth.value, 'chip=' + (ev[0] && ev[0].value) + ' store=' + truth.value);
+    check('live · an unknown reading is dropped rather than shown',
+      L.evidenceFor(['deals_active', 'выдуманный_показатель']).length === 1);
+    check('live · evidence survives a non-array', L.evidenceFor('deals_active').length === 0);
+
+    check('live · follow-ups are capped at three',
+      (L.normNext([1, 2, 3, 4, 5].map((i) => ({ label: 'п' + i, ask: 'в' + i }))) || []).length === 3);
+    check('live · a malformed follow-up is dropped',
+      (L.normNext([{ ask: 'нет метки' }, { label: 'есть', ask: 'да' }, null]) || []).length === 1);
+    check('live · a follow-up with no action is dropped',
+      L.normNext([{ label: 'пусто' }]) === null);
+
+    // A write instruction from the model is a proposal, never a write.
+    {
+      const before = (dd().contactTimeline['c_anna'] || []).length;
+      const r = L.toReply('Записал бы так.', {
+        act: { op: 'addEvent', scope: 'contact', id: 'c_anna', type: 'note', text: 'ЖИВАЯ ГОЛОВА: проверка' },
+      });
+      check('live · an action from the model becomes a proposal', r && r.kind === 'proposal', r && r.kind);
+      check('live · the proposal carries what the model said', r && r.text === 'Записал бы так.');
+      check('live · nothing is written by proposing',
+        (dd().contactTimeline['c_anna'] || []).length === before);
+    }
+    // An impossible action is refused as a dry run and answered honestly.
+    {
+      const r = L.toReply('Попробую.', { act: { op: 'dealStage', id: 'нет_такой_сделки', stage: 'done' } });
+      check('live · an impossible action does not become a proposal', r && r.kind !== 'proposal', r && r.kind);
+      check('live · and the refusal is said out loud', r && /Записать не выйдет/.test(r.text || ''), r && r.text);
+    }
+
+    check('live · the digest carries the readings the answer may use',
+      !!L.digest().показатели.deals_active);
+    check('live · the digest names entities so the model can refer to them',
+      (L.digest().контакты || []).some((c) => c.id === 'c_anna'));
+    // Sending only the stage code put «две сделки на стадии docs» into a reply.
+    {
+      const deal = (L.digest().сделки || [])[0];
+      check('live · a stage reaches the model as words, not a code',
+        !!deal && !/^(new|work|docs|done)$/.test(deal.стадия), deal && deal.стадия);
+      check('live · and the code is still there to write a change with',
+        !!deal && /^(new|work|docs|done)$/.test(deal.стадия_код), deal && deal.стадия_код);
+    }
+
+    // Two failures and the live head steps aside for the rest of the session.
+    {
+      WS.agent.setAsyncHead(() => { throw new Error('проверка'); });
+      check('live · a live head can be installed', WS.agent.hasAsyncHead() === true);
+      L.noteFailure('раз');
+      check('live · one hiccup does not cost the session its live head', WS.agent.hasAsyncHead() === true);
+      L.noteFailure('два');
+      check('live · a service that stays down is stopped being retried', WS.agent.hasAsyncHead() === false);
+    }
+  } else {
+    check('live head module present', false);
+  }
+
+  // A failing live head must answer anyway, through the offline planner.
+  if (WS.agent && WS.agent.askAsync) {
+    WS.agent.setAsyncHead(async () => { throw new Error('сеть легла'); });
+    const fallback = await WS.agent.askAsync('сколько сделок в работе');
+    check('live · a failed live call still produces an answer',
+      !!fallback && fallback.kind === 'answer' && /\d/.test(fallback.text || ''), fallback && fallback.text);
+    WS.agent.setAsyncHead(async () => ({ kind: 'answer', text: 'Живой ответ.', evidence: [], next: [] }));
+    const live = await WS.agent.askAsync('что там');
+    check('live · a working live call is used', live.text === 'Живой ответ.');
+    check('live · a live reply still gets follow-ups', (live.next || []).length > 0);
+    WS.agent.setAsyncHead(null);
+  }
+
+  // ============================================================
   //  End to end: what actually happens when a person types into the Concierge.
   //  The module tests above prove the reasoning; this proves the wiring.
   // ============================================================

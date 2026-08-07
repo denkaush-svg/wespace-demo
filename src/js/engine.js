@@ -556,9 +556,18 @@
     (WS.store.signals || (WS.store.signals = [])).push(text);
     const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Считаю по данным'] }, 1, false), threadId);
     await delay(560); if (!same()) return;
-    const reply = WS.agent.ask(text);
+    // The live head streams; the offline one returns at once. Both land in the
+    // same message, so the card simply fills in rather than being replaced.
+    const reply = await WS.agent.askAsync(text, {
+      onText: (partial) => {
+        if (!same() || !partial) return;
+        updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
+      },
+    });
+    if (!same()) return;
     engine.lastReply = reply;
     updateMsg(workMid, agentCard(reply), threadId);
+    if (reply && reply.open && reply.open.view) navigateTo(reply.open);
   }
 
   function freeReplyLegacy(text) {
@@ -611,14 +620,17 @@
     const badge = p.tier === 'guarded'
       ? '<span class="lvl-tag a3 lvl">нужно подтверждение</span>'
       : '<span class="lvl-tag a1 lvl">безопасное</span>';
+    // The live head says something before it proposes; the offline one does not.
+    const said = p.text ? '<div style="margin:0 0 9px;line-height:1.5">' + esc(p.text) + '</div>' : '';
     return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
+      said +
       '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
       '<div class="t">' + esc(p.title) + '</div>' + badge + '</div>' +
       '<div class="pb">' + lines + '</div>' +
       '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
       '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +
       '<button class="btn primary cta-hint" data-agok="' + p.id + '">' + I('check') + 'Подтвердить</button></div>' +
-      '</div></div></div>';
+      '</div></div>' + nextChips(p.next) + '</div>';
   }
   function draftCard(r) {
     const a = r.artifact || {};
@@ -656,6 +668,20 @@
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
   }
+  // Screens the Concierge may open on its own. A whitelist rather than
+  // whatever string came back, so a wrong guess is ignored instead of
+  // navigating the stand somewhere that does not render.
+  const OPENABLE = ['start', 'concierge', 'clients', 'objects', 'calc', 'finance',
+    'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'];
+  function navigateTo(o) {
+    if (!o) return;
+    const v = String(o.view || '');
+    if (v === 'contact' && o.id) return WS.ui.clientCard(o.id);
+    if (v === 'company' && o.id) return WS.ui.companyCard(o.id);
+    if (v === 'deal' && o.id) return WS.ui.dealCard(o.id);
+    if (OPENABLE.indexOf(v) >= 0) return WS.router.go(v);
+  }
+
   // Chips under a reply: either another question, or a card to open.
   function agentNext(i) {
     const r = engine.lastReply;

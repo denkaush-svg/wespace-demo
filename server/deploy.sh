@@ -15,7 +15,9 @@ HOST="${WESPACE_VPS:-vps}"
 REMOTE_DIR="${WESPACE_REMOTE_DIR:-wespace-proxy}"
 PORT="${WESPACE_PROXY_PORT:-8791}"
 DOMAIN="${WESPACE_PROXY_DOMAIN:-wespace.201-51-22-106.sslip.io}"
-ORIGINS="${WESPACE_PROXY_ORIGINS:-https://denkaush-svg.github.io}"
+# The published page, plus the local addresses the browser tests serve from —
+# without those, the live path can only ever be checked by hand in production.
+ORIGINS="${WESPACE_PROXY_ORIGINS:-https://denkaush-svg.github.io,http://localhost:8000,http://127.0.0.1:8000}"
 MODEL="${WESPACE_PROXY_MODEL:-claude-opus-5}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WITH_CADDY="${1:-}"
