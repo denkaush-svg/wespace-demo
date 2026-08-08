@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:51</title>
+  <title>WESPACE · сборка 02:18</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:51';
+    window.WS_BUILD='02:18';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -173,7 +173,8 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    APP SHELL
    ============================================================ */
-.app { display: grid; grid-template-columns: var(--nav-w) 1fr; grid-template-rows: var(--topbar-h) 1fr; grid-template-areas: "brand topbar" "nav main"; height: 100vh; height: 100dvh; }
+.app { display: grid; grid-template-columns: var(--nav-w) minmax(0, 1fr); grid-template-rows: var(--topbar-h) 1fr; grid-template-areas: "brand topbar" "nav main"; height: 100vh; height: 100dvh; }
+#main { min-width: 0; }
 
 /* brand corner */
 .brand { grid-area: brand; display: flex; align-items: center; gap: 10px; padding: 0 18px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
@@ -744,14 +745,21 @@ button { font-family: inherit; cursor: pointer; }
    ============================================================ */
 .mob-only { display: none; }
 @media (max-width: 860px) {
-  .app { grid-template-columns: 1fr; grid-template-rows: var(--topbar-h) 1fr auto; grid-template-areas: "topbar" "main" "tabbar"; }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topbar-h) 1fr auto; grid-template-areas: "topbar" "main" "tabbar"; }
   .brand { display: none; }
   .nav { display: none; }
   .topbar { padding: 0 14px; gap: 8px; }
   .tb-tenant .txt { display: none; }
   .view, .start, .concierge { padding-left: 16px; padding-right: 16px; }
-  .tiles .tile { grid-column: span 6; }
-  .tiles .tile.wide { grid-column: span 12; }
+  /* 12-track grid crams 11 phantom 14px gaps into 390px → collapse to 2 real tracks */
+  .tiles { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .tiles .tile { grid-column: span 1; }
+  .tiles .tile.wide { grid-column: span 2; }
+  .obj-page-head { flex-wrap: wrap; }
+  /* action-button clusters must wrap on phone, not push the page wide */
+  .obj-page-acts, .wq-head { flex-wrap: wrap; }
+  /* long compound provenance badges wrap instead of overflowing */
+  .prov .badge { white-space: normal; }
   .fin { grid-template-columns: 1fr; }
   .drawer { width: 100vw; max-width: 100vw; }
   .role-switch button .txt { display: none; }
