@@ -326,6 +326,22 @@
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">Одинаковый запрос → одинаковые числа. Клик по цифре — до записей. Комиссия платформы не показывается.</div>';
   }
+  // Agent Пульс effectiveness strip — the three KPIs the principal asked to surface:
+  // conversion request→deal, mean deal cycle, commission per lead.
+  function agentKpis() {
+    const m = computeMetrics();
+    const A = D().attribution || [];
+    const totalComm = A.reduce((s, x) => s + (x.commission || 0), 0);
+    const commPerLead = m.leads ? Math.round(totalComm / m.leads) : 0;
+    const cycle = (D().analytics || {}).avgCycleDays || 0;
+    const mtile = (label, val, sub, act) => '<button class="mtile" ' + act + '><div class="ml">' + label + '</div><div class="mv">' + val + '</div><div class="ms">' + sub + '</div></button>';
+    return '<div class="section-label" style="margin-top:24px">Эффективность · KPI <span class="badge demo">' + I('lock') + 'демо</span></div>' +
+      '<div class="mtiles">' +
+      mtile('Конверсия заявка → сделка', m.conv + '%', m.won + ' из ' + m.leads + ' лидов', 'data-analytics="conv"') +
+      mtile('Средний цикл сделки', cycle + ' дн.', 'от заявки до закрытия', 'data-nav="analytics"') +
+      mtile('Комиссия на лид', WS.AED(commPerLead), 'из ' + m.leads + ' лидов', 'data-analytics="pipeline"') +
+      '</div>';
+  }
   function openAnalyticsDrill(kind) {
     const deals = D().deals || [];
     let title = 'Записи', rows = '';
@@ -452,7 +468,7 @@
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
-      insightsBlock() + (isMgr ? canonMetrics() : '') +
+      insightsBlock() + (isMgr ? canonMetrics() : agentKpis()) +
       dayHint +
       queueBlock +
     '</div>';

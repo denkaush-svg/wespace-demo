@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 11:37</title>
+  <title>WESPACE · сборка 11:49</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='11:37';
+    window.WS_BUILD='11:49';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2349,6 +2349,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     weekTouches: { done: 11, total: 14 },
     sparks: [4, 6, 5, 8, 7, 9, 12], // deals/day trend
     coverage: 0.86,     // lead coverage
+    avgCycleDays: 34,   // mean days from request to close (demo KPI)
   };
 
   WS.fixtures = {
@@ -4730,6 +4731,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">Одинаковый запрос → одинаковые числа. Клик по цифре — до записей. Комиссия платформы не показывается.</div>';
   }
+  // Agent Пульс effectiveness strip — the three KPIs the principal asked to surface:
+  // conversion request→deal, mean deal cycle, commission per lead.
+  function agentKpis() {
+    const m = computeMetrics();
+    const A = D().attribution || [];
+    const totalComm = A.reduce((s, x) => s + (x.commission || 0), 0);
+    const commPerLead = m.leads ? Math.round(totalComm / m.leads) : 0;
+    const cycle = (D().analytics || {}).avgCycleDays || 0;
+    const mtile = (label, val, sub, act) => '<button class="mtile" ' + act + '><div class="ml">' + label + '</div><div class="mv">' + val + '</div><div class="ms">' + sub + '</div></button>';
+    return '<div class="section-label" style="margin-top:24px">Эффективность · KPI <span class="badge demo">' + I('lock') + 'демо</span></div>' +
+      '<div class="mtiles">' +
+      mtile('Конверсия заявка → сделка', m.conv + '%', m.won + ' из ' + m.leads + ' лидов', 'data-analytics="conv"') +
+      mtile('Средний цикл сделки', cycle + ' дн.', 'от заявки до закрытия', 'data-nav="analytics"') +
+      mtile('Комиссия на лид', WS.AED(commPerLead), 'из ' + m.leads + ' лидов', 'data-analytics="pipeline"') +
+      '</div>';
+  }
   function openAnalyticsDrill(kind) {
     const deals = D().deals || [];
     let title = 'Записи', rows = '';
@@ -4856,7 +4873,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
-      insightsBlock() + (isMgr ? canonMetrics() : '') +
+      insightsBlock() + (isMgr ? canonMetrics() : agentKpis()) +
       dayHint +
       queueBlock +
     '</div>';

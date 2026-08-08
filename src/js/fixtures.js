@@ -374,6 +374,7 @@
     weekTouches: { done: 11, total: 14 },
     sparks: [4, 6, 5, 8, 7, 9, 12], // deals/day trend
     coverage: 0.86,     // lead coverage
+    avgCycleDays: 34,   // mean days from request to close (demo KPI)
   };
 
   WS.fixtures = {
