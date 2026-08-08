@@ -1861,6 +1861,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width:640px){ .wh{ min-height:104px; padding:16px 18px; } .wh__p{ font-size:12px; } .wh__viz{ display:none; } }
 
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
   <style id="skin-wewall">
 /* ============================================================
    Skin "WEWALL" — the landing design language applied to the product.
@@ -1929,8 +1930,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   --r-xs: 0; --r-sm: 0; --r: 0; --r-lg: 0; --r-pill: 0;
 
-  --font:      'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-disp: 'Bebas Neue', Impact, 'Manrope', sans-serif;
+  --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Bebas Neue has no Cyrillic. On this product it rendered Latin and digits
+     in Bebas and every Russian word in the fallback — one heading, two
+     typefaces, and the fallback was Impact: extremely condensed, one weight,
+     closed counters. Oswald sets both scripts in a single condensed face with
+     real 400/500/600 masters, so nothing is synthetically bolded. Bebas is
+     gone from the stack entirely: keeping it would only restore the split
+     whenever Oswald failed to load. */
+  --font-disp: 'Oswald', 'Arial Narrow', Arial, sans-serif;
 
   --ease: cubic-bezier(.2, 0, 0, 1);
   --ease-out: cubic-bezier(.2, 0, 0, 1);
@@ -2044,13 +2052,19 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--line-2);
 }
 
-/* ---------- 6. loud: display numerals carry the page ---------- */
-.tile .val, .kpi .kv, .mtile .mv, .fn-n, .cal-date {
+/* ---------- 6. loud: display numerals carry the page ----------
+   500 is a real Oswald master, so no synthetic bolding. Tabular figures keep
+   columns of money aligned; proportional digits made them wander. */
+.tile .val, .kpi .kv, .mtile .mv, .cal-date, .osv, .ost {
   font-family: var(--font-disp);
-  font-weight: 400;
-  letter-spacing: .01em;
-  line-height: .88;
+  font-weight: 500;
+  letter-spacing: .012em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
+/* a two-digit counter inside a pill is not display typography */
+.fn-n, .view-pill .vp-n { font-family: var(--font); font-variant-numeric: tabular-nums; }
 .tile .val { font-size: 44px; color: var(--ink); margin-top: 16px; }
 .tile.accent .val { color: #fdfdfd; }
 .tile .val .u { font-family: var(--font); font-size: 14px; font-weight: 500; }
@@ -2073,6 +2087,42 @@ h1, .view-head h1, .cg-hero-head h1 {
 .greet h1 { font-size: clamp(38px, 4.4vw, 58px); }
 .greet .eyebrow { font-size: 12.5px; color: var(--mut); font-weight: 500; }
 .section-label { font-size: 11px; letter-spacing: .09em; color: var(--mut); font-weight: 600; }
+
+/* ---------- 6b. the section hero ----------
+   Condensed uppercase needs positive tracking or the verticals fuse into one
+   black bar — worst in Cyrillic, where Д Л К П share stems. The old .012em was
+   set for Bebas, which never rendered a Russian letter to begin with. */
+.wh__t {
+  font-family: var(--font-disp);
+  font-weight: 500;
+  font-size: clamp(30px, 3.6vw, 46px);
+  line-height: 1;
+  letter-spacing: .035em;
+  text-wrap: balance;
+}
+/* the deck under the title was 12.5px — caption size doing paragraph work */
+.wh__p { font-size: 14px; line-height: 1.5; max-width: 66ch; color: var(--mut); }
+.wh__eye { font-weight: 600; letter-spacing: .08em; color: var(--mut); }
+.ohero-title, .obj-body .ot { letter-spacing: -.01em; }
+
+/* ---------- 6c. text inside fields and key/value rows ----------
+   Form text sat at 13px against 13.5px values and 12px labels — three sizes
+   within a hair of each other, which reads as noise rather than hierarchy.
+   Two steps: 14px for what you read, 12.5px for what labels it. */
+.form-grid .fld input, .form-grid .fld select,
+.match-grid .fld input, .match-grid .fld select,
+.match-panel > select, label.fld textarea, .mini-input, .mini-sel {
+  font-size: 14px;
+  line-height: 1.4;
+}
+.form-grid .fld > span, label.fld > span, .field .k, .dfield .dk, .obj-row__fields .ofk {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: .005em;
+}
+.field .v, .dfield .dv, .obj-row__fields .ofv { font-size: 14px; }
+.msg .bubble { font-size: 14px; line-height: 1.6; }
+.prompt input { font-size: 15px; }
 
 /* ---------- 7. ruled: the GuideLines motif opens a view ---------- */
 .view-head, .greet {
@@ -2281,13 +2331,47 @@ h1, .view-head h1, .cg-hero-head h1 {
 
 /* filters whose active state is set inline in JS — the skin still owns the look */
 .chip[data-objfilter][style],
-.chip[data-dealsrc][style] {
+.chip[data-dealsrc][style],
+.chip[data-contacttype][style] {
   border-color: var(--acc) !important;
   background: var(--acc) !important;
   color: #fdfdfd !important;
 }
 .chip[data-objfilter][style] svg,
-.chip[data-dealsrc][style] svg { color: #fdfdfd !important; }
+.chip[data-dealsrc][style] svg,
+.chip[data-contacttype][style] svg { color: #fdfdfd !important; }
+
+/* Icon tiles were pastel washes — eight peach squares down a client list is
+   decoration, and it spends the accent on rows that need no attention. The
+   tile becomes a stated surface; the semantic colour stays on the glyph, where
+   it still means something. */
+.icon-tile, .feed-row .fi, .thread-row .fi, .nba-row .nba-i {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.i-acc { color: var(--acc); }
+.i-ok { color: var(--ok); } .i-warn { color: var(--warn); }
+.i-info { color: var(--info); } .i-stop { color: var(--stop); }
+.i-beta { color: var(--beta); } .i-mut { color: var(--mut); }
+.dx-sec-h .ic { background: var(--surface-2); border: 1px solid var(--line); color: var(--acc); }
+
+/* The stepper painted every stage accent, including the four the deal has not
+   reached — colour on inactive state, which is exactly what makes a status
+   line unreadable. Now: done is ink, current is accent, ahead is a hairline. */
+.dx-step .d, .dx-step.todo .d {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--mut);
+  font-weight: 600;
+  box-shadow: none;
+}
+.dx-step.done .d { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.dx-step.cur .d { background: var(--acc); border-color: var(--acc); color: #fdfdfd; box-shadow: none; }
+.dx-step.cur .l { color: var(--ink); font-weight: 600; }
+.dx-step.done .l { color: var(--mut); }
+.dx-step::before { height: 1px; top: 15px; background: var(--line); }
+.dx-step.done::before, .dx-step.cur::before { background: var(--ink); }
+.dx-step-cap { border: 1px solid var(--line); background: var(--surface); color: var(--mut); padding: 4px 10px; font-weight: 500; }
 
 /* ---------- 14. focus: the library's accessibility contract ---------- */
 :focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }

@@ -20,6 +20,7 @@ const TARGETS = [
 const SCREENS = [
   { name: 'pulse', run: async (p) => { await p.evaluate(() => window.WS.router.go('start')); } },
   { name: 'deals', run: async (p) => { await p.evaluate(() => window.WS.router.go('clients')); } },
+  { name: 'clients', run: async (p) => { await p.evaluate(() => { window.WS.store.clientsTab = 'contacts'; window.WS.router.go('clients'); }); } },
   { name: 'objects', run: async (p) => { await p.evaluate(() => window.WS.router.go('objects')); } },
   { name: 'concierge', run: async (p) => { await p.evaluate(() => window.WS.router.go('concierge')); } },
   { name: 'deal-card', run: async (p) => { await p.evaluate(() => window.WS.ui.dealCard('d_lease')); } },

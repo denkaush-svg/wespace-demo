@@ -6,7 +6,7 @@
 <title>WEWALL UI → WESPACE · витрина компонентов</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Tokens copied verbatim from @wewall/vibe-ui src/styles/tokens.scss */
 :root{
@@ -15,7 +15,9 @@
   --ww-color-muted:#737373; --ww-color-subtle:#a5a5a5; --ww-color-surface-muted:#f3f3f3;
   --ww-color-danger:#de3030;
   --ww-font-body:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;
-  --ww-font-display:"Bebas Neue",Impact,sans-serif;
+  /* the library ships "Bebas Neue", Impact — neither has Cyrillic, so every
+     Russian heading fell through to Impact. Oswald sets both scripts. */
+  --ww-font-display:Oswald,"Arial Narrow",Arial,sans-serif;
   --ww-container-max:1440px; --ww-gutter:30px;
   --ww-motion-fast:160ms; --ww-motion-normal:300ms; --ww-motion-slow:500ms;
   --ww-ease:cubic-bezier(.2,0,0,1);
@@ -40,8 +42,8 @@ a{color:inherit}
   place-items:center;font-weight:600;font-style:normal;font-size:16px}
 .mark b{font-family:var(--ww-font-display);font-weight:400;font-size:22px;letter-spacing:.06em}
 .mark b span{color:var(--ww-color-accent)}
-.pagehead h1{margin:0;font-family:var(--ww-font-display);font-weight:400;
-  font-size:clamp(52px,9vw,124px);line-height:.88;letter-spacing:.01em}
+.pagehead h1{margin:0;font-family:var(--ww-font-display);font-weight:500;
+  font-size:clamp(44px,7.5vw,92px);line-height:.96;letter-spacing:.03em;text-wrap:balance}
 .pagehead .lede{margin-top:24px;max-width:64ch;color:var(--ww-color-muted);font-size:17px;line-height:1.5}
 
 /* --- guide rails: the GuideLines component, in plain CSS --- */
@@ -57,7 +59,10 @@ section{padding:72px 0}
 .sh .main{min-width:0}
 .sh .titlerow{display:flex;align-items:flex-start;gap:12px}
 .sh h2{margin:0;font-weight:500;line-height:1.02;letter-spacing:-.025em;font-size:clamp(32px,4.4vw,62px)}
-.sh .idx{margin-top:.25em;color:var(--ww-color-accent);font-size:.4em;line-height:1;white-space:nowrap}
+/* the library sizes this in em, but the index is a SIBLING of the heading, so
+   the em resolved against 16px body text and the number came out at 6px */
+.sh .idx{margin-top:.45em;color:var(--ww-color-accent);font-size:clamp(15px,1.6vw,22px);
+  font-weight:600;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
 .sh .aside{justify-self:end;max-width:34ch;color:var(--ww-color-muted);font-size:14px;line-height:1.5}
 @media (max-width:768px){.sh{grid-template-columns:1fr;gap:18px}.sh .aside{justify-self:start}}
 
@@ -127,7 +132,8 @@ section{padding:72px 0}
 .wcard.muted{background:var(--ww-color-surface-muted)}
 .wcard.inverse{border-color:var(--ww-color-text);background:var(--ww-color-text);color:var(--ww-color-background)}
 .wcard.inverse .eyebrow,.wcard.inverse .d{color:rgb(253 253 253 / 75%)}
-.wcard .num{font-family:var(--ww-font-display);font-weight:400;font-size:64px;line-height:.88;letter-spacing:.01em}
+.wcard .num{font-family:var(--ww-font-display);font-weight:500;font-size:64px;line-height:1;
+  letter-spacing:.015em;font-variant-numeric:tabular-nums}
 
 /* --- ProjectCard --- */
 .pcard{min-width:0}

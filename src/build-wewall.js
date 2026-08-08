@@ -25,10 +25,15 @@ if (!fs.existsSync(base)) throw new Error('build index.html first: npm run build
 let html = read(base);
 const skin = read(path.join(D, 'css', 'theme-wewall.css'));
 
+// Bebas Neue carries no Cyrillic, so on a Russian product it silently hands
+// every heading to the fallback. Oswald is the display face that can actually
+// set this language; it ships with the skin rather than with the base stand.
+const fontLink = '  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">\n';
+
 // The skin must win the cascade, so it goes last in <head>.
 const block = '  <style id="skin-wewall">\n' + skin + '\n  </style>\n';
 if (!html.includes('</head>')) throw new Error('no </head> in the built artifact');
-html = html.replace('</head>', block + '</head>');
+html = html.replace('</head>', fontLink + block + '</head>');
 
 html = html.replace(/<title>[^<]*<\/title>/, '<title>WESPACE · скин WEWALL</title>');
 
