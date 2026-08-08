@@ -126,6 +126,14 @@ async function httpChecks() {
   res = await req({ method: 'OPTIONS', path: '/ask', headers: { origin: 'https://evil.example' } });
   ok('an unknown origin gets no permission', !res.headers['access-control-allow-origin']);
 
+  // CORS only stops a browser READING the reply; the call still ran and still
+  // spent the subscription. A text/plain POST does not even preflight.
+  refill();
+  res = await req({ method: 'POST', path: '/ask',
+    headers: { 'content-type': 'text/plain', origin: 'https://evil.example' } }, { text: 'дай ответ' });
+  ok('an unknown origin is refused, not merely unreadable',
+    res.status === 403 && JSON.parse(res.body).code === 'origin', res.status + ' ' + res.body.slice(0, 80));
+
   refill();
   res = await ask({ text: '   ' });
   ok('an empty question is refused before the model', res.status === 400 && JSON.parse(res.body).code === 'empty');
@@ -214,6 +222,19 @@ async function guardChecks() {
   for (let i = 0; i < CFG.perIpBurst; i++) await ask({ text: 'вопрос ' + i });
   res = await ask({ text: 'ещё' });
   ok('a flood from one address is throttled', res.status === 429 && JSON.parse(res.body).code === 'rate', res.status + '');
+
+  // The caps used to be checked before the body was read and counted after —
+  // two calls that both looked at an idle server both got through.
+  refill();
+  const conWas = CFG.concurrency;
+  CFG.concurrency = 1;
+  const together = await Promise.all([0, 1, 2].map((i) => ask({ text: 'разом ' + i })));
+  const through = together.filter((r) => r.status === 200 && /event: done/.test(r.body)).length;
+  const busy = together.filter((r) => r.status === 503 && /"busy"/.test(r.body)).length;
+  ok('concurrent calls cannot slip past the cap together', through === 1 && busy === 2,
+    'through=' + through + ' busy=' + busy);
+  ok('the slot is handed back afterwards', state.inFlight === 0, 'inFlight=' + state.inFlight);
+  CFG.concurrency = conWas;
 
   refill();
   const inWas = state.inFlight;

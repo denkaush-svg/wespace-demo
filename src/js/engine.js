@@ -564,9 +564,13 @@
         updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
       },
     });
+    // The reply is written back to the thread it was asked in, whether or not
+    // the agent has since walked to another one — messages are addressed, so
+    // this is safe, and returning early left a «Разбираю запрос» card there
+    // forever. Only the shared «last reply» state waits for the same thread.
+    updateMsg(workMid, agentCard(reply), threadId);
     if (!same()) return;
     engine.lastReply = reply;
-    updateMsg(workMid, agentCard(reply), threadId);
   }
 
   function freeReplyLegacy(text) {

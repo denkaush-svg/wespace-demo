@@ -194,11 +194,23 @@
   // It follows the rate on the linked object, because that is the rate shown on the
   // object card; a flat guess here is exactly the discrepancy a broker spots first.
   const DEFAULT_COMM_PCT = 2;
+  // A deal can carry several lots, and lots do not share a commission rate.
+  // Taking the first lot's rate for the whole contract produced a figure the
+  // stand then labelled as verified. Each lot is charged at its own rate, with
+  // the contract split across them by list price.
   function dealCommission(deal) {
     if (!deal) return 0;
-    const obj = (D().objects || []).find((o) => o.id === deal.objectId);
-    const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
-    return Math.round((deal.amount || 0) * pct / 100);
+    const objs = D().objects || [];
+    const rate = (o) => (o && o.commissionPct) || DEFAULT_COMM_PCT;
+    const ids = (deal.lots && deal.lots.length) ? deal.lots : (deal.objectId ? [deal.objectId] : []);
+    const lots = ids.map((id) => objs.find((o) => o.id === id)).filter(Boolean);
+    const amount = deal.amount || 0;
+    if (lots.length < 2) return Math.round(amount * rate(lots[0]) / 100);
+    const prices = lots.map((o) => Number(o.price) || 0);
+    const total = prices.reduce((s, p) => s + p, 0);
+    // No prices to split by — every lot weighs the same.
+    const share = (i) => (total > 0 ? prices[i] / total : 1 / lots.length);
+    return Math.round(lots.reduce((s, o, i) => s + amount * share(i) * rate(o) / 100, 0));
   }
 
   function computeMetrics() {

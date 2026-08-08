@@ -770,6 +770,49 @@ setTimeout(async () => {
       check('live · and the refusal is said out loud', r && /Записать не выйдет/.test(r.text || ''), r && r.text);
     }
 
+    // `WS.engine.threads` is not exported, so the obvious spelling returned an
+    // empty history and every follow-up reached the model with no memory.
+    {
+      WS.engine.openThread('probe:hist', 'История', 'chat');
+      WS.engine.pushText('me', 'текст', 'первый вопрос', 'probe:hist');
+      WS.engine.pushText('ai', 'Консьерж', 'первый ответ', 'probe:hist');
+      const hist = (function () { try { return JSON.parse(JSON.stringify(WS.live.history ? WS.live.history() : [])); } catch (e) { return []; } })();
+      check('live · the conversation so far reaches the model',
+        hist.length >= 2 && /первый вопрос/.test(JSON.stringify(hist)), JSON.stringify(hist).slice(0, 120));
+      check('live · and each turn is attributed to a speaker',
+        hist.some((m) => m.role === 'user') && hist.some((m) => m.role === 'agent'), JSON.stringify(hist.map((m) => m.role)));
+    }
+
+    // Entities the interface already shows must be visible to the model too,
+    // or it answers "нет данных" about something on screen.
+    {
+      const d = L.digest();
+      check('live · requests reach the model', Array.isArray(d.заявки) && d.заявки.length > 0,
+        'заявки=' + (d.заявки || []).length);
+      const multi = (d.сделки || []).find((x) => x.лоты && x.лоты.length > 1);
+      check('live · a multi-lot deal carries its lots', !!multi, JSON.stringify((d.сделки || [])[0]));
+    }
+
+    // Lots do not share a commission rate; charging the whole contract at the
+    // first lot's rate produced a figure the stand then called verified.
+    {
+      const deal = (dd().deals || []).find((x) => x.lots && x.lots.length > 1);
+      if (deal) {
+        const objs = dd().objects || [];
+        const lots = deal.lots.map((id) => objs.find((o) => o.id === id)).filter(Boolean);
+        const rates = lots.map((o) => (o.commissionPct || 2));
+        const got = WS.ui.dealCommission(deal);
+        const first = Math.round((deal.amount || 0) * rates[0] / 100);
+        const differ = rates.some((r) => r !== rates[0]);
+        check('live · a multi-lot commission is not the first lot rate alone',
+          !differ || got !== first, 'got=' + got + ' first-rate=' + first + ' rates=' + rates.join('/'));
+        const lo = Math.min.apply(null, rates), hi = Math.max.apply(null, rates);
+        check('live · and it lands between the lot rates',
+          got >= Math.round(deal.amount * lo / 100) - 1 && got <= Math.round(deal.amount * hi / 100) + 1,
+          'got=' + got + ' range=' + Math.round(deal.amount * lo / 100) + '..' + Math.round(deal.amount * hi / 100));
+      } else { check('a multi-lot deal exists to check', false); }
+    }
+
     check('live · the digest carries the readings the answer may use',
       !!L.digest().показатели.deals_active);
     // Left out, the model answered «комиссии в данных нет» while the analytics

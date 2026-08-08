@@ -116,6 +116,16 @@ function isOff() {
   try { fs.accessSync(CFG.offFile); return 'file'; } catch (e) { return null; }
 }
 
+// CORS tells a BROWSER not to read the reply; it does not stop the request from
+// running. A text/plain POST is a simple request, so it never even preflights —
+// any page anywhere could spend our subscription. The origin has to be refused
+// here, before any work happens.
+function originAllowed(req) {
+  const o = req.headers.origin;
+  if (!o) return true;                                   // same-origin, curl, a server
+  return CFG.origins.indexOf(o) >= 0 || CFG.origins.indexOf('*') >= 0;
+}
+
 function clientIp(req) {
   const fwd = req.headers['x-forwarded-for'];
   if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim();
@@ -360,19 +370,25 @@ function sse(res) {
 async function handleAsk(req, res) {
   const off = isOff();
   if (off) { bump('off:' + off); return json(res, 503, { ok: false, code: 'off' }); }
+  if (!originAllowed(req)) { bump('origin'); return json(res, 403, { ok: false, code: 'origin' }); }
   if (state.inFlight >= CFG.concurrency) { bump('busy'); return json(res, 503, { ok: false, code: 'busy' }); }
   if (dailyLeft() <= 0) { bump('daily'); return json(res, 503, { ok: false, code: 'daily' }); }
   if (!takeToken(clientIp(req))) { bump('rate'); return json(res, 429, { ok: false, code: 'rate' }); }
 
-  let body;
-  try { body = await readBody(req); }
-  catch (e) { return json(res, 400, { ok: false, code: 'bad_request', error: e.message }); }
-
-  const text = clip(body && body.text, CFG.maxText).trim();
-  if (!text) return json(res, 400, { ok: false, code: 'empty' });
-
+  // Claimed BEFORE the first await. Reading the body yields, and two requests
+  // that both checked the caps at zero would both have passed them.
   state.inFlight += 1;
   state.dayCount += 1;
+  let released = false;
+  const release = () => { if (!released) { released = true; state.inFlight -= 1; } };
+
+  let body;
+  try { body = await readBody(req); }
+  catch (e) { release(); return json(res, 400, { ok: false, code: 'bad_request', error: e.message }); }
+
+  const text = clip(body && body.text, CFG.maxText).trim();
+  if (!text) { release(); return json(res, 400, { ok: false, code: 'empty' }); }
+
   const send = sse(res);
   let aborted = false;
   req.on('close', () => { aborted = true; });
@@ -389,7 +405,7 @@ async function handleAsk(req, res) {
     bump('model');
     if (!aborted) send('error', { code: 'model', error: String(e.message || e).slice(0, 300) });
   } finally {
-    state.inFlight -= 1;
+    release();
     res.end();
   }
 }
@@ -428,4 +444,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CFG, buildPrompt, splitReply, takeToken, cliArgs, state, server, SYSTEM };
+module.exports = { CFG, buildPrompt, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM };

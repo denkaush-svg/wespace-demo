@@ -69,9 +69,11 @@
       сделки: take(d.deals, (x) => ({
         id: x.id, название: x.title, сумма: x.amount,
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
-        контакт: x.clientId, компания: x.companyId, объект: x.objectId, горячая: !!x.hot,
+        контакт: x.clientId, компания: x.companyId, объект: x.objectId, лоты: x.lots || null,
+        заявка: x.requestId || null, горячая: !!x.hot,
       })),
       объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
+      заявки: take(d.requests, (r) => ({ id: r.id, что: r.title || r.goal, контакт: r.clientId, статус: r.status, бюджет: r.budget })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       инвентарь: WS.agent.tools.inventory(),
       ревизия: WS.store.dataRevision,
@@ -79,7 +81,10 @@
   }
 
   function history() {
-    const th = WS.engine && WS.engine.threads && WS.engine.threads[WS.engine.activeThreadId];
+    // `WS.engine.threads` is not exported and `activeThreadId` is a function, so
+    // the obvious spelling silently produced an empty history and every
+    // follow-up reached the model with no memory of the conversation.
+    const th = (WS.engine && WS.engine.activeThread) ? WS.engine.activeThread() : null;
     const items = (th && th.items) || [];
     return items.slice(-8)
       .map((m) => ({
@@ -261,7 +266,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, toReply, normNext, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, toReply, normNext, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
