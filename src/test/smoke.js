@@ -813,6 +813,25 @@ setTimeout(async () => {
       } else { check('a multi-lot deal exists to check', false); }
     }
 
+    // The market slice is read through the same layer as everything else, so a
+    // figure about Dubai is openable exactly like a figure about the pipeline.
+    {
+      const q = WS.query.run({ from: 'market', where: [{ field: 'район', op: 'eq', value: 'Downtown Dubai' }] });
+      check('market · a district is queryable like any other collection',
+        q.ok && q.rows.length === 1, JSON.stringify(q).slice(0, 120));
+      const all = WS.query.run({ from: 'market' });
+      check('market · every row declares where its numbers come from',
+        all.ok && all.rows.every((r) => !!r.basis), 'rows=' + (all.rows || []).length);
+      check('market · rent, price and yield cannot contradict each other',
+        all.rows.every((r) => Math.abs(r.арендаЗаМетрВГод - Math.round(r.ценаЗаМетр * r.доходностьПроцент / 100)) <= 1));
+      // Downtown came back as «нет данных» in the live breadth pass.
+      const areas = (dd().objects || []).map((o) => o.area);
+      check('market · it covers the districts the stand already sells in',
+        areas.every((a) => all.rows.some((r) => r.район === a)), areas.join('/'));
+      check('market · the model is given the slice with its provenance intact',
+        (L.digest().рынок_дубая || []).some((r) => r.basis === 'иллюстративно'));
+    }
+
     check('live · the digest carries the readings the answer may use',
       !!L.digest().показатели.deals_active);
     // Left out, the model answered «комиссии в данных нет» while the analytics
@@ -845,6 +864,20 @@ setTimeout(async () => {
         put === true && WS.agent.hasAsyncHead() === true, 'install=' + put);
       if (hadFetch === undefined) delete win.fetch; else win.fetch = hadFetch;
       WS.agent.setAsyncHead(null);
+    }
+
+    // The boot probe is still in flight when the first question is typed. It
+    // used to be answered with the stale «not ready», so that question fell to
+    // the offline planner without a word.
+    {
+      L.disable('reset');
+      const a1 = L.probe();
+      const a2 = L.probe();
+      check('live · a second probe waits on the first instead of answering «no»',
+        a1 === a2, 'same promise=' + (a1 === a2));
+      const both = await Promise.all([a1, a2]);
+      check('live · and both callers get the same verdict', both[0] === both[1]);
+      L.disable('done');
     }
 
     // Two failures and the live head steps aside for the rest of the session.

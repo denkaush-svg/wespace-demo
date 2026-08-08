@@ -75,6 +75,9 @@
       объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
       заявки: take(d.requests, (r) => ({ id: r.id, что: r.title || r.goal, контакт: r.clientId, статус: r.status, бюджет: r.budget })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
+      // Каждая строка несёт своё происхождение, чтобы модель не выдала
+      // иллюстративную величину за опубликованную.
+      рынок_дубая: take(d.market, (m) => m),
       инвентарь: WS.agent.tools.inventory(),
       ревизия: WS.store.dataRevision,
     };
@@ -221,8 +224,18 @@
 
   // ---------- availability ----------
 
-  async function probe() {
-    if (cfg.checking) return cfg.ready;
+  // A probe already in flight is awaited, not answered with its stale verdict.
+  // Returning `cfg.ready` here meant the first question typed right after load
+  // raced the boot probe and silently fell back to the offline planner.
+  let pending = null;
+  function probe() {
+    if (pending) return pending;
+    const clear = () => { pending = null; };
+    pending = doProbe().then((r) => { clear(); return r; }, (e) => { clear(); throw e; });
+    return pending;
+  }
+
+  async function doProbe() {
     cfg.checking = true;
     cfg.url = configuredUrl();
     if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') {

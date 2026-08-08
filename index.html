@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 11:42</title>
+  <title>WESPACE · сборка 12:11</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='11:42';
+    window.WS_BUILD='12:11';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2338,9 +2338,46 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     coverage: 0.86,     // lead coverage
   };
 
+  // ---------- рынок по районам Дубая ----------
+  // Демо-стенд показывают инвесторам, и любая цифра о рынке будет прочитана как
+  // настоящая. Поэтому у каждой строки есть происхождение: `basis` говорит, откуда
+  // она взялась, а `source` — где это опубликовано. Пока источников нет, значения
+  // помечены как иллюстративные, и Консьерж обязан это проговаривать вслух.
+  //
+  // Величины строятся, а не набираются руками: годовая аренда выведена из цены и
+  // доходности, поэтому набор не может сам себе противоречить.
+  function district(id, name, pricePerSqm, yieldPct, opts) {
+    const o = opts || {};
+    return {
+      id: 'm_' + id,
+      район: name,
+      ценаЗаМетр: pricePerSqm,
+      доходностьПроцент: yieldPct,
+      арендаЗаМетрВГод: Math.round(pricePerSqm * yieldPct / 100),
+      изменениеЗаГодПроцент: o.yoy,
+      дней_на_рынке: o.dom,
+      доля_офф_плана: o.offplan,
+      сегмент: o.segment || 'квартиры',
+      basis: o.basis || 'иллюстративно',
+      source: o.source || null,
+      asOf: o.asOf || 'май 2026',
+    };
+  }
+
+  const market = [
+    district('business_bay', 'Business Bay', 22200, 6.4, { yoy: 8, dom: 42, offplan: 38 }),
+    district('jvc', 'JVC', 13800, 7.6, { yoy: 11, dom: 34, offplan: 46 }),
+    district('creek_harbour', 'Dubai Creek Harbour', 24600, 5.9, { yoy: 9, dom: 51, offplan: 62 }),
+    district('downtown', 'Downtown Dubai', 31500, 5.4, { yoy: 6, dom: 58, offplan: 21 }),
+    district('marina', 'Dubai Marina', 25400, 6.1, { yoy: 7, dom: 45, offplan: 18 }),
+    district('jlt', 'JLT', 17900, 7.1, { yoy: 9, dom: 39, offplan: 12 }),
+    district('palm', 'Palm Jumeirah', 48200, 4.6, { yoy: 5, dom: 74, offplan: 15 }),
+    district('arjan', 'Arjan', 11600, 8.1, { yoy: 13, dom: 31, offplan: 55 }),
+  ];
+
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, roster, clients, objects, refModel,
+    DEMO_NOW, tenant, users, roster, clients, objects, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
@@ -2765,7 +2802,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 10; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots.
+  const SCHEMA = 11; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: market[] (районы Дубая с происхождением цифр).
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -2801,6 +2838,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       users: clone(f.users),
       clients: clone(f.clients),
       objects: clone(f.objects),
+      market: clone(f.market),
       deals: clone(f.deals),
       requests: clone(f.requests),
       tasks: clone(f.tasks),
@@ -3236,6 +3274,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     events: 'события календаря',
     companies: 'компании',
     inbox: 'входящие',
+    market: 'районы рынка Дубая',
   };
 
   const num = (v) => (typeof v === 'number' ? v : parseFloat(v));
@@ -9285,6 +9324,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
       заявки: take(d.requests, (r) => ({ id: r.id, что: r.title || r.goal, контакт: r.clientId, статус: r.status, бюджет: r.budget })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
+      // Каждая строка несёт своё происхождение, чтобы модель не выдала
+      // иллюстративную величину за опубликованную.
+      рынок_дубая: take(d.market, (m) => m),
       инвентарь: WS.agent.tools.inventory(),
       ревизия: WS.store.dataRevision,
     };
@@ -9431,8 +9473,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---------- availability ----------
 
-  async function probe() {
-    if (cfg.checking) return cfg.ready;
+  // A probe already in flight is awaited, not answered with its stale verdict.
+  // Returning `cfg.ready` here meant the first question typed right after load
+  // raced the boot probe and silently fell back to the offline planner.
+  let pending = null;
+  function probe() {
+    if (pending) return pending;
+    const clear = () => { pending = null; };
+    pending = doProbe().then((r) => { clear(); return r; }, (e) => { clear(); throw e; });
+    return pending;
+  }
+
+  async function doProbe() {
     cfg.checking = true;
     cfg.url = configuredUrl();
     if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') {

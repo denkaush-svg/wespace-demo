@@ -376,9 +376,46 @@
     coverage: 0.86,     // lead coverage
   };
 
+  // ---------- рынок по районам Дубая ----------
+  // Демо-стенд показывают инвесторам, и любая цифра о рынке будет прочитана как
+  // настоящая. Поэтому у каждой строки есть происхождение: `basis` говорит, откуда
+  // она взялась, а `source` — где это опубликовано. Пока источников нет, значения
+  // помечены как иллюстративные, и Консьерж обязан это проговаривать вслух.
+  //
+  // Величины строятся, а не набираются руками: годовая аренда выведена из цены и
+  // доходности, поэтому набор не может сам себе противоречить.
+  function district(id, name, pricePerSqm, yieldPct, opts) {
+    const o = opts || {};
+    return {
+      id: 'm_' + id,
+      район: name,
+      ценаЗаМетр: pricePerSqm,
+      доходностьПроцент: yieldPct,
+      арендаЗаМетрВГод: Math.round(pricePerSqm * yieldPct / 100),
+      изменениеЗаГодПроцент: o.yoy,
+      дней_на_рынке: o.dom,
+      доля_офф_плана: o.offplan,
+      сегмент: o.segment || 'квартиры',
+      basis: o.basis || 'иллюстративно',
+      source: o.source || null,
+      asOf: o.asOf || 'май 2026',
+    };
+  }
+
+  const market = [
+    district('business_bay', 'Business Bay', 22200, 6.4, { yoy: 8, dom: 42, offplan: 38 }),
+    district('jvc', 'JVC', 13800, 7.6, { yoy: 11, dom: 34, offplan: 46 }),
+    district('creek_harbour', 'Dubai Creek Harbour', 24600, 5.9, { yoy: 9, dom: 51, offplan: 62 }),
+    district('downtown', 'Downtown Dubai', 31500, 5.4, { yoy: 6, dom: 58, offplan: 21 }),
+    district('marina', 'Dubai Marina', 25400, 6.1, { yoy: 7, dom: 45, offplan: 18 }),
+    district('jlt', 'JLT', 17900, 7.1, { yoy: 9, dom: 39, offplan: 12 }),
+    district('palm', 'Palm Jumeirah', 48200, 4.6, { yoy: 5, dom: 74, offplan: 15 }),
+    district('arjan', 'Arjan', 11600, 8.1, { yoy: 13, dom: 31, offplan: 55 }),
+  ];
+
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, roster, clients, objects, refModel,
+    DEMO_NOW, tenant, users, roster, clients, objects, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
