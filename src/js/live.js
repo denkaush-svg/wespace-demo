@@ -141,8 +141,18 @@
     return null;
   }
 
+  // Only shapes the renderer knows survive. Anything else is dropped rather
+  // than passed through, so the model cannot widen the vocabulary at runtime.
+  const BLOCK_TYPES = ['p', 'h', 'note', 'list', 'kv', 'table', 'bars'];
+  function normBlocks(list) {
+    if (!Array.isArray(list)) return null;
+    const out = list.filter((b) => b && typeof b === 'object' && BLOCK_TYPES.indexOf(String(b.t)) >= 0).slice(0, 10);
+    return out.length ? out : null;
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
+    const blocks = normBlocks(plan.blocks);
     const evidence = evidenceFor(plan.read);
     let next = normNext(plan.next);
     const chip = openChip(plan.open);
@@ -159,8 +169,8 @@
         evidence: evidence, next: next,
       };
     }
-    if (!text) return null;
-    return { kind: 'answer', text: text, evidence: evidence, next: next };
+    if (!text && !blocks) return null;
+    return { kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next };
   }
 
   // ---------- transport ----------
@@ -279,7 +289,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, toReply, normNext, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, toReply, normNext, normBlocks, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

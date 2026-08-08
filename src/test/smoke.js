@@ -693,6 +693,37 @@ setTimeout(async () => {
   if (WS.live) {
     const L = WS.live;
 
+    // The model names a shape; the markup is built by code. Nothing it returns
+    // may become markup, and no shape outside the vocabulary may be invented.
+    {
+      check('live · an unknown block shape is dropped',
+        L.normBlocks([{ t: 'script', text: 'x' }, { t: 'p', text: 'ок' }]).length === 1);
+      check('live · block lists are capped',
+        L.normBlocks(Array.from({ length: 30 }, () => ({ t: 'p', text: 'x' }))).length === 10);
+      check('live · a reply that is only blocks still stands',
+        (L.toReply('', { blocks: [{ t: 'p', text: 'только разбор' }] }) || {}).kind === 'answer');
+
+      const card = WS.engine.agentCard({
+        kind: 'answer', text: 'Ведущая фраза.', evidence: [], next: [{ label: 'ещё', ask: 'ещё' }],
+        blocks: [
+          { t: 'h', text: '<img src=x onerror=alert(1)>' },
+          { t: 'table', head: ['Район'], rows: [['<b>Arjan</b>']] },
+          { t: 'bars', rows: [{ label: 'Arjan', value: 8.1, suffix: '%' }, { label: 'JVC', value: 7.6, suffix: '%' }] },
+          { t: 'kv', rows: [{ k: 'Доходность', v: '8,1%' }] },
+        ],
+      });
+      const box = doc.createElement('div'); box.innerHTML = card;
+      check('live · a table renders as a table', box.querySelectorAll('.an-t td').length === 1);
+      check('live · bars are drawn to scale, longest first at full width',
+        (box.querySelectorAll('.an-bar .bt i')[0] || {}).style.width === '100%');
+      check('live · markup inside a block is text, never markup',
+        box.querySelectorAll('img').length === 0 && box.querySelectorAll('.an-t b').length === 0);
+      check('live · the escaped tag is still shown to the reader',
+        (box.textContent || '').indexOf('onerror') >= 0);
+      check('live · evidence and follow-ups survive the shaped answer',
+        box.querySelectorAll('[data-agnext]').length > 0);
+    }
+
     check('live · a plain reply becomes an answer',
       L.toReply('Четыре сделки.', {}).kind === 'answer');
 

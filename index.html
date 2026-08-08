@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:11</title>
+  <title>WESPACE · сборка 23:58</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:11';
+    window.WS_BUILD='23:58';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -520,6 +520,32 @@ button { font-family: inherit; cursor: pointer; }
 .obj-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 .obj-search { flex: 1; box-shadow: none; border-radius: var(--r); padding: 4px 4px 4px 14px; }
 .mini-sel { height: 40px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13px; padding: 0 10px; }
+/* ---- analytical answer: the model names the shape, the code draws it ---- */
+.an { margin-top: 9px; }
+.an-lead { margin: 0 0 10px; line-height: 1.55; }
+.an-p { margin: 0 0 8px; line-height: 1.55; }
+.an-h { margin: 12px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.an-h:first-child { margin-top: 0; }
+.an-list { margin: 0 0 9px; padding-left: 17px; line-height: 1.55; }
+.an-list li { margin-bottom: 3px; }
+.an-kvs { display: flex; flex-direction: column; gap: 5px; margin-bottom: 9px; }
+.an-kv { display: flex; align-items: baseline; gap: 9px; justify-content: space-between; padding: 5px 9px; background: var(--surface-2); border-radius: var(--r-sm); }
+.an-kv .k { font-size: 12.5px; color: var(--mut); min-width: 0; }
+.an-kv .v { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.an-tw { overflow-x: auto; margin-bottom: 9px; }
+.an-t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.an-t th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); padding: 0 10px 5px 0; white-space: nowrap; }
+.an-t td { padding: 5px 10px 5px 0; border-top: 1px solid var(--hair); font-variant-numeric: tabular-nums; }
+.an-t td:first-child { color: var(--ink); font-weight: 600; }
+.an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
+.an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
+.an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-bar .bt { height: 7px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.an-bar .bt i { display: block; height: 100%; background: var(--acc); border-radius: 999px; }
+.an-bar .bv { font-size: 12.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.an-note { display: flex; gap: 7px; align-items: flex-start; padding: 8px 10px; background: var(--surface-2); border-radius: var(--r-sm); font-size: 12px; color: var(--mut); line-height: 1.45; }
+.an-note svg { width: 14px; height: 14px; flex: none; margin-top: 1px; color: var(--faint); }
+
 @media (max-width: 860px) { .obj-toolbar { flex-wrap: wrap; } .obj-search { width: 100%; flex: 1 1 100%; } }
 
 /* entity/object cards grid */
@@ -4000,8 +4026,55 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
       '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
+  // An analytical answer is a shape, not a wall of prose. The model names the
+  // shape; the markup is built here, so nothing it returns can be markup.
+  function blocksHtml(blocks) {
+    if (!Array.isArray(blocks) || !blocks.length) return '';
+    const out = blocks.map((b) => {
+      if (!b || typeof b !== 'object') return '';
+      const t = String(b.t || '');
+      if (t === 'p') return '<p class="an-p">' + esc(b.text) + '</p>';
+      if (t === 'h') return '<div class="an-h">' + esc(b.text) + '</div>';
+      if (t === 'note') return '<div class="an-note">' + I('shield') + '<span>' + esc(b.text) + '</span></div>';
+      if (t === 'list') {
+        const li = (b.items || []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
+        return li ? '<ul class="an-list">' + li + '</ul>' : '';
+      }
+      if (t === 'kv') {
+        const rows = (b.rows || []).slice(0, 8).map((x) =>
+          '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
+        return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
+      }
+      if (t === 'table') {
+        const head = (b.head || []).slice(0, 5);
+        const body = (b.rows || []).slice(0, 8)
+          .map((row) => '<tr>' + (Array.isArray(row) ? row : []).slice(0, 5).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
+        if (!body) return '';
+        return '<div class="an-tw"><table class="an-t">' +
+          (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
+          '<tbody>' + body + '</tbody></table></div>';
+      }
+      if (t === 'bars') {
+        const rows = (b.rows || []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
+        if (!rows.length) return '';
+        const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
+        return '<div class="an-bars">' + rows.map((x) => {
+          const w = Math.max(3, Math.round(Math.abs(Number(x.value)) / max * 100));
+          return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
+            '<span class="bt"><i style="width:' + w + '%"></i></span>' +
+            '<span class="bv">' + esc(String(x.value) + (x.suffix ? ' ' + x.suffix : '')) + '</span></div>';
+        }).join('') + '</div>';
+      }
+      return '';
+    }).join('');
+    return out ? '<div class="an">' + out + '</div>' : '';
+  }
+
   function answerCard(r) {
-    return msg('ai', I('sparkle') + ' Консьерж', esc(r.text) + evChips(r.evidence) + nextChips(r.next));
+    const body = blocksHtml(r.blocks);
+    // The prose is the fallback: with no shape declared, it is the whole answer.
+    const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
+    return msg('ai', I('sparkle') + ' Консьерж', head + body + evChips(r.evidence) + nextChips(r.next));
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>
@@ -9390,8 +9463,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return null;
   }
 
+  // Only shapes the renderer knows survive. Anything else is dropped rather
+  // than passed through, so the model cannot widen the vocabulary at runtime.
+  const BLOCK_TYPES = ['p', 'h', 'note', 'list', 'kv', 'table', 'bars'];
+  function normBlocks(list) {
+    if (!Array.isArray(list)) return null;
+    const out = list.filter((b) => b && typeof b === 'object' && BLOCK_TYPES.indexOf(String(b.t)) >= 0).slice(0, 10);
+    return out.length ? out : null;
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
+    const blocks = normBlocks(plan.blocks);
     const evidence = evidenceFor(plan.read);
     let next = normNext(plan.next);
     const chip = openChip(plan.open);
@@ -9408,8 +9491,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         evidence: evidence, next: next,
       };
     }
-    if (!text) return null;
-    return { kind: 'answer', text: text, evidence: evidence, next: next };
+    if (!text && !blocks) return null;
+    return { kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next };
   }
 
   // ---------- transport ----------
@@ -9528,7 +9611,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.live = {
-    ask, probe, install, digest, history, toReply, normNext, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, toReply, normNext, normBlocks, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

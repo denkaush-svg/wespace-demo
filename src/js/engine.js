@@ -614,8 +614,55 @@
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
       '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
+  // An analytical answer is a shape, not a wall of prose. The model names the
+  // shape; the markup is built here, so nothing it returns can be markup.
+  function blocksHtml(blocks) {
+    if (!Array.isArray(blocks) || !blocks.length) return '';
+    const out = blocks.map((b) => {
+      if (!b || typeof b !== 'object') return '';
+      const t = String(b.t || '');
+      if (t === 'p') return '<p class="an-p">' + esc(b.text) + '</p>';
+      if (t === 'h') return '<div class="an-h">' + esc(b.text) + '</div>';
+      if (t === 'note') return '<div class="an-note">' + I('shield') + '<span>' + esc(b.text) + '</span></div>';
+      if (t === 'list') {
+        const li = (b.items || []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
+        return li ? '<ul class="an-list">' + li + '</ul>' : '';
+      }
+      if (t === 'kv') {
+        const rows = (b.rows || []).slice(0, 8).map((x) =>
+          '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
+        return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
+      }
+      if (t === 'table') {
+        const head = (b.head || []).slice(0, 5);
+        const body = (b.rows || []).slice(0, 8)
+          .map((row) => '<tr>' + (Array.isArray(row) ? row : []).slice(0, 5).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
+        if (!body) return '';
+        return '<div class="an-tw"><table class="an-t">' +
+          (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
+          '<tbody>' + body + '</tbody></table></div>';
+      }
+      if (t === 'bars') {
+        const rows = (b.rows || []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
+        if (!rows.length) return '';
+        const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
+        return '<div class="an-bars">' + rows.map((x) => {
+          const w = Math.max(3, Math.round(Math.abs(Number(x.value)) / max * 100));
+          return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
+            '<span class="bt"><i style="width:' + w + '%"></i></span>' +
+            '<span class="bv">' + esc(String(x.value) + (x.suffix ? ' ' + x.suffix : '')) + '</span></div>';
+        }).join('') + '</div>';
+      }
+      return '';
+    }).join('');
+    return out ? '<div class="an">' + out + '</div>' : '';
+  }
+
   function answerCard(r) {
-    return msg('ai', I('sparkle') + ' Консьерж', esc(r.text) + evChips(r.evidence) + nextChips(r.next));
+    const body = blocksHtml(r.blocks);
+    // The prose is the fallback: with no shape declared, it is the whole answer.
+    const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
+    return msg('ai', I('sparkle') + ' Консьерж', head + body + evChips(r.evidence) + nextChips(r.next));
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>
