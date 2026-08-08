@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:59</title>
+  <title>WESPACE · сборка 10:31</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:59';
+    window.WS_BUILD='10:31';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1524,12 +1524,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width: 640px) { .vb-hint { display: none; } }
 
 /* ---- Deal card v2: the deal reads first; the object is demoted to a compact card ---- */
-.deal-hd { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--acc-line); border-radius: var(--r); background: linear-gradient(150deg, var(--acc-soft), var(--surface)); margin-bottom: 12px; }
-.deal-hd-t { flex: 1 1 auto; min-width: 0; }
-.deal-hd-thumb { width: 78px; height: 56px; flex: 0 0 auto; border-radius: var(--r-sm); background: var(--surface-2) center/cover no-repeat; }
-.deal-hd-main { display: flex; align-items: center; gap: 8px; font-size: 16.5px; font-weight: 700; color: var(--ink); line-height: 1.25; }
-.deal-hd-main svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--acc-ink); }
-.deal-hd-sub { margin-top: 4px; font-size: 12.5px; color: var(--mut); }
+/* Compact deal hero — same photo-backdrop family as .chero / .ohero, but short. */
+.dhero { position: relative; border-radius: var(--r); overflow: hidden; min-height: 116px; display: flex; margin-bottom: 12px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
+.dhero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.dhero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 58%, rgba(15,17,21,.16)); }
+.dhero-content { position: relative; z-index: 2; display: flex; gap: 14px; align-items: center; padding: 16px 20px; flex: 1; }
+.dhero-av { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.dhero-info { flex: 1; min-width: 0; }
+.dhero-name { font-family: var(--font-disp); font-size: 21px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
+.dhero-sub { margin-top: 5px; font-size: 13px; color: rgba(255,255,255,.86); }
+/* Narrow stepper directly under the hero. */
+.deal-stepper-compact { margin-bottom: 12px; }
+.deal-stepper-compact .dx-stepper { margin: 8px 0 2px; }
+.deal-stepper-compact .dx-step .d { width: 24px; height: 24px; font-size: 11px; }
+.deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
+.deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
 /* Two facing cards under the hero: client contacts ↔ key params. */
 .deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
 .deal-top-cell { min-width: 0; display: flex; }
@@ -1543,14 +1552,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcli-ch { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--mut); }
 .dcli-ch svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--faint); }
 .dcli-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 11px; }
-/* "Что сейчас" — prominent prose status. */
-.dstatus { padding: 15px 18px; border: 1px solid var(--acc-line); border-radius: var(--r); background: linear-gradient(150deg, var(--acc-soft), var(--surface)); }
-.dstatus-urgent { border-color: var(--stop-line); background: var(--stop-soft); }
-.dstatus-cap { display: flex; align-items: center; gap: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--acc-ink); margin-bottom: 8px; }
-.dstatus-urgent .dstatus-cap { color: var(--stop); }
-.dstatus-cap svg { width: 15px; height: 15px; flex: 0 0 auto; }
-.dstatus-body { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); max-width: 72ch; }
-@media (max-width: 760px) { .deal-top { grid-template-columns: 1fr; } .deal-hd-thumb { width: 64px; height: 48px; } }
+/* "Что сейчас" — calm, structured (no red-by-default). */
+.dnb { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.dnb-cap { display: flex; align-items: center; gap: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--mut); margin-bottom: 10px; }
+.dnb-cap svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--acc-ink); }
+.dnb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.dnb-row { padding-top: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
+.dnb-row:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.dnb-k { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--faint); margin-bottom: 5px; }
+.dnb-k .btn { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.dnb-v { font-size: 13.5px; color: var(--ink); line-height: 1.4; }
+.dnb-why { color: var(--mut); font-size: 12.5px; }
+.dnb-hist { display: flex; flex-direction: column; gap: 8px; }
+.dnb-ev { display: flex; gap: 9px; align-items: flex-start; }
+.dnb-ev-dot { flex: 0 0 auto; margin-top: 2px; }
+.dnb-ev-dot svg { width: 12px; height: 12px; color: var(--acc); }
+.dnb-ev-t { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.dnb-ev-m { font-size: 11px; color: var(--faint); margin-top: 1px; }
+.dnb-ev-empty { font-size: 12px; color: var(--faint); }
+@media (max-width: 760px) { .deal-top { grid-template-columns: 1fr; } .dhero-name { font-size: 19px; } .dhero-content { padding: 14px 16px; } }
 .obj-mini { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: .15s var(--ease); }
 .obj-mini:hover { background: var(--surface-2); border-color: var(--line-2); }
 .obj-mini-ph { width: 64px; height: 48px; flex: 0 0 auto; border-radius: var(--r-xs); background: var(--acc-soft) center/cover no-repeat; display: grid; place-items: center; color: var(--faint); }
@@ -5709,17 +5729,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!doIt.length) doIt.push('Двигать к следующей вехе воронки');
     return { doIt: doIt, why: why };
   }
-  // A5: next-best-action with reason and an explicit "exclude" (downside).
-  function nbaInner(d) {
-    const a = nbaActions(d); const doIt = a.doIt; const why = a.why;
-    const skip = d.goal && /Инвест|Доход|Перепрод/.test(d.goal) ? 'Не давить эмоциями — клиент решает по цифрам' : 'Не перегружать вариантами';
-    const rows = doIt.map((x) => '<div class="chg-row">' + I('check') + '<span>' + x + '</span></div>').join('');
-    return '<div class="chg-list">' + rows + '</div>' +
-      '<div class="nba-skip">' + I('warn') + '<span>Исключить: ' + skip + (why ? ' · почему: ' + why : '') + '</span></div>';
-  }
-  function nbaBlock(d) {
-    return '<div class="section-label" style="margin-top:16px">Следующий шаг <span class="badge ai-b">' + I('sparkle') + 'AI</span></div>' + nbaInner(d);
-  }
   function chIcon(ch) {
     return ({ whatsapp: 'whatsapp', call: 'phone', email: 'mail', note: 'pencil', system: 'sparkle',
       meet: 'calendar', crm: 'clock', task: 'checkCircle', doc: 'doc' })[ch] || 'dot';
@@ -6029,7 +6038,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Tab content — every tab wrapped in the same dx-sec card treatment for consistent hierarchy.
   function dealTabContent(d, tab) {
     if (tab === 'params') {
-      return dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealFieldsRows(d) + '</div>');
+      const req = dealRequestBlock(d);
+      return (req ? req + '<div style="height:14px"></div>' : '') +
+        dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealFieldsRows(d) + '</div>');
     }
     if (tab === 'contacts') {
       const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
@@ -6048,15 +6059,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    // overview — key params now live in the header (dealKeyCard); overview carries the detail.
-    const next = dxSec('sparkle', 'Следующий шаг', '<span class="badge ai-b">' + I('sparkle') + 'AI</span>', nbaInner(d));
+    // overview — key params, next step and last events now live in the header; the заявка link
+    // moved to the Параметры tab. Overview carries the object(s) and any conflict / handoff.
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    const req = dealRequestBlock(d);
-    return (req ? req + '<div style="height:14px"></div>' : '') +
-      next +
-      '<div style="margin-top:14px">' + dealLotsBlock(d) + '</div>' +
-      '<div style="margin-top:14px">' + dealEventsPreview(d) + '</div>' +
+    return dealLotsBlock(d) +
       (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
       (ho ? '<div style="margin-top:14px">' + ho + '</div>' : '');
   }
@@ -6097,16 +6104,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (lots.length === 1) return lots[0].name;
     return lots.length + ' лота · ' + lots[0].name.split(',')[0] + ' +' + (lots.length - 1);
   }
-  // Small hero — client-first deal formulation with a compact object thumbnail.
-  // "{Клиент}" headline + "{действие} · {объект} · {сумма}" sub.
-  function dealSentence(d) {
+  // Small hero — same photo-backdrop family as the client/object heroes (.chero/.ohero),
+  // but compact. Client-first: avatar + name over the object photo, deal formulation below.
+  function dealHero(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.amount ? WS.AED(d.amount) : null].filter(Boolean).join(' · ');
     const o0 = dealLots(d)[0];
-    const ph = o0 && WS.photos && WS.photos[o0.id];
-    const thumb = ph ? '<div class="deal-hd-thumb" style="background-image:url(' + ph + ')"></div>' : '';
-    return '<div class="deal-hd"><div class="deal-hd-t"><div class="deal-hd-main">' + I('briefcase') + (c.name || 'Без клиента') + '</div>' +
-      '<div class="deal-hd-sub">' + sub + '</div></div>' + thumb + '</div>';
+    const bg = (o0 && WS.photos && WS.photos[o0.id]) || (WS.photos && WS.photos.o_interior) || '';
+    const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.amount ? WS.AED(d.amount) : null].filter(Boolean).join(' · ');
+    return '<div class="dhero">' + (bg ? '<img class="dhero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="dhero-scrim"></div>' +
+      '<div class="dhero-content"><div class="dhero-av">' + init + '</div>' +
+      '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Без клиента') + '</div>' +
+      '<div class="dhero-sub">' + sub + '</div></div></div></div>';
   }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
   function dealClientCard(d) {
@@ -6126,21 +6136,30 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
-  // "Что сейчас" — a prominent prose status composed from several deal params (stage, days,
-  // last event, next step, urgency). Reads as 3–4 sentences, not a field dump.
-  function dealNowSummary(d) {
-    const tl = (D().dealTimeline || {})[d.id] || [];
-    const last = tl.length ? tl[tl.length - 1] : null;
+  // "Что сейчас" — calm and structured (not a prose wall, not red-by-default): a laconic
+  // status line, then the next step, then the last events. Red is reserved for a real problem
+  // (missing consent) — never for "hot" or a few days in a stage.
+  function dealNowBlock(d) {
     const s = funnelSteps(d);
     const a = nbaActions(d);
-    const urgent = !!d.hot || (d.stageDays || 0) >= 5;
-    const sent = [];
-    sent.push('Сделка на стадии «' + s.cols[s.idx] + '» — ' + (d.stageDays || 0) + ' дн. в этом этапе.');
-    if (last) sent.push('Последнее: ' + last.text + ' (' + last.at + ').');
-    sent.push('Дальше — ' + a.doIt[0] + (a.why ? ', ' + a.why : '') + '.');
-    return '<div class="dstatus' + (urgent ? ' dstatus-urgent' : '') + '">' +
-      '<div class="dstatus-cap">' + I(urgent ? 'warn' : 'trend') + 'Что сейчас со сделкой</div>' +
-      '<p class="dstatus-body">' + sent.join(' ') + '</p></div>';
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const chips = '<div class="dnb-chips">' +
+      '<span class="chip on">' + I('trend') + s.cols[s.idx] + '</span>' +
+      '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
+      (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
+      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
+    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг</div>' +
+      '<div class="dnb-v">' + a.doIt[0] + (a.why ? ' <span class="dnb-why">· ' + a.why + '</span>' : '') + '</div></div>';
+    const tl = (D().dealTimeline || {})[d.id] || [];
+    const evs = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
+      '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
+      '<div class="dnb-ev-b"><div class="dnb-ev-t">' + p.e.text + '</div>' +
+      '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
+      '<div class="dnb-ev-empty">событий пока нет</div>';
+    const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
+    return '<div class="dnb"><div class="dnb-cap">' + I('pulse') + 'Что сейчас со сделкой</div>' +
+      chips + next +
+      '<div class="dnb-row"><div class="dnb-k">Последние события ' + more + '</div><div class="dnb-hist">' + evs + '</div></div></div>';
   }
   // Compact object card — the demoted hero. Opens the full object on click.
   function dealObjectMini(o) {
@@ -6161,16 +6180,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
     return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
   }
-  // Recent events surfaced on the overview (the full ribbon stays in the История tab).
-  function dealEventsPreview(d) {
-    const tl = (D().dealTimeline || {})[d.id] || [];
-    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
-      '<div class="feed-row"><div class="fi i-mut">' + I('dot') + '</div><div class="ft"><div class="t">' + p.e.text + '</div>' +
-      '<div class="m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
-      '<div style="font-size:12px;color:var(--faint);padding:6px 0">событий пока нет</div>';
-    const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
-    return dxSec('clock', 'Последние события', more, '<div class="feed">' + rows + '</div>');
-  }
   // Key params, lifted into the header (right of the facing pair).
   function dealKeyCard(d) {
     const p = d.prov || {};
@@ -6185,13 +6194,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dealField('Комиссия', comm, 'confirmed') +
       dealField('Co-broking', cobro, 'confirmed') + '</div>');
   }
-  // Header: small client-first hero, two facing cards (client contacts ↔ key params),
-  // then the prominent "что сейчас" prose status.
+  // Header order (client feedback): compact photo hero → narrow stepper → two facing cards
+  // (client contacts ↔ key params) → calm "что сейчас" (next step + last events).
   function dealHeader(d) {
-    return dealSentence(d) +
+    return dealHero(d) +
+      '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       '<div class="deal-top"><div class="deal-top-cell">' + dealClientCard(d) + '</div>' +
       '<div class="deal-top-cell">' + dealKeyCard(d) + '</div></div>' +
-      dealNowSummary(d);
+      dealNowBlock(d);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -6209,14 +6219,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealSpec(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return null;
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const s = funnelSteps(d);
-    const tags = (d.tags || []).map((t) => '<span class="badge">' + t + '</span>').join('');
-    const consent = c.consent === false ? '<span class="badge stop">' + I('lock') + 'нет согласия</span>' : (c.consent ? '<span class="badge ok">' + I('check') + 'согласие есть</span>' : '');
-    const statusBar = '<div class="prov dx-statusbar"><span class="badge acc">' + I('briefcase') + s.label + '</span>' +
-      '<span class="badge' + (d.stageDays >= 5 ? ' warn' : '') + '">' + I('clock') + 'в стадии ' + (d.stageDays || 0) + ' дн.</span>' + tags + consent + '</div>';
     return {
       type: 'deal', id: id, title: d.title,
-      status: dealHeader(d) + statusBar + '<div class="deal-stepper-wrap">' + dealStepperSection(d) + '</div>',
+      status: dealHeader(d),
       tabs: [['overview', 'Обзор'], ['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),

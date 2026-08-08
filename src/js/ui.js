@@ -1330,17 +1330,6 @@
     if (!doIt.length) doIt.push('Двигать к следующей вехе воронки');
     return { doIt: doIt, why: why };
   }
-  // A5: next-best-action with reason and an explicit "exclude" (downside).
-  function nbaInner(d) {
-    const a = nbaActions(d); const doIt = a.doIt; const why = a.why;
-    const skip = d.goal && /Инвест|Доход|Перепрод/.test(d.goal) ? 'Не давить эмоциями — клиент решает по цифрам' : 'Не перегружать вариантами';
-    const rows = doIt.map((x) => '<div class="chg-row">' + I('check') + '<span>' + x + '</span></div>').join('');
-    return '<div class="chg-list">' + rows + '</div>' +
-      '<div class="nba-skip">' + I('warn') + '<span>Исключить: ' + skip + (why ? ' · почему: ' + why : '') + '</span></div>';
-  }
-  function nbaBlock(d) {
-    return '<div class="section-label" style="margin-top:16px">Следующий шаг <span class="badge ai-b">' + I('sparkle') + 'AI</span></div>' + nbaInner(d);
-  }
   function chIcon(ch) {
     return ({ whatsapp: 'whatsapp', call: 'phone', email: 'mail', note: 'pencil', system: 'sparkle',
       meet: 'calendar', crm: 'clock', task: 'checkCircle', doc: 'doc' })[ch] || 'dot';
@@ -1650,7 +1639,9 @@
   // Tab content — every tab wrapped in the same dx-sec card treatment for consistent hierarchy.
   function dealTabContent(d, tab) {
     if (tab === 'params') {
-      return dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealFieldsRows(d) + '</div>');
+      const req = dealRequestBlock(d);
+      return (req ? req + '<div style="height:14px"></div>' : '') +
+        dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealFieldsRows(d) + '</div>');
     }
     if (tab === 'contacts') {
       const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
@@ -1669,15 +1660,11 @@
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    // overview — key params now live in the header (dealKeyCard); overview carries the detail.
-    const next = dxSec('sparkle', 'Следующий шаг', '<span class="badge ai-b">' + I('sparkle') + 'AI</span>', nbaInner(d));
+    // overview — key params, next step and last events now live in the header; the заявка link
+    // moved to the Параметры tab. Overview carries the object(s) and any conflict / handoff.
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    const req = dealRequestBlock(d);
-    return (req ? req + '<div style="height:14px"></div>' : '') +
-      next +
-      '<div style="margin-top:14px">' + dealLotsBlock(d) + '</div>' +
-      '<div style="margin-top:14px">' + dealEventsPreview(d) + '</div>' +
+    return dealLotsBlock(d) +
       (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
       (ho ? '<div style="margin-top:14px">' + ho + '</div>' : '');
   }
@@ -1718,16 +1705,19 @@
     if (lots.length === 1) return lots[0].name;
     return lots.length + ' лота · ' + lots[0].name.split(',')[0] + ' +' + (lots.length - 1);
   }
-  // Small hero — client-first deal formulation with a compact object thumbnail.
-  // "{Клиент}" headline + "{действие} · {объект} · {сумма}" sub.
-  function dealSentence(d) {
+  // Small hero — same photo-backdrop family as the client/object heroes (.chero/.ohero),
+  // but compact. Client-first: avatar + name over the object photo, deal formulation below.
+  function dealHero(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.amount ? WS.AED(d.amount) : null].filter(Boolean).join(' · ');
     const o0 = dealLots(d)[0];
-    const ph = o0 && WS.photos && WS.photos[o0.id];
-    const thumb = ph ? '<div class="deal-hd-thumb" style="background-image:url(' + ph + ')"></div>' : '';
-    return '<div class="deal-hd"><div class="deal-hd-t"><div class="deal-hd-main">' + I('briefcase') + (c.name || 'Без клиента') + '</div>' +
-      '<div class="deal-hd-sub">' + sub + '</div></div>' + thumb + '</div>';
+    const bg = (o0 && WS.photos && WS.photos[o0.id]) || (WS.photos && WS.photos.o_interior) || '';
+    const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.amount ? WS.AED(d.amount) : null].filter(Boolean).join(' · ');
+    return '<div class="dhero">' + (bg ? '<img class="dhero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="dhero-scrim"></div>' +
+      '<div class="dhero-content"><div class="dhero-av">' + init + '</div>' +
+      '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Без клиента') + '</div>' +
+      '<div class="dhero-sub">' + sub + '</div></div></div></div>';
   }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
   function dealClientCard(d) {
@@ -1747,21 +1737,30 @@
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
-  // "Что сейчас" — a prominent prose status composed from several deal params (stage, days,
-  // last event, next step, urgency). Reads as 3–4 sentences, not a field dump.
-  function dealNowSummary(d) {
-    const tl = (D().dealTimeline || {})[d.id] || [];
-    const last = tl.length ? tl[tl.length - 1] : null;
+  // "Что сейчас" — calm and structured (not a prose wall, not red-by-default): a laconic
+  // status line, then the next step, then the last events. Red is reserved for a real problem
+  // (missing consent) — never for "hot" or a few days in a stage.
+  function dealNowBlock(d) {
     const s = funnelSteps(d);
     const a = nbaActions(d);
-    const urgent = !!d.hot || (d.stageDays || 0) >= 5;
-    const sent = [];
-    sent.push('Сделка на стадии «' + s.cols[s.idx] + '» — ' + (d.stageDays || 0) + ' дн. в этом этапе.');
-    if (last) sent.push('Последнее: ' + last.text + ' (' + last.at + ').');
-    sent.push('Дальше — ' + a.doIt[0] + (a.why ? ', ' + a.why : '') + '.');
-    return '<div class="dstatus' + (urgent ? ' dstatus-urgent' : '') + '">' +
-      '<div class="dstatus-cap">' + I(urgent ? 'warn' : 'trend') + 'Что сейчас со сделкой</div>' +
-      '<p class="dstatus-body">' + sent.join(' ') + '</p></div>';
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const chips = '<div class="dnb-chips">' +
+      '<span class="chip on">' + I('trend') + s.cols[s.idx] + '</span>' +
+      '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
+      (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
+      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
+    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг</div>' +
+      '<div class="dnb-v">' + a.doIt[0] + (a.why ? ' <span class="dnb-why">· ' + a.why + '</span>' : '') + '</div></div>';
+    const tl = (D().dealTimeline || {})[d.id] || [];
+    const evs = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
+      '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
+      '<div class="dnb-ev-b"><div class="dnb-ev-t">' + p.e.text + '</div>' +
+      '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
+      '<div class="dnb-ev-empty">событий пока нет</div>';
+    const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
+    return '<div class="dnb"><div class="dnb-cap">' + I('pulse') + 'Что сейчас со сделкой</div>' +
+      chips + next +
+      '<div class="dnb-row"><div class="dnb-k">Последние события ' + more + '</div><div class="dnb-hist">' + evs + '</div></div></div>';
   }
   // Compact object card — the demoted hero. Opens the full object on click.
   function dealObjectMini(o) {
@@ -1782,16 +1781,6 @@
     const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
     return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
   }
-  // Recent events surfaced on the overview (the full ribbon stays in the История tab).
-  function dealEventsPreview(d) {
-    const tl = (D().dealTimeline || {})[d.id] || [];
-    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
-      '<div class="feed-row"><div class="fi i-mut">' + I('dot') + '</div><div class="ft"><div class="t">' + p.e.text + '</div>' +
-      '<div class="m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
-      '<div style="font-size:12px;color:var(--faint);padding:6px 0">событий пока нет</div>';
-    const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
-    return dxSec('clock', 'Последние события', more, '<div class="feed">' + rows + '</div>');
-  }
   // Key params, lifted into the header (right of the facing pair).
   function dealKeyCard(d) {
     const p = d.prov || {};
@@ -1806,13 +1795,14 @@
       dealField('Комиссия', comm, 'confirmed') +
       dealField('Co-broking', cobro, 'confirmed') + '</div>');
   }
-  // Header: small client-first hero, two facing cards (client contacts ↔ key params),
-  // then the prominent "что сейчас" prose status.
+  // Header order (client feedback): compact photo hero → narrow stepper → two facing cards
+  // (client contacts ↔ key params) → calm "что сейчас" (next step + last events).
   function dealHeader(d) {
-    return dealSentence(d) +
+    return dealHero(d) +
+      '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       '<div class="deal-top"><div class="deal-top-cell">' + dealClientCard(d) + '</div>' +
       '<div class="deal-top-cell">' + dealKeyCard(d) + '</div></div>' +
-      dealNowSummary(d);
+      dealNowBlock(d);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -1830,14 +1820,9 @@
   function dealSpec(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return null;
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const s = funnelSteps(d);
-    const tags = (d.tags || []).map((t) => '<span class="badge">' + t + '</span>').join('');
-    const consent = c.consent === false ? '<span class="badge stop">' + I('lock') + 'нет согласия</span>' : (c.consent ? '<span class="badge ok">' + I('check') + 'согласие есть</span>' : '');
-    const statusBar = '<div class="prov dx-statusbar"><span class="badge acc">' + I('briefcase') + s.label + '</span>' +
-      '<span class="badge' + (d.stageDays >= 5 ? ' warn' : '') + '">' + I('clock') + 'в стадии ' + (d.stageDays || 0) + ' дн.</span>' + tags + consent + '</div>';
     return {
       type: 'deal', id: id, title: d.title,
-      status: dealHeader(d) + statusBar + '<div class="deal-stepper-wrap">' + dealStepperSection(d) + '</div>',
+      status: dealHeader(d),
       tabs: [['overview', 'Обзор'], ['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),

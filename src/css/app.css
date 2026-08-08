@@ -1382,12 +1382,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width: 640px) { .vb-hint { display: none; } }
 
 /* ---- Deal card v2: the deal reads first; the object is demoted to a compact card ---- */
-.deal-hd { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--acc-line); border-radius: var(--r); background: linear-gradient(150deg, var(--acc-soft), var(--surface)); margin-bottom: 12px; }
-.deal-hd-t { flex: 1 1 auto; min-width: 0; }
-.deal-hd-thumb { width: 78px; height: 56px; flex: 0 0 auto; border-radius: var(--r-sm); background: var(--surface-2) center/cover no-repeat; }
-.deal-hd-main { display: flex; align-items: center; gap: 8px; font-size: 16.5px; font-weight: 700; color: var(--ink); line-height: 1.25; }
-.deal-hd-main svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--acc-ink); }
-.deal-hd-sub { margin-top: 4px; font-size: 12.5px; color: var(--mut); }
+/* Compact deal hero — same photo-backdrop family as .chero / .ohero, but short. */
+.dhero { position: relative; border-radius: var(--r); overflow: hidden; min-height: 116px; display: flex; margin-bottom: 12px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
+.dhero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.dhero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 58%, rgba(15,17,21,.16)); }
+.dhero-content { position: relative; z-index: 2; display: flex; gap: 14px; align-items: center; padding: 16px 20px; flex: 1; }
+.dhero-av { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.dhero-info { flex: 1; min-width: 0; }
+.dhero-name { font-family: var(--font-disp); font-size: 21px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
+.dhero-sub { margin-top: 5px; font-size: 13px; color: rgba(255,255,255,.86); }
+/* Narrow stepper directly under the hero. */
+.deal-stepper-compact { margin-bottom: 12px; }
+.deal-stepper-compact .dx-stepper { margin: 8px 0 2px; }
+.deal-stepper-compact .dx-step .d { width: 24px; height: 24px; font-size: 11px; }
+.deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
+.deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
 /* Two facing cards under the hero: client contacts ↔ key params. */
 .deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
 .deal-top-cell { min-width: 0; display: flex; }
@@ -1401,14 +1410,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcli-ch { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--mut); }
 .dcli-ch svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--faint); }
 .dcli-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 11px; }
-/* "Что сейчас" — prominent prose status. */
-.dstatus { padding: 15px 18px; border: 1px solid var(--acc-line); border-radius: var(--r); background: linear-gradient(150deg, var(--acc-soft), var(--surface)); }
-.dstatus-urgent { border-color: var(--stop-line); background: var(--stop-soft); }
-.dstatus-cap { display: flex; align-items: center; gap: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--acc-ink); margin-bottom: 8px; }
-.dstatus-urgent .dstatus-cap { color: var(--stop); }
-.dstatus-cap svg { width: 15px; height: 15px; flex: 0 0 auto; }
-.dstatus-body { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); max-width: 72ch; }
-@media (max-width: 760px) { .deal-top { grid-template-columns: 1fr; } .deal-hd-thumb { width: 64px; height: 48px; } }
+/* "Что сейчас" — calm, structured (no red-by-default). */
+.dnb { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.dnb-cap { display: flex; align-items: center; gap: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; color: var(--mut); margin-bottom: 10px; }
+.dnb-cap svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--acc-ink); }
+.dnb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.dnb-row { padding-top: 10px; border-top: 1px solid var(--line); margin-top: 10px; }
+.dnb-row:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.dnb-k { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--faint); margin-bottom: 5px; }
+.dnb-k .btn { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.dnb-v { font-size: 13.5px; color: var(--ink); line-height: 1.4; }
+.dnb-why { color: var(--mut); font-size: 12.5px; }
+.dnb-hist { display: flex; flex-direction: column; gap: 8px; }
+.dnb-ev { display: flex; gap: 9px; align-items: flex-start; }
+.dnb-ev-dot { flex: 0 0 auto; margin-top: 2px; }
+.dnb-ev-dot svg { width: 12px; height: 12px; color: var(--acc); }
+.dnb-ev-t { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.dnb-ev-m { font-size: 11px; color: var(--faint); margin-top: 1px; }
+.dnb-ev-empty { font-size: 12px; color: var(--faint); }
+@media (max-width: 760px) { .deal-top { grid-template-columns: 1fr; } .dhero-name { font-size: 19px; } .dhero-content { padding: 14px 16px; } }
 .obj-mini { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: .15s var(--ease); }
 .obj-mini:hover { background: var(--surface-2); border-color: var(--line-2); }
 .obj-mini-ph { width: 64px; height: 48px; flex: 0 0 auto; border-radius: var(--r-xs); background: var(--acc-soft) center/cover no-repeat; display: grid; place-items: center; color: var(--faint); }
