@@ -1207,6 +1207,13 @@
       '<div class="prov">' + chips + vals + '</div>' +
       '<div style="font-size:12.5px;color:var(--mut);margin-top:8px">Канал и тон: ' + ((p.channel || '—') + (p.tone ? ' · ' + p.tone : '')) + '</div>');
   }
+  // Client-level preference profile: aggregate this client's requests' offered ↔ selected/rejected.
+  function clientPrefProfile(c) {
+    const all = [];
+    (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
+    if (!all.length) return '';
+    return reqPrefProfile({ offered: all });
+  }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
       return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
@@ -1257,8 +1264,10 @@
       '<button class="chip" data-scn="S6">' + I('handshake') + 'Подключить партнёра</button>' +
       '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
+    const pref = clientPrefProfile(c);
     return contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
+      (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
       '<div style="margin-top:14px">' + actions + '</div>' +
       '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
   }

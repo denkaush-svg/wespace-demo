@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:00</title>
+  <title>WESPACE · сборка 12:04</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:00';
+    window.WS_BUILD='12:04';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5635,6 +5635,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="prov">' + chips + vals + '</div>' +
       '<div style="font-size:12.5px;color:var(--mut);margin-top:8px">Канал и тон: ' + ((p.channel || '—') + (p.tone ? ' · ' + p.tone : '')) + '</div>');
   }
+  // Client-level preference profile: aggregate this client's requests' offered ↔ selected/rejected.
+  function clientPrefProfile(c) {
+    const all = [];
+    (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
+    if (!all.length) return '';
+    return reqPrefProfile({ offered: all });
+  }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
       return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
@@ -5685,8 +5692,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="chip" data-scn="S6">' + I('handshake') + 'Подключить партнёра</button>' +
       '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
+    const pref = clientPrefProfile(c);
     return contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
+      (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
       '<div style="margin-top:14px">' + actions + '</div>' +
       '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
   }
