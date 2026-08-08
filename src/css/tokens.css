@@ -83,7 +83,7 @@
   --ink:   #efe6d5;
   --ink-2: #d3c8b3;
   --mut:   #a1937b;
-  --faint: #82755f;
+  --faint: #97896f;
 
   --acc:      #f0824a;
   --acc-2:    #ff9a68;
@@ -107,7 +107,7 @@
   :root:not([data-theme="light"]) {
     --bg:#17130e; --bg-2:#1c1811; --surface:#211c15; --surface-2:#26211a;
     --surface-3:#2c261d; --line:#38301f; --line-2:#453b28; --hair:#2d2619;
-    --ink:#efe6d5; --ink-2:#d3c8b3; --mut:#a1937b; --faint:#82755f;
+    --ink:#efe6d5; --ink-2:#d3c8b3; --mut:#a1937b; --faint:#97896f;
     --acc:#f0824a; --acc-2:#ff9a68; --acc-deep:#c8622e; --acc-soft:#2f2013;
     --acc-line:#593a20; --acc-ink:#ffb488;
     --ok:#6fce93; --ok-soft:#1a2a1f; --ok-line:#2f4a38;
