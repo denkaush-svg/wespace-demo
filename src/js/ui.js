@@ -1658,7 +1658,8 @@
     // Scope to the container of the clicked tab: modal overlay when in a pop-up, else the page (#main).
     const scope = srcEl ? (srcEl.closest('#modal') || document.getElementById('main') || document) : document;
     const el = scope.querySelector('.dx-tabbody');
-    if (el) el.innerHTML = spec.render(tab); // swap only content — no re-render, no flicker
+    // swap content, then re-trigger a quick fade so the tab change reads as a state change
+    if (el) { el.innerHTML = spec.render(tab); el.classList.remove('tab-anim'); void el.offsetWidth; el.classList.add('tab-anim'); }
     scope.querySelectorAll('.dx-tab').forEach((bt) => bt.classList.toggle('on', bt.getAttribute('data-etab') === type + '~' + id + '~' + tab));
   }
   function dfPair(k, v) { return '<div class="dfield"><div class="dk">' + k + '</div><div class="dv">' + (v || '—') + '</div></div>'; }

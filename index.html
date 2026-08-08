@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:17</title>
+  <title>WESPACE · сборка 01:51</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:17';
+    window.WS_BUILD='01:51';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -720,13 +720,24 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes blink { 0%,60%,100%{ opacity:.3; transform: translateY(0);} 30%{ opacity:1; transform: translateY(-2px);} }
 @keyframes toastin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes fadeup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.fadeup { animation: fadeup .3s var(--ease-out) both; }
+.fadeup { animation: fadeup .22s var(--ease-out) both; }
 @keyframes skel { 0%{ background-position: -200% 0; } 100%{ background-position: 200% 0; } }
 .skeleton { background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-2) 37%, var(--surface-3) 63%); background-size: 200% 100%; animation: skel 1.3s ease-in-out infinite; border-radius: var(--r-xs); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* ---- Interaction system (taste + motion pass) ----------------------------------------------
+   One consistent, fast, restrained response on every clickable surface. Emil lens for a
+   high-frequency tool: ~140ms, a barely-there press, motion conveys state — never decoration.
+   Reduced-motion above already neutralises the timing. */
+.feed-row, .src-row { transition: transform .14s var(--ease), background-color .14s var(--ease); }
+.tile:active, .mtile:active, .digest-row:active, .obj-mini:active,
+.chip:active, .nav-item:active, .dx-step:active { transform: scale(.99); }
+.feed-row:active, .src-row:active { transform: scale(.995); }
+/* A tab-content swap is a state change, so it earns a quick fade — justified, not decorative. */
+.tab-anim { animation: fadeup .18s var(--ease-out) both; }
 
 /* ============================================================
    RESPONSIVE — tablet + mobile (390×844 control size)
@@ -6089,7 +6100,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // Scope to the container of the clicked tab: modal overlay when in a pop-up, else the page (#main).
     const scope = srcEl ? (srcEl.closest('#modal') || document.getElementById('main') || document) : document;
     const el = scope.querySelector('.dx-tabbody');
-    if (el) el.innerHTML = spec.render(tab); // swap only content — no re-render, no flicker
+    // swap content, then re-trigger a quick fade so the tab change reads as a state change
+    if (el) { el.innerHTML = spec.render(tab); el.classList.remove('tab-anim'); void el.offsetWidth; el.classList.add('tab-anim'); }
     scope.querySelectorAll('.dx-tab').forEach((bt) => bt.classList.toggle('on', bt.getAttribute('data-etab') === type + '~' + id + '~' + tab));
   }
   function dfPair(k, v) { return '<div class="dfield"><div class="dk">' + k + '</div><div class="dv">' + (v || '—') + '</div></div>'; }
