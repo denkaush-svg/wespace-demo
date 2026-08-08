@@ -75,6 +75,36 @@ const serve = http.createServer((req, res) => {
       hasHead: window.WS.agent.hasAsyncHead(),
     };
   });
+
+  // ---- the write path, driven by the live model ----
+  // A question proves the model can read. This proves that when it decides to
+  // change something, the change still waits for a person's click.
+  const feedBefore = await page.evaluate(() =>
+    ((window.WS.store.data.contactTimeline['c_anna'] || []).length));
+
+  await page.evaluate(() =>
+    window.WS.router.routePrompt('запиши по Анне Ковалёвой: созвонились, обсудили график платежей'));
+  await page.waitForFunction(
+    () => document.getElementById('chat').querySelector('[data-agok]'),
+    { timeout: 90000 },
+  ).catch(() => {});
+
+  const proposed = await page.evaluate(() => ({
+    button: !!document.getElementById('chat').querySelector('[data-agok]'),
+    kind: (window.WS.engine.lastReply || {}).kind,
+    said: (window.WS.engine.lastReply || {}).text || '',
+    feed: (window.WS.store.data.contactTimeline['c_anna'] || []).length,
+  }));
+
+  await page.evaluate(() => {
+    const b = document.getElementById('chat').querySelector('[data-agok]');
+    if (b) b.click();
+  });
+  await new Promise((r) => setTimeout(r, 500));
+  const applied = await page.evaluate(() => ({
+    feed: (window.WS.store.data.contactTimeline['c_anna'] || []).length,
+    text: (document.getElementById('chat').textContent || '').indexOf('Применено') >= 0,
+  }));
   await page.screenshot({ path: path.join(SHOTS, 'concierge-live-model.png') });
   await browser.close();
   serve.close();
@@ -87,6 +117,13 @@ const serve = http.createServer((req, res) => {
   ok('the answer carries evidence or an action', info.evidence + (info.kind === 'proposal' ? 1 : 0) > 0,
     'chips=' + info.evidence + ' kind=' + info.kind);
   ok('the reply offers follow-ups', info.next > 0, 'chips=' + info.next);
+  ok('a write instruction reaches a proposal', proposed.button && proposed.kind === 'proposal',
+    'kind=' + proposed.kind + ' said=' + proposed.said.slice(0, 70));
+  ok('nothing is written before the click', proposed.feed === feedBefore,
+    'before=' + feedBefore + ' at-proposal=' + proposed.feed);
+  ok('the click writes it', applied.feed === feedBefore + 1,
+    'before=' + feedBefore + ' after=' + applied.feed);
+  ok('the chat says it applied', applied.text === true);
   ok('no page errors', errs.length === 0, errs.join('; '));
   console.log('---\noffline would say: ' + info.det.slice(0, 120));
   console.log('the model said:     ' + info.live.slice(0, 200));

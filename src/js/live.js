@@ -20,7 +20,7 @@
 (function (WS) {
   const DEFAULT_URL = 'https://wespace.201-51-22-106.sslip.io';
 
-  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0 };
+  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0, served: 0 };
   const GIVE_UP_AFTER = 2;
 
   // ?api=… for a demo against another host, ?api=off to force the planner.
@@ -45,11 +45,22 @@
     return out;
   }
 
+  // The figures the screens draw. Without these the model answered "комиссии в
+  // данных нет" while the analytics screen was showing exactly that number —
+  // the live head contradicting the stand is worse than it saying less.
+  function screenMetrics() {
+    const out = {};
+    const m = (WS.ui.metricsSnapshot ? (WS.ui.metricsSnapshot().metrics || {}) : {});
+    Object.keys(m).forEach((k) => { out[k] = { label: m[k].label, value: m[k].v }; });
+    return out;
+  }
+
   function digest() {
     const d = (WS.store && WS.store.data) || {};
     const take = (list, fn) => (list || []).map(fn);
     return {
       показатели: readings(),
+      показатели_экранов: screenMetrics(),
       контакты: take(d.clients, (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
       компании: take(d.companies, (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
@@ -60,7 +71,7 @@
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, горячая: !!x.hot,
       })),
-      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate })),
+      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       инвентарь: WS.agent.tools.inventory(),
       ревизия: WS.store.dataRevision,
@@ -167,11 +178,17 @@
   }
 
   async function ask(text, opts) {
-    if (!cfg.ready) throw new Error('offline');
+    // Readiness is decided here, not once at boot. A hiccup in the second the
+    // page loads used to cost the visitor the live Concierge for the whole
+    // session; now it costs one retry. Repeated failure still gives up, via
+    // noteFailure below.
+    if (!cfg.ready) await probe();
+    if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
     const done = await stream(text, opts && opts.onText);
     const reply = toReply(done.say, done.plan || {});
     if (!reply) throw new Error('empty reply');
     cfg.misses = 0;
+    cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;
   }
 
@@ -194,8 +211,18 @@
       cfg.lastError = String(e.message || e);
     }
     cfg.checking = false;
-    if (cfg.ready && WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(ask);
     return cfg.ready;
+  }
+
+  // The head goes in whether or not the first probe answered: it decides
+  // readiness per call, and a failing call falls back on its own. Installing
+  // only on a successful probe made one unlucky second at load permanent.
+  function install() {
+    cfg.url = configuredUrl();
+    if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') return false;
+    if (WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(ask);
+    probe().catch(() => {});     // warm it up; the verdict is not binding
+    return true;
   }
 
   // One hiccup should not cost the session its live head, and a service that
@@ -212,10 +239,11 @@
   }
 
   WS.live = {
-    ask, probe, digest, toReply, normNext, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, toReply, normNext, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
+    get served() { return cfg.served; },
     get lastError() { return cfg.lastError; },
   };
 })(window.WS = window.WS || {});

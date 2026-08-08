@@ -696,6 +696,17 @@ setTimeout(async () => {
     check('live · a plain reply becomes an answer',
       L.toReply('Четыре сделки.', {}).kind === 'answer');
 
+    // The generic deals rule used to fire first, so a question about
+    // commission came back with deal counts — an answer to another question.
+    {
+      const a = WS.agent.ask('какая комиссия набегает по активным сделкам');
+      check('offline · a commission question is answered about commission',
+        /комисси/i.test(a.text || ''), a.text);
+      const b = WS.agent.ask('сколько сделок в работе и на какую сумму');
+      check('offline · a deals question still answers about deals',
+        /сдел/i.test(b.text || '') && !/комисси/i.test(b.text || ''), b.text);
+    }
+
     // A count declines the noun after it, and these labels are the chip text.
     {
       const pl = WS.agent.tools.plural;
@@ -746,6 +757,14 @@ setTimeout(async () => {
 
     check('live · the digest carries the readings the answer may use',
       !!L.digest().показатели.deals_active);
+    // Left out, the model answered «комиссии в данных нет» while the analytics
+    // screen was showing the figure — the live head contradicting the stand.
+    {
+      const shown = WS.ui.metricsSnapshot().metrics.expected_commission;
+      const sent = L.digest().показатели_экранов.expected_commission;
+      check('live · the model sees every figure the screens show',
+        !!sent && sent.value === shown.v, 'sent=' + (sent && sent.value) + ' screen=' + shown.v);
+    }
     check('live · the digest names entities so the model can refer to them',
       (L.digest().контакты || []).some((c) => c.id === 'c_anna'));
     // Sending only the stage code put «две сделки на стадии docs» into a reply.
@@ -755,6 +774,19 @@ setTimeout(async () => {
         !!deal && !/^(new|work|docs|done)$/.test(deal.стадия), deal && deal.стадия);
       check('live · and the code is still there to write a change with',
         !!deal && /^(new|work|docs|done)$/.test(deal.стадия_код), deal && deal.стадия_код);
+    }
+
+    // A bad second at page load must not cost the visitor the live Concierge
+    // for the whole session — the head goes in even when the probe fails.
+    {
+      const hadFetch = win.fetch;
+      win.fetch = () => Promise.reject(new Error('сеть недоступна'));
+      WS.agent.setAsyncHead(null);
+      const put = L.install();
+      check('live · the head is installed even when the probe cannot answer',
+        put === true && WS.agent.hasAsyncHead() === true, 'install=' + put);
+      if (hadFetch === undefined) delete win.fetch; else win.fetch = hadFetch;
+      WS.agent.setAsyncHead(null);
     }
 
     // Two failures and the live head steps aside for the rest of the session.

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 19:12</title>
+  <title>WESPACE · сборка 21:53</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='19:12';
+    window.WS_BUILD='21:53';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -9066,11 +9066,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
     // analytics
     if (RE.ask.test(t) || /комисси|конверси|воронк/.test(t)) {
-      const hit = METRIC_HINTS.find((h) => h[0].test(t));
-      if (hit) {
-        const ans = answerReadings(hit[1]);
-        if (ans) return ans;
-      }
+      // Commission first. «какая комиссия набегает по активным сделкам» also
+      // matches the generic deals hint, and answering it with deal counts is
+      // not a worse answer — it is an answer to a different question.
       if (/комисси/.test(t)) {
         const m = metrics().metrics.expected_commission;
         return {
@@ -9079,6 +9077,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           evidence: [{ label: m.label, value: m.v, money: true, query: { from: 'deals', where: ACTIVE } }],
           next: suggestions(),
         };
+      }
+      const hit = METRIC_HINTS.find((h) => h[0].test(t));
+      if (hit) {
+        const ans = answerReadings(hit[1]);
+        if (ans) return ans;
       }
       // asked about an entity we know
       if (ent) {
@@ -9197,7 +9200,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 (function (WS) {
   const DEFAULT_URL = 'https://wespace.201-51-22-106.sslip.io';
 
-  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0 };
+  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0, served: 0 };
   const GIVE_UP_AFTER = 2;
 
   // ?api=… for a demo against another host, ?api=off to force the planner.
@@ -9222,11 +9225,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return out;
   }
 
+  // The figures the screens draw. Without these the model answered "комиссии в
+  // данных нет" while the analytics screen was showing exactly that number —
+  // the live head contradicting the stand is worse than it saying less.
+  function screenMetrics() {
+    const out = {};
+    const m = (WS.ui.metricsSnapshot ? (WS.ui.metricsSnapshot().metrics || {}) : {});
+    Object.keys(m).forEach((k) => { out[k] = { label: m[k].label, value: m[k].v }; });
+    return out;
+  }
+
   function digest() {
     const d = (WS.store && WS.store.data) || {};
     const take = (list, fn) => (list || []).map(fn);
     return {
       показатели: readings(),
+      показатели_экранов: screenMetrics(),
       контакты: take(d.clients, (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
       компании: take(d.companies, (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
@@ -9237,7 +9251,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, горячая: !!x.hot,
       })),
-      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate })),
+      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       инвентарь: WS.agent.tools.inventory(),
       ревизия: WS.store.dataRevision,
@@ -9344,11 +9358,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   async function ask(text, opts) {
-    if (!cfg.ready) throw new Error('offline');
+    // Readiness is decided here, not once at boot. A hiccup in the second the
+    // page loads used to cost the visitor the live Concierge for the whole
+    // session; now it costs one retry. Repeated failure still gives up, via
+    // noteFailure below.
+    if (!cfg.ready) await probe();
+    if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
     const done = await stream(text, opts && opts.onText);
     const reply = toReply(done.say, done.plan || {});
     if (!reply) throw new Error('empty reply');
     cfg.misses = 0;
+    cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;
   }
 
@@ -9371,8 +9391,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       cfg.lastError = String(e.message || e);
     }
     cfg.checking = false;
-    if (cfg.ready && WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(ask);
     return cfg.ready;
+  }
+
+  // The head goes in whether or not the first probe answered: it decides
+  // readiness per call, and a failing call falls back on its own. Installing
+  // only on a successful probe made one unlucky second at load permanent.
+  function install() {
+    cfg.url = configuredUrl();
+    if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') return false;
+    if (WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(ask);
+    probe().catch(() => {});     // warm it up; the verdict is not binding
+    return true;
   }
 
   // One hiccup should not cost the session its live head, and a service that
@@ -9389,10 +9419,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.live = {
-    ask, probe, digest, toReply, normNext, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, toReply, normNext, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
+    get served() { return cfg.served; },
     get lastError() { return cfg.lastError; },
   };
 })(window.WS = window.WS || {});
@@ -9748,9 +9779,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     api.subscribe(() => WS.ui.render());
     api.subscribe(placeCgPop);
     WS.ui.render();
-    // Ask once whether the live head is reachable. Failure is silent and the
-    // offline planner keeps answering, so the stand renders the same either way.
-    if (WS.live && WS.live.probe) WS.live.probe().catch(() => {});
+    // Put the live head in. It works out reachability per question, so a bad
+    // second at load costs a retry rather than the session; and every failure
+    // falls back to the offline planner, which answers the same questions.
+    if (WS.live && WS.live.install) WS.live.install();
   } catch (e) {
     var a = document.getElementById('app');
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';

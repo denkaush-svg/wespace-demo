@@ -235,11 +235,9 @@
 
     // analytics
     if (RE.ask.test(t) || /комисси|конверси|воронк/.test(t)) {
-      const hit = METRIC_HINTS.find((h) => h[0].test(t));
-      if (hit) {
-        const ans = answerReadings(hit[1]);
-        if (ans) return ans;
-      }
+      // Commission first. «какая комиссия набегает по активным сделкам» also
+      // matches the generic deals hint, and answering it with deal counts is
+      // not a worse answer — it is an answer to a different question.
       if (/комисси/.test(t)) {
         const m = metrics().metrics.expected_commission;
         return {
@@ -248,6 +246,11 @@
           evidence: [{ label: m.label, value: m.v, money: true, query: { from: 'deals', where: ACTIVE } }],
           next: suggestions(),
         };
+      }
+      const hit = METRIC_HINTS.find((h) => h[0].test(t));
+      if (hit) {
+        const ans = answerReadings(hit[1]);
+        if (ans) return ans;
       }
       // asked about an entity we know
       if (ent) {
