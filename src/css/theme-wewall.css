@@ -7,29 +7,42 @@
    class vocabulary. It is ADDITIVE: loaded last, it overrides,
    it never edits app.css / theme.css / any module.
 
-   The five moves that make it read as WeWall and not as a CRM:
-     1. sharp — every corner squared, pills abolished
-     2. flat  — hairlines carry depth, shadows are gone
-     3. loud  — Bebas display numbers, oversized and anchored
-     4. ruled — guide rails with terminal dots open each section
-     5. wiped — buttons fill from the left on hover, not tint
+   The moves that make it read as WeWall and not as a CRM:
+     1. sharp  — every corner squared, pills abolished
+     2. ruled  — depth comes from a two-weight rule system, not blur
+     3. layered — grey canvas, white surfaces: cards float without shadow
+     4. slotted — inputs are recessed, so a field is never invisible
+     5. loud   — Bebas display numbers, oversized and anchored
+     6. wiped  — buttons fill from the left on hover, not tint
+
+   v2 note. The first pass took the landing's flatness literally:
+   canvas #fdfdfd, cards transparent, one hairline for everything.
+   On a marketing page that reads as air; in a dense product it reads
+   as nothing — surfaces and fields dissolved. Flatness is kept, but
+   separation now comes from a value step between canvas and surface
+   and from two distinct rule weights.
    ============================================================ */
 
-/* ---------- 1. tokens: exact --ww-* values from the library ---------- */
+/* ---------- 1. tokens ----------
+   Palette stays the library's (#f17e3d / #222 / neutral greys, chroma 0).
+   What changes against the library is the canvas: an app needs a step
+   between the page and the things on it. Muted greys are darkened to
+   clear 4.5:1 on both the canvas and the white surface. */
 :root {
-  --bg:        #fdfdfd;
-  --bg-2:      #f3f3f3;
-  --surface:   #ffffff;
-  --surface-2: #f3f3f3;
-  --surface-3: #ececec;
-  --line:      #dadada;
-  --line-2:    #c4c4c4;
-  --hair:      #ececec;
+  --bg:        #eaeaea;  /* canvas — the page the work sits on */
+  --bg-2:      #e2e2e2;
+  --surface:   #ffffff;  /* the things on it */
+  --surface-2: #f6f6f6;  /* recessed: fields, table heads */
+  --surface-3: #ededed;
+
+  --line:   #cfcfcf;  /* structural: edges of surfaces */
+  --line-2: #b0b0b0;  /* emphatic: the focused edge */
+  --hair:   #e6e6e6;  /* internal: dividers inside one surface */
 
   --ink:   #222222;
   --ink-2: #3a3a3a;
-  --mut:   #737373;
-  --faint: #a5a5a5;
+  --mut:   #6b6b6b;  /* 5.4:1 on white, 4.7:1 on canvas */
+  --faint: #767676;  /* 4.5:1 on white — was #a5a5a5, which failed */
 
   --acc:      #f17e3d;
   --acc-2:    #e06a28;
@@ -45,7 +58,7 @@
   --info: #2b6c8f; --info-soft:#e8f1f6; --info-line:#c1dae5;
   --beta: #6a4bb0; --beta-soft:#eeeaf8; --beta-line:#cfc3ea;
 
-  /* flat by contract: depth comes from lines, never from blur */
+  /* flat by contract: depth is a value step and a rule, never a blur */
   --shadow-sm: none;
   --shadow:    none;
   --shadow-lg: 0 24px 80px rgba(34, 34, 34, .16);
@@ -60,9 +73,9 @@
 }
 
 :root[data-theme="dark"] {
-  --bg:#222222; --bg-2:#282828; --surface:#222222; --surface-2:#303030; --surface-3:#383838;
-  --line:rgba(253,253,253,.28); --line-2:rgba(253,253,253,.45); --hair:rgba(253,253,253,.16);
-  --ink:#fdfdfd; --ink-2:#e4e4e4; --mut:#c5c5c5; --faint:#a5a5a5;
+  --bg:#191919; --bg-2:#141414; --surface:#242424; --surface-2:#2c2c2c; --surface-3:#333;
+  --line:rgba(253,253,253,.20); --line-2:rgba(253,253,253,.38); --hair:rgba(253,253,253,.11);
+  --ink:#fdfdfd; --ink-2:#e4e4e4; --mut:#b3b3b3; --faint:#9a9a9a;
   --acc:#f17e3d; --acc-2:#ff9057; --acc-deep:#c85a1e;
   --acc-soft:rgba(241,126,61,.16); --acc-line:rgba(241,126,61,.42); --acc-ink:#ffb488;
   --shadow-lg: 0 24px 80px rgba(0, 0, 0, .45);
@@ -70,9 +83,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:#222222; --bg-2:#282828; --surface:#222222; --surface-2:#303030; --surface-3:#383838;
-    --line:rgba(253,253,253,.28); --line-2:rgba(253,253,253,.45); --hair:rgba(253,253,253,.16);
-    --ink:#fdfdfd; --ink-2:#e4e4e4; --mut:#c5c5c5; --faint:#a5a5a5;
+    --bg:#191919; --bg-2:#141414; --surface:#242424; --surface-2:#2c2c2c; --surface-3:#333;
+    --line:rgba(253,253,253,.20); --line-2:rgba(253,253,253,.38); --hair:rgba(253,253,253,.11);
+    --ink:#fdfdfd; --ink-2:#e4e4e4; --mut:#b3b3b3; --faint:#9a9a9a;
     --acc-soft:rgba(241,126,61,.16); --acc-line:rgba(241,126,61,.42); --acc-ink:#ffb488;
     --shadow-lg: 0 24px 80px rgba(0, 0, 0, .45);
   }
@@ -88,18 +101,19 @@
 .dot,
 .spinner { border-radius: 50% !important; }
 
-/* ---------- 3. flat: strip the elevation the CRM skin leaned on ---------- */
-.card, .tile, .kpi, .obj-card, .cg-card, .mtile, .pod-row {
-  background: transparent;
+/* ---------- 3. layered: the canvas recedes, surfaces come forward ---------- */
+.main { background: var(--bg); }
+.card, .tile, .kpi, .obj-card, .obj-row, .cg-card, .mtile, .pod-row, .deals-table, .conflict-card {
+  background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: none;
 }
 .card.pad { padding: 24px; }
 .tile:hover, .obj-card:hover, .cg-card:hover, .mtile:hover {
-  border-color: var(--acc);
+  border-color: var(--ink);
   box-shadow: none;
-  transform: translateY(-2px);
-  transition: border-color .3s var(--ease), transform .3s var(--ease);
+  transform: none;
+  transition: border-color .18s var(--ease);
 }
 .tile.accent {
   background: var(--acc);
@@ -108,10 +122,65 @@
 }
 .tile.accent .th, .tile.accent .sub, .tile.accent .val { color: #fdfdfd; }
 .tile.accent .th svg { color: #fdfdfd; }
+/* A column is a container, not a card: it drops to the canvas value so the
+   deals inside it are the surfaces. Otherwise it is white cards on white. */
+.kcol { background: var(--bg); border-color: var(--line); }
+.deal { background: var(--surface); border-color: var(--line); box-shadow: none; }
+.deal:hover { border-color: var(--ink); transform: none; box-shadow: none; }
+.deal .kmv { background: var(--surface); }
+
 .doc-page { box-shadow: 0 24px 80px rgba(34, 34, 34, .16); }
 .modal, .modal--wide, .drawer, .cgdock { box-shadow: var(--shadow-lg); }
 
-/* ---------- 4. loud: display numerals carry the page ---------- */
+/* Grouped metrics stop being separate boxes with air between them and become
+   one ruled block — the gap itself is the rule. Straight from the landing's
+   GuideLines idiom, and it gives the row a single decisive edge. */
+.tiles {
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.tiles > .tile { border: 0; }
+
+/* ---------- 4. ruled: two weights where there was one ----------
+   --line draws the edge of a surface, --hair divides inside one. */
+.feed-row, .ev-row, .dfield, .assumptions .arow, .cashflow th, .cashflow td, .tl-row {
+  border-color: var(--hair);
+}
+
+/* ---------- 5. slotted: a field is recessed, never invisible ----------
+   The single loudest complaint about the flat pass: inputs on white
+   disappeared. Recessing them gives every field a readable footprint,
+   and focus is marked by an accent rule, matching the tab underline. */
+.form-grid .fld input, .form-grid .fld select,
+.match-grid .fld input, .match-grid .fld select,
+.match-panel > select, label.fld textarea, .mini-input, input, select, textarea {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.form-grid .fld input:focus, .form-grid .fld select:focus,
+.match-grid .fld input:focus, .match-grid .fld select:focus,
+.match-panel > select:focus, label.fld textarea:focus, .mini-input:focus,
+input:focus, select:focus, textarea:focus {
+  background: var(--surface);
+  border-color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--acc);
+  outline: none;
+}
+.form-grid .fld > span, label.fld > span { color: var(--mut); font-weight: 500; }
+::placeholder { color: var(--mut); opacity: 1; }
+/* the composer's own input sits inside a framed control and must stay flush */
+.prompt input, .prompt input:focus { background: transparent; border: 0; box-shadow: none; }
+/* Two field contexts, deliberately different. Inside a white surface a field
+   is recessed. Standing directly on the canvas it is white with a firmer edge —
+   recessing it there would sink it into the page. */
+.obj-search, .obj-toolbar .mini-sel, .deal-filters .mini-input, .qa-row .mini-input {
+  background: var(--surface);
+  border-color: var(--line-2);
+}
+
+/* ---------- 6. loud: display numerals carry the page ---------- */
 .tile .val, .kpi .kv, .mtile .mv, .fn-n, .cal-date {
   font-family: var(--font-disp);
   font-weight: 400;
@@ -122,8 +191,14 @@
 .tile.accent .val { color: #fdfdfd; }
 .tile .val .u { font-family: var(--font); font-size: 14px; font-weight: 500; }
 .kpi { padding: 20px 16px; text-align: left; }
-.kpi .kv { font-size: 38px; }
+/* Six identical orange numbers is decoration, not emphasis. The accent marks
+   the metric that leads the row; the rest are ink and read as its support. */
+.kpi .kv { font-size: 38px; color: var(--ink); }
+.fin-kpis .kpi:first-child .kv { color: var(--acc); }
+.kpi .kv.neg { color: var(--stop); }
 .kpi .kk { font-size: 11px; letter-spacing: .09em; margin-top: 10px; }
+.fin-kpis { gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.fin-kpis > .kpi { border: 0; }
 
 h1, .view-head h1, .cg-hero-head h1 {
   font-weight: 500;
@@ -132,15 +207,10 @@ h1, .view-head h1, .cg-hero-head h1 {
 }
 .view-head h1 { font-size: 34px; }
 .greet h1 { font-size: clamp(38px, 4.4vw, 58px); }
-.greet .eyebrow {
-  font-size: 12px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--mut);
-  font-weight: 500;
-}
+.greet .eyebrow { font-size: 12.5px; color: var(--mut); font-weight: 500; }
+.section-label { font-size: 11px; letter-spacing: .09em; color: var(--mut); font-weight: 600; }
 
-/* ---------- 5. ruled: the GuideLines motif opens each section ---------- */
+/* ---------- 7. ruled: the GuideLines motif opens a view ---------- */
 .view-head, .greet {
   position: relative;
   padding-top: 26px;
@@ -152,27 +222,12 @@ h1, .view-head h1, .cg-hero-head h1 {
   height: 3px;
   pointer-events: none;
   background:
-    linear-gradient(var(--line), var(--line))      left  top / 100% 1px no-repeat,
-    linear-gradient(var(--ink), var(--ink))        left  top / 3px 3px no-repeat,
-    linear-gradient(var(--ink), var(--ink))        right top / 3px 3px no-repeat;
+    linear-gradient(var(--line-2), var(--line-2)) left  top / 100% 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink))       left  top / 3px 3px no-repeat,
+    linear-gradient(var(--ink), var(--ink))       right top / 3px 3px no-repeat;
 }
 
-/* numbered sections, the way the landing indexes its blocks */
-.view, .start { counter-reset: wwsec; }
-.section-label {
-  counter-increment: wwsec;
-  font-size: 11px;
-  letter-spacing: .09em;
-  color: var(--mut);
-  font-weight: 500;
-}
-.section-label::before {
-  content: counter(wwsec, decimal-leading-zero) " / ";
-  color: var(--acc);
-  font-weight: 600;
-}
-
-/* ---------- 6. wiped: the button fills from the left ---------- */
+/* ---------- 8. wiped: the button fills from the left ---------- */
 .btn, .tb-btn {
   position: relative;
   isolation: isolate;
@@ -183,7 +238,7 @@ h1, .view-head h1, .cg-hero-head h1 {
   font-size: 13.5px;
   border-color: var(--ink);
   color: var(--ink);
-  background: transparent;
+  background: var(--surface);
   transition: color .3s var(--ease), border-color .3s var(--ease);
 }
 .btn::before, .tb-btn::before {
@@ -196,7 +251,7 @@ h1, .view-head h1, .cg-hero-head h1 {
   transform-origin: left;
   transition: transform .5s var(--ease);
 }
-.btn:hover, .tb-btn:hover { color: #fdfdfd; border-color: var(--acc); background: transparent; }
+.btn:hover, .tb-btn:hover { color: #fdfdfd; border-color: var(--acc); background: var(--surface); }
 .btn:hover::before, .tb-btn:hover::before { transform: scaleX(1); }
 .btn:active { transform: none; }
 
@@ -208,23 +263,23 @@ h1, .view-head h1, .cg-hero-head h1 {
 .btn.primary::before, .tb-btn.accent::before { background: var(--ink); }
 .btn.primary:hover, .tb-btn.accent:hover { border-color: var(--ink); color: var(--bg); }
 
-.btn.ghost { border-color: transparent; color: var(--mut); }
-.btn.ghost::before { background: var(--surface-2); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--mut); }
+.btn.ghost::before { background: var(--surface-3); }
 .btn.ghost:hover { color: var(--ink); border-color: transparent; }
 .btn.sm, .btn.xs { height: 32px; padding: 0 14px; }
-.btn.danger { border-color: var(--stop); color: var(--stop); background: transparent; }
+.btn.danger { border-color: var(--stop); color: var(--stop); background: var(--surface); }
 .btn.danger::before { background: var(--stop); }
 .btn.danger:hover { color: #fdfdfd; }
 
-/* ---------- 7. tags: hairline rectangles, no soft fills ---------- */
+/* ---------- 9. tags: hairline rectangles on a stated surface ---------- */
 .chip, .badge, .fn-pill, .view-pill, .lvl-tag, .prov-b {
   border: 1px solid var(--line);
-  background: transparent;
+  background: var(--surface);
   color: var(--mut);
   font-weight: 500;
 }
 .chip { height: 30px; padding: 0 12px; }
-.chip:hover { border-color: var(--ink); background: transparent; color: var(--ink); }
+.chip:hover { border-color: var(--ink); color: var(--ink); }
 .chip.on, .chip.src, .fn-pill.on, .view-pill.on {
   border-color: var(--acc);
   background: var(--acc);
@@ -232,16 +287,22 @@ h1, .view-head h1, .cg-hero-head h1 {
 }
 .chip.on svg, .chip.src svg, .fn-pill.on svg { color: #fdfdfd; }
 .badge { padding: 4px 10px; min-height: 26px; }
-.badge.ok   { color: var(--ok);   border-color: var(--ok-line);   background: transparent; }
-.badge.warn { color: var(--warn); border-color: var(--warn-line); background: transparent; }
-.badge.stop { color: var(--stop); border-color: var(--stop-line); background: transparent; }
-.badge.info { color: var(--info); border-color: var(--info-line); background: transparent; }
+.badge.ok   { color: var(--ok);   border-color: var(--ok-line);   background: var(--ok-soft); }
+.badge.warn { color: var(--warn); border-color: var(--warn-line); background: var(--warn-soft); }
+.badge.stop { color: var(--stop); border-color: var(--stop-line); background: var(--stop-soft); }
+.badge.info { color: var(--info); border-color: var(--info-line); background: var(--info-soft); }
 .badge.acc, .badge.ai-b { color: #fdfdfd; background: var(--acc); border-color: var(--acc); }
-.badge.beta { color: var(--beta); border-color: var(--beta-line); background: transparent; }
+.badge.beta { color: var(--beta); border-color: var(--beta-line); background: var(--beta-soft); }
 .fn-pill.on .fn-n, .view-pill.on .vp-n { background: transparent; color: #fdfdfd; }
 .fn-pill .fn-n, .view-pill .vp-n { background: transparent; border-left: 1px solid var(--line); padding-left: 8px; }
 
-/* ---------- 8. tabs: the underline replaces the segmented pill ---------- */
+/* tinted blocks left over from the old skin become stated surfaces with a rule */
+.wh__chip { background: var(--surface); border: 1px solid var(--line); color: var(--ink); font-weight: 500; }
+.dhero-ctx, .dhero-empty { background: var(--surface); border-color: var(--line); }
+.dhero-ctx-badge { background: var(--surface); border-color: var(--line); color: var(--mut); }
+.dhero-ctx-label { color: var(--mut); }
+
+/* ---------- 10. tabs: the underline replaces the segmented pill ---------- */
 .seg {
   background: transparent;
   border: 0;
@@ -270,7 +331,7 @@ h1, .view-head h1, .cg-hero-head h1 {
 .seg button.on, .seg .seg-b.on { background: transparent; color: var(--ink); box-shadow: none; }
 .seg button.on::after, .seg .seg-b.on::after { transform: scaleX(1); }
 
-/* ---------- 9. chrome: white frame, hairlines, a black mark ---------- */
+/* ---------- 11. chrome: a white frame around a grey working surface ---------- */
 .brand, .topbar, .nav { background: var(--surface); }
 .brand .logo {
   background: var(--ink);
@@ -281,20 +342,21 @@ h1, .view-head h1, .cg-hero-head h1 {
 /* theme.css hardcodes the wordmark to #111, which vanishes in dark mode —
    the skin re-binds it to the ink token. The base stand still carries that bug. */
 .brand .wm { font-family: var(--font-disp); font-weight: 400; font-size: 22px; letter-spacing: .06em; color: var(--ink); }
-.tb-clock, .tb-icon { background: transparent; border-color: var(--line); }
+.tb-clock, .tb-icon { background: var(--surface); border-color: var(--line); }
 
+/* The selected item is an inverse block — the same idiom as Tag.inverse and
+   Card.inverse in the library, and unmistakable at a glance. */
 .nav-item {
-  border: 0;
-  border-left: 2px solid transparent;
+  border: 1px solid transparent;
   padding: 9px 12px;
   font-weight: 500;
-  transition: color .16s var(--ease), border-color .16s var(--ease);
+  transition: background .16s var(--ease), color .16s var(--ease);
 }
-.nav-item:hover { background: transparent; color: var(--ink); }
+.nav-item:hover { background: var(--surface-3); color: var(--ink); }
 .nav-item.on {
-  background: transparent;
-  border-left-color: var(--acc);
-  color: var(--ink);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
   font-weight: 600;
 }
 .nav-item.on svg { color: var(--acc); }
@@ -302,15 +364,16 @@ h1, .view-head h1, .cg-hero-head h1 {
 .nav-item.on .count { background: var(--acc); border-color: var(--acc); color: #fdfdfd; }
 .nav-foot .demo-mode .pill { background: transparent; border-color: var(--line); color: var(--mut); }
 
-/* ---------- 10. surfaces that used tint now use rules ---------- */
+/* ---------- 12. surfaces that used tint now use rules ---------- */
 .msg .bubble { padding: 14px 16px; }
 .msg.ai .bubble { background: var(--surface); border: 1px solid var(--line); box-shadow: none; }
 .msg.me .bubble { background: var(--acc); border-color: var(--acc); color: #fdfdfd; }
 .msg.me .who { color: var(--mut); }
-.deal-hd { background: transparent; border-color: var(--ink); }
-.conflict-card { background: transparent; border-color: var(--warn-line); }
+.deal-hd { background: var(--surface); border-color: var(--ink); }
+.conflict-card { border-color: var(--warn-line); }
+.dcli, .dcli-body { background: var(--surface); }
 .dcli-av { background: var(--ink); color: var(--bg); font-weight: 500; }
-.meter { background: var(--surface-2); height: 4px; }
+.meter { background: var(--surface-3); height: 4px; }
 .meter i { background: var(--acc); }
 .spark i { background: var(--line); }
 .spark i.on { background: var(--acc); }
@@ -325,7 +388,7 @@ h1, .view-head h1, .cg-hero-head h1 {
 }
 .fab-w:hover { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 
-/* ---------- 11. the composer: a framed control, not a tinted blob ----------
+/* ---------- 13. the composer: a framed control, not a tinted blob ----------
    The old skin made it focal by flooding it with accent. WeWall gets focus
    from an ink frame and one saturated square — the send button. */
 .prompt {
@@ -342,8 +405,8 @@ h1, .view-head h1, .cg-hero-head h1 {
 }
 .prompt.composer:focus-within { border-color: var(--acc); box-shadow: none; }
 .prompt.composer .ico { background: var(--ink); color: var(--bg); }
-.prompt .voice { background: transparent; border-color: var(--line); }
-.prompt .voice:hover { background: transparent; border-color: var(--ink); color: var(--ink); }
+.prompt .voice { background: var(--surface); border-color: var(--line); }
+.prompt .voice:hover { background: var(--surface); border-color: var(--ink); color: var(--ink); }
 .prompt .send { background: var(--acc); box-shadow: none; }
 .prompt .send:hover { background: var(--ink); color: var(--bg); transform: none; }
 
@@ -362,7 +425,7 @@ h1, .view-head h1, .cg-hero-head h1 {
 .chip[data-objfilter][style] svg,
 .chip[data-dealsrc][style] svg { color: #fdfdfd !important; }
 
-/* ---------- 12. focus: the library's accessibility contract ---------- */
+/* ---------- 14. focus: the library's accessibility contract ---------- */
 :focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {

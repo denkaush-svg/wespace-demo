@@ -23,6 +23,8 @@ const SCREENS = [
   { name: 'objects', run: async (p) => { await p.evaluate(() => window.WS.router.go('objects')); } },
   { name: 'concierge', run: async (p) => { await p.evaluate(() => window.WS.router.go('concierge')); } },
   { name: 'deal-card', run: async (p) => { await p.evaluate(() => window.WS.ui.dealCard('d_lease')); } },
+  { name: 'analytics', run: async (p) => { await p.evaluate(() => window.WS.router.go('analytics')); } },
+  { name: 'valuation', run: async (p) => { await p.evaluate(() => window.WS.router.go('valuation')); } },
 ];
 
 const VP = { width: 1440, height: 950 };
