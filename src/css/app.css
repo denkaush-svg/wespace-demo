@@ -597,6 +597,10 @@ button { font-family: inherit; cursor: pointer; }
   .topbar { padding: 0 14px; gap: 8px; }
   .tb-tenant .txt { display: none; }
   .view, .start, .concierge { padding-left: 16px; padding-right: 16px; }
+  /* `margin: 0 auto` opts a flex item out of stretching, so the chat column
+     took its content's minimum width (398px) and hung off a 360px screen.
+     Centering is meaningless at phone width anyway. */
+  .concierge { width: 100%; margin-left: 0; margin-right: 0; }
   .tiles .tile { grid-column: span 6; }
   .tiles .tile.wide { grid-column: span 12; }
   .fin { grid-template-columns: 1fr; }
@@ -625,6 +629,19 @@ button { font-family: inherit; cursor: pointer; }
   .modal .mf { justify-content: stretch; }
   .modal .mf .btn { flex: 1 1 auto; justify-content: center; }
   html, body { overflow-x: hidden; }
+
+  /* A grid or flex item is never narrower than its own content unless it is
+     told it may be. Without this the top bar's min-content width (480px)
+     inflated the single 1fr column to 480 inside a 390px screen, and the
+     overflow-x:hidden above then cut every line off mid-word instead of
+     showing a scrollbar — the failure was silent, which is why it survived. */
+  .app > *, .main, .view, .cg2, .cg2 > *, .cg-shell, .cg-shell > *,
+  .topbar, .thread-bar, .thread-bar > * { min-width: 0; }
+  /* Controls keep their own size; the room is made by dropping what a phone
+     does not need, not by squeezing buttons into unreadable stubs. */
+  .topbar > * { flex: none; }
+  .tb-build { display: none; }
+  .wallet-chip .txt { display: none; }   /* the icon opens the wallet; 172px of chrome does not fit a phone */
 
   /* stack diff/panel fields vertically; never overflow horizontally */
   .field { flex-direction: column; align-items: stretch; gap: 4px; }

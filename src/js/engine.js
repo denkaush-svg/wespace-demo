@@ -567,7 +567,6 @@
     if (!same()) return;
     engine.lastReply = reply;
     updateMsg(workMid, agentCard(reply), threadId);
-    if (reply && reply.open && reply.open.view) navigateTo(reply.open);
   }
 
   function freeReplyLegacy(text) {
@@ -688,9 +687,7 @@
     const n = r && r.next && r.next[i];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
-    if (n.open === 'contact') return WS.ui.clientCard(n.id);
-    if (n.open === 'company') return WS.ui.companyCard(n.id);
-    if (n.open === 'deal') return WS.ui.dealCard(n.id);
+    if (n.open) return navigateTo({ view: n.open, id: n.id });
   }
 
   function restartScene() {

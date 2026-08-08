@@ -113,10 +113,32 @@
       .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count }));
   }
 
+  // A screen the model wants shown becomes a chip, not a jump. Navigating the
+  // moment it answers throws the reply off a phone screen entirely — the
+  // person was still reading it.
+  const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', objects: 'Объекты',
+    tasks: 'Задачи', docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
+    club: 'Клуб', network: 'Сеть', profile: 'Профиль', settings: 'Настройки' };
+
+  function openChip(open) {
+    if (!open || !open.view) return null;
+    const v = String(open.view);
+    const id = open.id ? String(open.id) : '';
+    const d = (WS.store && WS.store.data) || {};
+    const named = (list) => ((list || []).find((x) => x.id === id) || {});
+    if (v === 'contact' && id) return { label: 'Открыть ' + (named(d.clients).name || 'контакт'), open: 'contact', id: id };
+    if (v === 'company' && id) return { label: 'Открыть ' + (named(d.companies).name || 'компанию'), open: 'company', id: id };
+    if (v === 'deal' && id) return { label: 'Открыть сделку', open: 'deal', id: id };
+    if (VIEW_RU[v]) return { label: 'Открыть «' + VIEW_RU[v] + '»', open: v, id: '' };
+    return null;
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
     const evidence = evidenceFor(plan.read);
-    const next = normNext(plan.next);
+    let next = normNext(plan.next);
+    const chip = openChip(plan.open);
+    if (chip) next = [chip].concat(next || []).slice(0, 3);
 
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
@@ -130,7 +152,7 @@
       };
     }
     if (!text) return null;
-    return { kind: 'answer', text: text, evidence: evidence, next: next, open: plan.open || null };
+    return { kind: 'answer', text: text, evidence: evidence, next: next };
   }
 
   // ---------- transport ----------

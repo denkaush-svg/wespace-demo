@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:53</title>
+  <title>WESPACE · сборка 11:25</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:53';
+    window.WS_BUILD='11:25';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -739,6 +739,10 @@ button { font-family: inherit; cursor: pointer; }
   .topbar { padding: 0 14px; gap: 8px; }
   .tb-tenant .txt { display: none; }
   .view, .start, .concierge { padding-left: 16px; padding-right: 16px; }
+  /* `margin: 0 auto` opts a flex item out of stretching, so the chat column
+     took its content's minimum width (398px) and hung off a 360px screen.
+     Centering is meaningless at phone width anyway. */
+  .concierge { width: 100%; margin-left: 0; margin-right: 0; }
   .tiles .tile { grid-column: span 6; }
   .tiles .tile.wide { grid-column: span 12; }
   .fin { grid-template-columns: 1fr; }
@@ -767,6 +771,19 @@ button { font-family: inherit; cursor: pointer; }
   .modal .mf { justify-content: stretch; }
   .modal .mf .btn { flex: 1 1 auto; justify-content: center; }
   html, body { overflow-x: hidden; }
+
+  /* A grid or flex item is never narrower than its own content unless it is
+     told it may be. Without this the top bar's min-content width (480px)
+     inflated the single 1fr column to 480 inside a 390px screen, and the
+     overflow-x:hidden above then cut every line off mid-word instead of
+     showing a scrollbar — the failure was silent, which is why it survived. */
+  .app > *, .main, .view, .cg2, .cg2 > *, .cg-shell, .cg-shell > *,
+  .topbar, .thread-bar, .thread-bar > * { min-width: 0; }
+  /* Controls keep their own size; the room is made by dropping what a phone
+     does not need, not by squeezing buttons into unreadable stubs. */
+  .topbar > * { flex: none; }
+  .tb-build { display: none; }
+  .wallet-chip .txt { display: none; }   /* the icon opens the wallet; 172px of chrome does not fit a phone */
 
   /* stack diff/panel fields vertically; never overflow horizontally */
   .field { flex-direction: column; align-items: stretch; gap: 4px; }
@@ -3897,7 +3914,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!same()) return;
     engine.lastReply = reply;
     updateMsg(workMid, agentCard(reply), threadId);
-    if (reply && reply.open && reply.open.view) navigateTo(reply.open);
   }
 
   function freeReplyLegacy(text) {
@@ -4018,9 +4034,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const n = r && r.next && r.next[i];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
-    if (n.open === 'contact') return WS.ui.clientCard(n.id);
-    if (n.open === 'company') return WS.ui.companyCard(n.id);
-    if (n.open === 'deal') return WS.ui.dealCard(n.id);
+    if (n.open) return navigateTo({ view: n.open, id: n.id });
   }
 
   function restartScene() {
@@ -9293,10 +9307,32 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count }));
   }
 
+  // A screen the model wants shown becomes a chip, not a jump. Navigating the
+  // moment it answers throws the reply off a phone screen entirely — the
+  // person was still reading it.
+  const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', objects: 'Объекты',
+    tasks: 'Задачи', docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
+    club: 'Клуб', network: 'Сеть', profile: 'Профиль', settings: 'Настройки' };
+
+  function openChip(open) {
+    if (!open || !open.view) return null;
+    const v = String(open.view);
+    const id = open.id ? String(open.id) : '';
+    const d = (WS.store && WS.store.data) || {};
+    const named = (list) => ((list || []).find((x) => x.id === id) || {});
+    if (v === 'contact' && id) return { label: 'Открыть ' + (named(d.clients).name || 'контакт'), open: 'contact', id: id };
+    if (v === 'company' && id) return { label: 'Открыть ' + (named(d.companies).name || 'компанию'), open: 'company', id: id };
+    if (v === 'deal' && id) return { label: 'Открыть сделку', open: 'deal', id: id };
+    if (VIEW_RU[v]) return { label: 'Открыть «' + VIEW_RU[v] + '»', open: v, id: '' };
+    return null;
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
     const evidence = evidenceFor(plan.read);
-    const next = normNext(plan.next);
+    let next = normNext(plan.next);
+    const chip = openChip(plan.open);
+    if (chip) next = [chip].concat(next || []).slice(0, 3);
 
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
@@ -9310,7 +9346,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       };
     }
     if (!text) return null;
-    return { kind: 'answer', text: text, evidence: evidence, next: next, open: plan.open || null };
+    return { kind: 'answer', text: text, evidence: evidence, next: next };
   }
 
   // ---------- transport ----------

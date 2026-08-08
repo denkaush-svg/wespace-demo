@@ -737,6 +737,21 @@ setTimeout(async () => {
     check('live · a follow-up with no action is dropped',
       L.normNext([{ label: 'пусто' }]) === null);
 
+    // Navigating the moment it answers threw the reply off a phone screen —
+    // the person was still reading it. It offers, they decide.
+    {
+      const r = L.toReply('Вот по сделке.', { open: { view: 'deal', id: 'd_anna' }, next: [{ label: 'Ещё', ask: 'что ещё' }] });
+      check('live · a screen the model wants shown becomes a chip', !!(r.next || []).some((n) => n.open === 'deal' && n.id === 'd_anna'),
+        JSON.stringify(r.next));
+      check('live · and never a jump', r.open === undefined, JSON.stringify(r.open));
+      const c = L.toReply('Смотри контакт.', { open: { view: 'contact', id: 'c_anna' } });
+      check('live · an entity chip is named, not called «contact»',
+        /Анна/.test(((c.next || [])[0] || {}).label || ''), JSON.stringify((c.next || [])[0]));
+      const bad = L.toReply('Текст.', { open: { view: 'нет_такого_экрана', id: 'x' } });
+      check('live · an unknown screen is ignored',
+        !(bad.next || []).some((n) => n.open === 'нет_такого_экрана'));
+    }
+
     // A write instruction from the model is a proposal, never a write.
     {
       const before = (dd().contactTimeline['c_anna'] || []).length;
