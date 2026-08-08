@@ -468,7 +468,8 @@
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
-      insightsBlock() + (isMgr ? canonMetrics() : agentKpis()) +
+      (isMgr ? '' : agentKpis()) +
+      insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
       queueBlock +
     '</div>';
@@ -1685,13 +1686,12 @@
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    // overview — key params, next step and last events now live in the header; the заявка link
-    // moved to the Параметры tab. Overview carries the object(s) and any conflict / handoff.
+    // overview — hero, stepper, status, key params, contacts and objects now live in the header;
+    // overview carries the deeper detail: data conflicts and the partner-handoff package.
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    return dealLotsBlock(d) +
-      (cf ? '<div style="margin-top:14px">' + cf + '</div>' : '') +
-      (ho ? '<div style="margin-top:14px">' + ho + '</div>' : '');
+    const body = (cf || '') + (ho ? (cf ? '<div style="margin-top:14px">' + ho + '</div>' : ho) : '');
+    return body || '<div style="font-size:12.5px;color:var(--mut);padding:10px 2px;line-height:1.5">Ключевое, контакты, объекты и текущий статус — в шапке карточки выше. Здесь появляются расхождения в данных и пакет передачи партнёру, когда они есть.</div>';
   }
   // Hero sections reuse the object-hero family (variant B: photo backdrop + dark scrim) at the top of
   // entity cards — client (name overlaid), deal (linked object), КП (flagship object).
@@ -1820,13 +1820,24 @@
       dealField('Комиссия', comm, 'confirmed') +
       dealField('Co-broking', cobro, 'confirmed') + '</div>');
   }
-  // Header order (client feedback): compact photo hero → narrow stepper → two facing cards
-  // (client contacts ↔ key params) → calm "что сейчас" (next step + last events).
+  // Essence status phrase — one short line high on the card, so "what's happening now" is
+  // visible without scrolling. Doc-oriented, keyed off the deal stage.
+  function dealStatusPhrase(d) {
+    return ({
+      new: 'квалифицируем клиента и готовим показ объектов.',
+      work: 'отправили предложение — ждём решение клиента.',
+      docs: 'готовим документы на подписание, ожидаем подписание клиентом.',
+      done: 'сделка закрыта, комиссия зафиксирована.',
+    })[d.stage] || ('стадия «' + funnelSteps(d).cols[funnelSteps(d).idx] + '».');
+  }
+  // Header order (client feedback v2): compact hero → narrow stepper → one-line essence status →
+  // facing cards (LEFT key params · RIGHT client contacts + objects) → "что сейчас" detail.
   function dealHeader(d) {
     return dealHero(d) +
       '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
-      '<div class="deal-top"><div class="deal-top-cell">' + dealClientCard(d) + '</div>' +
-      '<div class="deal-top-cell">' + dealKeyCard(d) + '</div></div>' +
+      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
+      '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + '</div>' +
+      '<div class="deal-top-cell">' + dealClientCard(d) + dealLotsBlock(d) + '</div></div>' +
       dealNowBlock(d);
   }
   function kpHero(flag) {
