@@ -174,14 +174,29 @@
 
   // Requests (Part B / V2) — the client inquiry that GROUPS deals. One request → many deals
   // (one contract = one deal); several units under one contract stay as lots inside a deal.
+  // A request is the working funnel head: brief attributes + offered objects (each with a client
+  // selection state) + an optional КП. Client picks → deals are created from the selected objects.
   const requests = [
     { id: 'r_anna', clientId: 'c_anna', title: 'Инвест-квартира до 2 млн', createdAt: '06 мая', channel: 'whatsapp',
-      goal: 'Инвестиция под аренду', budget: 2000000, areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
-      objectsShown: ['o_creekline', 'o_palmcourt', 'o_bayline'],
-      note: 'Голосовое из WhatsApp; показано 3 объекта, в работе один (Creekline — цепочка G1–G3).' },
+      interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Входящий звонок', partnerAgent: null,
+      dealType: 'Продажа · off-plan', objectType: 'Квартира', goal: 'Инвестиция под аренду', budget: 2000000,
+      areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
+      offered: [
+        { id: 'o_creekline', state: 'selected' },
+        { id: 'o_palmcourt', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
+        { id: 'o_bayline', state: 'offered' },
+      ],
+      kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_bayline'] },
+      note: 'Голосовое из WhatsApp; предложено 3 объекта, клиент выбрал Creekline.' },
     { id: 'r_viktor', clientId: 'c_docs', title: 'Квартира Bayline + портфель DIFC', createdAt: '04 мая', channel: 'email',
-      goal: 'Инвестиция', budget: 6150000, areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
-      objectsShown: ['o_bayline', 'o_creekline'],
+      interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Реферал', partnerAgent: null,
+      dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', goal: 'Инвестиция', budget: 6150000,
+      areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
+      offered: [
+        { id: 'o_bayline', state: 'selected' },
+        { id: 'o_creekline', state: 'selected' },
+      ],
+      kp: { formed: true, at: '05 мая', objectIds: ['o_bayline', 'o_creekline'] },
       note: 'Одна заявка → две сделки: бронирование Bayline (свой договор) и портфель DIFC на 2 лота (свой договор).' },
   ];
 

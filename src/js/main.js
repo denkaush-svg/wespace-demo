@@ -47,7 +47,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -97,6 +97,8 @@
     if (d.dealstage) return api.setDealStage(d.dealstage, d.stage);
     if (d.task) return WS.ui.taskCard(d.task);
     if (d.request) return WS.ui.requestCard(d.request);
+    if (d.reqobj) { const p = d.reqobj.split('~'); return WS.ui.reqObjState(p[0], p[1], p[2]); }
+    if (d.reqaddobj) { const p = d.reqaddobj.split('~'); return WS.ui.reqAddObjectDo(p[0], p[1]); }
     if (d.deal && !d.act) return WS.ui.dealCard(d.deal);
     if (d.evplay) { WS.ui.closeModal(); return WS.eventEngine.play(d.evplay); }
     if (d.fb) return WS.eventEngine.recordFb(d.fb, d.fbval);
@@ -210,6 +212,9 @@
       case 'sessionResults': WS.eventEngine.sessionResults(); break;
       case 'callSelf': WS.eventEngine.callSelf(); break;
       case 'callClient': WS.ui.callClient(t.dataset.cid); break;
+      case 'reqAddObject': WS.ui.reqAddObject(t.dataset.req); break;
+      case 'reqFormKp': WS.ui.reqFormKp(t.dataset.req); break;
+      case 'reqCreateDeal': WS.ui.reqCreateDeal(t.dataset.req); break;
       case 'callAi': WS.eventEngine.callAi(); break;
       case 'failHuman': WS.eventEngine.failResolve('human'); break;
       case 'failPick': WS.eventEngine.failResolve(t.dataset.deal); break;

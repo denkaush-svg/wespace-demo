@@ -1860,7 +1860,7 @@
     if (!d.requestId) return '';
     const r = requestById(d.requestId); if (!r) return '';
     const sibs = dealsOfRequest(r.id);
-    const shown = (r.objectsShown || []).length;
+    const shown = (r.offered || []).length;
     const sibChips = sibs.map((s) => '<button class="chip' + (s.id === d.id ? ' on' : '') + '" data-deal="' + s.id + '">' +
       I('briefcase') + dealActionWord(s) + ' · ' + dealLotsLabel(s) + '</button>').join('');
     return dxSec('mail', 'Заявка', '<button class="btn xs" data-request="' + r.id + '">' + I('arrowRight') + 'Открыть заявку</button>',
@@ -1869,30 +1869,135 @@
       (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки этой заявки</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
   }
   function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  function requestAttrs(r) {
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
+      '<div class="dfields">' +
+      dfPair('Клиент', c.name || '—') +
+      dfPair('Интерес', r.interest) +
+      dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') +
+      dfPair('Форма оплаты', r.paymentForm) +
+      dfPair('VAT (НДС 5%)', r.vat ? 'применяется' : 'не применяется') +
+      dfPair('Источник', r.source) +
+      dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') +
+      dfPair('Тип сделки', r.dealType) +
+      dfPair('Тип объекта', r.objectType) +
+      dfPair('Цель', r.goal) +
+      dfPair('Районы', (r.areas || []).join(', ')) +
+      dfPair('Срок', r.horizon) +
+      dfPair('Канал', r.channel || '—') + '</div>' +
+      (r.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + r.note + '</div>' : ''));
+  }
+  const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
+  function reqOfferedRow(r, off) {
+    const o = D().objects.find((x) => x.id === off.id); if (!o) return '';
+    const st = REQ_STATE[off.state || 'offered'];
+    const chip = '<span class="badge ' + st[0] + '">' + I(st[2]) + st[1] + '</span>';
+    const btn = (state, label, ic, cls) => '<button class="btn xs' + (off.state === state ? ' ' + cls : '') + '" data-reqobj="' + r.id + '~' + o.id + '~' + state + '">' + I(ic) + label + '</button>';
+    const acts = '<div class="reqo-acts">' + btn('selected', 'Выбрал', 'check', 'primary') + btn('rejected', 'Отклонил', 'x', 'danger') + btn('offered', 'В работе', 'clock', 'ghost') + '</div>';
+    const reason = off.reason ? '<div class="reqo-reason">' + I('warn') + off.reason + '</div>' : '';
+    return '<div class="reqo">' + dealObjectMini(o) + '<div class="reqo-bar">' + chip + acts + '</div>' + reason + '</div>';
+  }
+  function reqOfferedBlock(r) {
+    const off = r.offered || [];
+    const rows = off.map((o) => reqOfferedRow(r, o)).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
+    const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить объект</button>';
+    const selN = off.filter((o) => o.state === 'selected').length;
+    const sub = '<div style="font-size:11px;color:var(--faint);margin-top:6px">Отметьте, что выбрал или отклонил клиент — из выбранного собирается КП и создаётся сделка. Выбрано: ' + selN + '.</div>';
+    return dxSec('building', 'Подбор объектов · ' + off.length, add, rows + sub);
+  }
+  function reqKpBlock(r) {
+    const sel = (r.offered || []).filter((o) => o.state === 'selected');
+    if (!r.kp || !r.kp.formed) {
+      return dxSec('doc', 'Коммерческое предложение', '',
+        '<div style="font-size:12.5px;color:var(--mut);margin-bottom:8px">КП ещё не собрано. Отметьте выбранные объекты и соберите КП для клиента.</div>' +
+        '<button class="btn sm primary" data-act="reqFormKp" data-req="' + r.id + '"' + (sel.length ? '' : ' disabled') + '>' + I('doc') + 'Собрать КП из выбранного (' + sel.length + ')</button>');
+    }
+    const kpObjs = (r.kp.objectIds || []).map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    const rows = kpObjs.map((o) => '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + o.area + ' · ' + WS.AED(o.price) + '</div></div></div>').join('');
+    return dxSec('doc', 'Коммерческое предложение · ' + r.kp.at, '<span class="badge ok">' + I('check') + 'собрано</span>',
+      '<div class="feed">' + rows + '</div>' +
+      '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
+      '<button class="btn sm" data-act="openKp">' + I('arrowRight') + 'Открыть КП</button>' +
+      '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
+      '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
+  }
+  function reqPrefProfile(r) {
+    const off = r.offered || [];
+    const pick = (state) => off.filter((o) => o.state === state).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean);
+    const sel = pick('selected'), rej = pick('rejected');
+    if (!sel.length && !rej.length) return '';
+    const uniq = (arr) => arr.filter((v, i) => v && arr.indexOf(v) === i);
+    const likeAreas = uniq(sel.map((o) => o.area)), rejAreas = uniq(rej.map((o) => o.area));
+    const likeViews = uniq(sel.map((o) => o.attrs && o.attrs.view));
+    const like = sel.length ? '<div class="pref-row"><span class="badge ok">' + I('check') + 'Заходит</span><span>' + [likeAreas.join(', '), likeViews.length ? 'вид: ' + likeViews.join(', ') : ''].filter(Boolean).join(' · ') + '</span></div>' : '';
+    const rejl = rej.length ? '<div class="pref-row"><span class="badge stop">' + I('x') + 'Не заходит</span><span>' + rejAreas.join(', ') + '</span></div>' : '';
+    return dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>',
+      like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>');
+  }
   function viewRequestDetail(id) {
     const r = requestById(id);
     const back = '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>';
     if (!r) return back + '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
-    const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const summary = dxSec('mail', 'Заявка · ' + r.title, '', '<div class="dfields">' +
-      dfPair('Клиент', c.name || '—') + dfPair('Цель', r.goal) +
-      dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') + dfPair('Районы', (r.areas || []).join(', ')) +
-      dfPair('Срок', r.horizon) + dfPair('Канал', r.channel || '—') + '</div>' +
-      (r.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + r.note + '</div>' : ''));
-    const shownObjs = (r.objectsShown || []).map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
-    const objsBlock = dxSec('building', 'Показанные объекты · ' + shownObjs.length, '',
-      shownObjs.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты не показаны</div>');
     const deals = dealsOfRequest(r.id);
     const dealRows = deals.map((d) => {
       const s = funnelSteps(d);
       return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
         '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
         '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
-    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет — создайте из выбранных объектов</div>';
     const dealsBlock = dxSec('briefcase', 'Сделки заявки · ' + deals.length, '',
       '<div class="feed">' + dealRows + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
-    return back + summary + '<div style="margin-top:14px">' + objsBlock + '</div><div style="margin-top:14px">' + dealsBlock + '</div>';
+    const sp = (hh) => '<div style="margin-top:14px">' + hh + '</div>';
+    const pref = reqPrefProfile(r);
+    return back + requestAttrs(r) + sp(reqOfferedBlock(r)) + sp(reqKpBlock(r)) + (pref ? sp(pref) : '') + sp(dealsBlock);
+  }
+  // ---- Request funnel actions (A1): client-selection state, add object, form КП, create deal ----
+  function reqObjState(reqId, objId, state) {
+    const r = requestById(reqId); if (!r) return;
+    const off = (r.offered || []).find((o) => o.id === objId); if (!off) return;
+    off.state = state;
+    if (state !== 'rejected') delete off.reason;
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  function reqAddObject(reqId) {
+    const r = requestById(reqId); if (!r) return;
+    const have = {}; (r.offered || []).forEach((o) => { have[o.id] = 1; });
+    const avail = (D().objects || []).filter((o) => !have[o.id]);
+    const rows = avail.map((o) => '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + o.area + ' · ' + WS.AED(o.price) + ' · ' + o.br + '</div></div>' +
+      '<button class="btn sm primary" data-reqaddobj="' + r.id + '~' + o.id + '">' + I('plus') + 'Добавить</button></div>').join('') || '<div style="padding:8px;color:var(--faint)">все объекты уже в подборе</div>';
+    openModal('Добавить объект в подбор', '<div class="feed">' + rows + '</div>', '<button class="btn" data-act="closeModal">Готово</button>');
+  }
+  function reqAddObjectDo(reqId, objId) {
+    const r = requestById(reqId); if (!r) return;
+    r.offered = r.offered || [];
+    if (!r.offered.some((o) => o.id === objId)) r.offered.push({ id: objId, state: 'offered' });
+    WS.storeApi.save(); closeModal(); WS.storeApi.toast('Объект добавлен в подбор', 'ok'); WS.storeApi.emit();
+  }
+  function reqFormKp(reqId) {
+    const r = requestById(reqId); if (!r) return;
+    const sel = (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    if (!sel.length) { WS.storeApi.toast('Отметьте объекты, которые выбрал клиент — из них соберётся КП'); return; }
+    r.kp = { formed: true, at: 'сегодня', objectIds: sel };
+    WS.storeApi.save(); WS.storeApi.toast('КП собрано из выбранного (' + sel.length + ')', 'ok'); WS.storeApi.emit();
+  }
+  function reqCreateDeal(reqId) {
+    const r = requestById(reqId); if (!r) return;
+    const sel = (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    if (!sel.length) { WS.storeApi.toast('Сначала отметьте объекты, которые выбрал клиент'); return; }
+    const objs = sel.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const amount = objs.reduce((s, o) => s + (o.price || 0), 0);
+    const nid = 'd_' + r.id.replace(/^r_/, '') + '_' + ((D().deals || []).length + 1);
+    D().deals.push({ id: nid, clientId: r.clientId, companyId: null,
+      title: (c.name || 'Клиент') + ' · ' + (objs[0] ? objs[0].name.split(',')[0] : 'сделка'),
+      funnel: 'sale_offplan', stage: 'new', stageDays: 0, amount: amount, hot: false,
+      goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source, objectType: r.objectType, vat: r.vat,
+      requestId: r.id, lots: sel, objectId: sel[0], consideredProjects: objs.map((o) => o.name), prov: {} });
+    D().dealTimeline = D().dealTimeline || {};
+    D().dealTimeline[nid] = [{ ch: 'crm', by: 'Система', at: 'только что', ord: 999, text: 'Сделка создана из заявки «' + r.title + '» · подписан документ о намерениях · лотов: ' + sel.length }];
+    WS.storeApi.save(); WS.storeApi.toast('Сделка создана из заявки · лотов: ' + sel.length, 'ok'); dealCard(nid);
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
   const DEAL_ENUMS = {
@@ -3771,7 +3876,7 @@
       const dn = dealsOfRequest(r.id).length;
       return '<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('mail') + '</div>' +
         '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
-        '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · показано объектов: ' + ((r.objectsShown || []).length) + '</div></div>' + I('arrowRight') + '</div>';
+        '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · предложено объектов: ' + ((r.offered || []).length) + '</div></div>' + I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">активных заявок нет</div>';
     return head('Заявки', 'Два потока: активные заявки клиентов (клик по строке — карточка заявки со сделками и показанными объектами) и входящие обращения из каналов, которые ещё нужно разобрать. «Разобрать» запускает Консьержа — разобранная заявка становится сделкой.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
@@ -4442,5 +4547,5 @@
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal };
 })(window.WS = window.WS || {});
