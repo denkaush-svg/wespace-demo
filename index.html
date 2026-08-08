@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 10:31</title>
+  <title>WESPACE · сборка 11:37</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='10:31';
+    window.WS_BUILD='11:37';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1052,11 +1052,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prov-b.ai { background: var(--acc-soft); color: var(--acc); }
 .mini-confirm { border: 0; background: rgba(46,160,90,.14); color: #2e9d58; width: 20px; height: 20px; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; margin-left: 6px; vertical-align: middle; }
 .mini-confirm svg { width: 12px; height: 12px; }
-.dfields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; margin-top: 4px; }
-.dfield { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-.dfield .dk { color: var(--mut); flex: none; }
-.dfield .dv { color: var(--ink); font-weight: 600; text-align: right; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
-@media (max-width: 640px) { .dfields { grid-template-columns: 1fr; } }
+/* One field per row: label left, value right, aligned to the card edge — no 2-col halving that
+   wrapped long values, no inline badge clutter. Shared by every card that uses .dfields. */
+.dfields { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 4px; }
+.dfield { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.dfield:last-child { border-bottom: 0; }
+.dfield .dk { color: var(--mut); flex: 0 0 auto; }
+.dfield .dv { color: var(--ink); font-weight: 600; text-align: right; flex: 1 1 auto; min-width: 0; }
+.prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }
+.prov-i svg { width: 13px; height: 13px; }
+.dfield .mini-confirm { vertical-align: middle; }
 .conflict-card { border: 1px solid var(--warn-line, #e7cf8f); background: var(--warn-soft, #fdf6e6); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
 .cc-h { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: #8a6a1f; }
 .cc-h svg { width: 15px; height: 15px; }
@@ -4686,7 +4691,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="section-label" style="margin-top:24px">Дайджест дня <span class="badge demo">' + I('lock') + 'демо</span></div>' +
       '<div class="digest">' +
       row('calendar', 'i-acc', 'Показы сегодня и завтра', shows, 'data-nav="shows"') +
-      row('warn', 'i-stop', 'Просроченные касания', overdue, 'data-analytics="overdue"') +
+      row('warn', 'i-stop', 'Просроченные задачи', overdue, 'data-analytics="overdue"') +
       row('check', 'i-ok', 'Закрытые сделки', closed, 'data-analytics="closed"') +
       row('flame', 'i-acc', 'Горячие · SLA < 2 ч', hot, 'data-analytics="hot"') +
       '</div>';
@@ -4696,7 +4701,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Инсайты = автоматически сгенерированные Консьержем группы задач (рекомендательная система).
   // Один источник для Пульса (краткий блок) и экрана «Задачи» (типизированные AI-группы).
   const INSIGHTS = [
-    ['sparkle', 'Анна Петрова — 3 дня без касания', 'High-priority клиент остывает: был активен, интерес к Creekline подтверждён.', 'Связаться', 'data-client="c_anna"'],
+    ['sparkle', 'Анна Петрова — 3 дня без связи', 'High-priority клиент остывает: был активен, интерес к Creekline подтверждён.', 'Связаться', 'data-client="c_anna"'],
     ['trend', 'Bayline 1603 — на 8% ниже компов', 'Сильный аргумент под инвестора: доходность выше среднего по району.', 'Предложить Виктору', 'data-deal="d_viktor"'],
     ['shield', 'Escrow по Creekline — через 4 дня', 'Комплаенс-риск off-plan: нужен receipt до дедлайна DLD.', 'Открыть сделку', 'data-deal="d_anna"'],
     ['star', 'Karim Aziz ценит статус', 'По психопрофилю Palm Court под его предпочтения: престиж + вид.', 'Подобрать объект', 'data-client="c_partner"'],
@@ -4730,7 +4735,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     let title = 'Записи', rows = '';
     if (kind === 'overdue') {
       const list = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
-      title = 'Просроченные касания';
+      title = 'Просроченные задачи';
       rows = list.map((t) => { const c = D().clients.find((x) => x.id === t.clientId) || {}; return '<div class="feed-row" data-client="' + t.clientId + '" style="cursor:pointer"><div class="fi i-stop">' + I('warn') + '</div><div class="ft"><div class="t">' + t.title + '</div><div class="m">' + (c.name || '') + ' · ' + t.due + '</div></div>' + I('arrowRight') + '</div>'; }).join('');
     } else {
       let list = deals;
@@ -4811,18 +4816,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
     const _overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
     const tiles = '' +
-      tile('flame', 'Клиенты требуют действий', a.hotClients, '', 'span 3', 'Ожидают вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
-      tile('warn', 'Просрочено касаний', _overdue, '', 'span 3', 'Задачи вне срока', '', '', 'data-analytics="overdue"') +
-      tile('doc', 'КП на согласование', a.kpPending, '', 'span 3', 'Готовы к отправке клиенту', '', '', 'data-act="openKp"') +
-      tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 3', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
+      tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'Ждут вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
+      tile('warn', 'Просроченные задачи', _overdue, '', 'span 4', 'Пора связаться с клиентом', '', '', 'data-analytics="overdue"') +
+      tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 4', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
       '<button class="tile wide" data-nav="clients"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + _pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
         '<div class="sub">Тренд новых сделок · 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
-      '<button class="tile wide" data-nav="clients"><div class="th">' + I('target') + 'Покрытие лидов</div>' +
+      '<button class="tile wide" data-nav="clients"><div class="th">' + I('target') + 'Отработка лидов</div>' +
         '<div class="val">' + Math.round(a.coverage * 100) + '<span class="u">%</span></div>' +
         '<div class="meter"><i style="width:' + (a.coverage * 100) + '%"></i></div>' +
-        '<div class="sub">Касания за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + '</div></button>';
+        '<div class="sub">Связались за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + ' лидов</div></button>';
 
     // merged work queue (was a separate "Радар" tab) — role-aware
     const eyebrow = isMgr
@@ -5674,8 +5678,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // ---- CRM gap v3: deal-card blocks (R3 fields+provenance/A1, R4 timeline, A3 conflict, A6 handoff, A7 privacy) ----
   // Provenance badge (A1): AI-suggested field vs human-confirmed. Deterministic fields carry no badge (A4).
   function provBadge(st) {
-    if (st === 'confirmed') return '<span class="prov-b ok" title="Подтверждено человеком">' + I('check') + 'подтверждено</span>';
-    if (st === 'ai') return '<span class="prov-b ai" title="Предложено AI — подтвердите">' + I('sparkle') + 'AI</span>';
+    // Only flag what needs attention: an AI-suggested value awaiting confirmation. Confirmed and
+    // deterministic fields carry no marker, so the value column stays clean and aligned.
+    if (st === 'ai') return '<span class="prov-i" title="Предложено AI — подтвердите">' + I('sparkle') + '</span>';
     return '';
   }
   function dealField(label, val, provSt, confirmId) {

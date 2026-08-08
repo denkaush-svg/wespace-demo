@@ -910,11 +910,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prov-b.ai { background: var(--acc-soft); color: var(--acc); }
 .mini-confirm { border: 0; background: rgba(46,160,90,.14); color: #2e9d58; width: 20px; height: 20px; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; margin-left: 6px; vertical-align: middle; }
 .mini-confirm svg { width: 12px; height: 12px; }
-.dfields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; margin-top: 4px; }
-.dfield { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
-.dfield .dk { color: var(--mut); flex: none; }
-.dfield .dv { color: var(--ink); font-weight: 600; text-align: right; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
-@media (max-width: 640px) { .dfields { grid-template-columns: 1fr; } }
+/* One field per row: label left, value right, aligned to the card edge — no 2-col halving that
+   wrapped long values, no inline badge clutter. Shared by every card that uses .dfields. */
+.dfields { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 4px; }
+.dfield { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.dfield:last-child { border-bottom: 0; }
+.dfield .dk { color: var(--mut); flex: 0 0 auto; }
+.dfield .dv { color: var(--ink); font-weight: 600; text-align: right; flex: 1 1 auto; min-width: 0; }
+.prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }
+.prov-i svg { width: 13px; height: 13px; }
+.dfield .mini-confirm { vertical-align: middle; }
 .conflict-card { border: 1px solid var(--warn-line, #e7cf8f); background: var(--warn-soft, #fdf6e6); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
 .cc-h { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: #8a6a1f; }
 .cc-h svg { width: 15px; height: 15px; }

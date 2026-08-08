@@ -287,7 +287,7 @@
     return '<div class="section-label" style="margin-top:24px">Дайджест дня <span class="badge demo">' + I('lock') + 'демо</span></div>' +
       '<div class="digest">' +
       row('calendar', 'i-acc', 'Показы сегодня и завтра', shows, 'data-nav="shows"') +
-      row('warn', 'i-stop', 'Просроченные касания', overdue, 'data-analytics="overdue"') +
+      row('warn', 'i-stop', 'Просроченные задачи', overdue, 'data-analytics="overdue"') +
       row('check', 'i-ok', 'Закрытые сделки', closed, 'data-analytics="closed"') +
       row('flame', 'i-acc', 'Горячие · SLA < 2 ч', hot, 'data-analytics="hot"') +
       '</div>';
@@ -297,7 +297,7 @@
   // Инсайты = автоматически сгенерированные Консьержем группы задач (рекомендательная система).
   // Один источник для Пульса (краткий блок) и экрана «Задачи» (типизированные AI-группы).
   const INSIGHTS = [
-    ['sparkle', 'Анна Петрова — 3 дня без касания', 'High-priority клиент остывает: был активен, интерес к Creekline подтверждён.', 'Связаться', 'data-client="c_anna"'],
+    ['sparkle', 'Анна Петрова — 3 дня без связи', 'High-priority клиент остывает: был активен, интерес к Creekline подтверждён.', 'Связаться', 'data-client="c_anna"'],
     ['trend', 'Bayline 1603 — на 8% ниже компов', 'Сильный аргумент под инвестора: доходность выше среднего по району.', 'Предложить Виктору', 'data-deal="d_viktor"'],
     ['shield', 'Escrow по Creekline — через 4 дня', 'Комплаенс-риск off-plan: нужен receipt до дедлайна DLD.', 'Открыть сделку', 'data-deal="d_anna"'],
     ['star', 'Karim Aziz ценит статус', 'По психопрофилю Palm Court под его предпочтения: престиж + вид.', 'Подобрать объект', 'data-client="c_partner"'],
@@ -331,7 +331,7 @@
     let title = 'Записи', rows = '';
     if (kind === 'overdue') {
       const list = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
-      title = 'Просроченные касания';
+      title = 'Просроченные задачи';
       rows = list.map((t) => { const c = D().clients.find((x) => x.id === t.clientId) || {}; return '<div class="feed-row" data-client="' + t.clientId + '" style="cursor:pointer"><div class="fi i-stop">' + I('warn') + '</div><div class="ft"><div class="t">' + t.title + '</div><div class="m">' + (c.name || '') + ' · ' + t.due + '</div></div>' + I('arrowRight') + '</div>'; }).join('');
     } else {
       let list = deals;
@@ -412,18 +412,17 @@
 
     const _overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
     const tiles = '' +
-      tile('flame', 'Клиенты требуют действий', a.hotClients, '', 'span 3', 'Ожидают вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
-      tile('warn', 'Просрочено касаний', _overdue, '', 'span 3', 'Задачи вне срока', '', '', 'data-analytics="overdue"') +
-      tile('doc', 'КП на согласование', a.kpPending, '', 'span 3', 'Готовы к отправке клиенту', '', '', 'data-act="openKp"') +
-      tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 3', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
+      tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'Ждут вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
+      tile('warn', 'Просроченные задачи', _overdue, '', 'span 4', 'Пора связаться с клиентом', '', '', 'data-analytics="overdue"') +
+      tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 4', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
       '<button class="tile wide" data-nav="clients"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + _pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
         '<div class="sub">Тренд новых сделок · 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
-      '<button class="tile wide" data-nav="clients"><div class="th">' + I('target') + 'Покрытие лидов</div>' +
+      '<button class="tile wide" data-nav="clients"><div class="th">' + I('target') + 'Отработка лидов</div>' +
         '<div class="val">' + Math.round(a.coverage * 100) + '<span class="u">%</span></div>' +
         '<div class="meter"><i style="width:' + (a.coverage * 100) + '%"></i></div>' +
-        '<div class="sub">Касания за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + '</div></button>';
+        '<div class="sub">Связались за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + ' лидов</div></button>';
 
     // merged work queue (was a separate "Радар" tab) — role-aware
     const eyebrow = isMgr
@@ -1275,8 +1274,9 @@
   // ---- CRM gap v3: deal-card blocks (R3 fields+provenance/A1, R4 timeline, A3 conflict, A6 handoff, A7 privacy) ----
   // Provenance badge (A1): AI-suggested field vs human-confirmed. Deterministic fields carry no badge (A4).
   function provBadge(st) {
-    if (st === 'confirmed') return '<span class="prov-b ok" title="Подтверждено человеком">' + I('check') + 'подтверждено</span>';
-    if (st === 'ai') return '<span class="prov-b ai" title="Предложено AI — подтвердите">' + I('sparkle') + 'AI</span>';
+    // Only flag what needs attention: an AI-suggested value awaiting confirmation. Confirmed and
+    // deterministic fields carry no marker, so the value column stays clean and aligned.
+    if (st === 'ai') return '<span class="prov-i" title="Предложено AI — подтвердите">' + I('sparkle') + '</span>';
     return '';
   }
   function dealField(label, val, provSt, confirmId) {
