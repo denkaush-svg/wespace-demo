@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:50</title>
+  <title>WESPACE · сборка 13:29</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:50';
+    window.WS_BUILD='13:29';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -35,7 +35,7 @@
   --ink:   #211d16;
   --ink-2: #4a4338;
   --mut:   #766c5b;
-  --faint: #7d7059;
+  --faint: #9a8f7c;
 
   /* terracotta accent — the only accent on the page */
   --acc:      #cf5a25;
@@ -49,7 +49,7 @@
   --ok:       #2f7d4f;
   --ok-soft:  #e4f2e8;
   --ok-line:  #b9dcc6;
-  --warn:     #8f5e12;
+  --warn:     #b7791f;
   --warn-soft:#f8eed5;
   --warn-line:#ecd39a;
   --stop:     #b3341f;
@@ -740,8 +740,8 @@ button { font-family: inherit; cursor: pointer; }
 .stage-stepper .stg:active, .fn-pill:active, .view-pill:active { transform: scale(.99); }
 .feed-row:active, .src-row:active { transform: scale(.995); }
 /* small tactile controls press a touch harder so the feedback reads at 26-40px */
-.tb-btn:active, .tb-icon:active, .deal .kmv:active,
-.prompt .send:active, .prompt .voice:active { transform: scale(.96); }
+.tb-btn:active, .tb-icon:active, .deal .kmv:active, .tb-avatar:active,
+.role-switch button:active, .prompt .send:active, .prompt .voice:active { transform: scale(.96); }
 /* A tab-content swap is a state change, so it earns a quick fade — justified, not decorative. */
 .tab-anim { animation: fadeup .18s var(--ease-out) both; }
 
@@ -769,7 +769,9 @@ button { font-family: inherit; cursor: pointer; }
   .tb-icon, .tb-btn { height: 40px; }
   .tb-icon { width: 40px; }
   .deal .kmv { width: 40px; height: 40px; }
-  .dx-step .d { width: 36px; height: 36px; }
+  /* topbar is space-tight at 390 — drop the wallet label + build tag so controls (and 40px targets) fit, not clip */
+  .wallet-chip .txt { display: none; }
+  .tb-build { display: none; }
   .fin { grid-template-columns: 1fr; }
   .drawer { width: 100vw; max-width: 100vw; }
   .role-switch button .txt { display: none; }
@@ -1188,7 +1190,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .src-row:hover { background: var(--acc-soft); }
 .src-row .sn { flex: 1; font-size: 13px; font-weight: 600; color: var(--ink); }
 .src-row .sc { font-size: 12px; color: var(--mut); }
-.src-row .scomm { font-size: 12.5px; font-weight: 700; color: var(--acc-2); min-width: 90px; text-align: right; }
+.src-row .scomm { font-size: 12.5px; font-weight: 700; color: var(--acc-ink); min-width: 90px; text-align: right; }
 .loss-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink); }
 /* R5 signals + priority */
 .prio { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; font-size: 10.5px; font-weight: 800; color: #fff; margin-right: 6px; vertical-align: middle; }
@@ -1643,7 +1645,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   /* neutrals — old CRM tokens (grey-undercover as canvas → cards float) */
   --bg:#F3F3F3; --bg-2:#ECECEC; --surface:#FFFFFF; --surface-2:#F7F7F7; --surface-3:#F0F0F0;
   --line:#ECECEC; --line-2:#DADADA; --hair:#EFEFEF;
-  --ink:#222222; --ink-2:#3A3A3A; --mut:#737373; --faint:#A5A5A5;
+  --ink:#222222; --ink-2:#3A3A3A; --mut:#737373; --faint:#6E6E6E;
 
   /* orange accent — old CRM exact */
   --acc:#F17E3D; --acc-2:#DC6A2A; --acc-deep:#C85A1E;
@@ -1651,7 +1653,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   /* status — kept muted, paired with icon/label */
   --ok:#2E9D58; --ok-soft:#E9F6EE; --ok-line:#BEE3CC;
-  --warn:#B7791F; --warn-soft:#FBF1DC; --warn-line:#ECD8A6;
+  --warn:#8F5E12; --warn-soft:#FBF1DC; --warn-line:#ECD8A6;
   --stop:#DE3030; --stop-soft:#FCEAEA; --stop-line:#F3C3C3;
   --info:#2B6C8F; --info-soft:#E4F0F5; --info-line:#BBDAE6;
 

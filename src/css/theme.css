@@ -11,7 +11,7 @@
   /* neutrals — old CRM tokens (grey-undercover as canvas → cards float) */
   --bg:#F3F3F3; --bg-2:#ECECEC; --surface:#FFFFFF; --surface-2:#F7F7F7; --surface-3:#F0F0F0;
   --line:#ECECEC; --line-2:#DADADA; --hair:#EFEFEF;
-  --ink:#222222; --ink-2:#3A3A3A; --mut:#737373; --faint:#A5A5A5;
+  --ink:#222222; --ink-2:#3A3A3A; --mut:#737373; --faint:#6E6E6E;
 
   /* orange accent — old CRM exact */
   --acc:#F17E3D; --acc-2:#DC6A2A; --acc-deep:#C85A1E;
@@ -19,7 +19,7 @@
 
   /* status — kept muted, paired with icon/label */
   --ok:#2E9D58; --ok-soft:#E9F6EE; --ok-line:#BEE3CC;
-  --warn:#B7791F; --warn-soft:#FBF1DC; --warn-line:#ECD8A6;
+  --warn:#8F5E12; --warn-soft:#FBF1DC; --warn-line:#ECD8A6;
   --stop:#DE3030; --stop-soft:#FCEAEA; --stop-line:#F3C3C3;
   --info:#2B6C8F; --info-soft:#E4F0F5; --info-line:#BBDAE6;
 
