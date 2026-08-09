@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:45</title>
+  <title>WESPACE · сборка 14:09</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:45';
+    window.WS_BUILD='14:09';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1502,6 +1502,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .ohero-actions { position: absolute; top: 16px; right: 16px; z-index: 2; display: flex; flex-direction: column; gap: 8px; width: 196px; }
 .ohero-actions .btn { background: rgba(255,255,255,.95); border-color: rgba(255,255,255,.55); color: var(--ink); justify-content: flex-start; }
 .ohero-actions .btn:hover { background: #fff; }
+/* the one focal action (download the client offer) reads as primary over the glass stack */
+.ohero-actions .btn.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
+.ohero-actions .btn.primary:hover { background: var(--acc-2); }
 .ohero .og-nav { z-index: 2; top: auto; bottom: 14px; width: 30px; height: 30px; }
 .ohero .og-nav.prev { left: auto; right: 52px; }
 .ohero .og-nav.next { right: 14px; }
@@ -6963,8 +6966,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<span class="og-count"><b id="ogIdx">1</b>/' + ph.length + '</span>'
       : '';
     const actions = '<div class="ohero-actions">' +
+      '<button class="btn sm primary" data-act="openKp">' + I('doc') + 'Скачать КП</button>' +
       '<button class="btn sm" data-fin="' + o.id + '">' + I('money') + 'Доходность</button>' +
-      '<button class="btn sm" data-act="openKp">' + I('doc') + 'Скачать КП</button>' +
       '<button class="btn sm" data-promo="' + o.id + '">' + I('star') + 'Скачать креативы</button>' +
       '<button class="btn sm" data-act="openXls">' + I('calc') + 'Финмодель · Excel</button>' +
       '</div>';

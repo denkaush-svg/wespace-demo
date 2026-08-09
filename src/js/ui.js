@@ -2497,8 +2497,8 @@
         '<span class="og-count"><b id="ogIdx">1</b>/' + ph.length + '</span>'
       : '';
     const actions = '<div class="ohero-actions">' +
+      '<button class="btn sm primary" data-act="openKp">' + I('doc') + 'Скачать КП</button>' +
       '<button class="btn sm" data-fin="' + o.id + '">' + I('money') + 'Доходность</button>' +
-      '<button class="btn sm" data-act="openKp">' + I('doc') + 'Скачать КП</button>' +
       '<button class="btn sm" data-promo="' + o.id + '">' + I('star') + 'Скачать креативы</button>' +
       '<button class="btn sm" data-act="openXls">' + I('calc') + 'Финмодель · Excel</button>' +
       '</div>';
