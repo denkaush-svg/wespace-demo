@@ -467,13 +467,13 @@
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
-      // Action-first: for the agent, "Мой день" (what needs you today) leads; metrics follow as context.
-      (isMgr ? '' : queueBlock) +
+      // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
+      // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
       '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
       (isMgr ? '' : agentKpis()) +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
-      (isMgr ? queueBlock : '') +
+      queueBlock +
     '</div>';
   }
 
@@ -1897,22 +1897,33 @@
   function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
-      '<div class="dfields">' +
-      dfPair('Клиент', c.name || '—') +
-      dfPair('Интерес', r.interest) +
-      dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') +
-      dfPair('Форма оплаты', r.paymentForm) +
-      dfPair('VAT (НДС 5%)', r.vat ? 'применяется' : 'не применяется') +
-      dfPair('Источник', r.source) +
-      dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') +
-      dfPair('Тип сделки', r.dealType) +
+    const tag = (v) => v ? '<span class="badge">' + v + '</span>' : '';
+    const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
+    // Accent hero: the two facts a broker reads first — what the client wants + the budget.
+    const hero = '<div class="req-hero">' +
+      '<div class="rh-main">' +
+        '<div class="rh-client">' + I('users') + (c.name || 'Клиент') + '</div>' +
+        '<div class="rh-label">Что ищет клиент</div>' +
+        '<div class="rh-interest">' + (r.interest || '—') + '</div>' +
+        '<div class="rh-tags">' + tag(r.goal) + tag(r.dealType) + '</div>' +
+      '</div>' +
+      '<div class="rh-budget">' +
+        '<div class="rh-b-label">Бюджет</div>' +
+        '<div class="rh-b-val">' + (r.budget ? WS.AED(r.budget) : '—') + '</div>' +
+        (pay ? '<div class="rh-b-sub">' + pay + '</div>' : '') +
+      '</div></div>';
+    // Remaining fields split into two labelled groups of stacked cells (no flat 13-row list).
+    const g1 = '<div class="dgroup-h">Критерии подбора</div><div class="dfields two">' +
       dfPair('Тип объекта', r.objectType) +
-      dfPair('Цель', r.goal) +
       dfPair('Районы', (r.areas || []).join(', ')) +
-      dfPair('Срок', r.horizon) +
-      dfPair('Канал', r.channel || '—') + '</div>' +
-      (r.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + r.note + '</div>' : ''));
+      dfPair('Срок', r.horizon) + '</div>';
+    const g2 = '<div class="dgroup-h">Источник и участники</div><div class="dfields two">' +
+      dfPair('Источник', r.source) +
+      dfPair('Канал', r.channel || '—') +
+      dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div>';
+    return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
+      hero + g1 + g2 +
+      (r.note ? '<div class="req-note">' + I('sparkle') + '<span>' + r.note + '</span></div>' : ''));
   }
   const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
   function reqOfferedRow(r, off) {
