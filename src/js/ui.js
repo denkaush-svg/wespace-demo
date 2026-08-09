@@ -3270,9 +3270,11 @@
       if (dueF !== 'all' && taskDueBucket(t) !== dueF) return false;
       return true;
     });
-    const chip = (attr, k, l, cur) => '<button class="chip' + (cur === k ? '' : ' mut') + '" data-' + attr + '="' + k + '"' + (cur === k ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + l + '</button>';
-    const statusChips = [['open', 'Открытые'], ['done', 'Выполнено'], ['all', 'Все']].map(([k, l]) => chip('tasksstatus', k, l, statusF)).join('');
-    const dueChips = [['all', 'Все сроки'], ['overdue', 'Просрочено'], ['today', 'Сегодня'], ['later', 'Позже']].map(([k, l]) => chip('tasksdue', k, l, dueF)).join('');
+    // One row of clear one-click presets (was status ×3 + due ×4 = 7 chips across two axes).
+    // "Позже"/"Все сроки" fold into Открытые/Все — a broker rarely isolates the later-backlog alone.
+    const PRESETS = [['open', 'Открытые', 'open', 'all'], ['today', 'Сегодня', 'open', 'today'], ['overdue', 'Просрочено', 'open', 'overdue'], ['done', 'Выполнено', 'done', 'all'], ['all', 'Все', 'all', 'all']];
+    const curPreset = (PRESETS.find((pr) => pr[2] === statusF && pr[3] === dueF) || [])[0];
+    const presetChips = PRESETS.map((pr) => '<button class="chip' + (curPreset === pr[0] ? '' : ' mut') + '" data-taskpreset="' + pr[0] + '"' + (curPreset === pr[0] ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + pr[1] + '</button>').join('');
     const rows = list.map(taskRow).join('') || ('<div class="empty" style="padding:32px 20px">' + I('checkCircle') +
       '<div style="font-weight:700;color:var(--ink);margin-bottom:2px">' + (all.length ? 'Под фильтры задач нет' : 'Все задачи разобраны') + '</div>' +
       '<div>' + (all.length ? 'Измените статус или срок выше, чтобы увидеть остальные.' : 'Новые появятся из сделок и рекомендаций Консьержа.') + '</div></div>');
@@ -3280,7 +3282,7 @@
       '<button class="btn sm primary" data-act="newTask">' + I('plus') + 'Новая задача</button>') +
       tasksInsights() +
       (isMgr ? tasksHeatmap() : '') +
-      '<div class="qa-row" style="margin:16px 0 4px">' + statusChips + '<span class="df-sep"></span>' + dueChips + '</div>' +
+      '<div class="qa-row" style="margin:16px 0 4px">' + presetChips + '</div>' +
       '<div class="card"><div class="feed" style="padding:8px 16px">' + rows + '</div></div>';
   }
   // Task card (pop-up): суть · документы · история + чат по задаче с Консьержем.
