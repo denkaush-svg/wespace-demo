@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 14:09</title>
+  <title>WESPACE · сборка 17:09</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='14:09';
+    window.WS_BUILD='17:09';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5421,6 +5421,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         (isMgr ? '<td>' + agentName(d.agent) + '</td>' : '') +
         '<td class="td-mut">' + (d.updated || '') + '</td></tr>';
     }).join('');
+    if (!rows) return '<div class="empty" style="padding:40px 20px">' + I('briefcase') +
+      '<div style="font-weight:700;color:var(--ink);margin-bottom:2px">Под этот вид сделок нет</div>' +
+      '<div>Сбросьте сохранённый вид или фильтр источника выше.</div></div>';
     return '<div class="card" style="overflow-x:auto"><table class="deals-table"><thead><tr><th>Клиент · объект</th><th>Стадия</th><th>Сумма</th>' +
       (isMgr ? '<th>Агент</th>' : '') + '<th>Обновлено</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
@@ -7737,7 +7740,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const chip = (attr, k, l, cur) => '<button class="chip' + (cur === k ? '' : ' mut') + '" data-' + attr + '="' + k + '"' + (cur === k ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + l + '</button>';
     const statusChips = [['open', 'Открытые'], ['done', 'Выполнено'], ['all', 'Все']].map(([k, l]) => chip('tasksstatus', k, l, statusF)).join('');
     const dueChips = [['all', 'Все сроки'], ['overdue', 'Просрочено'], ['today', 'Сегодня'], ['later', 'Позже']].map(([k, l]) => chip('tasksdue', k, l, dueF)).join('');
-    const rows = list.map(taskRow).join('') || '<div class="empty" style="padding:20px">' + I('checkCircle') + '<div style="font-weight:700;color:var(--ink)">Нет задач по фильтру</div></div>';
+    const rows = list.map(taskRow).join('') || ('<div class="empty" style="padding:32px 20px">' + I('checkCircle') +
+      '<div style="font-weight:700;color:var(--ink);margin-bottom:2px">' + (all.length ? 'Под фильтры задач нет' : 'Все задачи разобраны') + '</div>' +
+      '<div>' + (all.length ? 'Измените статус или срок выше, чтобы увидеть остальные.' : 'Новые появятся из сделок и рекомендаций Консьержа.') + '</div></div>');
     return head('Задачи', 'Все задачи по сделкам и клиентам: бэклог, сроки, приоритет. «Мой день» (сегодня/просрочено) остаётся в Пульсе — здесь полный список с фильтрами. Инсайты — автоматически сгенерированные Консьержем группы задач из рекомендательной системы.',
       '<button class="btn sm primary" data-act="newTask">' + I('plus') + 'Новая задача</button>') +
       tasksInsights() +
@@ -8371,7 +8376,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return head('Заявки', 'Два потока: активные заявки клиентов (клик по строке — карточка заявки со сделками и показанными объектами) и входящие обращения из каналов, которые ещё нужно разобрать. «Разобрать» запускает Консьержа — разобранная заявка становится сделкой.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
-      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   function viewCompanies() {

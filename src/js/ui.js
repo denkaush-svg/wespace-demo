@@ -952,6 +952,9 @@
         (isMgr ? '<td>' + agentName(d.agent) + '</td>' : '') +
         '<td class="td-mut">' + (d.updated || '') + '</td></tr>';
     }).join('');
+    if (!rows) return '<div class="empty" style="padding:40px 20px">' + I('briefcase') +
+      '<div style="font-weight:700;color:var(--ink);margin-bottom:2px">Под этот вид сделок нет</div>' +
+      '<div>Сбросьте сохранённый вид или фильтр источника выше.</div></div>';
     return '<div class="card" style="overflow-x:auto"><table class="deals-table"><thead><tr><th>Клиент · объект</th><th>Стадия</th><th>Сумма</th>' +
       (isMgr ? '<th>Агент</th>' : '') + '<th>Обновлено</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
@@ -3268,7 +3271,9 @@
     const chip = (attr, k, l, cur) => '<button class="chip' + (cur === k ? '' : ' mut') + '" data-' + attr + '="' + k + '"' + (cur === k ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + l + '</button>';
     const statusChips = [['open', 'Открытые'], ['done', 'Выполнено'], ['all', 'Все']].map(([k, l]) => chip('tasksstatus', k, l, statusF)).join('');
     const dueChips = [['all', 'Все сроки'], ['overdue', 'Просрочено'], ['today', 'Сегодня'], ['later', 'Позже']].map(([k, l]) => chip('tasksdue', k, l, dueF)).join('');
-    const rows = list.map(taskRow).join('') || '<div class="empty" style="padding:20px">' + I('checkCircle') + '<div style="font-weight:700;color:var(--ink)">Нет задач по фильтру</div></div>';
+    const rows = list.map(taskRow).join('') || ('<div class="empty" style="padding:32px 20px">' + I('checkCircle') +
+      '<div style="font-weight:700;color:var(--ink);margin-bottom:2px">' + (all.length ? 'Под фильтры задач нет' : 'Все задачи разобраны') + '</div>' +
+      '<div>' + (all.length ? 'Измените статус или срок выше, чтобы увидеть остальные.' : 'Новые появятся из сделок и рекомендаций Консьержа.') + '</div></div>');
     return head('Задачи', 'Все задачи по сделкам и клиентам: бэклог, сроки, приоритет. «Мой день» (сегодня/просрочено) остаётся в Пульсе — здесь полный список с фильтрами. Инсайты — автоматически сгенерированные Консьержем группы задач из рекомендательной системы.',
       '<button class="btn sm primary" data-act="newTask">' + I('plus') + 'Новая задача</button>') +
       tasksInsights() +
@@ -3902,7 +3907,7 @@
     return head('Заявки', 'Два потока: активные заявки клиентов (клик по строке — карточка заявки со сделками и показанными объектами) и входящие обращения из каналов, которые ещё нужно разобрать. «Разобрать» запускает Консьержа — разобранная заявка становится сделкой.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
-      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   function viewCompanies() {
