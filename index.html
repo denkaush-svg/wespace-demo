@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 02:27</title>
+  <title>WESPACE · сборка 12:50</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='02:27';
+    window.WS_BUILD='12:50';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1574,9 +1574,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
 .deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
 /* Two facing cards under the hero: client contacts ↔ key params. */
-.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: start; }
+.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
 .deal-top-cell { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.deal-top-cell > .dx-sec { min-width: 0; margin: 0; }
+.deal-top-cell > .dx-sec { min-width: 0; margin: 0; display: flex; flex-direction: column; }
+/* the shorter column's last card fills to the taller column's height → bottom borders align, no gray page gap */
+.deal-top-cell > .dx-sec:last-child { flex: 1 1 auto; }
+/* "Ключевое" spec-sheet spreads its rows to fill, so extra height reads as comfortable spacing, not emptiness */
+.deal-top .dfields { flex: 1 1 auto; align-content: space-between; }
 /* Essence status line high on the deal card (no scroll to see what's happening now). */
 .deal-phrase { display: flex; align-items: center; gap: 9px; padding: 11px 15px; margin-bottom: 12px; border: 1px solid var(--acc-line); border-radius: var(--r); background: var(--acc-soft); font-size: 13.5px; color: var(--ink); }
 .deal-phrase svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--acc-ink); }
