@@ -175,6 +175,12 @@ button { font-family: inherit; cursor: pointer; }
 .tile .trend.up { color: var(--ok); } .tile .trend.down { color: var(--stop); }
 .tile.wide { grid-column: span 6; }
 .tile.accent { background: linear-gradient(150deg, var(--acc-soft), var(--surface)); border-color: var(--acc-line); }
+/* Unified Пульс dashboard: the 6 metric tiles (status + KPI) share the grid as 3-per-row,
+   the 2 charts stay full-width below — one block, not "5 tiles + a separate KPI strip". */
+@media (min-width: 861px) {
+  .tiles.dash .tile { grid-column: span 4; }
+  .tiles.dash .tile.wide { grid-column: span 6; }
+}
 
 /* mini sparkline / meter inside a tile */
 .spark { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-top: 10px; }

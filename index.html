@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:03</title>
+  <title>WESPACE · сборка 23:24</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:03';
+    window.WS_BUILD='23:24';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -317,6 +317,12 @@ button { font-family: inherit; cursor: pointer; }
 .tile .trend.up { color: var(--ok); } .tile .trend.down { color: var(--stop); }
 .tile.wide { grid-column: span 6; }
 .tile.accent { background: linear-gradient(150deg, var(--acc-soft), var(--surface)); border-color: var(--acc-line); }
+/* Unified Пульс dashboard: the 6 metric tiles (status + KPI) share the grid as 3-per-row,
+   the 2 charts stay full-width below — one block, not "5 tiles + a separate KPI strip". */
+@media (min-width: 861px) {
+  .tiles.dash .tile { grid-column: span 4; }
+  .tiles.dash .tile.wide { grid-column: span 6; }
+}
 
 /* mini sparkline / meter inside a tile */
 .spark { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-top: 10px; }
@@ -4819,22 +4825,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">Одинаковый запрос → одинаковые числа. Клик по цифре — до записей. Комиссия платформы не показывается.</div>';
   }
-  // Agent Пульс effectiveness strip — the three KPIs the principal asked to surface:
-  // conversion request→deal, mean deal cycle, commission per lead.
-  function agentKpis() {
-    const m = computeMetrics();
-    const A = D().attribution || [];
-    const totalComm = A.reduce((s, x) => s + (x.commission || 0), 0);
-    const commPerLead = m.leads ? Math.round(totalComm / m.leads) : 0;
-    const cycle = (D().analytics || {}).avgCycleDays || 0;
-    const mtile = (label, val, sub, act) => '<button class="mtile" ' + act + '><div class="ml">' + label + '</div><div class="mv">' + val + '</div><div class="ms">' + sub + '</div></button>';
-    return '<div class="section-label" style="margin-top:24px">Эффективность · KPI <span class="badge demo">' + I('lock') + 'демо</span></div>' +
-      '<div class="mtiles">' +
-      mtile('Конверсия заявка → сделка', m.conv + '%', m.won + ' из ' + m.leads + ' лидов', 'data-analytics="conv"') +
-      mtile('Средний цикл сделки', cycle + ' дн.', 'от заявки до закрытия', 'data-nav="analytics"') +
-      mtile('Комиссия на лид', WS.AED(commPerLead), 'из ' + m.leads + ' лидов', 'data-analytics="pipeline"') +
-      '</div>';
-  }
   function openAnalyticsDrill(kind) {
     const deals = D().deals || [];
     let title = 'Записи', rows = '';
@@ -4914,16 +4904,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { t: 'Оценить доходность', ic: 'money', nav: 'calc' },
       { t: 'Итог показа', ic: 'voice2', scn: 'G3' },
       { t: 'Холодный лид', ic: 'flame', scn: 'S15' },
-      { t: 'Брифинг дня', ic: 'sparkle', scn: 'S8' },
+      { t: 'Эффективность', ic: 'trend', nav: 'analytics' },
     ].map((q) => '<button class="chip" data-' + (q.scn ? 'scn="' + q.scn : 'nav="' + q.nav) + '">' + I(q.ic) + q.t + '</button>').join('');
 
     const spark = a.sparks.map((v, i) => '<i class="' + (i === a.sparks.length - 1 ? 'on' : '') + '" style="height:' + (30 + v * 4) + '%"></i>').join('');
 
     const _overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
+    // KPI values (conversion, mean cycle, commission/lead) render as tiles inside the one dashboard block.
+    const _km = computeMetrics();
+    const _kCommPerLead = _km.leads ? Math.round((D().attribution || []).reduce((s2, x) => s2 + (x.commission || 0), 0) / _km.leads) : 0;
+    const _kCycle = (D().analytics || {}).avgCycleDays || 0;
     const tiles = '' +
       tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'Ждут вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
       tile('warn', 'Просроченные задачи', _overdue, '', 'span 4', 'Пора связаться с клиентом', '', '', 'data-analytics="overdue"') +
       tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 4', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
+      tile('target', 'Конверсия заявка → сделка', _km.conv, '%', 'span 4', _km.won + ' из ' + _km.leads + ' лидов', '', '', 'data-analytics="conv"') +
+      tile('clock', 'Средний цикл сделки', _kCycle, ' дн.', 'span 4', 'от заявки до закрытия', '', '', 'data-nav="analytics"') +
+      tile('money', 'Комиссия на лид', WS.AED(_kCommPerLead), '', 'span 4', 'из ' + _km.leads + ' лидов', '', '', 'data-analytics="pipeline"') +
       '<button class="tile wide" data-nav="clients"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + _pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
@@ -4962,8 +4959,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
-      '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
-      (isMgr ? '' : agentKpis()) +
+      '<div class="tiles dash" style="margin-top:20px">' + tiles + '</div>' +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
       queueBlock +

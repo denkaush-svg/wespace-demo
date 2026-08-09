@@ -326,22 +326,6 @@
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">Одинаковый запрос → одинаковые числа. Клик по цифре — до записей. Комиссия платформы не показывается.</div>';
   }
-  // Agent Пульс effectiveness strip — the three KPIs the principal asked to surface:
-  // conversion request→deal, mean deal cycle, commission per lead.
-  function agentKpis() {
-    const m = computeMetrics();
-    const A = D().attribution || [];
-    const totalComm = A.reduce((s, x) => s + (x.commission || 0), 0);
-    const commPerLead = m.leads ? Math.round(totalComm / m.leads) : 0;
-    const cycle = (D().analytics || {}).avgCycleDays || 0;
-    const mtile = (label, val, sub, act) => '<button class="mtile" ' + act + '><div class="ml">' + label + '</div><div class="mv">' + val + '</div><div class="ms">' + sub + '</div></button>';
-    return '<div class="section-label" style="margin-top:24px">Эффективность · KPI <span class="badge demo">' + I('lock') + 'демо</span></div>' +
-      '<div class="mtiles">' +
-      mtile('Конверсия заявка → сделка', m.conv + '%', m.won + ' из ' + m.leads + ' лидов', 'data-analytics="conv"') +
-      mtile('Средний цикл сделки', cycle + ' дн.', 'от заявки до закрытия', 'data-nav="analytics"') +
-      mtile('Комиссия на лид', WS.AED(commPerLead), 'из ' + m.leads + ' лидов', 'data-analytics="pipeline"') +
-      '</div>';
-  }
   function openAnalyticsDrill(kind) {
     const deals = D().deals || [];
     let title = 'Записи', rows = '';
@@ -421,16 +405,23 @@
       { t: 'Оценить доходность', ic: 'money', nav: 'calc' },
       { t: 'Итог показа', ic: 'voice2', scn: 'G3' },
       { t: 'Холодный лид', ic: 'flame', scn: 'S15' },
-      { t: 'Брифинг дня', ic: 'sparkle', scn: 'S8' },
+      { t: 'Эффективность', ic: 'trend', nav: 'analytics' },
     ].map((q) => '<button class="chip" data-' + (q.scn ? 'scn="' + q.scn : 'nav="' + q.nav) + '">' + I(q.ic) + q.t + '</button>').join('');
 
     const spark = a.sparks.map((v, i) => '<i class="' + (i === a.sparks.length - 1 ? 'on' : '') + '" style="height:' + (30 + v * 4) + '%"></i>').join('');
 
     const _overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
+    // KPI values (conversion, mean cycle, commission/lead) render as tiles inside the one dashboard block.
+    const _km = computeMetrics();
+    const _kCommPerLead = _km.leads ? Math.round((D().attribution || []).reduce((s2, x) => s2 + (x.commission || 0), 0) / _km.leads) : 0;
+    const _kCycle = (D().analytics || {}).avgCycleDays || 0;
     const tiles = '' +
       tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'Ждут вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
       tile('warn', 'Просроченные задачи', _overdue, '', 'span 4', 'Пора связаться с клиентом', '', '', 'data-analytics="overdue"') +
       tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 4', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
+      tile('target', 'Конверсия заявка → сделка', _km.conv, '%', 'span 4', _km.won + ' из ' + _km.leads + ' лидов', '', '', 'data-analytics="conv"') +
+      tile('clock', 'Средний цикл сделки', _kCycle, ' дн.', 'span 4', 'от заявки до закрытия', '', '', 'data-nav="analytics"') +
+      tile('money', 'Комиссия на лид', WS.AED(_kCommPerLead), '', 'span 4', 'из ' + _km.leads + ' лидов', '', '', 'data-analytics="pipeline"') +
       '<button class="tile wide" data-nav="clients"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + _pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
@@ -469,8 +460,7 @@
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
-      '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
-      (isMgr ? '' : agentKpis()) +
+      '<div class="tiles dash" style="margin-top:20px">' + tiles + '</div>' +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
       queueBlock +
