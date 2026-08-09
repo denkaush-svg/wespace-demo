@@ -18,9 +18,9 @@
   --acc-soft:#FFF4F0; --acc-line:#F6D0B8; --acc-ink:#B0521E; --acc-weak:rgba(241,126,61,.10);
 
   /* status — kept muted, paired with icon/label */
-  --ok:#2E9D58; --ok-soft:#E9F6EE; --ok-line:#BEE3CC;
+  --ok:#1C7E42; --ok-soft:#E9F6EE; --ok-line:#BEE3CC;
   --warn:#8F5E12; --warn-soft:#FBF1DC; --warn-line:#ECD8A6;
-  --stop:#DE3030; --stop-soft:#FCEAEA; --stop-line:#F3C3C3;
+  --stop:#C62222; --stop-soft:#FCEAEA; --stop-line:#F3C3C3;
   --info:#2B6C8F; --info-soft:#E4F0F5; --info-line:#BBDAE6;
 
   --r-xs:4px; --r-sm:6px; --r:8px; --r-lg:10px;
