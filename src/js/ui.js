@@ -494,12 +494,12 @@
   // поэтому дедлайны escrow/Oqood/title deed всплывают здесь; клик открывает сделку).
   function docDeadlines() {
     const items = [
-      { deal: 'd_anna', kind: 'Escrow receipt', due: 'через 4 дня', warn: true, sub: 'Анна Петрова · Creekline 1208' },
-      { deal: 'd_viktor', kind: 'Oqood · регистрация DLD', due: 'через 9 дней', warn: false, sub: 'Виктор Орлов · Bayline 1603' },
-      { deal: 'd_rentbiz', kind: 'Title deed', due: 'через 21 день', warn: false, sub: 'Портфель · DIFC Gate' },
+      { deal: 'd_anna', kind: 'Escrow receipt', due: 'через 4 дня', warn: true, sub: 'Анна Петрова · Creekline 1208', tip: 'Escrow — эскроу-счёт застройщика: платежи по off-plan идут на защищённый счёт и раскрываются по этапам строительства' },
+      { deal: 'd_viktor', kind: 'Oqood · регистрация DLD', due: 'через 9 дней', warn: false, sub: 'Виктор Орлов · Bayline 1603', tip: 'Oqood — предварительная регистрация off-plan сделки в Земельном департаменте Дубая (DLD), до выдачи Title Deed' },
+      { deal: 'd_rentbiz', kind: 'Title deed', due: 'через 21 день', warn: false, sub: 'Портфель · DIFC Gate', tip: 'Title Deed — свидетельство о праве собственности, выдаётся DLD при передаче готового объекта' },
     ];
     const rows = items.map((it) => '<div class="feed-row" data-deal="' + it.deal + '" style="cursor:pointer"><div class="fi ' + (it.warn ? 'i-acc' : 'i-info') + '">' + I('doc') + '</div>' +
-      '<div class="ft"><div class="t">' + it.kind + '</div><div class="m">' + it.sub + '</div></div>' +
+      '<div class="ft"><div class="t"' + (it.tip ? ' title="' + it.tip + '"' : '') + '>' + it.kind + '</div><div class="m">' + it.sub + '</div></div>' +
       '<div class="fa"><span class="badge ' + (it.warn ? 'warn' : '') + '">' + I('clock') + it.due + '</span></div></div>').join('');
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Сроки по документам · off-plan</div>' +
       '<button class="btn sm" data-nav="docs">' + I('doc') + 'Документы</button></div>' +
@@ -2537,9 +2537,9 @@
       '</div></div>';
   }
   function objStatusesInner(o) {
-    return '<div class="prov"><span class="badge ' + (o.trakheesi === 'ok' ? 'ok' : 'warn') + '">' + I('shield') + 'Trakheesi ' + (o.trakheesi === 'ok' ? 'получено' : 'в процессе') + '</span>' +
-      '<span class="badge ' + (o.madmoun === 'ok' ? 'ok' : '') + '">' + I('qr') + 'Madmoun ' + (o.madmoun === 'ok' ? 'QR есть' : 'n/a') + '</span>' +
-      '<span class="badge ' + (o.verified === 'verified' ? 'ok' : 'warn') + '">' + I('check') + 'Проверка · ' + o.checkedAt + (o.verified === 'expired' ? ' (истекла)' : '') + '</span>' +
+    return '<div class="prov"><span class="badge ' + (o.trakheesi === 'ok' ? 'ok' : 'warn') + '" title="Trakheesi — разрешение DLD на публикацию объявления о недвижимости в Дубае">' + I('shield') + 'Trakheesi ' + (o.trakheesi === 'ok' ? 'получено' : 'в процессе') + '</span>' +
+      '<span class="badge ' + (o.madmoun === 'ok' ? 'ok' : '') + '" title="Madmoun — QR-верификация листинга: подтверждает легальность объявления">' + I('qr') + 'Madmoun ' + (o.madmoun === 'ok' ? 'QR есть' : 'n/a') + '</span>' +
+      '<span class="badge ' + (o.verified === 'verified' ? 'ok' : 'warn') + '" title="Проверка актуальности объекта — дата последней сверки инвентаря">' + I('check') + 'Проверка · ' + o.checkedAt + (o.verified === 'expired' ? ' (истекла)' : '') + '</span>' +
       '<span class="badge demo">' + I('lock') + 'проверка — имитация (DEMO)</span></div>';
   }
   function viewObjectDetail(id) {
