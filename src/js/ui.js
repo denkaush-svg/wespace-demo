@@ -467,11 +467,13 @@
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
+      // Action-first: for the agent, "Мой день" (what needs you today) leads; metrics follow as context.
+      (isMgr ? '' : queueBlock) +
       '<div class="tiles" style="margin-top:20px">' + tiles + '</div>' +
       (isMgr ? '' : agentKpis()) +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
-      queueBlock +
+      (isMgr ? queueBlock : '') +
     '</div>';
   }
 
