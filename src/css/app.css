@@ -960,8 +960,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Request card: accent hero (the ask + budget) + two labelled groups of stacked cells,
    replacing the flat 13-row parameter list. */
 .req-hero { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: stretch;
-  background: var(--acc-soft); border: 1px solid var(--acc-line); border-radius: 11px; padding: 13px 15px; margin: 2px 0 6px; }
-.rh-client { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--acc-ink); margin-bottom: 8px; }
+  /* token-driven gradient deepens the fill toward acc-line so the panel reads as a hero,
+     yet stays theme-aware (light: near-white→peach; dark: brown→deeper brown). */
+  background: linear-gradient(135deg, var(--acc-soft), var(--acc-line));
+  border: 1.5px solid var(--acc-line); border-radius: 12px; padding: 14px 16px; margin: 2px 0 6px; }
+.rh-client { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
 .rh-client svg { width: 14px; height: 14px; }
 .rh-label, .rh-b-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
 .rh-interest { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.3; }
