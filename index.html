@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:33</title>
+  <title>WESPACE · сборка 17:54</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:33';
+    window.WS_BUILD='17:54';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1189,8 +1189,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* ---- Event card — one event in a feed: тип · источник · дата, then the description.
    Newest first; the left rail is colour-coded by who the source is. ---- */
 .timeline { gap: 8px; }
-.evc { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 10px 12px 10px 14px; overflow: hidden; transition: .14s var(--ease); }
-.evc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line-2); }
+.evc { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 10px 12px; transition: .14s var(--ease); }
 .evc:hover { border-color: var(--line-2); box-shadow: var(--shadow-sm); }
 .evc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .evc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--surface-3); color: var(--mut); }
@@ -1209,8 +1208,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .evc-ic.ai, .evc-by.ai { background: var(--acc-soft); color: var(--acc-ink); border-color: var(--acc-line); }
 .evc-ic.client, .evc-by.client { background: var(--info-soft); color: var(--info); border-color: var(--info-line); }
 .evc-ic.sys, .evc-by.sys { background: var(--surface-3); color: var(--mut); }
-.evc.ai::before { background: var(--acc); }
-.evc.note::before { background: var(--warn); }
 @media (max-width: 640px) {
   .evc-when { margin-left: 0; width: 100%; }
 }

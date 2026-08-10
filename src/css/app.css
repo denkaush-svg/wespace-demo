@@ -1047,8 +1047,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* ---- Event card — one event in a feed: тип · источник · дата, then the description.
    Newest first; the left rail is colour-coded by who the source is. ---- */
 .timeline { gap: 8px; }
-.evc { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 10px 12px 10px 14px; overflow: hidden; transition: .14s var(--ease); }
-.evc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--line-2); }
+.evc { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 10px 12px; transition: .14s var(--ease); }
 .evc:hover { border-color: var(--line-2); box-shadow: var(--shadow-sm); }
 .evc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .evc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--surface-3); color: var(--mut); }
@@ -1067,8 +1066,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .evc-ic.ai, .evc-by.ai { background: var(--acc-soft); color: var(--acc-ink); border-color: var(--acc-line); }
 .evc-ic.client, .evc-by.client { background: var(--info-soft); color: var(--info); border-color: var(--info-line); }
 .evc-ic.sys, .evc-by.sys { background: var(--surface-3); color: var(--mut); }
-.evc.ai::before { background: var(--acc); }
-.evc.note::before { background: var(--warn); }
 @media (max-width: 640px) {
   .evc-when { margin-left: 0; width: 100%; }
 }
