@@ -964,17 +964,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      yet stays theme-aware (light: near-white→peach; dark: brown→deeper brown). */
   background: linear-gradient(135deg, var(--acc-soft), var(--acc-line));
   border: 1.5px solid var(--acc-line); border-radius: 12px; padding: 14px 16px; margin: 2px 0 6px; }
-.rh-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.rh-client { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
-.rh-client svg { width: 14px; height: 14px; color: var(--acc-ink); }
-/* Headline = the object descriptor (what the client wants), the hero's dominant line. */
-.rh-headline { display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 800; color: var(--ink);
-  font-family: var(--font-disp); line-height: 1.15; letter-spacing: -.01em; }
-.rh-headline svg { width: 18px; height: 18px; color: var(--acc-ink); flex: 0 0 auto; }
-.rh-headline span { min-width: 0; overflow-wrap: anywhere; }
-/* Meta lines = where (areas) + why (goal), quiet marker icon + value. */
-.rh-meta { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
-.rh-meta svg { width: 14px; height: 14px; color: var(--mut); flex: 0 0 auto; }
+.rh-main { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+/* Client name = the hero's dominant line (this is a client request). */
+.rh-client { font-size: 20px; font-weight: 800; color: var(--ink); font-family: var(--font-disp); letter-spacing: -.01em; line-height: 1.12; }
+/* Object line = what the client wants, a quiet subline under the name. */
+.rh-obj { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); line-height: 1.35; margin-top: 6px; }
+.rh-obj svg { width: 15px; height: 15px; color: var(--acc-ink); flex: 0 0 auto; }
+.rh-obj span { min-width: 0; overflow-wrap: anywhere; }
 .rh-b-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
 .rh-budget { text-align: right; border-left: 1px solid var(--acc-line); padding-left: 16px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .rh-b-val { font-size: 19px; font-weight: 800; color: var(--acc-ink); font-family: var(--font-disp); white-space: nowrap; }

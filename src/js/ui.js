@@ -1945,7 +1945,7 @@
   function reqOps(r) {
     const c = D().clients.find((x) => x.id === r.clientId);
     const line = opsLine([
-      ['users', 'Ответственный', r.assignee ? agentName(r.assignee) : 'не назначен'],
+      ['users', 'Ответственный агент', r.assignee ? agentName(r.assignee) : 'не назначен'],
       r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
       r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
       r.funding ? ['money', 'Финансирование', r.funding] : null,
@@ -1959,30 +1959,34 @@
     // (The old hero showed only r.interest = "Покупка" — the deal type, not the ask. Uninformative; the real
     //  criteria sat buried in a group below. Promote them; the detail groups keep only what the hero doesn't.)
     const objLine = [r.objectType, r.bedrooms].filter(Boolean).join(' · ') || r.interest || r.dealType || '—';
-    const areas = (r.areas || []).filter(Boolean).join(' · ');
-    const metaWhere = areas ? '<div class="rh-meta">' + I('compass') + '<span>' + areas + '</span></div>' : '';
-    const metaWhy = r.goal ? '<div class="rh-meta">' + I('target') + '<span>' + r.goal + '</span></div>' : '';
+    // Hero = one consolidated header: the client (dominant), the object they want, the budget.
+    // Everything else (areas, goal, deal terms, source) lives in «Ключевые условия сделки» below —
+    // so the top reads as a single glance instead of a title + hero that restate each other.
     const hero = '<div class="req-hero">' +
       '<div class="rh-main">' +
-        '<div class="rh-client">' + I('users') + (c.name || 'Клиент') + '</div>' +
-        '<div class="rh-headline">' + I('building') + '<span>' + objLine + '</span></div>' +
-        metaWhere + metaWhy +
+        '<div class="rh-client">' + (c.name || 'Клиент') + '</div>' +
+        '<div class="rh-obj">' + I('building') + '<span>' + objLine + '</span></div>' +
       '</div>' +
       '<div class="rh-budget">' +
         '<div class="rh-b-label">Бюджет</div>' +
         '<div class="rh-b-val">' + (r.budget ? WS.AED(r.budget) : '—') + '</div>' +
         (pay ? '<div class="rh-b-sub">' + pay + '</div>' : '') +
       '</div></div>';
-    // Detail groups hold ONLY params the hero doesn't surface — no duplication, same label/value treatment.
-    const grpA = '<div class="req-grp"><div class="dgroup-h">Условия сделки</div><div class="dfields">' +
+    // Key deal conditions — every remaining request attribute, two labelled columns, no duplication
+    // with the hero (object + budget live up top; type/beds are the hero's object line).
+    const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
       dfPair('Тип сделки', r.dealType) +
+      dfPair('Районы', (r.areas || []).join(' · ')) +
+      dfPair('Цель', r.goal) +
       dfPair('Срок', r.horizon) + '</div></div>';
-    const grpB = '<div class="req-grp"><div class="dgroup-h">Источник</div><div class="dfields">' +
+    const grpB = '<div class="req-grp"><div class="dgroup-h">Источник и оформление</div><div class="dfields">' +
       dfPair('Источник', r.source) +
       dfPair('Канал', r.channel || '—') +
       dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';
-    return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
-      hero + reqOps(r) + '<div class="req-groups">' + grpA + grpB + '</div>' +
+    const conds = '<div class="section-label" style="margin-top:18px">Ключевые условия сделки</div>' +
+      '<div class="req-groups">' + grpA + grpB + '</div>';
+    return dxSec('mail', 'Заявка', (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
+      hero + reqOps(r) + conds +
       (r.note ? '<div class="req-note">' + I('sparkle') + '<span>' + r.note + '</span></div>' : ''));
   }
   const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
