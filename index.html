@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 16:54</title>
+  <title>WESPACE · сборка 17:33</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='16:54';
+    window.WS_BUILD='17:33';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1106,10 +1106,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      yet stays theme-aware (light: near-white→peach; dark: brown→deeper brown). */
   background: linear-gradient(135deg, var(--acc-soft), var(--acc-line));
   border: 1.5px solid var(--acc-line); border-radius: 12px; padding: 14px 16px; margin: 2px 0 6px; }
-.rh-client { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
-.rh-client svg { width: 14px; height: 14px; }
-.rh-label, .rh-b-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
-.rh-interest { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.rh-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.rh-client { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.rh-client svg { width: 14px; height: 14px; color: var(--acc-ink); }
+/* Headline = the object descriptor (what the client wants), the hero's dominant line. */
+.rh-headline { display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 800; color: var(--ink);
+  font-family: var(--font-disp); line-height: 1.15; letter-spacing: -.01em; }
+.rh-headline svg { width: 18px; height: 18px; color: var(--acc-ink); flex: 0 0 auto; }
+.rh-headline span { min-width: 0; overflow-wrap: anywhere; }
+/* Meta lines = where (areas) + why (goal), quiet marker icon + value. */
+.rh-meta { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
+.rh-meta svg { width: 14px; height: 14px; color: var(--mut); flex: 0 0 auto; }
+.rh-b-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
 .rh-budget { text-align: right; border-left: 1px solid var(--acc-line); padding-left: 16px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .rh-b-val { font-size: 19px; font-weight: 800; color: var(--acc-ink); font-family: var(--font-disp); white-space: nowrap; }
 .rh-b-sub { font-size: 11.5px; color: var(--ink-2); margin-top: 4px; }
@@ -6486,28 +6494,29 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
-    // Accent hero: the two facts a broker reads first — what the client wants + the budget.
+    // Hero distils the brief into a 2-second glance: WHAT (object + beds) · WHERE (areas) · WHY (goal) · budget.
+    // (The old hero showed only r.interest = "Покупка" — the deal type, not the ask. Uninformative; the real
+    //  criteria sat buried in a group below. Promote them; the detail groups keep only what the hero doesn't.)
+    const objLine = [r.objectType, r.bedrooms].filter(Boolean).join(' · ') || r.interest || r.dealType || '—';
+    const areas = (r.areas || []).filter(Boolean).join(' · ');
+    const metaWhere = areas ? '<div class="rh-meta">' + I('compass') + '<span>' + areas + '</span></div>' : '';
+    const metaWhy = r.goal ? '<div class="rh-meta">' + I('target') + '<span>' + r.goal + '</span></div>' : '';
     const hero = '<div class="req-hero">' +
       '<div class="rh-main">' +
         '<div class="rh-client">' + I('users') + (c.name || 'Клиент') + '</div>' +
-        '<div class="rh-label">Что ищет клиент</div>' +
-        '<div class="rh-interest">' + (r.interest || '—') + '</div>' +
+        '<div class="rh-headline">' + I('building') + '<span>' + objLine + '</span></div>' +
+        metaWhere + metaWhy +
       '</div>' +
       '<div class="rh-budget">' +
         '<div class="rh-b-label">Бюджет</div>' +
         '<div class="rh-b-val">' + (r.budget ? WS.AED(r.budget) : '—') + '</div>' +
         (pay ? '<div class="rh-b-sub">' + pay + '</div>' : '') +
       '</div></div>';
-    // Every remaining attribute as a consistently-labelled field. Two side-by-side groups of four
-    // (even counts, no orphan cell) — same label/value treatment throughout, no mixed badges.
-    const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
-      dfPair('Тип объекта', r.objectType) +
-      (r.bedrooms ? dfPair('Спальни', r.bedrooms) : '') +
-      dfPair('Районы', (r.areas || []).join(', ')) +
-      dfPair('Срок', r.horizon) +
-      dfPair('Цель', r.goal) + '</div></div>';
-    const grpB = '<div class="req-grp"><div class="dgroup-h">Условия и источник</div><div class="dfields">' +
+    // Detail groups hold ONLY params the hero doesn't surface — no duplication, same label/value treatment.
+    const grpA = '<div class="req-grp"><div class="dgroup-h">Условия сделки</div><div class="dfields">' +
       dfPair('Тип сделки', r.dealType) +
+      dfPair('Срок', r.horizon) + '</div></div>';
+    const grpB = '<div class="req-grp"><div class="dgroup-h">Источник</div><div class="dfields">' +
       dfPair('Источник', r.source) +
       dfPair('Канал', r.channel || '—') +
       dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';

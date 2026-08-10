@@ -1955,28 +1955,29 @@
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
-    // Accent hero: the two facts a broker reads first — what the client wants + the budget.
+    // Hero distils the brief into a 2-second glance: WHAT (object + beds) · WHERE (areas) · WHY (goal) · budget.
+    // (The old hero showed only r.interest = "Покупка" — the deal type, not the ask. Uninformative; the real
+    //  criteria sat buried in a group below. Promote them; the detail groups keep only what the hero doesn't.)
+    const objLine = [r.objectType, r.bedrooms].filter(Boolean).join(' · ') || r.interest || r.dealType || '—';
+    const areas = (r.areas || []).filter(Boolean).join(' · ');
+    const metaWhere = areas ? '<div class="rh-meta">' + I('compass') + '<span>' + areas + '</span></div>' : '';
+    const metaWhy = r.goal ? '<div class="rh-meta">' + I('target') + '<span>' + r.goal + '</span></div>' : '';
     const hero = '<div class="req-hero">' +
       '<div class="rh-main">' +
         '<div class="rh-client">' + I('users') + (c.name || 'Клиент') + '</div>' +
-        '<div class="rh-label">Что ищет клиент</div>' +
-        '<div class="rh-interest">' + (r.interest || '—') + '</div>' +
+        '<div class="rh-headline">' + I('building') + '<span>' + objLine + '</span></div>' +
+        metaWhere + metaWhy +
       '</div>' +
       '<div class="rh-budget">' +
         '<div class="rh-b-label">Бюджет</div>' +
         '<div class="rh-b-val">' + (r.budget ? WS.AED(r.budget) : '—') + '</div>' +
         (pay ? '<div class="rh-b-sub">' + pay + '</div>' : '') +
       '</div></div>';
-    // Every remaining attribute as a consistently-labelled field. Two side-by-side groups of four
-    // (even counts, no orphan cell) — same label/value treatment throughout, no mixed badges.
-    const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
-      dfPair('Тип объекта', r.objectType) +
-      (r.bedrooms ? dfPair('Спальни', r.bedrooms) : '') +
-      dfPair('Районы', (r.areas || []).join(', ')) +
-      dfPair('Срок', r.horizon) +
-      dfPair('Цель', r.goal) + '</div></div>';
-    const grpB = '<div class="req-grp"><div class="dgroup-h">Условия и источник</div><div class="dfields">' +
+    // Detail groups hold ONLY params the hero doesn't surface — no duplication, same label/value treatment.
+    const grpA = '<div class="req-grp"><div class="dgroup-h">Условия сделки</div><div class="dfields">' +
       dfPair('Тип сделки', r.dealType) +
+      dfPair('Срок', r.horizon) + '</div></div>';
+    const grpB = '<div class="req-grp"><div class="dgroup-h">Источник</div><div class="dfields">' +
       dfPair('Источник', r.source) +
       dfPair('Канал', r.channel || '—') +
       dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';
