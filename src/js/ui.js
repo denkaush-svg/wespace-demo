@@ -1786,7 +1786,9 @@
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
       (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
-    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг</div>' +
+    const isOver = /просроч/i.test(d.nextDue || '');
+    const dueTxt = d.nextDue ? ' · <span' + (isOver ? ' style="color:var(--stop);font-weight:700"' : '') + '>' + (isOver ? d.nextDue : 'срок: ' + d.nextDue) + '</span>' : '';
+    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг · ' + agentName(d.agent) + dueTxt + '</div>' +
       '<div class="dnb-v">' + a.doIt[0] + (a.why ? ' <span class="dnb-why">· ' + a.why + '</span>' : '') + '</div></div>';
     const tl = (D().dealTimeline || {})[d.id] || [];
     const evs = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
@@ -1818,15 +1820,22 @@
     const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
     return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
   }
+  // EOI / booking deposit — amount, paid?, date, refundable (Codex IA review: a P0 for a live deal).
+  function depositLabel(d) {
+    const x = d.deposit; if (!x) return null;
+    return x.kind + ' · ' + WS.AED(x.amount) + ' · ' + (x.paid ? 'внесён' + (x.at ? ' ' + x.at : '') : 'не внесён') + ' · ' + (x.refundable ? 'возвратный' : 'невозвратный');
+  }
   // Key params, lifted into the header (right of the facing pair).
   function dealKeyCard(d) {
     const p = d.prov || {};
     const o0 = dealLots(d)[0];
     const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
+    const dep = depositLabel(d);
     return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
       dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
       dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+      (dep ? dealField('Задаток / EOI', dep, 'confirmed') : '') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal') +
       dealField('Тип сделки', d.dealType, p.dealType) +
       dealField('Комиссия', comm, 'confirmed') +

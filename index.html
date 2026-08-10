@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:39</title>
+  <title>WESPACE · сборка 16:18</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:39';
+    window.WS_BUILD='16:18';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2200,6 +2200,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
       consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
+      nextDue: 'сегодня 16:00', deposit: { kind: 'EOI', amount: 100000, paid: false, refundable: true },
       contacts: [
         { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
         { name: 'Пётр Петров', role: 'Супруг — со-решение', rating: 'B', phone: '+971 55 210 6642' },
@@ -2210,12 +2211,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       funnel: 'sale_ready', dealType: 'Продажа · готовое', objectType: 'готовое', goal: 'Перепродажа',
       paymentForm: '100% оплата', vat: false, source: 'Реферал', partnerAgent: null, companyId: null,
       consideredProjects: ['Bayline Terraces'], stageDays: 6,
+      nextDue: 'просрочено (касание)', deposit: { kind: 'EOI', amount: 50000, paid: true, at: '8 мая', refundable: true },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_viktor', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_marina', amount: 1950000, hot: false, stage: 'docs',
       title: 'Виктор Орлов', sub: 'Договор бронирования', tags: ['документ'], updated: 'вчера',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция',
       paymentForm: 'Ипотека', vat: false, source: 'Property Finder', partnerAgent: null, companyId: 'co_emaar',
       consideredProjects: ['Bayline Terraces'], stageDays: 3, requestId: 'r_viktor',
+      nextDue: '12 мая', deposit: { kind: 'Бронирование (booking)', amount: 97500, paid: true, at: '6 мая', refundable: false },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'work',
       title: 'Karim Aziz', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня',
@@ -6309,7 +6312,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
       (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
-    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг</div>' +
+    const isOver = /просроч/i.test(d.nextDue || '');
+    const dueTxt = d.nextDue ? ' · <span' + (isOver ? ' style="color:var(--stop);font-weight:700"' : '') + '>' + (isOver ? d.nextDue : 'срок: ' + d.nextDue) + '</span>' : '';
+    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг · ' + agentName(d.agent) + dueTxt + '</div>' +
       '<div class="dnb-v">' + a.doIt[0] + (a.why ? ' <span class="dnb-why">· ' + a.why + '</span>' : '') + '</div></div>';
     const tl = (D().dealTimeline || {})[d.id] || [];
     const evs = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
@@ -6341,15 +6346,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
     return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
   }
+  // EOI / booking deposit — amount, paid?, date, refundable (Codex IA review: a P0 for a live deal).
+  function depositLabel(d) {
+    const x = d.deposit; if (!x) return null;
+    return x.kind + ' · ' + WS.AED(x.amount) + ' · ' + (x.paid ? 'внесён' + (x.at ? ' ' + x.at : '') : 'не внесён') + ' · ' + (x.refundable ? 'возвратный' : 'невозвратный');
+  }
   // Key params, lifted into the header (right of the facing pair).
   function dealKeyCard(d) {
     const p = d.prov || {};
     const o0 = dealLots(d)[0];
     const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
+    const dep = depositLabel(d);
     return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
       dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
       dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+      (dep ? dealField('Задаток / EOI', dep, 'confirmed') : '') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal') +
       dealField('Тип сделки', d.dealType, p.dealType) +
       dealField('Комиссия', comm, 'confirmed') +
