@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 16:42</title>
+  <title>WESPACE · сборка 16:54</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='16:42';
+    window.WS_BUILD='16:54';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2263,7 +2263,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const requests = [
     { id: 'r_anna', clientId: 'c_anna', title: 'Инвест-квартира до 2 млн', createdAt: '06 мая', channel: 'whatsapp',
       interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Входящий звонок', partnerAgent: null,
-      dealType: 'Продажа · off-plan', objectType: 'Квартира', goal: 'Инвестиция под аренду', budget: 2000000,
+      dealType: 'Продажа · off-plan', objectType: 'Квартира', bedrooms: '1–2 BR', goal: 'Инвестиция под аренду', budget: 2000000,
       areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
       assignee: 'u_marina', leadStatus: 'Квалифицирован', temperature: 'hot', nextContact: 'сегодня, 16:00', funding: 'Подтв. средств ✓ · рассрочка застройщика',
       offered: [
@@ -2275,7 +2275,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       note: 'Голосовое из WhatsApp; предложено 3 объекта, клиент выбрал Creekline.' },
     { id: 'r_viktor', clientId: 'c_docs', title: 'Квартира Bayline + портфель DIFC', createdAt: '04 мая', channel: 'email',
       interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Реферал', partnerAgent: null,
-      dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', goal: 'Инвестиция', budget: 6150000,
+      dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', bedrooms: '1BR + офисы', goal: 'Инвестиция', budget: 6150000,
       areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
       assignee: 'u_marina', leadStatus: 'В переговорах', temperature: 'warm', nextContact: '12 мая, 11:00', funding: 'Cash 100% · подтв. средств ✓',
       offered: [
@@ -5547,8 +5547,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     if (tab === 'history') return companyFeedBlock(co);
     // overview
-    const key = dxSec('building', 'Ключевое', '', '<div class="dfields">' +
-      dfPair('Тип', co.kind) + dfPair('Условия комиссии', co.commission) + dfPair('Сделок', String(deals.length)) + '</div>' +
+    const key = dxSec('building', 'Реквизиты и статус', '', '<div class="dfields">' +
+      dfPair('Тип', co.kind) +
+      dfPair('Лицензия / ORN', co.license || '—') +
+      dfPair('TRN', co.trn || '—') +
+      dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
+      dfPair('Условия комиссии', co.commission) +
+      dfPair('Сделок', String(deals.length)) + '</div>' +
       (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''));
     const contact = dxSec('users', 'Контактное лицо', '', '<div class="dfields">' +
       dfPair(co.contactPerson || 'Контакт', co.contactRole || '—') + dfPair('Телефон', co.phone) +
@@ -6360,7 +6365,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealKeyCard(d) {
     const p = d.prov || {};
     const o0 = dealLots(d)[0];
-    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
+    const commPayer = ({ sale_offplan: 'застройщик', sale_ready: 'покупатель', rent: 'арендатор', rental_biz: 'покупатель' })[d.funnel] || 'по договору';
+    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) + ' · платит ' + commPayer : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
     const dep = depositLabel(d);
     return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
@@ -6496,6 +6502,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // (even counts, no orphan cell) — same label/value treatment throughout, no mixed badges.
     const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
       dfPair('Тип объекта', r.objectType) +
+      (r.bedrooms ? dfPair('Спальни', r.bedrooms) : '') +
       dfPair('Районы', (r.areas || []).join(', ')) +
       dfPair('Срок', r.horizon) +
       dfPair('Цель', r.goal) + '</div></div>';
@@ -7917,8 +7924,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       return dxSec('clock', 'История задачи', '', '<div class="feed">' + rows + '</div>');
     }
     // essence (суть задачи)
+    const taskDeal = (D().deals || []).find((d) => d.clientId === t.clientId);
+    const prio = t.when === 'overdue' ? 'высокий' : t.when === 'today' ? 'средний' : 'обычный';
     const key = dxSec('checkCircle', 'Суть задачи', '', '<div class="dfields">' +
-      dfPair('Что сделать', t.title) + dfPair('Клиент', c.name || '—') + dfPair('Тип', kindLabel) +
+      dfPair('Что сделать', t.title) + dfPair('Клиент', c.name || '—') +
+      (taskDeal ? dfPair('Сделка', dealActionWord(taskDeal) + ' · ' + WS.AED(taskDeal.amount)) : '') +
+      dfPair('Тип', kindLabel) + dfPair('Приоритет', prio) +
       dfPair('Срок', t.due) + dfPair('Исполнитель', asg) + dfPair('Статус', t.status === 'done' ? 'выполнено' : (t.when === 'overdue' ? 'просрочено' : 'в работе')) + '</div>' +
       (t.why ? '<div style="margin-top:8px;font-size:12.5px;color:var(--mut)">' + t.why + '</div>' : ''));
     const act = dxSec('sparkle', 'Действия', '', '<div class="qa-row">' +

@@ -1016,8 +1016,13 @@
     }
     if (tab === 'history') return companyFeedBlock(co);
     // overview
-    const key = dxSec('building', 'Ключевое', '', '<div class="dfields">' +
-      dfPair('Тип', co.kind) + dfPair('Условия комиссии', co.commission) + dfPair('Сделок', String(deals.length)) + '</div>' +
+    const key = dxSec('building', 'Реквизиты и статус', '', '<div class="dfields">' +
+      dfPair('Тип', co.kind) +
+      dfPair('Лицензия / ORN', co.license || '—') +
+      dfPair('TRN', co.trn || '—') +
+      dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
+      dfPair('Условия комиссии', co.commission) +
+      dfPair('Сделок', String(deals.length)) + '</div>' +
       (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''));
     const contact = dxSec('users', 'Контактное лицо', '', '<div class="dfields">' +
       dfPair(co.contactPerson || 'Контакт', co.contactRole || '—') + dfPair('Телефон', co.phone) +
@@ -1829,7 +1834,8 @@
   function dealKeyCard(d) {
     const p = d.prov || {};
     const o0 = dealLots(d)[0];
-    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) : '—';
+    const commPayer = ({ sale_offplan: 'застройщик', sale_ready: 'покупатель', rent: 'арендатор', rental_biz: 'покупатель' })[d.funnel] || 'по договору';
+    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) + ' · платит ' + commPayer : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
     const dep = depositLabel(d);
     return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
@@ -1965,6 +1971,7 @@
     // (even counts, no orphan cell) — same label/value treatment throughout, no mixed badges.
     const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
       dfPair('Тип объекта', r.objectType) +
+      (r.bedrooms ? dfPair('Спальни', r.bedrooms) : '') +
       dfPair('Районы', (r.areas || []).join(', ')) +
       dfPair('Срок', r.horizon) +
       dfPair('Цель', r.goal) + '</div></div>';
@@ -3386,8 +3393,12 @@
       return dxSec('clock', 'История задачи', '', '<div class="feed">' + rows + '</div>');
     }
     // essence (суть задачи)
+    const taskDeal = (D().deals || []).find((d) => d.clientId === t.clientId);
+    const prio = t.when === 'overdue' ? 'высокий' : t.when === 'today' ? 'средний' : 'обычный';
     const key = dxSec('checkCircle', 'Суть задачи', '', '<div class="dfields">' +
-      dfPair('Что сделать', t.title) + dfPair('Клиент', c.name || '—') + dfPair('Тип', kindLabel) +
+      dfPair('Что сделать', t.title) + dfPair('Клиент', c.name || '—') +
+      (taskDeal ? dfPair('Сделка', dealActionWord(taskDeal) + ' · ' + WS.AED(taskDeal.amount)) : '') +
+      dfPair('Тип', kindLabel) + dfPair('Приоритет', prio) +
       dfPair('Срок', t.due) + dfPair('Исполнитель', asg) + dfPair('Статус', t.status === 'done' ? 'выполнено' : (t.when === 'overdue' ? 'просрочено' : 'в работе')) + '</div>' +
       (t.why ? '<div style="margin-top:8px;font-size:12.5px;color:var(--mut)">' + t.why + '</div>' : ''));
     const act = dxSec('sparkle', 'Действия', '', '<div class="qa-row">' +

@@ -190,7 +190,7 @@
   const requests = [
     { id: 'r_anna', clientId: 'c_anna', title: 'Инвест-квартира до 2 млн', createdAt: '06 мая', channel: 'whatsapp',
       interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Входящий звонок', partnerAgent: null,
-      dealType: 'Продажа · off-plan', objectType: 'Квартира', goal: 'Инвестиция под аренду', budget: 2000000,
+      dealType: 'Продажа · off-plan', objectType: 'Квартира', bedrooms: '1–2 BR', goal: 'Инвестиция под аренду', budget: 2000000,
       areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
       assignee: 'u_marina', leadStatus: 'Квалифицирован', temperature: 'hot', nextContact: 'сегодня, 16:00', funding: 'Подтв. средств ✓ · рассрочка застройщика',
       offered: [
@@ -202,7 +202,7 @@
       note: 'Голосовое из WhatsApp; предложено 3 объекта, клиент выбрал Creekline.' },
     { id: 'r_viktor', clientId: 'c_docs', title: 'Квартира Bayline + портфель DIFC', createdAt: '04 мая', channel: 'email',
       interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Реферал', partnerAgent: null,
-      dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', goal: 'Инвестиция', budget: 6150000,
+      dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', bedrooms: '1BR + офисы', goal: 'Инвестиция', budget: 6150000,
       areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
       assignee: 'u_marina', leadStatus: 'В переговорах', temperature: 'warm', nextContact: '12 мая, 11:00', funding: 'Cash 100% · подтв. средств ✓',
       offered: [
