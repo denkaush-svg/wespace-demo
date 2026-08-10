@@ -1916,17 +1916,35 @@
     const m = ({ hot: ['Горячий', 'ro-hot'], warm: ['Тёплый', 'ro-warm'], cold: ['Холодный', 'ro-cold'] })[t];
     return m ? '<span class="ro-item ' + m[1] + '">' + I('flame') + m[0] + '</span>' : '';
   }
-  function opsStrip(items, temperature) {
-    return '<div class="req-ops">' + opsTempChip(temperature) +
+  function opsLine(items, temperature) {
+    return '<div class="ro-line">' + opsTempChip(temperature) +
       items.filter(Boolean).map((it) => '<span class="ro-item">' + I(it[0]) + it[1] + ': <b>' + it[2] + '</b></span>').join('') + '</div>';
   }
+  function opsStrip(items, temperature) {
+    return '<div class="req-ops">' + opsLine(items, temperature) + '</div>';
+  }
+  // Quick contact for a client request — phone + WhatsApp + call/write, so the broker can dial fast.
+  function reqContactRow(r, c) {
+    const vals = clientContactVals(c);
+    const dealForC = D().deals.find((d) => d.clientId === c.id);
+    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    return '<div class="ro-contact">' +
+      '<span class="rc-num">' + I('phone') + (vals.phone || '—') + '</span>' +
+      '<span class="rc-num rc-wa">' + I('whatsapp') + 'WhatsApp</span>' +
+      '<div class="rc-acts">' +
+        '<button class="btn xs primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
+        '<button class="btn xs" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · заявка" data-ticon="mail">' + I('whatsapp') + 'Написать</button>' +
+      '</div></div>';
+  }
   function reqOps(r) {
-    return opsStrip([
+    const c = D().clients.find((x) => x.id === r.clientId);
+    const line = opsLine([
       ['users', 'Ответственный', r.assignee ? agentName(r.assignee) : 'не назначен'],
       r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
       r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
       r.funding ? ['money', 'Финансирование', r.funding] : null,
     ], r.temperature);
+    return '<div class="req-ops">' + (c ? reqContactRow(r, c) : '') + line + '</div>';
   }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};

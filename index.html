@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 16:18</title>
+  <title>WESPACE · сборка 16:42</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='16:18';
+    window.WS_BUILD='16:42';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1108,20 +1108,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   border: 1.5px solid var(--acc-line); border-radius: 12px; padding: 14px 16px; margin: 2px 0 6px; }
 .rh-client { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
 .rh-client svg { width: 14px; height: 14px; }
-.rh-label, .rh-b-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
+.rh-label, .rh-b-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
 .rh-interest { font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.3; }
 .rh-budget { text-align: right; border-left: 1px solid var(--acc-line); padding-left: 16px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.rh-b-val { font-size: 21px; font-weight: 800; color: var(--acc-ink); font-family: var(--font-disp); white-space: nowrap; }
+.rh-b-val { font-size: 19px; font-weight: 800; color: var(--acc-ink); font-family: var(--font-disp); white-space: nowrap; }
 .rh-b-sub { font-size: 11.5px; color: var(--ink-2); margin-top: 4px; }
 /* Two side-by-side field groups (four each → no orphan cell); one label/value treatment throughout. */
 .req-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 30px; margin-top: 16px; }
 .req-grp { min-width: 0; }
-.dgroup-h { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--mut); margin: 0 0 6px; }
+.dgroup-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--mut); margin: 0 0 6px; }
 .req-note { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; padding: 9px 11px; background: var(--surface-2); border-radius: 9px; font-size: 12px; color: var(--mut); }
 .req-note svg { width: 15px; height: 15px; color: var(--acc); flex: 0 0 auto; margin-top: 1px; }
 /* Lead-ops strip: operational facts (owner / status / temperature / next contact), a distinct bar
    above the attribute fields — deliberately not loose badges. Shared by request + client cards. */
-.req-ops { display: flex; flex-wrap: wrap; gap: 7px 16px; align-items: center; margin: 12px 0 2px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; color: var(--mut); }
+.req-ops { display: flex; flex-direction: column; gap: 9px; margin: 12px 0 2px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; color: var(--mut); }
+.ro-line { display: flex; flex-wrap: wrap; gap: 7px 16px; align-items: center; }
+.ro-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+.rc-num { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--acc-ink); }
+.rc-num svg { width: 14px; height: 14px; }
+.rc-acts { display: flex; gap: 6px; margin-left: auto; }
 .ro-item { display: inline-flex; align-items: center; gap: 5px; }
 .ro-item b { color: var(--ink); font-weight: 700; }
 .ro-item svg { width: 13px; height: 13px; color: var(--acc); }
@@ -1562,9 +1567,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .osum-metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 15px; border-top: 1px solid var(--acc-line); }
 .osum-m { padding: 14px 20px 15px; border-left: 1px solid var(--acc-line); }
 .osum-m:first-child { padding-left: 0; border-left: none; }
-.osum-v { font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+.osum-v { font-size: 20px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
 .osum-l { font-size: 12px; color: var(--mut); margin-top: 4px; }
-.osum-m--hero .osum-v { color: var(--acc-deep); font-size: 26px; }
+.osum-m--hero .osum-v { color: var(--acc-deep); font-size: 23px; }
 .osum-m--hero .osum-l { color: var(--acc-ink); font-weight: 600; }
 .odetail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; align-items: stretch; }
 .odetail-grid > .dx-sec { margin-top: 0; display: flex; flex-direction: column; }
@@ -6442,17 +6447,35 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const m = ({ hot: ['Горячий', 'ro-hot'], warm: ['Тёплый', 'ro-warm'], cold: ['Холодный', 'ro-cold'] })[t];
     return m ? '<span class="ro-item ' + m[1] + '">' + I('flame') + m[0] + '</span>' : '';
   }
-  function opsStrip(items, temperature) {
-    return '<div class="req-ops">' + opsTempChip(temperature) +
+  function opsLine(items, temperature) {
+    return '<div class="ro-line">' + opsTempChip(temperature) +
       items.filter(Boolean).map((it) => '<span class="ro-item">' + I(it[0]) + it[1] + ': <b>' + it[2] + '</b></span>').join('') + '</div>';
   }
+  function opsStrip(items, temperature) {
+    return '<div class="req-ops">' + opsLine(items, temperature) + '</div>';
+  }
+  // Quick contact for a client request — phone + WhatsApp + call/write, so the broker can dial fast.
+  function reqContactRow(r, c) {
+    const vals = clientContactVals(c);
+    const dealForC = D().deals.find((d) => d.clientId === c.id);
+    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    return '<div class="ro-contact">' +
+      '<span class="rc-num">' + I('phone') + (vals.phone || '—') + '</span>' +
+      '<span class="rc-num rc-wa">' + I('whatsapp') + 'WhatsApp</span>' +
+      '<div class="rc-acts">' +
+        '<button class="btn xs primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
+        '<button class="btn xs" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · заявка" data-ticon="mail">' + I('whatsapp') + 'Написать</button>' +
+      '</div></div>';
+  }
   function reqOps(r) {
-    return opsStrip([
+    const c = D().clients.find((x) => x.id === r.clientId);
+    const line = opsLine([
       ['users', 'Ответственный', r.assignee ? agentName(r.assignee) : 'не назначен'],
       r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
       r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
       r.funding ? ['money', 'Финансирование', r.funding] : null,
     ], r.temperature);
+    return '<div class="req-ops">' + (c ? reqContactRow(r, c) : '') + line + '</div>';
   }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
