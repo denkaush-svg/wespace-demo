@@ -1487,7 +1487,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
 .deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
 /* Two facing cards under the hero: client contacts ↔ key params. */
-.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: start; }
+.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
 .deal-top-cell { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .deal-top-cell > .dx-sec { min-width: 0; margin: 0; display: flex; flex-direction: column; }
 /* the shorter column's last card fills to the taller column's height → bottom borders align, no gray page gap */
@@ -1546,6 +1546,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* --- Shared "now" cards: emphasized next-step + structured recent events (не серая каша) --- */
 .nstep-meta { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-end; }
+.nstep-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
 .nstep-act { font-size: 14px; font-weight: 650; color: var(--ink); line-height: 1.4; }
 .nstep-why { font-size: 12px; color: var(--mut); margin-top: 5px; line-height: 1.4; }
 .nstep-owner, .nstep-due { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--mut); }
@@ -1553,8 +1554,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .nstep-due { color: var(--acc-ink); }
 .nstep-due.over, .nstep-due.over svg { color: var(--stop); }
 /* Inline decision control on a подбор tile — Выбран / В работе / Отклонён без ухода со страницы */
-.obj-seg { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
-.obj-seg-b { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--mut); cursor: pointer; transition: .12s var(--ease); }
+.obj-mini-b-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.obj-mini-info { flex: 1 1 180px; min-width: 0; }
+.obj-seg { display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; width: 118px; }
+.obj-seg-b { display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--mut); cursor: pointer; transition: .12s var(--ease); }
 .obj-seg-b svg { width: 11px; height: 11px; }
 .obj-seg-b:hover { border-color: var(--line-2); background: var(--surface-2); color: var(--ink); }
 .obj-seg-b.on { border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc-ink); font-weight: 700; }
@@ -1575,7 +1578,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .kp-doc-cli { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
 .kp-tblwrap { overflow-x: auto; }
 .kp-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-@media (max-width: 600px) { .kp-doc-head { flex-wrap: wrap; } .kp-tbl { font-size: 11px; } .kp-tbl th, .kp-tbl td { padding: 6px 7px; } }
+@media (max-width: 600px) { .kp-doc-head { flex-wrap: wrap; } .kp-tbl { font-size: 11px; } .kp-tbl th, .kp-tbl td { padding: 6px 7px; } .obj-seg { flex-direction: row; flex-wrap: wrap; width: 100%; flex-basis: 100%; } .obj-seg-b { flex: 1 1 auto; } }
 .kp-tbl th, .kp-tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .kp-tbl th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); font-weight: 700; }
 .kp-tbl td { color: var(--ink); }

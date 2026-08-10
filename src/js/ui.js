@@ -1833,7 +1833,7 @@
     const meta = (owner ? '<span class="nstep-owner">' + I('users') + owner + '</span>' : '') +
       (due ? '<span class="nstep-due' + (over ? ' over' : '') + '">' + I('clock') + due + '</span>' : '');
     return dxSec('target', 'Следующий шаг', meta ? '<span class="nstep-meta">' + meta + '</span>' : '',
-      '<div class="nstep-act">' + actionHtml + '</div>' + (whyHtml ? '<div class="nstep-why">' + whyHtml + '</div>' : ''));
+      '<div class="nstep-body"><div class="nstep-act">' + actionHtml + '</div>' + (whyHtml ? '<div class="nstep-why">' + whyHtml + '</div>' : '') + '</div>');
   }
   function nowEvLine(p) {
     return '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
@@ -1841,8 +1841,8 @@
       '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>';
   }
   // "Последние события" card: the few most-recent events that fit, then a jump to the full history.
-  function recentEventsCard(tl, moreEtab) {
-    const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, 4).map(nowEvLine).join('') ||
+  function recentEventsCard(tl, moreEtab, limit) {
+    const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, limit || 4).map(nowEvLine).join('') ||
       '<div class="dnb-ev-empty">событий пока нет</div>';
     const more = '<button class="btn xs" data-etab="' + moreEtab + '">' + I('arrowRight') + 'вся история</button>';
     return dxSec('clock', 'Последние события', more, '<div class="dnb-hist">' + evs + '</div>');
@@ -2133,10 +2133,10 @@
           '<button class="obj-seg-b' + (o.state === s[0] ? ' on' : '') + '" data-reqobj="' + r.id + '~' + obj.id + '~' + s[0] + '">' + I(s[2]) + s[1] + '</button>').join('') + '</div>';
       return '<div class="obj-mini" data-obj="' + obj.id + '" data-fromreq="' + r.id + '">' +
         (ph ? '<div class="obj-mini-ph" style="background-image:url(' + ph + ')"></div>' : '<div class="obj-mini-ph">' + I('building') + '</div>') +
-        '<div class="obj-mini-b"><div class="obj-mini-n">' + obj.name + '</div>' +
+        '<div class="obj-mini-b' + (seg ? ' obj-mini-b-row' : '') + '"><div class="obj-mini-info"><div class="obj-mini-n">' + obj.name + '</div>' +
         '<div class="obj-mini-m">' + obj.area + ' · ' + WS.AED(obj.price) + ' · ' + obj.br + '</div>' +
         '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
-        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + seg + '</div>' +
+        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + '</div>' +
         I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
     const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить</button>';
@@ -2172,7 +2172,8 @@
     return nextStepCard(owner, r.nextContact || '', false, reqNextAction(r), '');
   }
   function reqRecentCard(r) {
-    return recentEventsCard((D().requestTimeline || {})[r.id] || [], 'request~' + r.id + '~history');
+    // 3 (not 4) events on the request so the right column bottom lands level with «Следующий шаг».
+    return recentEventsCard((D().requestTimeline || {})[r.id] || [], 'request~' + r.id + '~history', 3);
   }
   // Профиль предпочтений + сделки заявки — раньше жили во вкладке «Обзор» (дублировала шапку, роль
   // неясна). Теперь в основной части под объектами.

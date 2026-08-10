@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:48</title>
+  <title>WESPACE · сборка 00:15</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:48';
+    window.WS_BUILD='00:15';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1629,7 +1629,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
 .deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
 /* Two facing cards under the hero: client contacts ↔ key params. */
-.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: start; }
+.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
 .deal-top-cell { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .deal-top-cell > .dx-sec { min-width: 0; margin: 0; display: flex; flex-direction: column; }
 /* the shorter column's last card fills to the taller column's height → bottom borders align, no gray page gap */
@@ -1688,6 +1688,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* --- Shared "now" cards: emphasized next-step + structured recent events (не серая каша) --- */
 .nstep-meta { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-end; }
+.nstep-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
 .nstep-act { font-size: 14px; font-weight: 650; color: var(--ink); line-height: 1.4; }
 .nstep-why { font-size: 12px; color: var(--mut); margin-top: 5px; line-height: 1.4; }
 .nstep-owner, .nstep-due { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--mut); }
@@ -1695,8 +1696,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .nstep-due { color: var(--acc-ink); }
 .nstep-due.over, .nstep-due.over svg { color: var(--stop); }
 /* Inline decision control on a подбор tile — Выбран / В работе / Отклонён без ухода со страницы */
-.obj-seg { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
-.obj-seg-b { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--mut); cursor: pointer; transition: .12s var(--ease); }
+.obj-mini-b-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.obj-mini-info { flex: 1 1 180px; min-width: 0; }
+.obj-seg { display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; width: 118px; }
+.obj-seg-b { display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--mut); cursor: pointer; transition: .12s var(--ease); }
 .obj-seg-b svg { width: 11px; height: 11px; }
 .obj-seg-b:hover { border-color: var(--line-2); background: var(--surface-2); color: var(--ink); }
 .obj-seg-b.on { border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc-ink); font-weight: 700; }
@@ -1717,7 +1720,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .kp-doc-cli { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
 .kp-tblwrap { overflow-x: auto; }
 .kp-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-@media (max-width: 600px) { .kp-doc-head { flex-wrap: wrap; } .kp-tbl { font-size: 11px; } .kp-tbl th, .kp-tbl td { padding: 6px 7px; } }
+@media (max-width: 600px) { .kp-doc-head { flex-wrap: wrap; } .kp-tbl { font-size: 11px; } .kp-tbl th, .kp-tbl td { padding: 6px 7px; } .obj-seg { flex-direction: row; flex-wrap: wrap; width: 100%; flex-basis: 100%; } .obj-seg-b { flex: 1 1 auto; } }
 .kp-tbl th, .kp-tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .kp-tbl th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); font-weight: 700; }
 .kp-tbl td { color: var(--ink); }
@@ -6455,7 +6458,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const meta = (owner ? '<span class="nstep-owner">' + I('users') + owner + '</span>' : '') +
       (due ? '<span class="nstep-due' + (over ? ' over' : '') + '">' + I('clock') + due + '</span>' : '');
     return dxSec('target', 'Следующий шаг', meta ? '<span class="nstep-meta">' + meta + '</span>' : '',
-      '<div class="nstep-act">' + actionHtml + '</div>' + (whyHtml ? '<div class="nstep-why">' + whyHtml + '</div>' : ''));
+      '<div class="nstep-body"><div class="nstep-act">' + actionHtml + '</div>' + (whyHtml ? '<div class="nstep-why">' + whyHtml + '</div>' : '') + '</div>');
   }
   function nowEvLine(p) {
     return '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
@@ -6463,8 +6466,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>';
   }
   // "Последние события" card: the few most-recent events that fit, then a jump to the full history.
-  function recentEventsCard(tl, moreEtab) {
-    const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, 4).map(nowEvLine).join('') ||
+  function recentEventsCard(tl, moreEtab, limit) {
+    const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, limit || 4).map(nowEvLine).join('') ||
       '<div class="dnb-ev-empty">событий пока нет</div>';
     const more = '<button class="btn xs" data-etab="' + moreEtab + '">' + I('arrowRight') + 'вся история</button>';
     return dxSec('clock', 'Последние события', more, '<div class="dnb-hist">' + evs + '</div>');
@@ -6755,10 +6758,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           '<button class="obj-seg-b' + (o.state === s[0] ? ' on' : '') + '" data-reqobj="' + r.id + '~' + obj.id + '~' + s[0] + '">' + I(s[2]) + s[1] + '</button>').join('') + '</div>';
       return '<div class="obj-mini" data-obj="' + obj.id + '" data-fromreq="' + r.id + '">' +
         (ph ? '<div class="obj-mini-ph" style="background-image:url(' + ph + ')"></div>' : '<div class="obj-mini-ph">' + I('building') + '</div>') +
-        '<div class="obj-mini-b"><div class="obj-mini-n">' + obj.name + '</div>' +
+        '<div class="obj-mini-b' + (seg ? ' obj-mini-b-row' : '') + '"><div class="obj-mini-info"><div class="obj-mini-n">' + obj.name + '</div>' +
         '<div class="obj-mini-m">' + obj.area + ' · ' + WS.AED(obj.price) + ' · ' + obj.br + '</div>' +
         '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
-        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + seg + '</div>' +
+        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + '</div>' +
         I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
     const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить</button>';
@@ -6794,7 +6797,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return nextStepCard(owner, r.nextContact || '', false, reqNextAction(r), '');
   }
   function reqRecentCard(r) {
-    return recentEventsCard((D().requestTimeline || {})[r.id] || [], 'request~' + r.id + '~history');
+    // 3 (not 4) events on the request so the right column bottom lands level with «Следующий шаг».
+    return recentEventsCard((D().requestTimeline || {})[r.id] || [], 'request~' + r.id + '~history', 3);
   }
   // Профиль предпочтений + сделки заявки — раньше жили во вкладке «Обзор» (дублировала шапку, роль
   // неясна). Теперь в основной части под объектами.
