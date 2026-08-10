@@ -1964,12 +1964,12 @@
     const rej = off.filter((o) => o.state === 'rejected').length;
     const deals = dealsOfRequest(r.id);
     if (deals.length && deals.every((d) => d.stage === 'done')) return { label: 'Закрыта', tone: 'ok', icon: 'check' };
-    if (deals.length) return { label: 'На сделку', tone: 'acc', icon: 'briefcase' };
-    if (r.kp && r.kp.formed) return { label: 'КП собрано', tone: 'info', icon: 'doc' };
-    if (sel) return { label: 'Клиент выбирает', tone: 'warn', icon: 'target' };
+    if (deals.length) return { label: 'В работе', tone: 'acc', icon: 'briefcase' };
+    if (r.kp && r.kp.formed) return { label: 'Готовим КП', tone: 'info', icon: 'doc' };
+    if (sel) return { label: 'Выбор клиента', tone: 'warn', icon: 'target' };
     if (off.length && rej === off.length) return { label: 'Отклонена', tone: 'stop', icon: 'x' };
     if (off.length) return { label: 'На подборе', tone: '', icon: 'building' };
-    return { label: 'Новая заявка', tone: '', icon: 'sparkle' };
+    return { label: 'Новая', tone: '', icon: 'sparkle' };
   }
   function reqStatusChip(r) {
     const off = r.offered || [];
@@ -1990,19 +1990,19 @@
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length) return 'из заявки создано сделок: ' + deals.length + ' — ведём к подписанию.';
-    if (r.kp && r.kp.formed) return 'КП собрано из выбранного — ждём решение клиента, готовим сделку.';
+    if (deals.length) return 'ведём сделку — согласуем условия и готовим документы.';
+    if (r.kp && r.kp.formed) return 'КП собрано — ждём решение клиента.';
     if (sel) return 'клиент выбрал ' + sel + ' из ' + off.length + ' — собираем КП.';
-    if (off.length) return 'подобрали объектов: ' + off.length + ' — ждём реакцию клиента.';
-    return 'новая заявка — подбираем объекты под запрос.';
+    if (off.length) return 'объекты подобраны — ждём реакцию клиента.';
+    return 'подбираем объекты под запрос.';
   }
   function reqNextAction(r) {
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
-    if (dealsOfRequest(r.id).length) return 'вести сделку к подписанию';
+    if (dealsOfRequest(r.id).length) return 'довести сделку до подписания';
     if (r.kp && r.kp.formed) return 'создать сделку из выбранного';
     if (sel) return 'собрать КП из выбранного (' + sel + ')';
-    if (off.length) return 'дождаться выбора клиента по подборке';
+    if (off.length) return 'получить решение клиента по подборке';
     return 'подобрать объекты под запрос';
   }
   // Facing LEFT — key request conditions (mirror the deal's «Ключевое»).
@@ -2036,13 +2036,36 @@
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
-  // Facing RIGHT (bottom) — the request's analog of the deal's «Объект сделки»: top-3 подбор.
-  function reqOffersMini(r) {
+  // Status of one offered object: whether it became a deal (the final state), else the client's
+  // pick/reject/in-work state. So the broker sees at a glance what each object turned into.
+  function reqOfferStatus(r, off) {
+    const dealObjIds = {};
+    dealsOfRequest(r.id).forEach((d) => {
+      const done = d.stage === 'done';
+      (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
+    });
+    if (dealObjIds[off.id]) return dealObjIds[off.id] === 'done' ? { label: 'Сделка закрыта', tone: 'ok', icon: 'check' } : { label: 'В сделке', tone: 'acc', icon: 'briefcase' };
+    const m = ({ selected: ['Выбрал клиент', 'ok', 'check'], rejected: ['Отклонён', 'stop', 'x'] })[off.state] || ['В работе', '', 'clock'];
+    return { label: m[0], tone: m[1], icon: m[2] };
+  }
+  // Full-width подбор with the status model — the read view (editable pick/reject lives in the tab).
+  function reqOffersStatusBlock(r) {
     const off = r.offered || [];
-    const objs = off.map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean).slice(0, 3);
-    const more = off.length > 3 ? '<button class="btn xs" data-etab="request~' + r.id + '~offers">' + I('arrowRight') + 'ещё ' + (off.length - 3) + '</button>' : '';
-    return dxSec('building', 'Объекты подбора' + (off.length ? ' · ' + off.length : ''), more,
-      objs.length ? objs.map(dealObjectMini).join('') : '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>');
+    const rows = off.map((o) => {
+      const obj = D().objects.find((x) => x.id === o.id); if (!obj) return '';
+      const st = reqOfferStatus(r, o);
+      const ph = (WS.photos && WS.photos[obj.id]) || '';
+      const reason = (o.state === 'rejected' && o.reason) ? '<div class="reqo-reason">' + I('warn') + o.reason + '</div>' : '';
+      return '<div class="obj-mini" data-obj="' + obj.id + '">' +
+        (ph ? '<div class="obj-mini-ph" style="background-image:url(' + ph + ')"></div>' : '<div class="obj-mini-ph">' + I('building') + '</div>') +
+        '<div class="obj-mini-b"><div class="obj-mini-n">' + obj.name + '</div>' +
+        '<div class="obj-mini-m">' + obj.area + ' · ' + WS.AED(obj.price) + ' · ' + obj.br + '</div>' +
+        '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
+        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' +
+        I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
+    const edit = '<button class="btn xs" data-etab="request~' + r.id + '~offers">' + I('pencil') + 'Отметить выбор</button>';
+    return dxSec('building', 'Объекты подбора · ' + off.length, edit, rows);
   }
   function reqRecentEvents(r) {
     const tl = (D().requestTimeline || {})[r.id] || [];
@@ -2053,13 +2076,14 @@
       '<div class="dnb-ev-empty">событий пока нет</div>';
   }
   function reqNowBlock(r) {
+    const owner = r.assignee ? agentName(r.assignee) : D().users.agent.name;
     const line = opsLine([
-      ['users', 'Ответственный агент', r.assignee ? agentName(r.assignee) : 'не назначен'],
+      ['users', 'Ответственный', owner],
       r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
       r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
       r.funding ? ['money', 'Финансирование', r.funding] : null,
     ], undefined);
-    const nextRow = '<div class="dnb-row"><div class="dnb-k">Что делать дальше</div><div class="dnb-v">' + reqNextAction(r) + '</div></div>';
+    const nextRow = '<div class="dnb-row"><div class="dnb-k">Следующий шаг</div><div class="dnb-v">' + reqNextAction(r) + '</div></div>';
     const more = '<button class="btn xs" data-etab="request~' + r.id + '~history">' + I('arrowRight') + 'вся история</button>';
     const histRow = '<div class="dnb-row"><div class="dnb-k">Последние события ' + more + '</div><div class="dnb-hist">' + reqRecentEvents(r) + '</div></div>';
     return '<div class="dnb"><div class="dnb-cap">' + I('pulse') + 'Что сейчас по заявке</div>' + line + nextRow + histRow + '</div>';
@@ -2068,9 +2092,9 @@
     return requestHero(r) +
       '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>' +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
-      '<div class="deal-top"><div class="deal-top-cell">' + reqKeyCard(r) + '</div>' +
-      '<div class="deal-top-cell">' + reqClientCard(r) + reqOffersMini(r) + '</div></div>' +
-      reqNowBlock(r);
+      '<div class="deal-top req-top"><div class="deal-top-cell">' + reqKeyCard(r) + '</div>' +
+      '<div class="deal-top-cell">' + reqClientCard(r) + reqNowBlock(r) + '</div></div>' +
+      reqOffersStatusBlock(r);
   }
   function requestTimelineInner(r) {
     const tl = (D().requestTimeline || {})[r.id] || [];
