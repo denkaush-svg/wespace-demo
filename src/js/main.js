@@ -62,7 +62,7 @@
     if (d.taskpreset) { const m = { open: ['open', 'all'], today: ['open', 'today'], overdue: ['open', 'overdue'], done: ['done', 'all'], all: ['all', 'all'] }[d.taskpreset]; if (m) { store.tasksStatus = m[0]; store.tasksDue = m[1]; } return api.emit(); }
     if (d.tasksdue) { store.tasksDue = d.tasksdue; return api.emit(); }
     if (d.tasksstatus) { store.tasksStatus = d.tasksstatus; return api.emit(); }
-    if (d.commsfilter) { store.commsFilter = d.commsfilter; return api.emit(); }
+    if (d.commsfilter) { store.commsFilter = d.commsfilter; return WS.ui.refreshCommsTab(t); }
     if (d.netchat) { store.netChat = d.netchat; return api.emit(); }
     if (d.netsel) { store.netSel = d.netsel; return api.emit(); }
     if (d.nettype) { store.netType = d.nettype; return api.emit(); }

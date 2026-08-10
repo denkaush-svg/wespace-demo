@@ -1325,24 +1325,17 @@
     const confirm = provSt === 'ai' && confirmId ? '<button class="mini-confirm" data-dfconfirm="' + confirmId + '" title="Подтвердить значение">' + I('check') + '</button>' : '';
     return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
   }
-  function dealFieldsRows(d) {
+  // Params tab shows only what the header «Ключевое» doesn't (no Бюджет/Форма оплаты/Цель/Тип —
+  // those are up top). Источник is inherited from the заявка, labelled as such.
+  function dealParamsExtra(d) {
     const co = (D().companies || []).find((x) => x.id === d.companyId);
     const p = d.prov || {};
-    return dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
-      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+    return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
-      dealField('Источник', d.source, p.source, d.id + ':source') +
-      dealField('Тип сделки', d.dealType, p.dealType) +
-      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
-      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
+      dealField('Источник (из заявки)', d.source, p.source, d.id + ':source') +
       dealField('Компания', co ? co.name + ' · ' + co.kind : '—', 'confirmed') +
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
-  }
-  function dealFieldsBlock(d) {
-    return '<div class="section-label" style="margin-top:16px">Параметры сделки' +
-      '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button></div>' +
-      '<div class="dfields">' + dealFieldsRows(d) + '</div>';
   }
   function conflictBlock(d) {
     const cf = (D().conflicts || {})[d.id];
@@ -1368,8 +1361,9 @@
     if (d.stageDays >= 5) { doIt.push('Вернуться к сделке: позвонить, предложить следующий шаг'); why = 'застряла ' + d.stageDays + ' дн. в стадии'; }
     if (d.hot) { doIt.push('Ответить в течение 2 часов (SLA)'); why = why || 'горячий клиент'; }
     if (d.partnerAgent) doIt.push('Согласовать co-broking и сплит с партнёром');
-    if (d.stage === 'new') doIt.push('Подобрать 3 объекта и назначить показ');
-    if (!doIt.length) doIt.push('Двигать к следующей вехе воронки');
+    // Concrete operational step by stage — not a vague goal like «двигать к вехе».
+    doIt.push(({ new: 'Назначить показ объектов клиенту', work: 'Согласовать оффер и условия с клиентом',
+      docs: 'Подписать договор с клиентом', done: 'Запросить отзыв и рекомендации у клиента' })[d.stage] || 'Согласовать следующий шаг с клиентом');
     return { doIt: doIt, why: why };
   }
   function chIcon(ch) {
@@ -1518,24 +1512,10 @@
   }
   function contactFeedBlock(c, limit) { return entityFeedBlock('contact', c, limit); }
   function companyFeedBlock(co, limit) { return entityFeedBlock('company', co, limit); }
-  // ---- Cross-entity comms (Step 2): the whole conversation with a client in ONE ribbon — the
-  // client's request timelines + deal timelines + contact notes, each tagged with its origin, so a
-  // manager sees заявка ↔ сделки ↔ контакт without hunting between cards. A filter narrows the scope.
-  function clientCommsEntries(clientId) {
-    const data = D();
-    const c = (data.clients || []).find((x) => x.id === clientId) || {};
-    const out = [];
-    (data.requests || []).filter((r) => r.clientId === clientId).forEach((r) => {
-      ((data.requestTimeline || {})[r.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Заявка · ' + r.title, _origin: { type: 'request', id: r.id } })));
-    });
-    (data.deals || []).filter((d) => d.clientId === clientId).forEach((d) => {
-      const lbl = dealFeedLabel(d, c);
-      ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка · ' + lbl, _origin: { type: 'deal', id: d.id } })));
-    });
-    ((data.contactTimeline || {})[clientId] || []).forEach((e) => out.push(Object.assign({}, e, { src: e.src || 'Контакт', _origin: { type: 'contact', id: clientId } })));
-    return feedSortDesc(out.map((e, i) => ({ e: e, i: i }))).map((p) => p.e);
-  }
-  function commsFilterVal() { return (WS.store && WS.store.commsFilter) || 'this'; }
+  // ---- Comms history. The request shows ONLY its own history (drill into a deal for the deal's own).
+  // A deal shows its full LINEAGE — this deal + the заявка it grew from + contact notes — but NOT
+  // sibling deals (merging two deals into one is noise). ----
+  function commsFilterVal() { return (WS.store && WS.store.commsFilter) || 'all'; }
   function commsFilterChips(chips) {
     const active = commsFilterVal();
     return '<div class="comms-filter">' + chips.map((ch) =>
@@ -1546,33 +1526,45 @@
       '<div style="font-size:12px;color:var(--faint);padding:8px 0">по выбранному фильтру событий нет</div>';
     return '<div class="timeline">' + rows + '</div>';
   }
-  // Request История: «Эта заявка» keeps the editable own-timeline; «Сделки заявки» / «Всё по клиенту»
-  // switch to the read-only shared ribbon with origin badges.
-  function requestHistoryTab(r) {
-    const filter = commsFilterVal();
-    const chips = commsFilterChips([['this', 'Эта заявка', 'mail'], ['related', 'Сделки заявки', 'briefcase'], ['all', 'Всё по клиенту', 'users']]);
-    let inner;
-    if (filter === 'this') { inner = requestTimelineInner(r); }
-    else if (filter === 'related') {
-      const dids = {}; dealsOfRequest(r.id).forEach((d) => { dids[d.id] = 1; });
-      inner = commsFeedRows(clientCommsEntries(r.clientId).filter((e) => e._origin.type === 'deal' && dids[e._origin.id]));
-    } else { inner = commsFeedRows(clientCommsEntries(r.clientId)); }
-    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="request" data-req="' + r.id + '">' + I('plus') + 'Событие</button>';
-    return dxSec('clock', 'История · переписка', addBtn, chips + inner) +
-      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Одна лента по клиенту: заявка ↔ сделки ↔ контакт. Новое сверху; фильтр сужает область.</div>';
+  function dealLineageEntries(d) {
+    const data = D();
+    const out = [];
+    ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка', _origin: { type: 'deal', id: d.id } })));
+    if (d.requestId) {
+      const r = requestById(d.requestId);
+      if (r) ((data.requestTimeline || {})[r.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Заявка · ' + r.title, _origin: { type: 'request', id: r.id } })));
+    }
+    ((data.contactTimeline || {})[d.clientId] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Контакт', _origin: { type: 'contact', id: d.clientId } })));
+    return feedSortDesc(out.map((e, i) => ({ e: e, i: i }))).map((p) => p.e);
   }
-  // Deal История: «Эта сделка» keeps the own-timeline (+ запись A7); «Заявка» / «Всё по клиенту» — shared ribbon.
+  // Request История — own timeline only.
+  function requestHistoryTab(r) {
+    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="request" data-req="' + r.id + '">' + I('plus') + 'Событие</button>';
+    return dxSec('clock', 'История коммуникаций', addBtn, requestTimelineInner(r));
+  }
+  // Deal История — full lineage by default; filter to just the сделка or just the заявка.
   function dealHistoryTab(d) {
     const filter = commsFilterVal();
-    const chips = commsFilterChips([['this', 'Эта сделка', 'briefcase'], ['related', 'Заявка', 'mail'], ['all', 'Всё по клиенту', 'users']]);
-    let inner;
-    if (filter === 'this') { inner = dealTimelineInner(d); }
-    else if (filter === 'related') {
-      const r = d.requestId ? requestById(d.requestId) : null;
-      inner = commsFeedRows(r ? clientCommsEntries(d.clientId).filter((e) => e._origin.type === 'request' && e._origin.id === r.id) : []);
-    } else { inner = commsFeedRows(clientCommsEntries(d.clientId)); }
+    const chips = commsFilterChips([['all', 'Вся история', 'clock'], ['deal', 'Сделка', 'briefcase'], ['request', 'Заявка', 'mail']]);
     const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="deal" data-deal="' + d.id + '">' + I('plus') + 'Событие</button>';
-    return dxSec('clock', 'История · переписка', addBtn, chips + inner);
+    let inner;
+    if (filter === 'deal') inner = dealTimelineInner(d);
+    else if (filter === 'request') inner = commsFeedRows(dealLineageEntries(d).filter((e) => e._origin.type === 'request'));
+    else inner = commsFeedRows(dealLineageEntries(d));
+    return dxSec('clock', 'История коммуникаций', addBtn, chips + inner);
+  }
+  // Re-render only the active tab body (no full-page emit) so the filter click doesn't jump to top.
+  // Resolve the spec from the active tab in the clicked element's scope (page vs modal), not the
+  // global WS._card — which can be stale after a modal closes (mirrors setEntityTab).
+  function refreshCommsTab(srcEl) {
+    const scope = srcEl ? (srcEl.closest('#modal') || document.getElementById('main') || document) : (document.getElementById('main') || document);
+    const el = scope.querySelector('.dx-tabbody'); if (!el) return;
+    const onTab = scope.querySelector('.dx-tab.on') || scope.querySelector('.dx-tab');
+    const etab = onTab && onTab.getAttribute('data-etab'); if (!etab) return;
+    const p = etab.split('~');
+    const spec = (WS._cardByType && WS._cardByType[p[0]]) || WS._card;
+    if (!spec || spec.type !== p[0] || String(spec.id) !== String(p[1])) return;
+    el.innerHTML = spec.render(p[2]);
   }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
   const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
@@ -1737,11 +1729,6 @@
   function dfPair(k, v) { return '<div class="dfield"><div class="dk">' + k + '</div><div class="dv">' + (v || '—') + '</div></div>'; }
   // Tab content — every tab wrapped in the same dx-sec card treatment for consistent hierarchy.
   function dealTabContent(d, tab) {
-    if (tab === 'params') {
-      const req = dealRequestBlock(d);
-      return (req ? req + '<div style="height:14px"></div>' : '') +
-        dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealFieldsRows(d) + '</div>');
-    }
     if (tab === 'contacts') {
       const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
       const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">Рейтинг A/B/C — влияние контакта на решение. Основной помечен звездой.</div>';
@@ -1759,12 +1746,15 @@
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    // overview — hero, stepper, status, key params, contacts and objects now live in the header;
-    // overview carries the deeper detail: data conflicts and the partner-handoff package.
+    // params (default) — deal-specific structural fields (key terms are already up in «Ключевое»),
+    // the parent заявка, plus data conflicts / partner handoff (was the near-empty «Обзор» tab).
+    const req = dealRequestBlock(d);
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    const body = (cf || '') + (ho ? (cf ? '<div style="margin-top:14px">' + ho + '</div>' : ho) : '');
-    return body || '<div style="font-size:12.5px;color:var(--mut);padding:10px 2px;line-height:1.5">Ключевое, контакты, объекты и текущий статус — в шапке карточки выше. Здесь появляются расхождения в данных и пакет передачи партнёру, когда они есть.</div>';
+    return (req ? req + '<div style="height:14px"></div>' : '') +
+      dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealParamsExtra(d) + '</div>') +
+      (cf ? '<div style="height:14px"></div>' + cf : '') +
+      (ho ? '<div style="height:14px"></div>' + ho : '');
   }
   // Hero sections reuse the object-hero family (variant B: photo backdrop + dark scrim) at the top of
   // entity cards — client (name overlaid), deal (linked object), КП (flagship object).
@@ -1934,7 +1924,8 @@
       dealChipRow(d) +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
       '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
-      '<div class="deal-top-cell">' + dealClientCard(d) + dealLotsBlock(d) + dealRecentCard(d) + '</div></div>';
+      '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
+      dealLotsBlock(d);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -1955,7 +1946,7 @@
     return {
       type: 'deal', id: id, title: d.title,
       status: dealHeader(d),
-      tabs: [['overview', 'Обзор'], ['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),
       pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
@@ -2071,12 +2062,15 @@
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length && deals.every((d) => d.stage === 'done')) return 'постпродажное сопровождение клиента';
-    if (deals.length) return 'довести сделку до подписания';
-    if (r.kp && r.kp.formed) return 'создать сделку из выбранного';
-    if (sel) return 'собрать КП из выбранного (' + sel + ')';
-    if (off.length) return 'уточнить решение клиента по подборке';
-    return 'подобрать объекты под запрос';
+    if (deals.length) {
+      if (deals.every((d) => d.stage === 'done')) return 'Запросить отзыв и рекомендации у клиента';
+      const fd = deals.slice().sort((a, b) => dealStageIdx(b) - dealStageIdx(a))[0];
+      return nbaActions(fd).doIt[0]; // mirror the deal's concrete operational step
+    }
+    if (r.kp && r.kp.formed) return 'Создать сделку из выбранного';
+    if (sel) return 'Собрать КП из выбранного (' + sel + ')';
+    if (off.length) return 'Уточнить решение клиента по подборке';
+    return 'Подобрать объекты под запрос';
   }
   // Facing LEFT — key request conditions (mirror the deal's «Ключевое»).
   function reqKeyCard(r) {
@@ -5035,5 +5029,5 @@
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab };
 })(window.WS = window.WS || {});

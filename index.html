@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 22:46</title>
+  <title>WESPACE · сборка 23:33</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='22:46';
+    window.WS_BUILD='23:33';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1629,7 +1629,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
 .deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
 /* Two facing cards under the hero: client contacts ↔ key params. */
-.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
+.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: start; }
 .deal-top-cell { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .deal-top-cell > .dx-sec { min-width: 0; margin: 0; display: flex; flex-direction: column; }
 /* the shorter column's last card fills to the taller column's height → bottom borders align, no gray page gap */
@@ -2374,12 +2374,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '14 мая · 09:05', ord: 140905, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Голосовое: ищу инвест-квартиру до 2 млн, Business Bay.', capture: true },
       { at: '14 мая · 09:12', ord: 140912, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Извлечены параметры заявки, создана сделка (уверенность 0,86).' },
       { at: '14 мая · 09:20', ord: 140920, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Просила график первого платежа — приоритет доходность.' },
+      { at: '14 мая · 09:25', ord: 140925, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Назначить показ Creekline 1208 на сегодня 16:00, подтвердить с клиентом.' },
+      { at: '14 мая · 09:30', ord: 140930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Показ добавлен в календарь на 16:00; клиент подтвердил в WhatsApp.' },
     ],
     d_igor: [
       { at: '10 мая · 11:00', ord: 101100, ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 4:12 — обсудили перепродажу Bayline.', capture: true },
       { at: '12 мая', ord: 120000, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Обещано КП 12 мая — не отправлено. Касание просрочено.' },
     ],
     d_viktor: [
+      { at: '10 мая · 10:30', ord: 101030, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча в офисе Emaar — подписан лист бронирования Bayline Terraces.', capture: true },
+      { at: '11 мая · 14:00', ord: 111400, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Направлен MOU (договор о намерениях) на согласование клиенту.' },
+      { at: '12 мая · 11:20', ord: 121120, ch: 'call', kind: 'raw', by: 'Клиент', text: 'Звонок 4:30 — MOU согласован, подаёмся на ипотеку в Emirates NBD.', capture: true },
+      { at: '13 мая · 09:45', ord: 130945, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Банк запросил подтверждение дохода — поставлена задача агенту собрать пакет.' },
       { at: '13 мая · 15:30', ord: 131530, ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлен черновик договора бронирования.', capture: true },
       { at: '13 мая · 16:10', ord: 131610, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Ждём подтверждение ипотеки от банка.' },
     ],
@@ -2468,6 +2474,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '04 мая · 10:05', ord: 41005, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт создан из заявки на Property Finder.' },
       { at: '06 мая · 14:50', ord: 61450, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Звонок 7:20 — ипотека, нужно предодобрение банка.', capture: true },
       { at: '09 мая · 16:30', ord: 91630, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча — подписан лист бронирования по Bayline Terraces.' },
+      { at: '11 мая · 15:00', ord: 111500, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Предпочитает email; звонки после 18:00. По-русски, документы — на английском.' },
     ],
     c_partner: [
       { at: '12 мая · 10:30', ord: 121030, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт пришёл из клубного канала.' },
@@ -2542,11 +2549,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '06 мая · 10:12', ord: 60012, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Входящее: ищу инвест-квартиру до 2 млн, Business Bay или Creek Harbour.', capture: true },
       { at: '06 мая · 11:40', ord: 61140, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Созвон 8:20 — уточнила срок 1–3 мес, приоритет доходность под аренду.', capture: true },
       { at: '07 мая · 09:15', ord: 70915, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Подобрала 3 объекта (Creekline, Palm Court, Bayline) — отправлю на выбор.' },
+      { at: '07 мая · 16:20', ord: 71620, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлено 3 объекта на выбор с расчётом доходности и графиком платежей.' },
       { at: '08 мая · 12:30', ord: 81230, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Понравился Creekline 1208; JVC не подходит — далеко от центра.', capture: true },
+      { at: '08 мая · 13:10', ord: 81310, ch: 'whatsapp', kind: 'raw', by: 'Марина Волкова', text: 'Готова показать Creekline вживую — предложила слот на сегодня 16:00.' },
     ],
     r_viktor: [
       { at: '04 мая · 14:05', ord: 41405, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Реферал: интересует квартира Bayline и портфель офисов в DIFC.', capture: true },
       { at: '05 мая · 12:30', ord: 51230, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча в офисе — согласовали 1BR + офисный портфель, 100% оплата.', capture: true },
+      { at: '05 мая · 15:40', ord: 51540, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Собран портфель DIFC (2 лота) + бронирование Bayline — предложено вести двумя сделками.' },
+      { at: '06 мая · 10:20', ord: 61020, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлено КП: доходность по Bayline и портфелю DIFC, комиссии и условия.' },
+      { at: '07 мая · 12:15', ord: 71215, ch: 'call', kind: 'raw', by: 'Клиент', text: 'Звонок 5:40 — подтвердил Bayline, по портфелю DIFC берёт паузу на неделю.', capture: true },
+      { at: '08 мая · 09:30', ord: 80930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Банк запросил подтверждение дохода по ипотеке — собрать пакет к четвергу.' },
     ],
   };
 
@@ -5929,24 +5942,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const confirm = provSt === 'ai' && confirmId ? '<button class="mini-confirm" data-dfconfirm="' + confirmId + '" title="Подтвердить значение">' + I('check') + '</button>' : '';
     return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
   }
-  function dealFieldsRows(d) {
+  // Params tab shows only what the header «Ключевое» doesn't (no Бюджет/Форма оплаты/Цель/Тип —
+  // those are up top). Источник is inherited from the заявка, labelled as such.
+  function dealParamsExtra(d) {
     const co = (D().companies || []).find((x) => x.id === d.companyId);
     const p = d.prov || {};
-    return dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
-      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+    return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
-      dealField('Источник', d.source, p.source, d.id + ':source') +
-      dealField('Тип сделки', d.dealType, p.dealType) +
-      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
-      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
+      dealField('Источник (из заявки)', d.source, p.source, d.id + ':source') +
       dealField('Компания', co ? co.name + ' · ' + co.kind : '—', 'confirmed') +
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
-  }
-  function dealFieldsBlock(d) {
-    return '<div class="section-label" style="margin-top:16px">Параметры сделки' +
-      '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button></div>' +
-      '<div class="dfields">' + dealFieldsRows(d) + '</div>';
   }
   function conflictBlock(d) {
     const cf = (D().conflicts || {})[d.id];
@@ -5972,8 +5978,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.stageDays >= 5) { doIt.push('Вернуться к сделке: позвонить, предложить следующий шаг'); why = 'застряла ' + d.stageDays + ' дн. в стадии'; }
     if (d.hot) { doIt.push('Ответить в течение 2 часов (SLA)'); why = why || 'горячий клиент'; }
     if (d.partnerAgent) doIt.push('Согласовать co-broking и сплит с партнёром');
-    if (d.stage === 'new') doIt.push('Подобрать 3 объекта и назначить показ');
-    if (!doIt.length) doIt.push('Двигать к следующей вехе воронки');
+    // Concrete operational step by stage — not a vague goal like «двигать к вехе».
+    doIt.push(({ new: 'Назначить показ объектов клиенту', work: 'Согласовать оффер и условия с клиентом',
+      docs: 'Подписать договор с клиентом', done: 'Запросить отзыв и рекомендации у клиента' })[d.stage] || 'Согласовать следующий шаг с клиентом');
     return { doIt: doIt, why: why };
   }
   function chIcon(ch) {
@@ -6122,24 +6129,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function contactFeedBlock(c, limit) { return entityFeedBlock('contact', c, limit); }
   function companyFeedBlock(co, limit) { return entityFeedBlock('company', co, limit); }
-  // ---- Cross-entity comms (Step 2): the whole conversation with a client in ONE ribbon — the
-  // client's request timelines + deal timelines + contact notes, each tagged with its origin, so a
-  // manager sees заявка ↔ сделки ↔ контакт without hunting between cards. A filter narrows the scope.
-  function clientCommsEntries(clientId) {
-    const data = D();
-    const c = (data.clients || []).find((x) => x.id === clientId) || {};
-    const out = [];
-    (data.requests || []).filter((r) => r.clientId === clientId).forEach((r) => {
-      ((data.requestTimeline || {})[r.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Заявка · ' + r.title, _origin: { type: 'request', id: r.id } })));
-    });
-    (data.deals || []).filter((d) => d.clientId === clientId).forEach((d) => {
-      const lbl = dealFeedLabel(d, c);
-      ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка · ' + lbl, _origin: { type: 'deal', id: d.id } })));
-    });
-    ((data.contactTimeline || {})[clientId] || []).forEach((e) => out.push(Object.assign({}, e, { src: e.src || 'Контакт', _origin: { type: 'contact', id: clientId } })));
-    return feedSortDesc(out.map((e, i) => ({ e: e, i: i }))).map((p) => p.e);
-  }
-  function commsFilterVal() { return (WS.store && WS.store.commsFilter) || 'this'; }
+  // ---- Comms history. The request shows ONLY its own history (drill into a deal for the deal's own).
+  // A deal shows its full LINEAGE — this deal + the заявка it grew from + contact notes — but NOT
+  // sibling deals (merging two deals into one is noise). ----
+  function commsFilterVal() { return (WS.store && WS.store.commsFilter) || 'all'; }
   function commsFilterChips(chips) {
     const active = commsFilterVal();
     return '<div class="comms-filter">' + chips.map((ch) =>
@@ -6150,33 +6143,45 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div style="font-size:12px;color:var(--faint);padding:8px 0">по выбранному фильтру событий нет</div>';
     return '<div class="timeline">' + rows + '</div>';
   }
-  // Request История: «Эта заявка» keeps the editable own-timeline; «Сделки заявки» / «Всё по клиенту»
-  // switch to the read-only shared ribbon with origin badges.
-  function requestHistoryTab(r) {
-    const filter = commsFilterVal();
-    const chips = commsFilterChips([['this', 'Эта заявка', 'mail'], ['related', 'Сделки заявки', 'briefcase'], ['all', 'Всё по клиенту', 'users']]);
-    let inner;
-    if (filter === 'this') { inner = requestTimelineInner(r); }
-    else if (filter === 'related') {
-      const dids = {}; dealsOfRequest(r.id).forEach((d) => { dids[d.id] = 1; });
-      inner = commsFeedRows(clientCommsEntries(r.clientId).filter((e) => e._origin.type === 'deal' && dids[e._origin.id]));
-    } else { inner = commsFeedRows(clientCommsEntries(r.clientId)); }
-    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="request" data-req="' + r.id + '">' + I('plus') + 'Событие</button>';
-    return dxSec('clock', 'История · переписка', addBtn, chips + inner) +
-      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Одна лента по клиенту: заявка ↔ сделки ↔ контакт. Новое сверху; фильтр сужает область.</div>';
+  function dealLineageEntries(d) {
+    const data = D();
+    const out = [];
+    ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка', _origin: { type: 'deal', id: d.id } })));
+    if (d.requestId) {
+      const r = requestById(d.requestId);
+      if (r) ((data.requestTimeline || {})[r.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Заявка · ' + r.title, _origin: { type: 'request', id: r.id } })));
+    }
+    ((data.contactTimeline || {})[d.clientId] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Контакт', _origin: { type: 'contact', id: d.clientId } })));
+    return feedSortDesc(out.map((e, i) => ({ e: e, i: i }))).map((p) => p.e);
   }
-  // Deal История: «Эта сделка» keeps the own-timeline (+ запись A7); «Заявка» / «Всё по клиенту» — shared ribbon.
+  // Request История — own timeline only.
+  function requestHistoryTab(r) {
+    const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="request" data-req="' + r.id + '">' + I('plus') + 'Событие</button>';
+    return dxSec('clock', 'История коммуникаций', addBtn, requestTimelineInner(r));
+  }
+  // Deal История — full lineage by default; filter to just the сделка or just the заявка.
   function dealHistoryTab(d) {
     const filter = commsFilterVal();
-    const chips = commsFilterChips([['this', 'Эта сделка', 'briefcase'], ['related', 'Заявка', 'mail'], ['all', 'Всё по клиенту', 'users']]);
-    let inner;
-    if (filter === 'this') { inner = dealTimelineInner(d); }
-    else if (filter === 'related') {
-      const r = d.requestId ? requestById(d.requestId) : null;
-      inner = commsFeedRows(r ? clientCommsEntries(d.clientId).filter((e) => e._origin.type === 'request' && e._origin.id === r.id) : []);
-    } else { inner = commsFeedRows(clientCommsEntries(d.clientId)); }
+    const chips = commsFilterChips([['all', 'Вся история', 'clock'], ['deal', 'Сделка', 'briefcase'], ['request', 'Заявка', 'mail']]);
     const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="deal" data-deal="' + d.id + '">' + I('plus') + 'Событие</button>';
-    return dxSec('clock', 'История · переписка', addBtn, chips + inner);
+    let inner;
+    if (filter === 'deal') inner = dealTimelineInner(d);
+    else if (filter === 'request') inner = commsFeedRows(dealLineageEntries(d).filter((e) => e._origin.type === 'request'));
+    else inner = commsFeedRows(dealLineageEntries(d));
+    return dxSec('clock', 'История коммуникаций', addBtn, chips + inner);
+  }
+  // Re-render only the active tab body (no full-page emit) so the filter click doesn't jump to top.
+  // Resolve the spec from the active tab in the clicked element's scope (page vs modal), not the
+  // global WS._card — which can be stale after a modal closes (mirrors setEntityTab).
+  function refreshCommsTab(srcEl) {
+    const scope = srcEl ? (srcEl.closest('#modal') || document.getElementById('main') || document) : (document.getElementById('main') || document);
+    const el = scope.querySelector('.dx-tabbody'); if (!el) return;
+    const onTab = scope.querySelector('.dx-tab.on') || scope.querySelector('.dx-tab');
+    const etab = onTab && onTab.getAttribute('data-etab'); if (!etab) return;
+    const p = etab.split('~');
+    const spec = (WS._cardByType && WS._cardByType[p[0]]) || WS._card;
+    if (!spec || spec.type !== p[0] || String(spec.id) !== String(p[1])) return;
+    el.innerHTML = spec.render(p[2]);
   }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
   const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
@@ -6341,11 +6346,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dfPair(k, v) { return '<div class="dfield"><div class="dk">' + k + '</div><div class="dv">' + (v || '—') + '</div></div>'; }
   // Tab content — every tab wrapped in the same dx-sec card treatment for consistent hierarchy.
   function dealTabContent(d, tab) {
-    if (tab === 'params') {
-      const req = dealRequestBlock(d);
-      return (req ? req + '<div style="height:14px"></div>' : '') +
-        dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealFieldsRows(d) + '</div>');
-    }
     if (tab === 'contacts') {
       const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
       const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">Рейтинг A/B/C — влияние контакта на решение. Основной помечен звездой.</div>';
@@ -6363,12 +6363,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    // overview — hero, stepper, status, key params, contacts and objects now live in the header;
-    // overview carries the deeper detail: data conflicts and the partner-handoff package.
+    // params (default) — deal-specific structural fields (key terms are already up in «Ключевое»),
+    // the parent заявка, plus data conflicts / partner handoff (was the near-empty «Обзор» tab).
+    const req = dealRequestBlock(d);
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    const body = (cf || '') + (ho ? (cf ? '<div style="margin-top:14px">' + ho + '</div>' : ho) : '');
-    return body || '<div style="font-size:12.5px;color:var(--mut);padding:10px 2px;line-height:1.5">Ключевое, контакты, объекты и текущий статус — в шапке карточки выше. Здесь появляются расхождения в данных и пакет передачи партнёру, когда они есть.</div>';
+    return (req ? req + '<div style="height:14px"></div>' : '') +
+      dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealParamsExtra(d) + '</div>') +
+      (cf ? '<div style="height:14px"></div>' + cf : '') +
+      (ho ? '<div style="height:14px"></div>' + ho : '');
   }
   // Hero sections reuse the object-hero family (variant B: photo backdrop + dark scrim) at the top of
   // entity cards — client (name overlaid), deal (linked object), КП (flagship object).
@@ -6538,7 +6541,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dealChipRow(d) +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
       '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
-      '<div class="deal-top-cell">' + dealClientCard(d) + dealLotsBlock(d) + dealRecentCard(d) + '</div></div>';
+      '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
+      dealLotsBlock(d);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -6559,7 +6563,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return {
       type: 'deal', id: id, title: d.title,
       status: dealHeader(d),
-      tabs: [['overview', 'Обзор'], ['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),
       pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
@@ -6675,12 +6679,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length && deals.every((d) => d.stage === 'done')) return 'постпродажное сопровождение клиента';
-    if (deals.length) return 'довести сделку до подписания';
-    if (r.kp && r.kp.formed) return 'создать сделку из выбранного';
-    if (sel) return 'собрать КП из выбранного (' + sel + ')';
-    if (off.length) return 'уточнить решение клиента по подборке';
-    return 'подобрать объекты под запрос';
+    if (deals.length) {
+      if (deals.every((d) => d.stage === 'done')) return 'Запросить отзыв и рекомендации у клиента';
+      const fd = deals.slice().sort((a, b) => dealStageIdx(b) - dealStageIdx(a))[0];
+      return nbaActions(fd).doIt[0]; // mirror the deal's concrete operational step
+    }
+    if (r.kp && r.kp.formed) return 'Создать сделку из выбранного';
+    if (sel) return 'Собрать КП из выбранного (' + sel + ')';
+    if (off.length) return 'Уточнить решение клиента по подборке';
+    return 'Подобрать объекты под запрос';
   }
   // Facing LEFT — key request conditions (mirror the deal's «Ключевое»).
   function reqKeyCard(r) {
@@ -9639,7 +9646,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab };
 })(window.WS = window.WS || {});
 
 </script>
@@ -10015,7 +10022,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.taskpreset) { const m = { open: ['open', 'all'], today: ['open', 'today'], overdue: ['open', 'overdue'], done: ['done', 'all'], all: ['all', 'all'] }[d.taskpreset]; if (m) { store.tasksStatus = m[0]; store.tasksDue = m[1]; } return api.emit(); }
     if (d.tasksdue) { store.tasksDue = d.tasksdue; return api.emit(); }
     if (d.tasksstatus) { store.tasksStatus = d.tasksstatus; return api.emit(); }
-    if (d.commsfilter) { store.commsFilter = d.commsfilter; return api.emit(); }
+    if (d.commsfilter) { store.commsFilter = d.commsfilter; return WS.ui.refreshCommsTab(t); }
     if (d.netchat) { store.netChat = d.netchat; return api.emit(); }
     if (d.netsel) { store.netSel = d.netsel; return api.emit(); }
     if (d.nettype) { store.netType = d.nettype; return api.emit(); }
