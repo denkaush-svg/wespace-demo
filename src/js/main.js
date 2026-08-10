@@ -220,6 +220,7 @@
       case 'editRequest': WS.ui.openRequestEdit(t.dataset.req); break;
       case 'saveRequest': WS.ui.saveRequestEdit(t.dataset.req); break;
       case 'openReqKp': WS.ui.openReqKp(t.dataset.req); break;
+      case 'openDealKp': WS.ui.openDealKp(t.dataset.deal); break;
       case 'callAi': WS.eventEngine.callAi(); break;
       case 'failHuman': WS.eventEngine.failResolve('human'); break;
       case 'failPick': WS.eventEngine.failResolve(t.dataset.deal); break;

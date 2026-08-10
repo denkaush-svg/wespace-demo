@@ -1584,3 +1584,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .kp-doc-terms { margin-top: 14px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; color: var(--mut); line-height: 1.6; }
 .kp-doc-terms-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--faint); margin-bottom: 5px; }
 .kp-doc-terms b { color: var(--ink); font-weight: 650; }
+.kp-doc-note { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: var(--mut); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+.kp-doc-note svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--acc-ink); margin-top: 1px; }
+/* Document pipeline КП → MOU → SPA → DLD */
+.docchain-row { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+.docchain-row:last-child { border-bottom: 0; }
+.docchain-ic { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); color: var(--faint); }
+.docchain-ic svg { width: 15px; height: 15px; }
+.docchain-row.active .docchain-ic, .docchain-row.done .docchain-ic { background: var(--acc-soft); color: var(--acc-ink); }
+.docchain-b { flex: 1 1 auto; min-width: 0; }
+.docchain-k { font-weight: 700; font-size: 13px; color: var(--ink); }
+.docchain-row.wait .docchain-k { color: var(--mut); }
+.docchain-s { font-size: 11.5px; color: var(--mut); margin-top: 1px; }
+.docchain-row .badge { margin-left: auto; flex: 0 0 auto; }

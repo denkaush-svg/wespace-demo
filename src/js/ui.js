@@ -1748,7 +1748,10 @@
       return dxSec('users', 'Контакты сделки · ' + dealContacts(d).length, addBtn, dealContactsInner(d) + hint);
     }
     if (tab === 'docs') {
-      return dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
+      const kpN = dealKpObjects(d).length;
+      const kpBtn = kpN ? '<button class="btn xs" data-act="openDealKp" data-deal="' + d.id + '">' + I('doc') + 'КП сделки · ' + kpN + '</button>' : '';
+      return docChainBlock(dealStageIdx(d), kpN > 0, kpBtn) + '<div style="height:14px"></div>' +
+        dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
     }
     if (tab === 'history') return dealHistoryTab(d);
     if (tab === 'tasks') {
@@ -2216,7 +2219,10 @@
       return dxSec('check', 'Задачи по заявке · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
     if (tab === 'history') return requestHistoryTab(r);
-    return reqKpBlock(r); // docs — КП и документы заявки (объекты, профиль, сделки — в основной части)
+    // docs — КП + документооборот КП→MOU→SPA→DLD (объекты, профиль, сделки — в основной части)
+    const rDeals = dealsOfRequest(r.id);
+    const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(dealStageIdx)) : -1;
+    return reqKpBlock(r) + '<div style="height:14px"></div>' + docChainBlock(sidx, !!(r.kp && r.kp.formed), '');
   }
   function requestSpec(id) {
     const r = requestById(id); if (!r) return null;
@@ -2313,11 +2319,16 @@
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     const amount = objs.reduce((s, o) => s + (o.price || 0), 0);
     const nid = 'd_' + r.id.replace(/^r_/, '') + '_' + ((D().deals || []).length + 1);
+    // Immutable snapshot of the КП the deal was created from — objects AND terms frozen at creation,
+    // so later edits to the request or the deal never rewrite this historical document. The request
+    // keeps its live r.kp (can be re-formed).
+    const kpSnapshot = { objectIds: sel.slice(), at: 'сегодня', version: 1,
+      terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
     D().deals.push({ id: nid, clientId: r.clientId, companyId: null,
       title: (c.name || 'Клиент') + ' · ' + (objs[0] ? objs[0].name.split(',')[0] : 'сделка'),
       funnel: 'sale_offplan', stage: 'new', stageDays: 0, amount: amount, hot: false,
-      goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source, objectType: r.objectType, vat: r.vat,
-      requestId: r.id, lots: sel, objectId: sel[0], consideredProjects: objs.map((o) => o.name), prov: {} });
+      goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source, objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
+      requestId: r.id, lots: sel, objectId: sel[0], consideredProjects: objs.map((o) => o.name), kpSnapshot: kpSnapshot, prov: {} });
     D().dealTimeline = D().dealTimeline || {};
     D().dealTimeline[nid] = [{ ch: 'crm', by: 'Система', at: 'только что', ord: 999, text: 'Сделка создана из заявки «' + r.title + '» · подписан документ о намерениях · лотов: ' + sel.length }];
     WS.storeApi.save(); WS.storeApi.toast('Сделка создана из заявки · лотов: ' + sel.length, 'ok'); dealCard(nid);
@@ -2356,32 +2367,78 @@
     WS.storeApi.save(); closeModal(); WS.storeApi.toast('Ключевые условия обновлены', 'ok'); WS.storeApi.emit();
   }
   // КП as a client-facing document — objects with cost + net yield + commission, then the terms.
-  function openReqKp(id) {
-    const r = requestById(id); if (!r) return;
-    const ids = (r.kp && r.kp.objectIds && r.kp.objectIds.length) ? r.kp.objectIds : (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
-    const objs = ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
-    if (!objs.length) { WS.storeApi.toast('Отметьте выбранные объекты — из них соберётся КП'); return; }
-    const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const body = objs.map((o) => {
+  // Shared by the live request КП and the deal's frozen snapshot.
+  function kpDocBody(cliName, subtitle, objs, terms, note) {
+    const rows = objs.map((o) => {
       const ny = reqKpNetYield(o);
       return '<tr><td>' + o.name + '</td><td>' + o.area + '</td><td class="num">' + WS.AED(o.price) + '</td>' +
         '<td class="num">' + (ny != null ? (ny * 100).toFixed(1) + '%' : '—') + '</td>' +
         '<td class="num">' + (o.commissionPct ? o.commissionPct + '%' : '—') + '</td></tr>';
     }).join('');
     const total = objs.reduce((s, o) => s + (o.price || 0), 0);
-    const doc = '<div class="kp-doc">' +
+    return '<div class="kp-doc">' +
       '<div class="kp-doc-head"><div><div class="kp-doc-to">Коммерческое предложение</div>' +
-      '<div class="kp-doc-cli">' + (c.name || 'Клиент') + ' · ' + r.title + '</div></div>' +
+      '<div class="kp-doc-cli">' + cliName + ' · ' + subtitle + '</div></div>' +
       '<span class="badge demo">' + I('lock') + 'DEMO</span></div>' +
+      (note ? '<div class="kp-doc-note">' + I('lock') + note + '</div>' : '') +
       '<div class="kp-tblwrap"><table class="kp-tbl"><thead><tr><th>Объект</th><th>Район</th><th class="num">Стоимость</th><th class="num">Доходность</th><th class="num">Комиссия</th></tr></thead>' +
-      '<tbody>' + body + '</tbody>' +
+      '<tbody>' + rows + '</tbody>' +
       '<tfoot><tr><td colspan="2">Итого · ' + objs.length + ' об.</td><td class="num">' + WS.AED(total) + '</td><td class="num">—</td><td class="num">—</td></tr></tfoot></table></div>' +
       '<div class="kp-doc-terms"><div class="kp-doc-terms-h">Условия</div>' +
-      '<div>Форма оплаты: <b>' + (r.paymentForm || '—') + '</b> · НДС: <b>' + (r.vat ? '5%' : 'не облагается') + '</b> · Срок: <b>' + (r.horizon || '—') + '</b></div>' +
-      (r.funding ? '<div>Финансирование: <b>' + r.funding + '</b></div>' : '') + '</div></div>';
-    openModal('КП · ' + r.title, doc,
+      '<div>Форма оплаты: <b>' + (terms.paymentForm || '—') + '</b> · НДС: <b>' + (terms.vat ? '5%' : 'не облагается') + '</b> · Срок: <b>' + (terms.horizon || '—') + '</b></div>' +
+      (terms.funding ? '<div>Финансирование: <b>' + terms.funding + '</b></div>' : '') + '</div></div>';
+  }
+  function openReqKp(id) {
+    const r = requestById(id); if (!r) return;
+    const ids = (r.kp && r.kp.objectIds && r.kp.objectIds.length) ? r.kp.objectIds : (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    const objs = ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    if (!objs.length) { WS.storeApi.toast('Отметьте выбранные объекты — из них соберётся КП'); return; }
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    openModal('КП · ' + r.title, kpDocBody(c.name || 'Клиент', r.title, objs, r, null),
       '<button class="btn" data-act="closeModal">Закрыть</button>' +
       '<button class="btn primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button>');
+  }
+  // The КП objects a deal carries — its own frozen snapshot, else (pre-baked demo deals) its request's КП.
+  function dealKpObjects(d) {
+    const ids = (d.kpSnapshot && d.kpSnapshot.objectIds) ||
+      (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.objectIds : null) || [];
+    return ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+  }
+  function openDealKp(id) {
+    const d = D().deals.find((x) => x.id === id); if (!d) return;
+    const objs = dealKpObjects(d);
+    if (!objs.length) { WS.storeApi.toast('У сделки нет зафиксированного КП'); return; }
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const at = (d.kpSnapshot && d.kpSnapshot.at) || (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.at : 'при создании сделки');
+    // Terms frozen in the snapshot; pre-baked demo deals (no snapshot) fall back to their live fields.
+    const terms = (d.kpSnapshot && d.kpSnapshot.terms) || d;
+    openModal('КП сделки · ' + d.title,
+      kpDocBody(c.name || 'Клиент', 'КП сделки · зафиксировано ' + at, objs, terms,
+        'Снимок КП на момент создания сделки — неизменяемый. Живое КП правится в заявке.'),
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+  // Document pipeline of a deal: КП → MOU → SPA → DLD, statuses derived from the deal stage.
+  function dealStageIdx(d) { const m = { new: 0, work: 1, docs: 2, done: 3 }; return (d && m[d.stage] != null) ? m[d.stage] : 0; }
+  function docChainStatuses(sidx, hasKp) {
+    const defs = [['КП', 'Коммерческое предложение', 'Собрано'], ['MOU', 'Договор о намерениях', 'Подписан'],
+      ['SPA', 'Договор купли-продажи', 'Подписан'], ['DLD', 'Регистрация в Земельном департаменте', 'Зарегистрирован']];
+    return defs.map((def, i) => {
+      let state;
+      if (i === 0) state = hasKp ? 'done' : (sidx >= 0 ? 'active' : 'wait');
+      else if (i === 3) state = sidx >= 3 ? 'done' : 'wait';
+      else state = sidx > i ? 'done' : (sidx >= i ? 'active' : 'wait');
+      return { k: def[0], s: def[1],
+        label: state === 'done' ? def[2] : (state === 'active' ? 'В работе' : 'Ожидает'),
+        tone: state === 'done' ? 'ok' : (state === 'active' ? 'acc' : ''),
+        icon: state === 'done' ? 'check' : (state === 'active' ? 'clock' : 'dot'), state: state };
+    });
+  }
+  function docChainBlock(sidx, hasKp, right) {
+    const rows = docChainStatuses(sidx, hasKp).map((it) => '<div class="docchain-row ' + it.state + '">' +
+      '<span class="docchain-ic">' + I(it.icon) + '</span>' +
+      '<div class="docchain-b"><div class="docchain-k">' + it.k + '</div><div class="docchain-s">' + it.s + '</div></div>' +
+      '<span class="badge ' + it.tone + '">' + it.label + '</span></div>').join('');
+    return dxSec('doc', 'Документооборот · КП → MOU → SPA → DLD', right || '', '<div class="docchain">' + rows + '</div>');
   }
   // Which заявка a deal/object breadcrumbs back to. An object can be offered in several requests, so
   // first-match would send you to the wrong one — prefer the request we actually navigated in FROM
@@ -4978,5 +5035,5 @@
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, setObjOrigin };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin };
 })(window.WS = window.WS || {});
