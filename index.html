@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:33</title>
+  <title>WESPACE · сборка 23:48</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:33';
+    window.WS_BUILD='23:48';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2552,6 +2552,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '07 мая · 16:20', ord: 71620, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлено 3 объекта на выбор с расчётом доходности и графиком платежей.' },
       { at: '08 мая · 12:30', ord: 81230, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Понравился Creekline 1208; JVC не подходит — далеко от центра.', capture: true },
       { at: '08 мая · 13:10', ord: 81310, ch: 'whatsapp', kind: 'raw', by: 'Марина Волкова', text: 'Готова показать Creekline вживую — предложила слот на сегодня 16:00.' },
+      { at: '09 мая · 15:30', ord: 91530, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Провела показ Creekline 1208 — клиенту понравился вид на канал, забрал расчёт рассрочки на изучение.', capture: true },
+      { at: '11 мая · 12:10', ord: 111210, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Сравнил Creekline и Bayline — беру Creekline, пришлите точный график рассрочки 60/40.', capture: true },
+      { at: '13 мая · 17:45', ord: 131745, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Созвон 6:10 — подтвердили рассрочку 60/40, клиент готов бронировать на этой неделе.', capture: true },
     ],
     r_viktor: [
       { at: '04 мая · 14:05', ord: 41405, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Реферал: интересует квартира Bayline и портфель офисов в DIFC.', capture: true },
@@ -2560,6 +2563,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '06 мая · 10:20', ord: 61020, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлено КП: доходность по Bayline и портфелю DIFC, комиссии и условия.' },
       { at: '07 мая · 12:15', ord: 71215, ch: 'call', kind: 'raw', by: 'Клиент', text: 'Звонок 5:40 — подтвердил Bayline, по портфелю DIFC берёт паузу на неделю.', capture: true },
       { at: '08 мая · 09:30', ord: 80930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Банк запросил подтверждение дохода по ипотеке — собрать пакет к четвергу.' },
+      { at: '09 мая · 11:20', ord: 91120, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Прислал пакет по доходам к запросу банка — по бронированию Bayline.', capture: true },
+      { at: '10 мая · 16:05', ord: 101605, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Bayline перевела в сделку (бронь + MOU); по портфелю DIFC клиент пока думает — заявку держим открытой.' },
     ],
   };
 
@@ -2990,7 +2995,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 11; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp.
+  const SCHEMA = 12; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
