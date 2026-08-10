@@ -1025,6 +1025,157 @@ setTimeout(async () => {
   }
 
   // ============================================================
+  //  Voice. Both halves belong to the browser, so both are faked here — what
+  //  is being tested is the wiring: that dictation reaches the composer and
+  //  survives a re-render, and that a spoken answer is the answer's own.
+  // ============================================================
+  if (WS.voice) {
+    const V = WS.voice;
+
+    // ---- what a reply sounds like ----
+    check('voice · the model’s spoken form wins', V.spokenText({ speak: 'Коротко вслух.', text: 'Длинный текст.' }) === 'Коротко вслух.');
+    check('voice · without one, the prose is read', V.spokenText({ text: 'Четыре сделки в работе.' }) === 'Четыре сделки в работе.');
+    check('voice · a table is never read aloud, even one carrying a caption',
+      V.spokenText({ text: '', blocks: [
+        { t: 'table', text: 'Сравнение районов', head: ['a'], rows: [['b']] },
+        { t: 'bars', text: 'Доходность', rows: [{ label: 'Arjan', value: 8.1 }] },
+        { t: 'p', text: 'Суть.' },
+      ] }) === 'Суть.');
+    check('voice · nothing to say produces nothing', V.spokenText({}) === '' && V.spokenText(null) === '');
+    check('voice · a spoken form is clipped', V.spokenText({ speak: 'а'.repeat(900) }).length === 600);
+    if (WS.live) {
+      check('voice · the live head carries the spoken form', WS.live.toReply('текст', { say_aloud: '  вслух   так  ' }).speak === 'вслух так');
+      check('voice · and drops anything that is not a phrase', WS.live.normSay({ x: 1 }) === null);
+    }
+
+    // ---- dictation ----
+    function FakeRec() { this.calls = []; FakeRec.last = this; }
+    FakeRec.prototype.start = function () { this.started = true; };
+    FakeRec.prototype.stop = function () { this.stopped = true; if (this.onend) this.onend(); };
+    FakeRec.prototype.emit = function (text, isFinal) {
+      const res = [Object.assign([{ transcript: text }], { isFinal: !!isFinal })];
+      if (this.onresult) this.onresult({ resultIndex: 0, results: res });
+    };
+    win.SpeechRecognition = FakeRec;
+    check('voice · dictation is offered where the browser has it', V.canDictate() === true);
+
+    WS.router.go('concierge');
+    const micBtn = doc.querySelector('[data-act="voice"]');
+    const input = doc.getElementById('cgPrompt');
+    check('voice · the composer has a microphone and a field', !!micBtn && !!input);
+    if (micBtn && input) {
+      input.value = 'для Анны';
+      micBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('voice · a press starts listening', V.dictating() === true);
+      check('voice · and the button says so without a re-render', micBtn.classList.contains('rec'));
+
+      FakeRec.last.emit('подбери', false);
+      check('voice · a half-said phrase is already in the field', input.value.indexOf('подбери') >= 0);
+      FakeRec.last.emit('подбери две однушки', true);
+      check('voice · what was typed before is kept, not overwritten',
+        input.value.indexOf('для Анны') === 0 && input.value.indexOf('две однушки') > 0, input.value);
+
+      // The composer is rebuilt on almost any state change; the words must not
+      // fall on the floor when it is.
+      WS.storeApi.emit();
+      const fresh = doc.getElementById('cgPrompt');
+      check('voice · a re-render replaces the field', fresh !== input);
+      FakeRec.last.emit('подбери две однушки до двух миллионов', true);
+      check('voice · dictation follows it', (fresh.value || '').indexOf('двух миллионов') > 0, fresh.value);
+
+      const micNow = doc.querySelector('[data-act="voice"]');
+      micNow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('voice · a second press stops listening', V.dictating() === false);
+      check('voice · and the button stops saying it is', !micNow.classList.contains('rec'));
+
+      // A field that has gone for good stops the recogniser instead of typing
+      // into a node nobody can see.
+      micNow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      WS.router.go('clients');
+      FakeRec.last.emit('в пустоту', true);
+      check('voice · a field that is gone ends the dictation', V.dictating() === false);
+    }
+
+    delete win.SpeechRecognition;
+    check('voice · a browser without it says so rather than pretending', V.canDictate() === false);
+    WS.router.go('concierge');
+    const micGone = doc.querySelector('[data-act="voice"]');
+    if (micGone) {
+      micGone.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('voice · and pressing it is harmless', V.dictating() === false);
+    }
+
+    // ---- the answer said out loud ----
+    check('voice · no listen button where the browser cannot speak',
+      V.canSpeak() === false &&
+      String(WS.engine.agentCard({ kind: 'answer', text: 'Ответ.', evidence: [], next: [] }, 'mQuiet')).indexOf('data-agsay') < 0);
+
+    const spoken = [];
+    win.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    win.speechSynthesis = {
+      canceled: 0,
+      cancel() { this.canceled += 1; },
+      speak(u) { spoken.push(u); },
+      getVoices() { return [{ lang: 'en-US', name: 'Alex' }, { lang: 'ru-RU', name: 'Milena' }]; },
+    };
+    check('voice · speaking is offered where the browser has it', V.canSpeak() === true);
+
+    {
+      const older = { kind: 'answer', text: 'старый ответ', speak: 'Старое вслух.', evidence: [], next: [] };
+      const newer = { kind: 'answer', text: 'новый ответ', speak: 'Новое вслух.', evidence: [], next: [] };
+      WS.engine.openThread('probe:say', 'Голос', 'chat');
+      WS.router.go('concierge');
+      const midOld = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(midOld, WS.engine.agentCard(older, midOld));
+      const midNew = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(midNew, WS.engine.agentCard(newer, midNew));
+
+      const btns = doc.getElementById('chat').querySelectorAll('[data-agsay]');
+      check('voice · every answer offers to be read out', btns.length === 2);
+      if (btns.length === 2) {
+        // Through the real click path — the handlers were right and the
+        // delegation was not, which is how this class of bug survives.
+        btns[0].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('voice · the button speaks its own answer, not the newest',
+          spoken.length === 1 && spoken[0].text === 'Старое вслух.', spoken.length ? spoken[0].text : 'nothing spoken');
+        check('voice · in Russian, with a Russian voice when there is one',
+          !!spoken[0] && spoken[0].lang === 'ru-RU' && !!spoken[0].voice && spoken[0].voice.name === 'Milena');
+        check('voice · and shows that it is the one speaking', btns[0].classList.contains('on'));
+        btns[0].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('voice · pressing it again stops', V.speaking() === null && win.speechSynthesis.canceled > 0);
+        check('voice · and the button lets go of the state', !btns[0].classList.contains('on'));
+
+        btns[1].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('voice · a different answer speaks its own words',
+          spoken.length === 2 && !!spoken[1] && spoken[1].text === 'Новое вслух.',
+          spoken.map((u) => u.text).join(' | '));
+        V.stopSpeech();
+
+        // Chrome cuts a single utterance at about fifteen seconds, mid-word.
+        // A long spoken form has to arrive as several short ones.
+        spoken.length = 0;
+        const longSay = 'Первое предложение про Business Bay и его доходность. ' +
+          'Второе предложение про JVC и сроки сдачи. Третье предложение про комиссию по сделке. ' +
+          'Четвёртое предложение про то, что делать дальше и кому позвонить сегодня.';
+        V.say(longSay, 'mLong');
+        check('voice · a long answer is spoken in pieces, not one long breath',
+          spoken.length > 1 && spoken.every((u) => u.text.length <= 200), 'pieces=' + spoken.length);
+        check('voice · and the pieces are the whole answer, in order',
+          spoken.map((u) => u.text).join(' ').replace(/\s+/g, ' ') === longSay.trim().replace(/\s+/g, ' '),
+          spoken.map((u) => u.text).join(' | '));
+        spoken.length = 0;
+        V.say('Одна короткая фраза.', 'mShort');
+        check('voice · a short answer is not chopped up', spoken.length === 1);
+        V.stopSpeech();
+      }
+      const mute = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [] }, 'mMute');
+      check('voice · an answer with nothing to say offers no button', String(mute).indexOf('data-agsay') < 0);
+    }
+  } else {
+    check('voice module present', false);
+  }
+
+  // ============================================================
   //  End to end: what actually happens when a person types into the Concierge.
   //  The module tests above prove the reasoning; this proves the wiring.
   // ============================================================
@@ -1063,6 +1214,47 @@ setTimeout(async () => {
       WS.ui.closeModal();
     } else {
       check('e2e · evidence opens the underlying records', false, 'no evidence chip to click');
+    }
+
+    // The same addressing, through the click. Resolving the chip key was
+    // correct and the delegation coerced it with + — which turns «m3:0» into
+    // NaN, and NaN into the first row of whatever answered last. Every check
+    // that called the handler directly stayed green while every chip in the
+    // running stand opened the wrong answer.
+    {
+      const first = { kind: 'answer', text: 'первый', next: [{ label: 'ещё', ask: 'вопрос первого' }],
+        evidence: [{ label: 'сделок в первом', value: 1, query: { from: 'deals' } }] };
+      const second = { kind: 'answer', text: 'второй', next: [{ label: 'ещё', ask: 'вопрос второго' }],
+        evidence: [{ label: 'сделок во втором', value: 2, query: { from: 'deals' } }] };
+      const m1 = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(m1, WS.engine.agentCard(first, m1));
+      const m2 = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(m2, WS.engine.agentCard(second, m2));
+
+      const evs = doc.getElementById('chat').querySelectorAll('[data-agev]');
+      const olderEv = Array.prototype.filter.call(evs, (b) => b.getAttribute('data-agev').indexOf(m1 + ':') === 0)[0];
+      if (olderEv) {
+        olderEv.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        await waitFor(() => doc.getElementById('modal').innerHTML.indexOf('Откуда это число') >= 0, 1500);
+        const mh = doc.getElementById('modal').innerHTML;
+        check('e2e · a chip opens its own answer’s rows, not the newest',
+          mh.indexOf('сделок в первом') >= 0 && mh.indexOf('сделок во втором') < 0, mh.slice(0, 120));
+        WS.ui.closeModal();
+      } else {
+        check('e2e · a chip opens its own answer’s rows, not the newest', false, 'no chip under the older answer');
+      }
+
+      const nexts = doc.getElementById('chat').querySelectorAll('[data-agnext]');
+      const olderNext = Array.prototype.filter.call(nexts, (b) => b.getAttribute('data-agnext').indexOf(m1 + ':') === 0)[0];
+      if (olderNext) {
+        olderNext.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        await waitFor(() => doc.getElementById('chat').innerHTML.indexOf('вопрос первого') >= 0, 1500);
+        const ch = doc.getElementById('chat').innerHTML;
+        check('e2e · a follow-up asks its own answer’s question',
+          ch.indexOf('вопрос первого') >= 0 && ch.indexOf('вопрос второго') < 0);
+      } else {
+        check('e2e · a follow-up asks its own answer’s question', false, 'no follow-up under the older answer');
+      }
     }
 
     // A write instruction reaches a proposal, and only a click applies it.

@@ -690,13 +690,24 @@
       '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
   }
 
+  // Offered, never automatic — and only where the browser can actually speak,
+  // so nobody presses a button that was never going to do anything. Carries its
+  // own message id: an answer from ten minutes ago must not read out the latest.
+  function sayBtn(r, mid) {
+    if (!WS.voice || !WS.voice.canSpeak() || !WS.voice.spokenText(r)) return '';
+    return '<div class="qa-row" style="margin-top:9px">' +
+      '<button class="chip say" data-agsay="' + esc(mid || '') + '" title="Зачитать ответ вслух">' +
+      I('voice2') + '<span class="lb">Прослушать</span></button></div>';
+  }
+
   function answerCard(r, mid) {
     chipMid = mid || null;
     if (mid) replies[mid] = r;
     const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
-    return msg('ai', I('sparkle') + ' Консьерж', head + body + evChips(r.evidence) + nextChips(r.next));
+    return msg('ai', I('sparkle') + ' Консьерж',
+      head + body + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>

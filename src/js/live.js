@@ -175,6 +175,13 @@
     };
   }
 
+  // What the answer sounds like out loud — one or two sentences the model
+  // writes separately, because reading a table aloud is not an answer.
+  function normSay(v) {
+    const s = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '';
+    return s ? s.slice(0, 400) : null;
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
     const blocks = normBlocks(plan.blocks);
@@ -199,6 +206,7 @@
     const made = report ? WS.report.create(report) : null;
     return {
       kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next,
+      speak: normSay(plan.say_aloud),
       report: made ? { id: made.id, title: made.title, name: made.name, count: report.blocks.length } : null,
     };
   }
@@ -319,7 +327,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, toReply, normNext, normBlocks, normReport, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

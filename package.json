@@ -14,6 +14,7 @@
     "live": "node src/test/live-shot.js",
     "live:report": "node src/test/live-report.js",
     "live:mobile": "node src/test/live-mobile.js",
+    "live:voice": "node src/test/live-voice.js",
     "live:breadth": "node src/test/live-breadth.js",
     "check": "npm test && npm run test:proxy && npm run build"
   },

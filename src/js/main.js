@@ -47,7 +47,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-rpopen],[data-rpsave],[data-request],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-agsay],[data-rpopen],[data-rpsave],[data-request],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -127,8 +127,12 @@
     if (d.fetype) return WS.ui.setFeedType(d.fetype);
     if (d.agok) return WS.engine.agentConfirm(d.agok);
     if (d.agcancel) return WS.engine.agentCancel(d.agcancel);
-    if (d.agev != null) return WS.ui.openAgentEvidence(+d.agev);
-    if (d.agnext != null) return WS.engine.agentNext(+d.agnext);
+    // A chip key is «<id сообщения>:<номер>», not a number. Coercing it with +
+    // gave NaN here and every chip in the running stand did nothing at all —
+    // the tests called the handlers directly and never saw it.
+    if (d.agev != null) return WS.ui.openAgentEvidence(d.agev);
+    if (d.agnext != null) return WS.engine.agentNext(d.agnext);
+    if (d.agsay != null) return WS.voice.sayReply(d.agsay);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
     if (d.funnel) { store.dealFunnel = d.funnel; return api.emit(); }
@@ -229,7 +233,16 @@
       case 'restartScene': WS.engine.restartScene(); break;
       case 'threadBack': WS.engine.closeThread(); break;
       case 'cltab': store.clientsTab = t.dataset.tab; api.emit(); break;
-      case 'voice': api.toast('Голосовой ввод — имитация (спец. §13.1)'); if (store.view === 'start') WS.engine.startScenario('G1'); break;
+      // Real dictation where the browser has it. Where it does not, the stand
+      // says so and shows the voice scenario instead of pretending to listen.
+      case 'voice': {
+        const box = t.closest ? t.closest('.prompt') : null;
+        const input = box ? box.querySelector('input') : null;
+        if (WS.voice.canDictate() && input) { WS.voice.dictate(input); break; }
+        api.toast('Диктовка недоступна в этом браузере — наберите текстом');
+        if (store.view === 'start') WS.engine.startScenario('G1');
+        break;
+      }
       case 'startSend': routePrompt(promptValue('startPrompt')); break;
       case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
       case 'cgDock': store.cgDock = !store.cgDock; WS.ui.renderCgDock(); break;

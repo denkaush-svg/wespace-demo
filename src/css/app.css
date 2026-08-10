@@ -154,6 +154,11 @@ button { font-family: inherit; cursor: pointer; }
 .prompt input:focus { outline: none; }
 .prompt .voice { width: 40px; height: 40px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface-2); color: var(--mut); display: grid; place-items: center; transition: .15s var(--ease); }
 .prompt .voice:hover { color: var(--acc); border-color: var(--acc-line); background: var(--acc-soft); }
+/* Recording. Painted onto the button directly — a re-render here would replace
+   the input the words are being written into. */
+.prompt .voice.rec, .prompt .voice.rec:hover { color: #fff; background: var(--stop); border-color: var(--stop); }
+.prompt .voice.rec { animation: rec-pulse 1.5s var(--ease) infinite; }
+@keyframes rec-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--stop-soft); } 50% { box-shadow: 0 0 0 5px var(--stop-soft); } }
 .prompt .send { width: 44px; height: 44px; border-radius: var(--r); border: 0; background: var(--acc); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow-sm); transition: .15s var(--ease); }
 .prompt .send:hover { background: var(--acc-2); transform: translateY(-1px); }
 .prompt .send svg { width: 19px; height: 19px; }
@@ -211,6 +216,13 @@ button { font-family: inherit; cursor: pointer; }
 .chip.src { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc-ink);
   font-variant-numeric: tabular-nums; }
 .chip.src:hover { border-color: var(--acc); }
+/* Listening to the answer is a quieter offer than the follow-ups next to it —
+   until it is actually speaking, when it has to be obvious what to press to stop. */
+.chip.say { color: var(--mut); }
+.chip.say svg { color: var(--mut); }
+.chip.say.on { border-color: var(--acc); background: var(--acc-soft); color: var(--acc-ink); }
+.chip.say.on svg { color: var(--acc); animation: say-wave 1.1s var(--ease) infinite; }
+@keyframes say-wave { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .msg { max-width: 88%; }
 .msg .who { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); margin-bottom: 5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .msg .bubble { border-radius: var(--r); padding: 13px 15px; font-size: 13.5px; line-height: 1.55; }
