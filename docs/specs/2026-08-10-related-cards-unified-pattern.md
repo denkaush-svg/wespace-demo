@@ -2,14 +2,21 @@
 
 Date: 2026-08-10 · Status: approved (3 forks resolved) · Author: session + 2 fable critics
 
+## Card taxonomy (client framing, 2026-08-10)
+Two families:
+- **Process cards** — deal · request · promotion. They have a workflow FLOW. They share ONE
+  flow-template (same header zones + tabs), with per-entity variation slots (the status element,
+  boards, etc. differ by entity). This spec aligns the **request** to that template (deal is the
+  reference); the **promotion** card joins the same family later.
+- **Static cards** — client · object. A different, non-flow type. The **object card is NOT touched**
+  (already well-built). The **client** already rides `entityPage`; its layout is not restructured —
+  it only serves as the spine for the shared communication history.
+
 ## Goal
-Related cards (request · deal · client · object) must share ONE layout so the same
-kind of information sits in the same screen zone on every card — the user's focus
-habituates, the important stuff is always in the header, deeper detail is in tabs.
-The request card is the outlier (bespoke linear scroll); migrate it onto the shared
-`entityPage(spec)` frame that deal and client already use. Add the missing piece the
-manager actually asked for: a **followable communication trail** across
-request ↔ deal ↔ object without hunting between cards.
+Align the request (a process card) onto the shared `entityPage(spec)` frame the deal already uses,
+so the same kind of information sits in the same screen zone across process cards — focus habituates,
+important stuff in the header, deeper detail in tabs. Add the piece the manager actually asked for:
+a **followable communication trail** across request ↔ deal ↔ object without hunting between cards.
 
 ## What the two fable critics changed (scores 5/10 & 6/10 → ~8/10 with these)
 1. No linear stepper on a request — requests loop, reject, spawn 2 deals. → **status chip + counters.**
@@ -58,8 +65,8 @@ Replace `viewRequestDetail`'s linear scroll with a spec plugged into `entityPage
 - **Документы**: КП (with date/version/status) + document chain (below).
 - **История**: merged client comms view (below).
 
-Note (known inconsistency, out of scope now): the OBJECT card still uses `viewObjectDetail`,
-not `entityPage`. Align later so all five cards share the frame.
+Note: the OBJECT card (static family) stays on `viewObjectDetail` by design — not migrated,
+not touched. Process-card consistency is the target here, not one frame for all five cards.
 
 ## Communication history — anchored events + merged client view (Phase 1)
 No manual per-message tagging. Each event is anchored to exactly one origin:
