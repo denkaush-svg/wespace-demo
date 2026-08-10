@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:04</title>
+  <title>WESPACE · сборка 21:17</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:04';
+    window.WS_BUILD='21:17';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -6517,9 +6517,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const deals = dealsOfRequest(r.id);
     if (deals.length && deals.every((d) => d.stage === 'done')) return { label: 'Закрыта', tone: 'ok', icon: 'check' };
     if (deals.length) return { label: 'В работе', tone: 'acc', icon: 'briefcase' };
-    if (r.kp && r.kp.formed) return { label: 'Готовим КП', tone: 'info', icon: 'doc' };
-    if (sel) return { label: 'Выбор клиента', tone: 'warn', icon: 'target' };
-    if (off.length && rej === off.length) return { label: 'Отклонена', tone: 'stop', icon: 'x' };
+    if (r.kp && r.kp.formed) return { label: 'КП собрано', tone: 'info', icon: 'doc' };
+    if (sel) return { label: 'Клиент выбрал', tone: 'warn', icon: 'target' };
+    if (off.length && rej === off.length) return { label: 'Новый подбор', tone: 'warn', icon: 'replay' };
     if (off.length) return { label: 'На подборе', tone: '', icon: 'building' };
     return { label: 'Новая', tone: '', icon: 'sparkle' };
   }
@@ -6530,9 +6530,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const st = reqStatusState(r);
     const items = [{ label: st.label, tone: st.tone || 'acc', icon: st.icon }];
     if (off.length) {
-      items.push({ label: 'показано ' + off.length });
-      if (sel) items.push({ label: 'выбрал ' + sel, tone: 'ok' });
-      if (rej) items.push({ label: 'отклонил ' + rej, tone: 'stop' });
+      items.push({ label: 'Показано ' + off.length });
+      if (sel) items.push({ label: 'Выбрано ' + sel, tone: 'ok' });
+      if (rej) items.push({ label: 'Отклонено ' + rej, tone: 'stop' });
     }
     const tm = ({ hot: ['Горячий', 'stop'], warm: ['Тёплый', 'warn'], cold: ['Холодный', ''] })[r.temperature];
     if (tm) items.push({ label: tm[0], tone: tm[1], icon: 'flame' });
@@ -6542,6 +6542,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
+    if (deals.length && deals.every((d) => d.stage === 'done')) return 'сделка закрыта — комиссия зафиксирована.';
     if (deals.length) return 'ведём сделку — согласуем условия и готовим документы.';
     if (r.kp && r.kp.formed) return 'КП собрано — ждём решение клиента.';
     if (sel) return 'клиент выбрал ' + sel + ' из ' + off.length + ' — собираем КП.';
@@ -6551,10 +6552,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function reqNextAction(r) {
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
-    if (dealsOfRequest(r.id).length) return 'довести сделку до подписания';
+    const deals = dealsOfRequest(r.id);
+    if (deals.length && deals.every((d) => d.stage === 'done')) return 'постпродажное сопровождение клиента';
+    if (deals.length) return 'довести сделку до подписания';
     if (r.kp && r.kp.formed) return 'создать сделку из выбранного';
     if (sel) return 'собрать КП из выбранного (' + sel + ')';
-    if (off.length) return 'получить решение клиента по подборке';
+    if (off.length) return 'уточнить решение клиента по подборке';
     return 'подобрать объекты под запрос';
   }
   // Facing LEFT — key request conditions (mirror the deal's «Ключевое»).
@@ -6566,7 +6569,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dfPair('Тип сделки', r.dealType) +
       dfPair('Районы', (r.areas || []).join(' · ')) +
       dfPair('Цель', r.goal) +
-      dfPair('Срок', r.horizon) + '</div>');
+      dfPair('Срок сделки', r.horizon) + '</div>');
   }
   // Facing RIGHT (top) — client contact card (mirror dealClientCard: call / write / open).
   function reqClientCard(r) {
@@ -6597,7 +6600,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
     });
     if (dealObjIds[off.id]) return dealObjIds[off.id] === 'done' ? { label: 'Сделка закрыта', tone: 'ok', icon: 'check' } : { label: 'В сделке', tone: 'acc', icon: 'briefcase' };
-    const m = ({ selected: ['Выбрал клиент', 'ok', 'check'], rejected: ['Отклонён', 'stop', 'x'] })[off.state] || ['В работе', '', 'clock'];
+    const m = ({ selected: ['Выбран', 'ok', 'check'], rejected: ['Отклонён', 'stop', 'x'] })[off.state] || ['На рассмотрении', '', 'clock'];
     return { label: m[0], tone: m[1], icon: m[2] };
   }
   // Full-width подбор with the status model — the read view (editable pick/reject lives in the tab).
@@ -6616,7 +6619,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' +
         I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
-    const edit = '<button class="btn xs" data-etab="request~' + r.id + '~offers">' + I('pencil') + 'Отметить выбор</button>';
+    const edit = '<button class="btn xs" data-etab="request~' + r.id + '~offers">' + I('pencil') + 'Отметить решение</button>';
     return dxSec('building', 'Объекты подбора · ' + off.length, edit, rows);
   }
   function reqRecentEvents(r) {
@@ -6628,10 +6631,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="dnb-ev-empty">событий пока нет</div>';
   }
   function reqNowBlock(r) {
-    const owner = r.assignee ? agentName(r.assignee) : D().users.agent.name;
+    const me = (D().users && D().users.agent) ? D().users.agent.name : 'не назначен';
+    const owner = r.assignee ? agentName(r.assignee) : me;
     const line = opsLine([
       ['users', 'Ответственный', owner],
-      r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
+      r.leadStatus ? ['target', 'Статус лида', r.leadStatus] : null,
       r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
       r.funding ? ['money', 'Финансирование', r.funding] : null,
     ], undefined);
@@ -6660,7 +6664,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (tab === 'tasks') {
       const list = (D().tasks || []).filter((t) => t.clientId === r.clientId);
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по заявке пока нет</div>';
-      return dxSec('check', 'Задачи заявки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
+      return dxSec('check', 'Задачи по заявке · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
     if (tab === 'docs') return reqKpBlock(r);
     if (tab === 'history') {
@@ -6676,7 +6680,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
         '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет — создайте из выбранных объектов</div>';
-    const dealsBlock = dxSec('briefcase', 'Сделки заявки · ' + deals.length, '',
+    const dealsBlock = dxSec('briefcase', 'Сделки по заявке · ' + deals.length, '',
       '<div class="feed">' + dealRows + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
     const pref = reqPrefProfile(r);
