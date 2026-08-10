@@ -1566,6 +1566,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .req-secondary { margin-top: 12px; }
 /* Parent-request breadcrumb over deal/object detail */
 .page-crumb { margin-bottom: 10px; }
+/* Shared-history scope filter (заявка ↔ сделки ↔ контакт) */
+.comms-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 /* КП as a client-facing document (modal) */
 .kp-doc { font-size: 13px; }
 .kp-doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
