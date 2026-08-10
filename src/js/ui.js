@@ -1929,65 +1929,197 @@
   function opsStrip(items, temperature) {
     return '<div class="req-ops">' + opsLine(items, temperature) + '</div>';
   }
-  // Quick contact for a client request — phone + WhatsApp + call/write, so the broker can dial fast.
-  function reqContactRow(r, c) {
+  // ============================================================================================
+  // Request = a PROCESS card. Same entityPage frame + header zones as the deal (spec 2026-08-10):
+  // hero → status-chip + counters → «Сейчас» phrase → facing pair (LEFT key conditions ·
+  // RIGHT client contact + Объекты подбора) → «что сейчас». No linear stepper — requests loop,
+  // reject, or spawn several deals, so the status is an honest STATE label.
+  // ============================================================================================
+  function reqActionWord(r) {
+    const t = (r.dealType || '') + ' ' + (r.interest || '');
+    if (/аренд/i.test(t)) return 'Аренда';
+    if (/fit|отдел/i.test(t)) return 'Fit-out';
+    if (/портфел|инвест/i.test(t)) return 'Инвестиция';
+    return 'Покупка';
+  }
+  function reqPhotoBg(r) {
+    const o0 = (r.offered || []).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean)[0];
+    return (o0 && WS.photos && WS.photos[o0.id]) || (WS.photos && WS.photos.o_interior) || '';
+  }
+  function requestHero(r) {
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const obj = [r.objectType, r.bedrooms].filter(Boolean).join(' · ') || r.interest || '';
+    const sub = [reqActionWord(r) + (obj ? ' · ' + obj : ''), r.budget ? WS.AED(r.budget) : null].filter(Boolean).join(' · ');
+    const bg = reqPhotoBg(r);
+    return '<div class="dhero">' + (bg ? '<img class="dhero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="dhero-scrim"></div>' +
+      '<div class="dhero-content"><div class="dhero-av">' + init + '</div>' +
+      '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Клиент') + '</div>' +
+      '<div class="dhero-sub">' + sub + '</div></div></div></div>';
+  }
+  function reqStatusState(r) {
+    const off = r.offered || [];
+    const sel = off.filter((o) => o.state === 'selected').length;
+    const rej = off.filter((o) => o.state === 'rejected').length;
+    const deals = dealsOfRequest(r.id);
+    if (deals.length && deals.every((d) => d.stage === 'done')) return { label: 'Закрыта', tone: 'ok', icon: 'check' };
+    if (deals.length) return { label: 'На сделку', tone: 'acc', icon: 'briefcase' };
+    if (r.kp && r.kp.formed) return { label: 'КП собрано', tone: 'info', icon: 'doc' };
+    if (sel) return { label: 'Клиент выбирает', tone: 'warn', icon: 'target' };
+    if (off.length && rej === off.length) return { label: 'Отклонена', tone: 'stop', icon: 'x' };
+    if (off.length) return { label: 'На подборе', tone: '', icon: 'building' };
+    return { label: 'Новая заявка', tone: '', icon: 'sparkle' };
+  }
+  function reqStatusChip(r) {
+    const off = r.offered || [];
+    const sel = off.filter((o) => o.state === 'selected').length;
+    const rej = off.filter((o) => o.state === 'rejected').length;
+    const st = reqStatusState(r);
+    const items = [{ label: st.label, tone: st.tone || 'acc', icon: st.icon }];
+    if (off.length) {
+      items.push({ label: 'показано ' + off.length });
+      if (sel) items.push({ label: 'выбрал ' + sel, tone: 'ok' });
+      if (rej) items.push({ label: 'отклонил ' + rej, tone: 'stop' });
+    }
+    const tm = ({ hot: ['Горячий', 'stop'], warm: ['Тёплый', 'warn'], cold: ['Холодный', ''] })[r.temperature];
+    if (tm) items.push({ label: tm[0], tone: tm[1], icon: 'flame' });
+    return statusChip(items);
+  }
+  function reqStatusPhrase(r) {
+    const off = r.offered || [];
+    const sel = off.filter((o) => o.state === 'selected').length;
+    const deals = dealsOfRequest(r.id);
+    if (deals.length) return 'из заявки создано сделок: ' + deals.length + ' — ведём к подписанию.';
+    if (r.kp && r.kp.formed) return 'КП собрано из выбранного — ждём решение клиента, готовим сделку.';
+    if (sel) return 'клиент выбрал ' + sel + ' из ' + off.length + ' — собираем КП.';
+    if (off.length) return 'подобрали объектов: ' + off.length + ' — ждём реакцию клиента.';
+    return 'новая заявка — подбираем объекты под запрос.';
+  }
+  function reqNextAction(r) {
+    const off = r.offered || [];
+    const sel = off.filter((o) => o.state === 'selected').length;
+    if (dealsOfRequest(r.id).length) return 'вести сделку к подписанию';
+    if (r.kp && r.kp.formed) return 'создать сделку из выбранного';
+    if (sel) return 'собрать КП из выбранного (' + sel + ')';
+    if (off.length) return 'дождаться выбора клиента по подборке';
+    return 'подобрать объекты под запрос';
+  }
+  // Facing LEFT — key request conditions (mirror the deal's «Ключевое»).
+  function reqKeyCard(r) {
+    const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
+    return dxSec('briefcase', 'Ключевые условия', '', '<div class="dfields">' +
+      dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') +
+      dfPair('Форма оплаты', pay) +
+      dfPair('Тип сделки', r.dealType) +
+      dfPair('Районы', (r.areas || []).join(' · ')) +
+      dfPair('Цель', r.goal) +
+      dfPair('Срок', r.horizon) + '</div>');
+  }
+  // Facing RIGHT (top) — client contact card (mirror dealClientCard: call / write / open).
+  function reqClientCard(r) {
+    const c = D().clients.find((x) => x.id === r.clientId);
+    if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан</div>');
+    const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
+    const meta = [r.goal, r.budget ? 'бюджет ' + WS.AED(r.budget) : '', r.horizon ? 'срок ' + r.horizon : ''].filter(Boolean).join(' · ');
     const dealForC = D().deals.find((d) => d.clientId === c.id);
     const tid = dealForC ? 'deal:' + dealForC.id : 'general';
-    return '<div class="ro-contact">' +
-      '<span class="rc-num">' + I('phone') + (vals.phone || '—') + '</span>' +
-      '<span class="rc-num rc-wa">' + I('whatsapp') + 'WhatsApp</span>' +
-      '<div class="rc-acts">' +
-        '<button class="btn xs primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-        '<button class="btn xs" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · заявка" data-ticon="mail">' + I('whatsapp') + 'Написать</button>' +
-      '</div></div>';
+    const head = '<div class="dcli-head"><div class="dcli-av">' + init + '</div>' +
+      '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
+      '<div class="dcli-meta">' + meta + '</div></div></div>';
+    const chans = '<div class="dcli-chans">' + ['phone', 'whatsapp', 'telegram', 'email'].map((ch) =>
+      '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
+    const acts = '<div class="dcli-acts">' +
+      '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
+      '<button class="btn sm" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · заявка" data-ticon="mail">' + I('whatsapp') + 'Написать</button>' +
+      '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
+    return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
-  function reqOps(r) {
-    const c = D().clients.find((x) => x.id === r.clientId);
+  // Facing RIGHT (bottom) — the request's analog of the deal's «Объект сделки»: top-3 подбор.
+  function reqOffersMini(r) {
+    const off = r.offered || [];
+    const objs = off.map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean).slice(0, 3);
+    const more = off.length > 3 ? '<button class="btn xs" data-etab="request~' + r.id + '~offers">' + I('arrowRight') + 'ещё ' + (off.length - 3) + '</button>' : '';
+    return dxSec('building', 'Объекты подбора' + (off.length ? ' · ' + off.length : ''), more,
+      objs.length ? objs.map(dealObjectMini).join('') : '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>');
+  }
+  function reqRecentEvents(r) {
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    return feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
+      '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
+      '<div class="dnb-ev-b"><div class="dnb-ev-t">' + p.e.text + '</div>' +
+      '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
+      '<div class="dnb-ev-empty">событий пока нет</div>';
+  }
+  function reqNowBlock(r) {
     const line = opsLine([
       ['users', 'Ответственный агент', r.assignee ? agentName(r.assignee) : 'не назначен'],
       r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
       r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
       r.funding ? ['money', 'Финансирование', r.funding] : null,
-    ], r.temperature);
-    return '<div class="req-ops">' + (c ? reqContactRow(r, c) : '') + line + '</div>';
+    ], undefined);
+    const nextRow = '<div class="dnb-row"><div class="dnb-k">Что делать дальше</div><div class="dnb-v">' + reqNextAction(r) + '</div></div>';
+    const more = '<button class="btn xs" data-etab="request~' + r.id + '~history">' + I('arrowRight') + 'вся история</button>';
+    const histRow = '<div class="dnb-row"><div class="dnb-k">Последние события ' + more + '</div><div class="dnb-hist">' + reqRecentEvents(r) + '</div></div>';
+    return '<div class="dnb"><div class="dnb-cap">' + I('pulse') + 'Что сейчас по заявке</div>' + line + nextRow + histRow + '</div>';
   }
-  function requestAttrs(r) {
+  function requestHeader(r) {
+    return requestHero(r) +
+      '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>' +
+      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
+      '<div class="deal-top"><div class="deal-top-cell">' + reqKeyCard(r) + '</div>' +
+      '<div class="deal-top-cell">' + reqClientCard(r) + reqOffersMini(r) + '</div></div>' +
+      reqNowBlock(r);
+  }
+  function requestTimelineInner(r) {
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i })))
+      .map((p) => tlRow(p.e, '')).join('') ||
+      '<div style="font-size:12px;color:var(--faint);padding:8px 0">по заявке пока нет истории</div>';
+    return '<div class="timeline">' + rows + '</div>';
+  }
+  function requestTabContent(r, tab) {
+    if (tab === 'offers') return reqOfferedBlock(r);
+    if (tab === 'tasks') {
+      const list = (D().tasks || []).filter((t) => t.clientId === r.clientId);
+      const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по заявке пока нет</div>';
+      return dxSec('check', 'Задачи заявки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
+    }
+    if (tab === 'docs') return reqKpBlock(r);
+    if (tab === 'history') {
+      const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="request" data-req="' + r.id + '">' + I('plus') + 'Событие</button>';
+      return dxSec('clock', 'История заявки', addBtn, requestTimelineInner(r)) +
+        '<div style="font-size:11px;color:var(--faint);margin-top:6px">Сквозная переписка по клиенту (заявка ↔ сделки, с фильтром) — следующим шагом.</div>';
+    }
+    // overview — preference profile + the deals this request produced.
+    const deals = dealsOfRequest(r.id);
+    const dealRows = deals.map((d) => {
+      const s = funnelSteps(d);
+      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
+        '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
+        '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет — создайте из выбранных объектов</div>';
+    const dealsBlock = dxSec('briefcase', 'Сделки заявки · ' + deals.length, '',
+      '<div class="feed">' + dealRows + '</div>' +
+      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
+    const pref = reqPrefProfile(r);
+    return (pref ? pref + '<div style="height:14px"></div>' : '') + dealsBlock;
+  }
+  function requestSpec(id) {
+    const r = requestById(id); if (!r) return null;
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
-    // Hero distils the brief into a 2-second glance: WHAT (object + beds) · WHERE (areas) · WHY (goal) · budget.
-    // (The old hero showed only r.interest = "Покупка" — the deal type, not the ask. Uninformative; the real
-    //  criteria sat buried in a group below. Promote them; the detail groups keep only what the hero doesn't.)
-    const objLine = [r.objectType, r.bedrooms].filter(Boolean).join(' · ') || r.interest || r.dealType || '—';
-    // Hero = one consolidated header: the client (dominant), the object they want, the budget.
-    // Everything else (areas, goal, deal terms, source) lives in «Ключевые условия сделки» below —
-    // so the top reads as a single glance instead of a title + hero that restate each other.
-    const hero = '<div class="req-hero">' +
-      '<div class="rh-main">' +
-        '<div class="rh-client">' + (c.name || 'Клиент') + '</div>' +
-        '<div class="rh-obj">' + I('building') + '<span>' + objLine + '</span></div>' +
-      '</div>' +
-      '<div class="rh-budget">' +
-        '<div class="rh-b-label">Бюджет</div>' +
-        '<div class="rh-b-val">' + (r.budget ? WS.AED(r.budget) : '—') + '</div>' +
-        (pay ? '<div class="rh-b-sub">' + pay + '</div>' : '') +
-      '</div></div>';
-    // Key deal conditions — every remaining request attribute, two labelled columns, no duplication
-    // with the hero (object + budget live up top; type/beds are the hero's object line).
-    const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
-      dfPair('Тип сделки', r.dealType) +
-      dfPair('Районы', (r.areas || []).join(' · ')) +
-      dfPair('Цель', r.goal) +
-      dfPair('Срок', r.horizon) + '</div></div>';
-    const grpB = '<div class="req-grp"><div class="dgroup-h">Источник и оформление</div><div class="dfields">' +
-      dfPair('Источник', r.source) +
-      dfPair('Канал', r.channel || '—') +
-      dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';
-    const conds = '<div class="section-label" style="margin-top:18px">Ключевые условия сделки</div>' +
-      '<div class="req-groups">' + grpA + grpB + '</div>';
-    return dxSec('mail', 'Заявка', (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
-      hero + reqOps(r) + conds +
-      (r.note ? '<div class="req-note">' + I('sparkle') + '<span>' + r.note + '</span></div>' : ''));
+    const dealForC = D().deals.find((d) => d.clientId === r.clientId);
+    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    return {
+      type: 'request', id: id, title: 'Заявка · ' + r.title,
+      status: requestHeader(r),
+      tabs: [['overview', 'Обзор'], ['offers', 'Подбор объектов'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['docs', 'Документы'], ['history', 'История']],
+      render: function (tab) { return requestTabContent(r, tab); },
+      concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
+      pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
+        '<button class="btn sm primary" data-thread="' + tid + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail">' + I('chat') + 'Чат по заявке</button>',
+    };
   }
   const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
   function reqOfferedRow(r, off) {
@@ -2037,22 +2169,10 @@
       like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>');
   }
   function viewRequestDetail(id) {
-    const r = requestById(id);
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>';
-    if (!r) return back + '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
-    const deals = dealsOfRequest(r.id);
-    const dealRows = deals.map((d) => {
-      const s = funnelSteps(d);
-      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
-        '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
-        '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
-    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет — создайте из выбранных объектов</div>';
-    const dealsBlock = dxSec('briefcase', 'Сделки заявки · ' + deals.length, '',
-      '<div class="feed">' + dealRows + '</div>' +
-      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
-    const sp = (hh) => '<div style="margin-top:14px">' + hh + '</div>';
-    const pref = reqPrefProfile(r);
-    return back + requestAttrs(r) + sp(reqOfferedBlock(r)) + sp(reqKpBlock(r)) + (pref ? sp(pref) : '') + sp(dealsBlock);
+    const spec = requestSpec(id);
+    if (!spec) return '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>' +
+      '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
+    return entityPage(spec, 'requests', '', 'Назад к заявкам');
   }
   // ---- Request funnel actions (A1): client-selection state, add object, form КП, create deal ----
   function reqObjState(reqId, objId, state) {

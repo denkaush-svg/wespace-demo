@@ -50,6 +50,7 @@
       refModel: clone(f.refModel),
       companies: clone(f.companies),
       dealTimeline: clone(f.dealTimeline),
+      requestTimeline: clone(f.requestTimeline),
       contactTimeline: clone(f.contactTimeline),
       companyTimeline: clone(f.companyTimeline),
       conflicts: clone(f.conflicts),

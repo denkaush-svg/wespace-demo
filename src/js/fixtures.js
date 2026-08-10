@@ -405,10 +405,25 @@
     avgCycleDays: 34,   // mean days from request to close (demo KPI)
   };
 
+  // Request-level channel history (pre-deal correspondence). Anchored to the request; the merged
+  // client comms view unions this with the client's deal timelines + contact timeline.
+  const requestTimeline = {
+    r_anna: [
+      { at: '06 мая · 10:12', ord: 60012, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Входящее: ищу инвест-квартиру до 2 млн, Business Bay или Creek Harbour.', capture: true },
+      { at: '06 мая · 11:40', ord: 61140, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Созвон 8:20 — уточнила срок 1–3 мес, приоритет доходность под аренду.', capture: true },
+      { at: '07 мая · 09:15', ord: 70915, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Подобрала 3 объекта (Creekline, Palm Court, Bayline) — отправлю на выбор.' },
+      { at: '08 мая · 12:30', ord: 81230, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Понравился Creekline 1208; JVC не подходит — далеко от центра.', capture: true },
+    ],
+    r_viktor: [
+      { at: '04 мая · 14:05', ord: 41405, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Реферал: интересует квартира Bayline и портфель офисов в DIFC.', capture: true },
+      { at: '05 мая · 12:30', ord: 51230, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча в офисе — согласовали 1BR + офисный портфель, 100% оплата.', capture: true },
+    ],
+  };
+
   WS.fixtures = {
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, refModel,
     deals, requests, tasks, events, inbox, analytics,
-    FUNNELS, companies, dealTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
