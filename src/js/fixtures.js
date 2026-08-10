@@ -189,6 +189,7 @@
       interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Входящий звонок', partnerAgent: null,
       dealType: 'Продажа · off-plan', objectType: 'Квартира', goal: 'Инвестиция под аренду', budget: 2000000,
       areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
+      assignee: 'u_marina', leadStatus: 'Квалифицирован', temperature: 'hot', nextContact: 'сегодня, 16:00', funding: 'Подтв. средств ✓ · рассрочка застройщика',
       offered: [
         { id: 'o_creekline', state: 'selected' },
         { id: 'o_palmcourt', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
@@ -200,6 +201,7 @@
       interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Реферал', partnerAgent: null,
       dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', goal: 'Инвестиция', budget: 6150000,
       areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
+      assignee: 'u_marina', leadStatus: 'В переговорах', temperature: 'warm', nextContact: '12 мая, 11:00', funding: 'Cash 100% · подтв. средств ✓',
       offered: [
         { id: 'o_bayline', state: 'selected' },
         { id: 'o_creekline', state: 'selected' },

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:32</title>
+  <title>WESPACE · сборка 15:39</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:32';
+    window.WS_BUILD='15:39';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1119,6 +1119,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dgroup-h { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--mut); margin: 0 0 6px; }
 .req-note { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; padding: 9px 11px; background: var(--surface-2); border-radius: 9px; font-size: 12px; color: var(--mut); }
 .req-note svg { width: 15px; height: 15px; color: var(--acc); flex: 0 0 auto; margin-top: 1px; }
+/* Lead-ops strip: operational facts (owner / status / temperature / next contact), a distinct bar
+   above the attribute fields — deliberately not loose badges. Shared by request + client cards. */
+.req-ops { display: flex; flex-wrap: wrap; gap: 7px 16px; align-items: center; margin: 12px 0 2px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; color: var(--mut); }
+.ro-item { display: inline-flex; align-items: center; gap: 5px; }
+.ro-item b { color: var(--ink); font-weight: 700; }
+.ro-item svg { width: 13px; height: 13px; color: var(--acc); }
+.ro-item.ro-hot { color: var(--stop); font-weight: 700; } .ro-item.ro-hot svg { color: var(--stop); }
+.ro-item.ro-warm { color: var(--warn); font-weight: 700; } .ro-item.ro-warm svg { color: var(--warn); }
+.ro-item.ro-cold { color: var(--mut); font-weight: 700; } .ro-item.ro-cold svg { color: var(--mut); }
 @media (max-width: 620px) {
   .req-hero { grid-template-columns: 1fr; }
   .rh-budget { text-align: left; border-left: 0; border-top: 1px solid var(--acc-line); padding-left: 0; padding-top: 10px; margin-top: 8px; }
@@ -2248,6 +2257,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Входящий звонок', partnerAgent: null,
       dealType: 'Продажа · off-plan', objectType: 'Квартира', goal: 'Инвестиция под аренду', budget: 2000000,
       areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
+      assignee: 'u_marina', leadStatus: 'Квалифицирован', temperature: 'hot', nextContact: 'сегодня, 16:00', funding: 'Подтв. средств ✓ · рассрочка застройщика',
       offered: [
         { id: 'o_creekline', state: 'selected' },
         { id: 'o_palmcourt', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
@@ -2259,6 +2269,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Реферал', partnerAgent: null,
       dealType: 'Инвестиция · портфель', objectType: 'Квартира + портфель', goal: 'Инвестиция', budget: 6150000,
       areas: ['Dubai Creek Harbour', 'DIFC'], horizon: 'сделка идёт',
+      assignee: 'u_marina', leadStatus: 'В переговорах', temperature: 'warm', nextContact: '12 мая, 11:00', funding: 'Cash 100% · подтв. средств ✓',
       offered: [
         { id: 'o_bayline', state: 'selected' },
         { id: 'o_creekline', state: 'selected' },
@@ -5722,6 +5733,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!all.length) return '';
     return reqPrefProfile({ offered: all });
   }
+  // Client-level lead ops (derived): owner from the active deal, lifecycle stage, next contact from tasks.
+  function clientOps(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const deal = deals.find((d) => d.stage !== 'done') || deals[0];
+    const owner = deal ? agentName(deal.agent) : 'не назначен';
+    const stage = deal ? ({ new: 'Новый лид', work: 'В переговорах', docs: 'Документы', done: 'Закрыт' })[deal.stage] : 'Без активной сделки';
+    const nextTask = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done')
+      .sort((a, b) => (a.when === 'overdue' ? -1 : b.when === 'overdue' ? 1 : 0))[0];
+    const nextC = nextTask ? ((nextTask.when === 'overdue' ? 'просрочено · ' : '') + nextTask.due) : null;
+    return opsStrip([
+      ['users', 'Ответственный', owner],
+      ['target', 'Стадия', stage],
+      deal ? ['briefcase', 'Активная сделка', dealActionWord(deal) + ' · ' + WS.AED(deal.amount)] : null,
+      nextC ? ['clock', 'Следующий контакт', nextC] : null,
+    ], deal && deal.hot ? 'hot' : undefined);
+  }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
       return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
@@ -5773,7 +5800,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
     const pref = clientPrefProfile(c);
-    return contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
+    return clientOps(c) + contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
       (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
       '<div style="margin-top:14px">' + actions + '</div>' +
@@ -6397,6 +6424,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки этой заявки</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
   }
   function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  // Lead-ops strip (Codex IA review): who owns the lead, its status/temperature, the next contact —
+  // the operational facts a broker needs before the brief attributes. Shared by request + client.
+  function opsTempChip(t) {
+    const m = ({ hot: ['Горячий', 'ro-hot'], warm: ['Тёплый', 'ro-warm'], cold: ['Холодный', 'ro-cold'] })[t];
+    return m ? '<span class="ro-item ' + m[1] + '">' + I('flame') + m[0] + '</span>' : '';
+  }
+  function opsStrip(items, temperature) {
+    return '<div class="req-ops">' + opsTempChip(temperature) +
+      items.filter(Boolean).map((it) => '<span class="ro-item">' + I(it[0]) + it[1] + ': <b>' + it[2] + '</b></span>').join('') + '</div>';
+  }
+  function reqOps(r) {
+    return opsStrip([
+      ['users', 'Ответственный', r.assignee ? agentName(r.assignee) : 'не назначен'],
+      r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
+      r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
+      r.funding ? ['money', 'Финансирование', r.funding] : null,
+    ], r.temperature);
+  }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
@@ -6425,7 +6470,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dfPair('Канал', r.channel || '—') +
       dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';
     return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
-      hero + '<div class="req-groups">' + grpA + grpB + '</div>' +
+      hero + reqOps(r) + '<div class="req-groups">' + grpA + grpB + '</div>' +
       (r.note ? '<div class="req-note">' + I('sparkle') + '<span>' + r.note + '</span></div>' : ''));
   }
   const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };

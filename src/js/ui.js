@@ -1210,6 +1210,22 @@
     if (!all.length) return '';
     return reqPrefProfile({ offered: all });
   }
+  // Client-level lead ops (derived): owner from the active deal, lifecycle stage, next contact from tasks.
+  function clientOps(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const deal = deals.find((d) => d.stage !== 'done') || deals[0];
+    const owner = deal ? agentName(deal.agent) : 'не назначен';
+    const stage = deal ? ({ new: 'Новый лид', work: 'В переговорах', docs: 'Документы', done: 'Закрыт' })[deal.stage] : 'Без активной сделки';
+    const nextTask = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done')
+      .sort((a, b) => (a.when === 'overdue' ? -1 : b.when === 'overdue' ? 1 : 0))[0];
+    const nextC = nextTask ? ((nextTask.when === 'overdue' ? 'просрочено · ' : '') + nextTask.due) : null;
+    return opsStrip([
+      ['users', 'Ответственный', owner],
+      ['target', 'Стадия', stage],
+      deal ? ['briefcase', 'Активная сделка', dealActionWord(deal) + ' · ' + WS.AED(deal.amount)] : null,
+      nextC ? ['clock', 'Следующий контакт', nextC] : null,
+    ], deal && deal.hot ? 'hot' : undefined);
+  }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
       return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
@@ -1261,7 +1277,7 @@
       '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
     const pref = clientPrefProfile(c);
-    return contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
+    return clientOps(c) + contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
       (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
       '<div style="margin-top:14px">' + actions + '</div>' +
@@ -1885,6 +1901,24 @@
       (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки этой заявки</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
   }
   function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  // Lead-ops strip (Codex IA review): who owns the lead, its status/temperature, the next contact —
+  // the operational facts a broker needs before the brief attributes. Shared by request + client.
+  function opsTempChip(t) {
+    const m = ({ hot: ['Горячий', 'ro-hot'], warm: ['Тёплый', 'ro-warm'], cold: ['Холодный', 'ro-cold'] })[t];
+    return m ? '<span class="ro-item ' + m[1] + '">' + I('flame') + m[0] + '</span>' : '';
+  }
+  function opsStrip(items, temperature) {
+    return '<div class="req-ops">' + opsTempChip(temperature) +
+      items.filter(Boolean).map((it) => '<span class="ro-item">' + I(it[0]) + it[1] + ': <b>' + it[2] + '</b></span>').join('') + '</div>';
+  }
+  function reqOps(r) {
+    return opsStrip([
+      ['users', 'Ответственный', r.assignee ? agentName(r.assignee) : 'не назначен'],
+      r.leadStatus ? ['target', 'Статус', r.leadStatus] : null,
+      r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
+      r.funding ? ['money', 'Финансирование', r.funding] : null,
+    ], r.temperature);
+  }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
@@ -1913,7 +1947,7 @@
       dfPair('Канал', r.channel || '—') +
       dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';
     return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
-      hero + '<div class="req-groups">' + grpA + grpB + '</div>' +
+      hero + reqOps(r) + '<div class="req-groups">' + grpA + grpB + '</div>' +
       (r.note ? '<div class="req-note">' + I('sparkle') + '<span>' + r.note + '</span></div>' : ''));
   }
   const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
