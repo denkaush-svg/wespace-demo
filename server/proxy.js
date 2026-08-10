@@ -55,6 +55,7 @@ const CFG = {
   cliPrefix: (process.env.WESPACE_PROXY_CLI_PREFIX || '').split(' ').filter(Boolean),
 
   maxBody: 32 * 1024,
+  bodyTimeoutMs: Number(process.env.WESPACE_PROXY_BODY_TIMEOUT_MS || 8000),
   maxText: 1000,
   maxHistory: 6,
   maxHistoryChars: 600,
@@ -200,7 +201,12 @@ function buildPrompt(body) {
   const digest = clip(JSON.stringify(body.digest == null ? {} : body.digest), CFG.maxDigestChars);
   const hist = (Array.isArray(body.history) ? body.history : [])
     .slice(-CFG.maxHistory)
-    .map((h) => (h && h.role === 'agent' ? 'Консьерж: ' : 'Брокер: ') + clip(h && h.text, CFG.maxHistoryChars))
+    // Three voices, not two. A client's own words handed over as the
+    // Concierge's leaves the model reasoning from a conversation that never
+    // happened.
+    .map((h) => (h && h.role === 'agent' ? 'Консьерж: '
+      : h && h.role === 'client' ? 'Клиент: ' : 'Брокер: ')
+      + clip(h && h.text, CFG.maxHistoryChars))
     .join('\n');
 
   return [
@@ -356,6 +362,12 @@ function json(res, code, obj) {
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
+    // A body that trickles in would otherwise hold a concurrency slot for as
+    // long as the request timeout allows.
+    const deadline = setTimeout(() => { reject(new Error('slow body')); req.destroy(); },
+      CFG.bodyTimeoutMs);
+    const settle = (fn) => (v) => { clearTimeout(deadline); fn(v); };
+    resolve = settle(resolve); reject = settle(reject);
     let size = 0;
     let over = false;
     const parts = [];
@@ -395,10 +407,12 @@ async function handleAsk(req, res) {
   if (dailyLeft() <= 0) { bump('daily'); return json(res, 503, { ok: false, code: 'daily' }); }
   if (!takeToken(clientIp(req))) { bump('rate'); return json(res, 429, { ok: false, code: 'rate' }); }
 
-  // Claimed BEFORE the first await. Reading the body yields, and two requests
-  // that both checked the caps at zero would both have passed them.
+  // The concurrency slot is claimed BEFORE the first await: reading the body
+  // yields, and two requests that both checked the cap at zero would both have
+  // passed it. The DAILY count is not claimed here — it counts calls to the
+  // model, and charging it for an empty or malformed body let anyone drain the
+  // day's allowance without the model ever running.
   state.inFlight += 1;
-  state.dayCount += 1;
   let released = false;
   const release = () => { if (!released) { released = true; state.inFlight -= 1; } };
 
@@ -409,6 +423,7 @@ async function handleAsk(req, res) {
   const text = clip(body && body.text, CFG.maxText).trim();
   if (!text) { release(); return json(res, 400, { ok: false, code: 'empty' }); }
 
+  state.dayCount += 1;                 // from here on the model is actually called
   const send = sse(res);
   let aborted = false;
   req.on('close', () => { aborted = true; });

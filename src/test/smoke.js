@@ -693,6 +693,27 @@ setTimeout(async () => {
   if (WS.live) {
     const L = WS.live;
 
+    // A shape whose fields are the wrong type used to pass the check and then
+    // throw mid-render, stranding the «Разбираю запрос» card.
+    {
+      check('live · a block with the wrong field type is dropped',
+        L.normBlocks([{ t: 'list', items: {} }, { t: 'bars', rows: 'нет' }, { t: 'p', text: 'ок' }]).length === 1);
+      let threw = false;
+      try { WS.engine.agentCard({ kind: 'answer', text: 'x', blocks: [{ t: 'list', items: {} }, { t: 'table', rows: 7 }] }); }
+      catch (e) { threw = true; }
+      check('live · and the renderer survives one that slips through', threw === false);
+    }
+
+    // Chat threads are persisted; the documents behind them are not.
+    {
+      const a = WS.report.create({ title: 'Первый', blocks: [{ t: 'p', text: 'a' }] });
+      const b = WS.report.create({ title: 'Второй', blocks: [{ t: 'p', text: 'b' }] });
+      check('report · ids are unique within a session', a.id !== b.id);
+      check('report · an id carries the page load that built it', /^rp\d+_\d+$/.test(a.id), a.id);
+      check('report · a card from a past session finds nothing rather than the wrong file',
+        WS.report.get('rp1') === null && WS.report.get('rp00000000_1') === null);
+    }
+
     // The report leaves the stand and is forwarded to a client, so it has to
     // stand alone — and it must not carry an unlabelled demo figure outside.
     {
@@ -735,6 +756,21 @@ setTimeout(async () => {
       const rb = doc.createElement('div'); rb.innerHTML = card;
       check('report · the answer offers the file rather than pushing it',
         rb.querySelectorAll('[data-rpopen]').length === 1 && rb.querySelectorAll('[data-rpsave]').length === 1);
+    }
+
+    // A chip must open its own message's rows, not the newest reply's.
+    {
+      const older = { kind: 'answer', text: 'старый', evidence: [{ label: 'старое', value: 1, query: { from: 'deals' } }], next: [{ label: 'a', ask: 'a' }] };
+      const newer = { kind: 'answer', text: 'новый', evidence: [{ label: 'новое', value: 2, query: { from: 'deals' } }], next: [{ label: 'b', ask: 'b' }] };
+      const h1 = WS.engine.agentCard(older, 'mOld');
+      WS.engine.agentCard(newer, 'mNew');
+      const bx = doc.createElement('div'); bx.innerHTML = h1;
+      const key = bx.querySelector('[data-agev]').getAttribute('data-agev');
+      check('live · a chip is addressed to its own message', key.indexOf('mOld:') === 0, key);
+      check('live · and resolves to that message’s reply',
+        WS.engine.replyFor(key).evidence[0].label === 'старое');
+      check('live · an unknown address falls back rather than throwing',
+        WS.engine.replyFor('mGone:0') !== undefined);
     }
 
     // The model names a shape; the markup is built by code. Nothing it returns
@@ -854,6 +890,13 @@ setTimeout(async () => {
       const hist = (function () { try { return JSON.parse(JSON.stringify(WS.live.history ? WS.live.history() : [])); } catch (e) { return []; } })();
       check('live · the conversation so far reaches the model',
         hist.length >= 2 && /первый вопрос/.test(JSON.stringify(hist)), JSON.stringify(hist).slice(0, 120));
+      // A client's own words handed over as the Concierge's leaves the model
+      // reasoning from a conversation that never happened.
+      WS.engine.pushText('user', 'Sarah', 'ещё ищу 1BR в JVC', 'probe:hist');
+      const withClient = WS.live.history();
+      check('live · a client is a third voice, not the Concierge',
+        withClient.some((m) => m.role === 'client' && /1BR/.test(m.text)),
+        JSON.stringify(withClient.map((m) => m.role)));
       check('live · and each turn is attributed to a speaker',
         hist.some((m) => m.role === 'user') && hist.some((m) => m.role === 'agent'), JSON.stringify(hist.map((m) => m.role)));
     }

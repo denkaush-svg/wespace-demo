@@ -77,17 +77,17 @@
     if (t === 'p') return '<p>' + esc(b.text) + '</p>';
     if (t === 'note') return '<div class="note">' + esc(b.text) + '</div>';
     if (t === 'list') {
-      const li = (b.items || []).slice(0, 20).map((x) => '<li>' + esc(x) + '</li>').join('');
+      const li = (Array.isArray(b.items) ? b.items : []).slice(0, 20).map((x) => '<li>' + esc(x) + '</li>').join('');
       return li ? '<ul>' + li + '</ul>' : '';
     }
     if (t === 'kv') {
-      return (b.rows || []).slice(0, 20).map((x) =>
+      return (Array.isArray(b.rows) ? b.rows : []).slice(0, 20).map((x) =>
         '<div class="kv"><span class="k">' + esc(x && x.k) + '</span>' +
         '<span class="v">' + esc(x && x.v) + '</span></div>').join('');
     }
     if (t === 'table') {
-      const head = (b.head || []).slice(0, 6);
-      const body = (b.rows || []).slice(0, 40).map((row) =>
+      const head = (Array.isArray(b.head) ? b.head : []).slice(0, 6);
+      const body = (Array.isArray(b.rows) ? b.rows : []).slice(0, 40).map((row) =>
         '<tr>' + (Array.isArray(row) ? row : []).slice(0, 6).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
       if (!body) return '';
       return '<div class="tw"><table>' +
@@ -95,7 +95,7 @@
         '<tbody>' + body + '</tbody></table></div>';
     }
     if (t === 'bars') {
-      const rows = (b.rows || []).slice(0, 12).filter((x) => x && isFinite(Number(x.value)));
+      const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 12).filter((x) => x && isFinite(Number(x.value)));
       if (!rows.length) return '';
       const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
       return '<div class="bars">' + rows.map((x) => {
@@ -152,12 +152,18 @@
 
   // Held so the chat card can offer the same document twice without rebuilding
   // it, and so a test can read what was produced without a download.
+  // Chat threads are persisted; the documents behind them are not. After a
+  // reload the counter restarted at 1, so a card left over from last session
+  // matched a freshly built report and offered to download the wrong document
+  // under the old title. The id carries the page load it was built in, so a
+  // stale card can never match a live report.
   const made = {};
+  const BOOT = String(Date.now()).slice(-8);
   let seq = 0;
 
   function create(spec) {
     seq++;
-    const id = 'rp' + seq;
+    const id = 'rp' + BOOT + '_' + seq;
     const html = build(spec);
     made[id] = { id: id, html: html, title: (spec && spec.title) || 'Аналитическая записка', name: fileName(spec && spec.title) };
     return made[id];

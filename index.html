@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 16:18</title>
+  <title>WESPACE · сборка 17:06</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='16:18';
+    window.WS_BUILD='17:06';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3990,7 +3990,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // the agent has since walked to another one — messages are addressed, so
     // this is safe, and returning early left a «Разбираю запрос» card there
     // forever. Only the shared «last reply» state waits for the same thread.
-    updateMsg(workMid, agentCard(reply), threadId);
+    updateMsg(workMid, agentCard(reply, workMid), threadId);
     if (!same()) return;
     engine.lastReply = reply;
   }
@@ -4024,17 +4024,30 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // writes arrives as a proposal with the change spelled out, never as a fait
   // accompli; and an action we cannot actually perform arrives as the artifact
   // itself, labelled, rather than as an apology.
+  // A chip belongs to the message it sits under, not to whatever answered last.
+  // Addressed by index into a global, an older card's «откуда это число» opened
+  // the newest reply's rows — and a reply landing after the agent switched
+  // threads made that reachable in one click.
+  const replies = {};
+  let chipMid = null;
+  function replyFor(key) {
+    const mid = String(key || '').split(':')[0];
+    return (mid && replies[mid]) || engine.lastReply || null;
+  }
+  function chipIndex(key) { return Number(String(key || '').split(':').pop()); }
+  function chipKey(i) { return (chipMid ? chipMid + ':' : '') + i; }
+
   function evChips(ev) {
     if (!ev || !ev.length) return '';
     return '<div class="ev-cap">' + I('source') + 'откуда это число</div>' +
       '<div class="qa-row" style="margin-top:5px">' + ev.map((e, i) =>
-      '<button class="chip src" data-agev="' + i + '" title="показать записи, из которых это посчитано">' +
+      '<button class="chip src" data-agev="' + chipKey(i) + '" title="показать записи, из которых это посчитано">' +
       (e.money ? WS.AED(e.value) : e.value) + ' ' + esc(e.label) + '</button>').join('') + '</div>';
   }
   function nextChips(next) {
     if (!next || !next.length) return '';
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
-      '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
+      '<button class="chip" data-agnext="' + chipKey(i) + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
   // Russian prints a decimal comma, and no gap before a percent sign.
   function anVal(v, suffix) {
@@ -4055,17 +4068,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       if (t === 'h') return '<div class="an-h">' + esc(b.text) + '</div>';
       if (t === 'note') return '<div class="an-note">' + I('shield') + '<span>' + esc(b.text) + '</span></div>';
       if (t === 'list') {
-        const li = (b.items || []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
+        const li = (Array.isArray(b.items) ? b.items : []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
         return li ? '<ul class="an-list">' + li + '</ul>' : '';
       }
       if (t === 'kv') {
-        const rows = (b.rows || []).slice(0, 8).map((x) =>
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8).map((x) =>
           '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
         return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
       }
       if (t === 'table') {
-        const head = (b.head || []).slice(0, 5);
-        const body = (b.rows || []).slice(0, 8)
+        const head = (Array.isArray(b.head) ? b.head : []).slice(0, 5);
+        const body = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8)
           .map((row) => '<tr>' + (Array.isArray(row) ? row : []).slice(0, 5).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
         if (!body) return '';
         return '<div class="an-tw"><table class="an-t">' +
@@ -4073,7 +4086,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           '<tbody>' + body + '</tbody></table></div>';
       }
       if (t === 'bars') {
-        const rows = (b.rows || []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
         if (!rows.length) return '';
         const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
         return '<div class="an-bars">' + rows.map((x) => {
@@ -4099,7 +4112,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
   }
 
-  function answerCard(r) {
+  function answerCard(r, mid) {
+    chipMid = mid || null;
+    if (mid) replies[mid] = r;
     const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
@@ -4131,12 +4146,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="prov" style="margin-top:10px"><span class="badge demo">' + I('lock') + esc(a.note || '') + '</span></div>' +
       nextChips(r.next) + '</div></div>';
   }
-  function agentCard(r) {
+  // The message id travels with the reply so the chips under it stay bound to
+  // it — the whole point of addressing them was lost if this dropped it.
+  function agentCard(r, mid) {
     if (!r) return msg('ai', I('sparkle') + ' Консьерж', 'Слушаю.');
+    chipMid = mid || null;
+    if (mid) replies[mid] = r;
     if (r.kind === 'proposal') return proposalCard(r);
     if (r.kind === 'draft') return draftCard(r);
     if (r.kind === 'error') return msg('ai', I('warn') + ' Консьерж', esc(r.text) + nextChips(r.next));
-    return answerCard(r);
+    return answerCard(r, mid);
   }
 
   function agentConfirm(id) {
@@ -4156,9 +4175,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge warn">' + I('warn') + esc(why) + '</span></div></div>');
     }
   }
-  function reportOpen(id) { if (WS.report) WS.report.openTab(id); }
+  // A card left over from a previous session points at a document that no
+  // longer exists. Saying so is the whole fix: silence looked like a dead button.
+  const GONE = 'Файл собран в прошлой сессии — попросите собрать заново';
+  function reportOpen(id) {
+    if (!WS.report || !WS.report.get(id)) return WS.storeApi.toast(GONE);
+    WS.report.openTab(id);
+  }
   function reportSave(id) {
-    if (WS.report && WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
+    if (!WS.report || !WS.report.get(id)) return WS.storeApi.toast(GONE);
+    if (WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
   }
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
@@ -4178,9 +4204,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   // Chips under a reply: either another question, or a card to open.
-  function agentNext(i) {
-    const r = engine.lastReply;
-    const n = r && r.next && r.next[i];
+  function agentNext(key) {
+    const r = replyFor(key);
+    const n = r && r.next && r.next[chipIndex(key)];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
     if (n.open) return navigateTo({ view: n.open, id: n.id });
@@ -4196,7 +4222,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
-    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave,
+    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     get lastReply() { return engine.lastReply; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
@@ -4792,9 +4818,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // Opens the records a figure was computed from. This is what makes an answer
   // checkable in the room: the number is not asserted, it is shown with its rows.
-  function openAgentEvidence(i) {
-    const r = WS.engine.lastReply && WS.engine.lastReply.evidence;
-    const e = r && r[i];
+  function openAgentEvidence(key) {
+    // Addressed to its own message: a chip under an older answer opens that
+    // answer's rows, not whatever replied most recently.
+    const reply = WS.engine.replyFor ? WS.engine.replyFor(key) : WS.engine.lastReply;
+    const r = reply && reply.evidence;
+    const e = r && r[Number(String(key || '').split(':').pop())];
     if (!e) return;
     const res = WS.query.run(Object.assign({}, e.query, { aggregate: null }));
     const rows = (res.rows || []).map((x) => {
@@ -9432,17 +9461,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (t === 'p') return '<p>' + esc(b.text) + '</p>';
     if (t === 'note') return '<div class="note">' + esc(b.text) + '</div>';
     if (t === 'list') {
-      const li = (b.items || []).slice(0, 20).map((x) => '<li>' + esc(x) + '</li>').join('');
+      const li = (Array.isArray(b.items) ? b.items : []).slice(0, 20).map((x) => '<li>' + esc(x) + '</li>').join('');
       return li ? '<ul>' + li + '</ul>' : '';
     }
     if (t === 'kv') {
-      return (b.rows || []).slice(0, 20).map((x) =>
+      return (Array.isArray(b.rows) ? b.rows : []).slice(0, 20).map((x) =>
         '<div class="kv"><span class="k">' + esc(x && x.k) + '</span>' +
         '<span class="v">' + esc(x && x.v) + '</span></div>').join('');
     }
     if (t === 'table') {
-      const head = (b.head || []).slice(0, 6);
-      const body = (b.rows || []).slice(0, 40).map((row) =>
+      const head = (Array.isArray(b.head) ? b.head : []).slice(0, 6);
+      const body = (Array.isArray(b.rows) ? b.rows : []).slice(0, 40).map((row) =>
         '<tr>' + (Array.isArray(row) ? row : []).slice(0, 6).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
       if (!body) return '';
       return '<div class="tw"><table>' +
@@ -9450,7 +9479,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<tbody>' + body + '</tbody></table></div>';
     }
     if (t === 'bars') {
-      const rows = (b.rows || []).slice(0, 12).filter((x) => x && isFinite(Number(x.value)));
+      const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 12).filter((x) => x && isFinite(Number(x.value)));
       if (!rows.length) return '';
       const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
       return '<div class="bars">' + rows.map((x) => {
@@ -9507,12 +9536,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // Held so the chat card can offer the same document twice without rebuilding
   // it, and so a test can read what was produced without a download.
+  // Chat threads are persisted; the documents behind them are not. After a
+  // reload the counter restarted at 1, so a card left over from last session
+  // matched a freshly built report and offered to download the wrong document
+  // under the old title. The id carries the page load it was built in, so a
+  // stale card can never match a live report.
   const made = {};
+  const BOOT = String(Date.now()).slice(-8);
   let seq = 0;
 
   function create(spec) {
     seq++;
-    const id = 'rp' + seq;
+    const id = 'rp' + BOOT + '_' + seq;
     const html = build(spec);
     made[id] = { id: id, html: html, title: (spec && spec.title) || 'Аналитическая записка', name: fileName(spec && spec.title) };
     return made[id];
@@ -9637,7 +9672,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const items = (th && th.items) || [];
     return items.slice(-8)
       .map((m) => ({
-        role: /class="msg me/.test(m.html || '') ? 'user' : 'agent',
+        // Three voices, not two. A client's message carries `msg user`, and
+        // calling it «agent» handed the model the client's words as its own.
+        role: /class="msg me/.test(m.html || '') ? 'user'
+          : (/class="msg user/.test(m.html || '') ? 'client' : 'agent'),
         text: String(m.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
       }))
       .filter((m) => m.text);
@@ -9689,10 +9727,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // Only shapes the renderer knows survive. Anything else is dropped rather
   // than passed through, so the model cannot widen the vocabulary at runtime.
-  const BLOCK_TYPES = ['p', 'h', 'note', 'list', 'kv', 'table', 'bars'];
+  // The type alone is not enough: {t:'list',items:{}} passed the old check and
+  // then threw on .slice() while the chat was mid-render, stranding the card.
+  // Every shape declares which of its fields must be arrays.
+  const BLOCK_ARRAYS = { p: [], h: [], note: [], list: ['items'], kv: ['rows'], table: ['rows'], bars: ['rows'] };
   function normBlocks(list) {
     if (!Array.isArray(list)) return null;
-    const out = list.filter((b) => b && typeof b === 'object' && BLOCK_TYPES.indexOf(String(b.t)) >= 0).slice(0, 10);
+    const out = list.filter((b) => {
+      if (!b || typeof b !== 'object') return false;
+      const need = BLOCK_ARRAYS[String(b.t)];
+      if (!need) return false;
+      if (!need.every((f) => Array.isArray(b[f]))) return false;
+      if (b.head != null && !Array.isArray(b.head)) return false;
+      return true;
+    }).slice(0, 10);
     return out.length ? out : null;
   }
 

@@ -91,7 +91,10 @@
     const items = (th && th.items) || [];
     return items.slice(-8)
       .map((m) => ({
-        role: /class="msg me/.test(m.html || '') ? 'user' : 'agent',
+        // Three voices, not two. A client's message carries `msg user`, and
+        // calling it «agent» handed the model the client's words as its own.
+        role: /class="msg me/.test(m.html || '') ? 'user'
+          : (/class="msg user/.test(m.html || '') ? 'client' : 'agent'),
         text: String(m.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
       }))
       .filter((m) => m.text);
@@ -143,10 +146,20 @@
 
   // Only shapes the renderer knows survive. Anything else is dropped rather
   // than passed through, so the model cannot widen the vocabulary at runtime.
-  const BLOCK_TYPES = ['p', 'h', 'note', 'list', 'kv', 'table', 'bars'];
+  // The type alone is not enough: {t:'list',items:{}} passed the old check and
+  // then threw on .slice() while the chat was mid-render, stranding the card.
+  // Every shape declares which of its fields must be arrays.
+  const BLOCK_ARRAYS = { p: [], h: [], note: [], list: ['items'], kv: ['rows'], table: ['rows'], bars: ['rows'] };
   function normBlocks(list) {
     if (!Array.isArray(list)) return null;
-    const out = list.filter((b) => b && typeof b === 'object' && BLOCK_TYPES.indexOf(String(b.t)) >= 0).slice(0, 10);
+    const out = list.filter((b) => {
+      if (!b || typeof b !== 'object') return false;
+      const need = BLOCK_ARRAYS[String(b.t)];
+      if (!need) return false;
+      if (!need.every((f) => Array.isArray(b[f]))) return false;
+      if (b.head != null && !Array.isArray(b.head)) return false;
+      return true;
+    }).slice(0, 10);
     return out.length ? out : null;
   }
 

@@ -568,7 +568,7 @@
     // the agent has since walked to another one — messages are addressed, so
     // this is safe, and returning early left a «Разбираю запрос» card there
     // forever. Only the shared «last reply» state waits for the same thread.
-    updateMsg(workMid, agentCard(reply), threadId);
+    updateMsg(workMid, agentCard(reply, workMid), threadId);
     if (!same()) return;
     engine.lastReply = reply;
   }
@@ -602,17 +602,30 @@
   // writes arrives as a proposal with the change spelled out, never as a fait
   // accompli; and an action we cannot actually perform arrives as the artifact
   // itself, labelled, rather than as an apology.
+  // A chip belongs to the message it sits under, not to whatever answered last.
+  // Addressed by index into a global, an older card's «откуда это число» opened
+  // the newest reply's rows — and a reply landing after the agent switched
+  // threads made that reachable in one click.
+  const replies = {};
+  let chipMid = null;
+  function replyFor(key) {
+    const mid = String(key || '').split(':')[0];
+    return (mid && replies[mid]) || engine.lastReply || null;
+  }
+  function chipIndex(key) { return Number(String(key || '').split(':').pop()); }
+  function chipKey(i) { return (chipMid ? chipMid + ':' : '') + i; }
+
   function evChips(ev) {
     if (!ev || !ev.length) return '';
     return '<div class="ev-cap">' + I('source') + 'откуда это число</div>' +
       '<div class="qa-row" style="margin-top:5px">' + ev.map((e, i) =>
-      '<button class="chip src" data-agev="' + i + '" title="показать записи, из которых это посчитано">' +
+      '<button class="chip src" data-agev="' + chipKey(i) + '" title="показать записи, из которых это посчитано">' +
       (e.money ? WS.AED(e.value) : e.value) + ' ' + esc(e.label) + '</button>').join('') + '</div>';
   }
   function nextChips(next) {
     if (!next || !next.length) return '';
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
-      '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
+      '<button class="chip" data-agnext="' + chipKey(i) + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
   // Russian prints a decimal comma, and no gap before a percent sign.
   function anVal(v, suffix) {
@@ -633,17 +646,17 @@
       if (t === 'h') return '<div class="an-h">' + esc(b.text) + '</div>';
       if (t === 'note') return '<div class="an-note">' + I('shield') + '<span>' + esc(b.text) + '</span></div>';
       if (t === 'list') {
-        const li = (b.items || []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
+        const li = (Array.isArray(b.items) ? b.items : []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
         return li ? '<ul class="an-list">' + li + '</ul>' : '';
       }
       if (t === 'kv') {
-        const rows = (b.rows || []).slice(0, 8).map((x) =>
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8).map((x) =>
           '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
         return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
       }
       if (t === 'table') {
-        const head = (b.head || []).slice(0, 5);
-        const body = (b.rows || []).slice(0, 8)
+        const head = (Array.isArray(b.head) ? b.head : []).slice(0, 5);
+        const body = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8)
           .map((row) => '<tr>' + (Array.isArray(row) ? row : []).slice(0, 5).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
         if (!body) return '';
         return '<div class="an-tw"><table class="an-t">' +
@@ -651,7 +664,7 @@
           '<tbody>' + body + '</tbody></table></div>';
       }
       if (t === 'bars') {
-        const rows = (b.rows || []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
         if (!rows.length) return '';
         const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
         return '<div class="an-bars">' + rows.map((x) => {
@@ -677,7 +690,9 @@
       '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
   }
 
-  function answerCard(r) {
+  function answerCard(r, mid) {
+    chipMid = mid || null;
+    if (mid) replies[mid] = r;
     const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
@@ -709,12 +724,16 @@
       '<div class="prov" style="margin-top:10px"><span class="badge demo">' + I('lock') + esc(a.note || '') + '</span></div>' +
       nextChips(r.next) + '</div></div>';
   }
-  function agentCard(r) {
+  // The message id travels with the reply so the chips under it stay bound to
+  // it — the whole point of addressing them was lost if this dropped it.
+  function agentCard(r, mid) {
     if (!r) return msg('ai', I('sparkle') + ' Консьерж', 'Слушаю.');
+    chipMid = mid || null;
+    if (mid) replies[mid] = r;
     if (r.kind === 'proposal') return proposalCard(r);
     if (r.kind === 'draft') return draftCard(r);
     if (r.kind === 'error') return msg('ai', I('warn') + ' Консьерж', esc(r.text) + nextChips(r.next));
-    return answerCard(r);
+    return answerCard(r, mid);
   }
 
   function agentConfirm(id) {
@@ -734,9 +753,16 @@
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge warn">' + I('warn') + esc(why) + '</span></div></div>');
     }
   }
-  function reportOpen(id) { if (WS.report) WS.report.openTab(id); }
+  // A card left over from a previous session points at a document that no
+  // longer exists. Saying so is the whole fix: silence looked like a dead button.
+  const GONE = 'Файл собран в прошлой сессии — попросите собрать заново';
+  function reportOpen(id) {
+    if (!WS.report || !WS.report.get(id)) return WS.storeApi.toast(GONE);
+    WS.report.openTab(id);
+  }
   function reportSave(id) {
-    if (WS.report && WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
+    if (!WS.report || !WS.report.get(id)) return WS.storeApi.toast(GONE);
+    if (WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
   }
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
@@ -756,9 +782,9 @@
   }
 
   // Chips under a reply: either another question, or a card to open.
-  function agentNext(i) {
-    const r = engine.lastReply;
-    const n = r && r.next && r.next[i];
+  function agentNext(key) {
+    const r = replyFor(key);
+    const n = r && r.next && r.next[chipIndex(key)];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
     if (n.open) return navigateTo({ view: n.open, id: n.id });
@@ -774,7 +800,7 @@
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
-    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave,
+    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     get lastReply() { return engine.lastReply; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,

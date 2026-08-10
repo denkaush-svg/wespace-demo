@@ -229,9 +229,12 @@
 
   // Opens the records a figure was computed from. This is what makes an answer
   // checkable in the room: the number is not asserted, it is shown with its rows.
-  function openAgentEvidence(i) {
-    const r = WS.engine.lastReply && WS.engine.lastReply.evidence;
-    const e = r && r[i];
+  function openAgentEvidence(key) {
+    // Addressed to its own message: a chip under an older answer opens that
+    // answer's rows, not whatever replied most recently.
+    const reply = WS.engine.replyFor ? WS.engine.replyFor(key) : WS.engine.lastReply;
+    const r = reply && reply.evidence;
+    const e = r && r[Number(String(key || '').split(':').pop())];
     if (!e) return;
     const res = WS.query.run(Object.assign({}, e.query, { aggregate: null }));
     const rows = (res.rows || []).map((x) => {
