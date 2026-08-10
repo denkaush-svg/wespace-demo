@@ -113,7 +113,7 @@
     if (d.taskassign) { api.taskAction(d.taskassign, 'reassign', d.who); WS.ui.closeModal(); return api.toast('Задача переназначена', 'ok'); }
     if (d.artopen) { WS.ui.closeModal(); return WS.ui.openArtifactId(d.artopen); }
     if (d.client) return WS.ui.clientCard(d.client);
-    if (d.obj) return WS.ui.objectCard(d.obj);
+    if (d.obj) { WS.ui.setObjOrigin(d.fromreq || null); return WS.ui.objectCard(d.obj); }
     if (d.doc) { WS.ui.openDoc(d.doc); return; }
     if (d.cgctx) { const p = d.cgctx.split('~~'); store.cgCtx = store.cgCtx || []; const ix = store.cgCtx.findIndex((c) => c.label === p[1]); if (ix >= 0) store.cgCtx.splice(ix, 1); else store.cgCtx.push({ icon: p[0], label: p[1] }); return api.emit(); }
     if (d.cgctxdel) { (store.cgCtx || []).splice(+d.cgctxdel, 1); return api.emit(); }
@@ -216,6 +216,9 @@
       case 'reqAddObject': WS.ui.reqAddObject(t.dataset.req); break;
       case 'reqFormKp': WS.ui.reqFormKp(t.dataset.req); break;
       case 'reqCreateDeal': WS.ui.reqCreateDeal(t.dataset.req); break;
+      case 'editRequest': WS.ui.openRequestEdit(t.dataset.req); break;
+      case 'saveRequest': WS.ui.saveRequestEdit(t.dataset.req); break;
+      case 'openReqKp': WS.ui.openReqKp(t.dataset.req); break;
       case 'callAi': WS.eventEngine.callAi(); break;
       case 'failHuman': WS.eventEngine.failResolve('human'); break;
       case 'failPick': WS.eventEngine.failResolve(t.dataset.deal); break;

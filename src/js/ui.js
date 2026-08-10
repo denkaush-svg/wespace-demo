@@ -1779,32 +1779,45 @@
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
-  // "Что сейчас" — calm and structured (not a prose wall, not red-by-default): a laconic
-  // status line, then the next step, then the last events. Red is reserved for a real problem
-  // (missing consent) — never for "hot" or a few days in a stage.
-  function dealNowBlock(d) {
+  // ---- Shared "now" cards (deal + request use the SAME treatment so related process cards don't
+  // diverge). The old flat grey "Что сейчас" block is split into distinct titled surface cards with
+  // an emphasized action — so it reads as hierarchy, not one grey area of same-size text. ----
+  // "Следующий шаг" callout: owner + due sit in the header, the action itself is emphasized.
+  function nextStepCard(owner, due, over, actionHtml, whyHtml) {
+    const meta = (owner ? '<span class="nstep-owner">' + I('users') + owner + '</span>' : '') +
+      (due ? '<span class="nstep-due' + (over ? ' over' : '') + '">' + I('clock') + due + '</span>' : '');
+    return dxSec('target', 'Следующий шаг', meta ? '<span class="nstep-meta">' + meta + '</span>' : '',
+      '<div class="nstep-act">' + actionHtml + '</div>' + (whyHtml ? '<div class="nstep-why">' + whyHtml + '</div>' : ''));
+  }
+  function nowEvLine(p) {
+    return '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
+      '<div class="dnb-ev-b"><div class="dnb-ev-t">' + p.e.text + '</div>' +
+      '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>';
+  }
+  // "Последние события" card: the few most-recent events that fit, then a jump to the full history.
+  function recentEventsCard(tl, moreEtab) {
+    const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, 4).map(nowEvLine).join('') ||
+      '<div class="dnb-ev-empty">событий пока нет</div>';
+    const more = '<button class="btn xs" data-etab="' + moreEtab + '">' + I('arrowRight') + 'вся история</button>';
+    return dxSec('clock', 'Последние события', more, '<div class="dnb-hist">' + evs + '</div>');
+  }
+  // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
+  function dealChipRow(d) {
     const s = funnelSteps(d);
-    const a = nbaActions(d);
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const chips = '<div class="dnb-chips">' +
+    return '<div class="dnb-chips">' +
       '<span class="chip on">' + I('trend') + s.cols[s.idx] + '</span>' +
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
       (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
-    const isOver = /просроч/i.test(d.nextDue || '');
-    const dueTxt = d.nextDue ? ' · <span' + (isOver ? ' style="color:var(--stop);font-weight:700"' : '') + '>' + (isOver ? d.nextDue : 'срок: ' + d.nextDue) + '</span>' : '';
-    const next = '<div class="dnb-row"><div class="dnb-k">Следующий шаг · ' + agentName(d.agent) + dueTxt + '</div>' +
-      '<div class="dnb-v">' + a.doIt[0] + (a.why ? ' <span class="dnb-why">· ' + a.why + '</span>' : '') + '</div></div>';
-    const tl = (D().dealTimeline || {})[d.id] || [];
-    const evs = feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
-      '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
-      '<div class="dnb-ev-b"><div class="dnb-ev-t">' + p.e.text + '</div>' +
-      '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
-      '<div class="dnb-ev-empty">событий пока нет</div>';
-    const more = '<button class="btn xs" data-etab="deal~' + d.id + '~history">' + I('arrowRight') + 'вся история</button>';
-    return '<div class="dnb"><div class="dnb-cap">' + I('pulse') + 'Что сейчас со сделкой</div>' +
-      chips + next +
-      '<div class="dnb-row"><div class="dnb-k">Последние события ' + more + '</div><div class="dnb-hist">' + evs + '</div></div></div>';
+  }
+  function dealNextStepCard(d) {
+    const a = nbaActions(d);
+    const over = /просроч/i.test(d.nextDue || '');
+    return nextStepCard(agentName(d.agent), d.nextDue || '', over, a.doIt[0], a.why || '');
+  }
+  function dealRecentCard(d) {
+    return recentEventsCard((D().dealTimeline || {})[d.id] || [], 'deal~' + d.id + '~history');
   }
   // Compact object card — the demoted hero. Opens the full object on click.
   function dealObjectMini(o) {
@@ -1862,10 +1875,10 @@
   function dealHeader(d) {
     return dealHero(d) +
       '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
+      dealChipRow(d) +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
-      '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + '</div>' +
-      '<div class="deal-top-cell">' + dealClientCard(d) + dealLotsBlock(d) + '</div></div>' +
-      dealNowBlock(d);
+      '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
+      '<div class="deal-top-cell">' + dealClientCard(d) + dealLotsBlock(d) + dealRecentCard(d) + '</div></div>';
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -1982,6 +1995,7 @@
       if (sel) items.push({ label: 'Выбрано ' + sel, tone: 'ok' });
       if (rej) items.push({ label: 'Отклонено ' + rej, tone: 'stop' });
     }
+    if (r.leadStatus) items.push({ label: r.leadStatus, icon: 'target' });
     const tm = ({ hot: ['Горячий', 'stop'], warm: ['Тёплый', 'warn'], cold: ['Холодный', ''] })[r.temperature];
     if (tm) items.push({ label: tm[0], tone: tm[1], icon: 'flame' });
     return statusChip(items);
@@ -2011,9 +2025,11 @@
   // Facing LEFT — key request conditions (mirror the deal's «Ключевое»).
   function reqKeyCard(r) {
     const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
-    return dxSec('briefcase', 'Ключевые условия', '', '<div class="dfields">' +
+    const edit = '<button class="btn xs" data-act="editRequest" data-req="' + r.id + '">' + I('pencil') + 'Изменить</button>';
+    return dxSec('briefcase', 'Ключевые условия', edit, '<div class="dfields">' +
       dfPair('Бюджет', r.budget ? WS.AED(r.budget) : '—') +
       dfPair('Форма оплаты', pay) +
+      (r.funding ? dfPair('Финансирование', r.funding) : '') +
       dfPair('Тип сделки', r.dealType) +
       dfPair('Районы', (r.areas || []).join(' · ')) +
       dfPair('Цель', r.goal) +
@@ -2051,54 +2067,87 @@
     const m = ({ selected: ['Выбран', 'ok', 'check'], rejected: ['Отклонён', 'stop', 'x'] })[off.state] || ['На рассмотрении', '', 'clock'];
     return { label: m[0], tone: m[1], icon: m[2] };
   }
-  // Full-width подбор with the status model — the read view (editable pick/reject lives in the tab).
+  // Full-width подбор with the status model + INLINE decision editing (pick / in-work / reject right
+  // in the tile — no separate edit page). Under it the КП scenario: отметить выбранное → собрать КП
+  // с доходностью/стоимостью/условиями → создать сделку.
   function reqOffersStatusBlock(r) {
     const off = r.offered || [];
     const rows = off.map((o) => {
       const obj = D().objects.find((x) => x.id === o.id); if (!obj) return '';
       const st = reqOfferStatus(r, o);
+      const locked = st.label === 'В сделке' || st.label === 'Сделка закрыта';
       const ph = (WS.photos && WS.photos[obj.id]) || '';
       const reason = (o.state === 'rejected' && o.reason) ? '<div class="reqo-reason">' + I('warn') + o.reason + '</div>' : '';
-      return '<div class="obj-mini" data-obj="' + obj.id + '">' +
+      const seg = locked ? '' : '<div class="obj-seg">' +
+        [['selected', 'Выбран', 'check'], ['offered', 'В работе', 'clock'], ['rejected', 'Отклонён', 'x']].map((s) =>
+          '<button class="obj-seg-b' + (o.state === s[0] ? ' on' : '') + '" data-reqobj="' + r.id + '~' + obj.id + '~' + s[0] + '">' + I(s[2]) + s[1] + '</button>').join('') + '</div>';
+      return '<div class="obj-mini" data-obj="' + obj.id + '" data-fromreq="' + r.id + '">' +
         (ph ? '<div class="obj-mini-ph" style="background-image:url(' + ph + ')"></div>' : '<div class="obj-mini-ph">' + I('building') + '</div>') +
         '<div class="obj-mini-b"><div class="obj-mini-n">' + obj.name + '</div>' +
         '<div class="obj-mini-m">' + obj.area + ' · ' + WS.AED(obj.price) + ' · ' + obj.br + '</div>' +
         '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
-        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' +
+        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + seg + '</div>' +
         I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
-    const edit = '<button class="btn xs" data-etab="request~' + r.id + '~offers">' + I('pencil') + 'Отметить решение</button>';
-    return dxSec('building', 'Объекты подбора · ' + off.length, edit, rows);
+    const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить</button>';
+    return dxSec('building', 'Объекты подбора · ' + off.length, add, rows + reqKpActions(r));
   }
-  function reqRecentEvents(r) {
-    const tl = (D().requestTimeline || {})[r.id] || [];
-    return feedSortDesc(tl.map((e, i) => ({ e: e, i: i }))).slice(0, 3).map((p) =>
-      '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
-      '<div class="dnb-ev-b"><div class="dnb-ev-t">' + p.e.text + '</div>' +
-      '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>').join('') ||
-      '<div class="dnb-ev-empty">событий пока нет</div>';
+  // КП scenario, right in the objects block: собрать / открыть / пересобрать / создать сделку.
+  // Selected objects not yet consumed by a deal — the actionable set for «Создать сделку» (a request
+  // can spawn several deals, so we key off free-selected, not "any deal exists").
+  function reqSelectedFree(r) {
+    const inDeal = {};
+    dealsOfRequest(r.id).forEach((d) => (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) inDeal[oid] = 1; }));
+    return (r.offered || []).filter((o) => o.state === 'selected' && !inDeal[o.id]).map((o) => o.id);
   }
-  function reqNowBlock(r) {
-    const me = (D().users && D().users.agent) ? D().users.agent.name : 'не назначен';
+  function reqKpActions(r) {
+    const sel = (r.offered || []).filter((o) => o.state === 'selected').length;
+    const selFree = reqSelectedFree(r).length;
+    const formed = !!(r.kp && r.kp.formed);
+    const btns = [];
+    if (formed) {
+      btns.push('<button class="btn sm" data-act="openReqKp" data-req="' + r.id + '">' + I('doc') + 'Открыть КП · ' + (r.kp.objectIds || []).length + '</button>');
+      btns.push('<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '"' + (sel ? '' : ' disabled') + '>' + I('sparkle') + 'Пересобрать · ' + sel + '</button>');
+      if (selFree) btns.push('<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку · ' + selFree + '</button>');
+    } else {
+      btns.push('<button class="btn sm primary" data-act="reqFormKp" data-req="' + r.id + '"' + (sel ? '' : ' disabled') + '>' + I('doc') + 'Собрать КП из выбранного · ' + sel + '</button>');
+    }
+    return '<div class="reqo-kp"><div class="reqo-kp-hint">' + I('sparkle') +
+      'Отметьте выбранные объекты — КП собирается с доходностью, стоимостью и условиями, из него создаётся сделка.</div>' +
+      '<div class="reqo-kp-acts">' + btns.join('') + '</div></div>';
+  }
+  function reqNextStepCard(r) {
+    const me = (D().users && D().users.agent) ? D().users.agent.name : '—';
     const owner = r.assignee ? agentName(r.assignee) : me;
-    const line = opsLine([
-      ['users', 'Ответственный', owner],
-      r.leadStatus ? ['target', 'Статус лида', r.leadStatus] : null,
-      r.nextContact ? ['clock', 'Следующий контакт', r.nextContact] : null,
-      r.funding ? ['money', 'Финансирование', r.funding] : null,
-    ], undefined);
-    const nextRow = '<div class="dnb-row"><div class="dnb-k">Следующий шаг</div><div class="dnb-v">' + reqNextAction(r) + '</div></div>';
-    const more = '<button class="btn xs" data-etab="request~' + r.id + '~history">' + I('arrowRight') + 'вся история</button>';
-    const histRow = '<div class="dnb-row"><div class="dnb-k">Последние события ' + more + '</div><div class="dnb-hist">' + reqRecentEvents(r) + '</div></div>';
-    return '<div class="dnb"><div class="dnb-cap">' + I('pulse') + 'Что сейчас по заявке</div>' + line + nextRow + histRow + '</div>';
+    return nextStepCard(owner, r.nextContact || '', false, reqNextAction(r), '');
+  }
+  function reqRecentCard(r) {
+    return recentEventsCard((D().requestTimeline || {})[r.id] || [], 'request~' + r.id + '~history');
+  }
+  // Профиль предпочтений + сделки заявки — раньше жили во вкладке «Обзор» (дублировала шапку, роль
+  // неясна). Теперь в основной части под объектами.
+  function reqDealsBlock(r) {
+    const deals = dealsOfRequest(r.id);
+    const dealRows = deals.map((d) => {
+      const s = funnelSteps(d);
+      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
+        '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
+        '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('');
+    return dxSec('briefcase', 'Сделки по заявке · ' + deals.length, '', '<div class="feed">' + dealRows + '</div>');
+  }
+  function reqSecondaryBlocks(r) {
+    const parts = [reqPrefProfile(r), dealsOfRequest(r.id).length ? reqDealsBlock(r) : ''].filter(Boolean);
+    return parts.length ? '<div class="req-secondary">' + parts.join('') + '</div>' : '';
   }
   function requestHeader(r) {
     return requestHero(r) +
       '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>' +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
-      '<div class="deal-top req-top"><div class="deal-top-cell">' + reqKeyCard(r) + '</div>' +
-      '<div class="deal-top-cell">' + reqClientCard(r) + reqNowBlock(r) + '</div></div>' +
-      reqOffersStatusBlock(r);
+      '<div class="deal-top"><div class="deal-top-cell">' + reqKeyCard(r) + reqNextStepCard(r) + '</div>' +
+      '<div class="deal-top-cell">' + reqClientCard(r) + reqRecentCard(r) + '</div></div>' +
+      reqOffersStatusBlock(r) +
+      reqSecondaryBlocks(r);
   }
   function requestTimelineInner(r) {
     const tl = (D().requestTimeline || {})[r.id] || [];
@@ -2108,31 +2157,17 @@
     return '<div class="timeline">' + rows + '</div>';
   }
   function requestTabContent(r, tab) {
-    if (tab === 'offers') return reqOfferedBlock(r);
     if (tab === 'tasks') {
       const list = (D().tasks || []).filter((t) => t.clientId === r.clientId);
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по заявке пока нет</div>';
       return dxSec('check', 'Задачи по заявке · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
-    if (tab === 'docs') return reqKpBlock(r);
     if (tab === 'history') {
       const addBtn = '<button class="btn xs" data-act="addEvent" data-scope="request" data-req="' + r.id + '">' + I('plus') + 'Событие</button>';
       return dxSec('clock', 'История заявки', addBtn, requestTimelineInner(r)) +
         '<div style="font-size:11px;color:var(--faint);margin-top:6px">Сквозная переписка по клиенту (заявка ↔ сделки, с фильтром) — следующим шагом.</div>';
     }
-    // overview — preference profile + the deals this request produced.
-    const deals = dealsOfRequest(r.id);
-    const dealRows = deals.map((d) => {
-      const s = funnelSteps(d);
-      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
-        '<div class="ft"><div class="t">' + dealActionWord(d) + ' · ' + dealLotsLabel(d) + '</div>' +
-        '<div class="m">' + s.cols[s.idx] + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>';
-    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">сделок по заявке ещё нет — создайте из выбранных объектов</div>';
-    const dealsBlock = dxSec('briefcase', 'Сделки по заявке · ' + deals.length, '',
-      '<div class="feed">' + dealRows + '</div>' +
-      '<div style="font-size:11px;color:var(--faint);margin-top:6px">Один договор = одна сделка. Несколько юнитов под одним договором — лоты внутри сделки.</div>');
-    const pref = reqPrefProfile(r);
-    return (pref ? pref + '<div style="height:14px"></div>' : '') + dealsBlock;
+    return reqKpBlock(r); // docs — КП и документы заявки (объекты, профиль, сделки — в основной части)
   }
   function requestSpec(id) {
     const r = requestById(id); if (!r) return null;
@@ -2142,44 +2177,34 @@
     return {
       type: 'request', id: id, title: 'Заявка · ' + r.title,
       status: requestHeader(r),
-      tabs: [['overview', 'Обзор'], ['offers', 'Подбор объектов'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
       pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
         '<button class="btn sm primary" data-thread="' + tid + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail">' + I('chat') + 'Чат по заявке</button>',
     };
   }
-  const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
-  function reqOfferedRow(r, off) {
-    const o = D().objects.find((x) => x.id === off.id); if (!o) return '';
-    const st = REQ_STATE[off.state || 'offered'];
-    const chip = '<span class="badge ' + st[0] + '">' + I(st[2]) + st[1] + '</span>';
-    const btn = (state, label, ic, cls) => '<button class="btn xs' + (off.state === state ? ' ' + cls : '') + '" data-reqobj="' + r.id + '~' + o.id + '~' + state + '">' + I(ic) + label + '</button>';
-    const acts = '<div class="reqo-acts">' + btn('selected', 'Выбрал', 'check', 'primary') + btn('rejected', 'Отклонил', 'x', 'danger') + btn('offered', 'В работе', 'clock', 'ghost') + '</div>';
-    const reason = off.reason ? '<div class="reqo-reason">' + I('warn') + off.reason + '</div>' : '';
-    return '<div class="reqo">' + dealObjectMini(o) + '<div class="reqo-bar">' + chip + acts + '</div>' + reason + '</div>';
-  }
-  function reqOfferedBlock(r) {
-    const off = r.offered || [];
-    const rows = off.map((o) => reqOfferedRow(r, o)).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
-    const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить объект</button>';
-    const selN = off.filter((o) => o.state === 'selected').length;
-    const sub = '<div style="font-size:11px;color:var(--faint);margin-top:6px">Отметьте, что выбрал или отклонил клиент — из выбранного собирается КП и создаётся сделка. Выбрано: ' + selN + '.</div>';
-    return dxSec('building', 'Подбор объектов · ' + off.length, add, rows + sub);
+  // Net yield for the КП preview — reuses the finance model; guarded so a compute miss never breaks render.
+  function reqKpNetYield(o) {
+    try { const y = objNetYield(o); return (typeof y === 'number' && isFinite(y)) ? y : null; } catch (e) { return null; }
   }
   function reqKpBlock(r) {
     const sel = (r.offered || []).filter((o) => o.state === 'selected');
     if (!r.kp || !r.kp.formed) {
       return dxSec('doc', 'Коммерческое предложение', '',
-        '<div style="font-size:12.5px;color:var(--mut);margin-bottom:8px">КП ещё не собрано. Отметьте выбранные объекты и соберите КП для клиента.</div>' +
+        '<div style="font-size:12.5px;color:var(--mut);margin-bottom:8px">КП ещё не собрано. Отметьте выбранные объекты в подборе и соберите КП — с доходностью, стоимостью и условиями.</div>' +
         '<button class="btn sm primary" data-act="reqFormKp" data-req="' + r.id + '"' + (sel.length ? '' : ' disabled') + '>' + I('doc') + 'Собрать КП из выбранного (' + sel.length + ')</button>');
     }
     const kpObjs = (r.kp.objectIds || []).map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
-    const rows = kpObjs.map((o) => '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + o.area + ' · ' + WS.AED(o.price) + '</div></div></div>').join('');
+    const rows = kpObjs.map((o) => {
+      const ny = reqKpNetYield(o);
+      const m = [o.area, WS.AED(o.price), (ny != null ? 'доходность ' + (ny * 100).toFixed(1) + '%' : null), (o.commissionPct ? 'комиссия ' + o.commissionPct + '%' : null)].filter(Boolean).join(' · ');
+      return '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + m + '</div></div></div>';
+    }).join('');
     return dxSec('doc', 'Коммерческое предложение · ' + r.kp.at, '<span class="badge ok">' + I('check') + 'собрано</span>',
       '<div class="feed">' + rows + '</div>' +
       '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
-      '<button class="btn sm" data-act="openKp">' + I('arrowRight') + 'Открыть КП</button>' +
+      '<button class="btn sm" data-act="openReqKp" data-req="' + r.id + '">' + I('arrowRight') + 'Открыть КП</button>' +
       '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
       '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
   }
@@ -2233,7 +2258,7 @@
   }
   function reqCreateDeal(reqId) {
     const r = requestById(reqId); if (!r) return;
-    const sel = (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    const sel = reqSelectedFree(r);
     if (!sel.length) { WS.storeApi.toast('Сначала отметьте объекты, которые выбрал клиент'); return; }
     const objs = sel.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
     const c = D().clients.find((x) => x.id === r.clientId) || {};
@@ -2247,6 +2272,82 @@
     D().dealTimeline = D().dealTimeline || {};
     D().dealTimeline[nid] = [{ ch: 'crm', by: 'Система', at: 'только что', ord: 999, text: 'Сделка создана из заявки «' + r.title + '» · подписан документ о намерениях · лотов: ' + sel.length }];
     WS.storeApi.save(); WS.storeApi.toast('Сделка создана из заявки · лотов: ' + sel.length, 'ok'); dealCard(nid);
+  }
+  // ---- Request Ключевые условия edit (D) + КП document (E) + parent-request breadcrumb (F) ----
+  const REQ_ENUMS = {
+    dealType: ['Продажа · off-plan', 'Продажа · готовое', 'Аренда', 'Fit-out', 'Инвестиция · портфель', 'Готовый арендный бизнес'],
+    paymentForm: ['100% оплата', 'Рассрочка от застройщика', 'Ипотека', 'Годовой чек', 'Поэтапно'],
+  };
+  function openRequestEdit(id) {
+    const r = requestById(id); if (!r) return;
+    const sel = (k, label, opts) => '<label class="fld"><span>' + label + '</span><select id="rf_' + k + '">' +
+      opts.map((o) => '<option' + (o === r[k] ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Ключевые условия заявки. Сохранение обновляет карточку, подбор и КП.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Бюджет, AED</span><input id="rf_budget" type="text" value="' + (r.budget || '') + '"></label>' +
+      sel('dealType', 'Тип сделки', REQ_ENUMS.dealType) + sel('paymentForm', 'Форма оплаты', REQ_ENUMS.paymentForm) +
+      '<label class="fld"><span>Районы (через запятую)</span><input id="rf_areas" type="text" value="' + escAttr((r.areas || []).join(', ')) + '"></label>' +
+      '<label class="fld"><span>Цель</span><input id="rf_goal" type="text" value="' + escAttr(r.goal || '') + '"></label>' +
+      '<label class="fld"><span>Срок сделки</span><input id="rf_horizon" type="text" value="' + escAttr(r.horizon || '') + '"></label>' +
+      '<label class="fld"><span>Финансирование</span><input id="rf_funding" type="text" value="' + escAttr(r.funding || '') + '"></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="rf_vat"' + (r.vat ? ' checked' : '') + '> Применяется НДС 5%</label>';
+    openModal('Ключевые условия · ' + r.title, body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveRequest" data-req="' + id + '">' + I('check') + 'Сохранить</button>');
+  }
+  function saveRequestEdit(id) {
+    const r = requestById(id); if (!r) return;
+    const g = (k) => { const el = document.getElementById('rf_' + k); return el ? el.value : r[k]; };
+    const amt = parseInt((g('budget') || '').toString().replace(/\D/g, ''), 10);
+    r.budget = amt || r.budget;
+    r.dealType = g('dealType'); r.paymentForm = g('paymentForm');
+    r.areas = (g('areas') || '').split(',').map((s) => s.trim()).filter(Boolean);
+    r.goal = g('goal'); r.horizon = g('horizon'); r.funding = g('funding');
+    r.vat = !!(document.getElementById('rf_vat') || {}).checked;
+    WS.storeApi.save(); closeModal(); WS.storeApi.toast('Ключевые условия обновлены', 'ok'); WS.storeApi.emit();
+  }
+  // КП as a client-facing document — objects with cost + net yield + commission, then the terms.
+  function openReqKp(id) {
+    const r = requestById(id); if (!r) return;
+    const ids = (r.kp && r.kp.objectIds && r.kp.objectIds.length) ? r.kp.objectIds : (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    const objs = ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    if (!objs.length) { WS.storeApi.toast('Отметьте выбранные объекты — из них соберётся КП'); return; }
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const body = objs.map((o) => {
+      const ny = reqKpNetYield(o);
+      return '<tr><td>' + o.name + '</td><td>' + o.area + '</td><td class="num">' + WS.AED(o.price) + '</td>' +
+        '<td class="num">' + (ny != null ? (ny * 100).toFixed(1) + '%' : '—') + '</td>' +
+        '<td class="num">' + (o.commissionPct ? o.commissionPct + '%' : '—') + '</td></tr>';
+    }).join('');
+    const total = objs.reduce((s, o) => s + (o.price || 0), 0);
+    const doc = '<div class="kp-doc">' +
+      '<div class="kp-doc-head"><div><div class="kp-doc-to">Коммерческое предложение</div>' +
+      '<div class="kp-doc-cli">' + (c.name || 'Клиент') + ' · ' + r.title + '</div></div>' +
+      '<span class="badge demo">' + I('lock') + 'DEMO</span></div>' +
+      '<div class="kp-tblwrap"><table class="kp-tbl"><thead><tr><th>Объект</th><th>Район</th><th class="num">Стоимость</th><th class="num">Доходность</th><th class="num">Комиссия</th></tr></thead>' +
+      '<tbody>' + body + '</tbody>' +
+      '<tfoot><tr><td colspan="2">Итого · ' + objs.length + ' об.</td><td class="num">' + WS.AED(total) + '</td><td class="num">—</td><td class="num">—</td></tr></tfoot></table></div>' +
+      '<div class="kp-doc-terms"><div class="kp-doc-terms-h">Условия</div>' +
+      '<div>Форма оплаты: <b>' + (r.paymentForm || '—') + '</b> · НДС: <b>' + (r.vat ? '5%' : 'не облагается') + '</b> · Срок: <b>' + (r.horizon || '—') + '</b></div>' +
+      (r.funding ? '<div>Финансирование: <b>' + r.funding + '</b></div>' : '') + '</div></div>';
+    openModal('КП · ' + r.title, doc,
+      '<button class="btn" data-act="closeModal">Закрыть</button>' +
+      '<button class="btn primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button>');
+  }
+  // Which заявка a deal/object breadcrumbs back to. An object can be offered in several requests, so
+  // first-match would send you to the wrong one — prefer the request we actually navigated in FROM
+  // (set on the подбор tile click); fall back to the offering request only when it's unambiguous.
+  let objOriginReq = null;
+  function setObjOrigin(reqId) { objOriginReq = reqId || null; }
+  function objBackRequest(objId) {
+    if (objOriginReq) { const r = requestById(objOriginReq); if (r && (r.offered || []).some((o) => o.id === objId)) return r; }
+    const hits = (D().requests || []).filter((r) => (r.offered || []).some((o) => o.id === objId));
+    return hits.length === 1 ? hits[0] : null;
+  }
+  function parentReqCrumb(r) {
+    if (!r) return '';
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    return '<div class="page-crumb"><button class="btn sm ghost" data-request="' + r.id + '">' + I('chevLeft') + 'К заявке · ' + (c.name || r.title) + '</button></div>';
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
   const DEAL_ENUMS = {
@@ -2805,7 +2906,7 @@
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return back + objHero(o) + objSummary(o) +
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) +
       (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
   }
 
@@ -2813,7 +2914,9 @@
   function viewDealDetail(id) {
     const spec = dealSpec(id);
     if (!spec) return viewClients();
-    return entityPage(spec, 'clients', 'deals', 'Назад к сделкам');
+    const d = D().deals.find((x) => x.id === id);
+    const crumb = (d && d.requestId) ? parentReqCrumb(requestById(d.requestId)) : '';
+    return crumb + entityPage(spec, 'clients', 'deals', 'Назад к сделкам');
   }
   function viewClientDetail(id) {
     const spec = clientSpec(id);
@@ -4826,5 +4929,5 @@
     openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, setObjOrigin };
 })(window.WS = window.WS || {});
