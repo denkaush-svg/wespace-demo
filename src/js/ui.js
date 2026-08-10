@@ -2486,13 +2486,33 @@
   // Object detail = HERO pattern (parity with old CRM realty-detail): full-width photo on top with
   // overlaid title/address/key-params/materials, then description → big metrics → params+map → statuses → docs.
   function objHeroParams(o) {
+    const isOff = /off-plan/i.test(o.segment || '');
     const rows = [
       ['Класс', o.br],
-      ['Готовность', o.availability === 'available' ? 'Доступен для показа' : 'Требует проверки'],
-      ['Расположение', o.area + ((o.attrs && o.attrs.metro) ? ' · метро рядом' : '')],
+      ['Сегмент', o.segment || (isOff ? 'off-plan' : 'готовое')],
+      [isOff ? 'Срок сдачи' : 'Заселение', isOff ? (o.handover || '—') : (o.occupancy || 'Готов к заселению')],
       ['Комиссия агенту', o.commissionPct ? o.commissionPct + '%' : '—'],
     ];
     return '<dl class="ohero-meta">' + rows.map((r) => '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>').join('') + '</dl>';
+  }
+  // Deal-context block: the off-plan vs ready/secondary split decides which fields matter
+  // (developer, handover, payment plan, escrow for off-plan; occupancy for ready). From the Codex IA review.
+  function objDealContext(o) {
+    const isOff = /off-plan/i.test(o.segment || '');
+    const rows = [];
+    if (o.developer) rows.push(['Застройщик', o.developer]);
+    if (o.project) rows.push(['Проект · корпус', o.project]);
+    if (isOff) {
+      if (o.handover) rows.push(['Срок сдачи (handover)', o.handover]);
+      if (o.paymentPlan) rows.push(['План оплаты', o.paymentPlan]);
+      if (o.escrow) rows.push(['Escrow (DLD)', o.escrow]);
+    } else if (o.occupancy) {
+      rows.push(['Заселение', o.occupancy]);
+    }
+    if (o.serviceCharge) rows.push(['Service charge', o.serviceCharge]);
+    if (!rows.length) return '';
+    const seg = o.segment || (isOff ? 'off-plan' : 'готовое');
+    return dxSec('briefcase', 'Условия сделки · ' + seg, '', '<div class="dfields">' + rows.map((r) => dfPair(r[0], r[1])).join('') + '</div>');
   }
   function objHero(o) {
     const ph = objPhotos(o);
@@ -2563,7 +2583,9 @@
       dxSec('compass', 'Расположение на карте', '', objMap(o)) + '</div>';
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
-    return back + objHero(o) + objSummary(o) + grid + statuses + docs;
+    const ctx = objDealContext(o);
+    return back + objHero(o) + objSummary(o) +
+      (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.

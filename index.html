@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:07</title>
+  <title>WESPACE · сборка 15:32</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:07';
+    window.WS_BUILD='15:32';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2133,21 +2133,29 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       availability: 'available', verified: 'verified', checkedAt: '12 мая 2026',
       trakheesi: 'ok', madmoun: 'ok',
       attrs: { view: 'city', floor: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
-      match: 'Business Bay, в бюджете, проверенная доступность, инвестиционный профиль.' },
+      match: 'Business Bay, в бюджете, проверенная доступность, инвестиционный профиль.',
+      segment: 'off-plan', developer: 'Emaar Properties', project: 'Creekline Residences · Tower B',
+      handover: 'Q4 2026', paymentPlan: '10% бронь · 40% в стройку · 50% на сдаче',
+      serviceCharge: '16 AED/фт²·год', escrow: 'Escrow DLD · ADCB', occupancy: null },
     { id: 'o_palmcourt', name: 'Palm Court Residence, Unit 704', source: 'club',
       sourceLabel: 'Клубный эксклюзив', area: 'JVC', price: 1690000, size: 95, br: '1BR+',
       address: 'JVC, Palm Court Residence, District 12, Unit 704', commissionPct: 3,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
       trakheesi: 'ok', madmoun: 'na',
       attrs: { view: 'garden', floor: 'mid', finish: 'new', demand: 'mid', prestige: 'mid', metro: false },
-      match: 'JVC, ниже бюджета, клубный эксклюзив, высокая доходность аренды.' },
+      match: 'JVC, ниже бюджета, клубный эксклюзив, высокая доходность аренды.',
+      segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Palm Court Residence · District 12',
+      handover: null, paymentPlan: null, serviceCharge: '14 AED/фт²·год', escrow: null, occupancy: 'Свободна (vacant)' },
     { id: 'o_bayline', name: 'Bayline Terraces, Unit 1603', source: 'import',
       sourceLabel: 'Импорт застройщика', area: 'Dubai Creek Harbour', price: 1950000, size: 88, br: '1BR',
       address: 'Dubai Creek Harbour, Bayline Terraces, Unit 1603', commissionPct: 2.5,
       availability: 'stale', verified: 'expired', checkedAt: '2 апр 2026',
       trakheesi: 'pending', madmoun: 'na',
       attrs: { view: 'water', floor: 'high', finish: 'standard', demand: 'mid', prestige: 'high', metro: false },
-      match: 'Dubai Creek Harbour, у верхней границы бюджета. Проверка доступности устарела.' },
+      match: 'Dubai Creek Harbour, у верхней границы бюджета. Проверка доступности устарела.',
+      segment: 'off-plan', developer: 'Emaar Properties', project: 'Bayline Terraces · Dubai Creek Harbour',
+      handover: 'Q2 2027', paymentPlan: '20% бронь · 40% в стройку · 40% post-handover (2 года)',
+      serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null },
   ];
 
   // Reference financial model (spec §12.2) — single source of truth for
@@ -6990,13 +6998,33 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Object detail = HERO pattern (parity with old CRM realty-detail): full-width photo on top with
   // overlaid title/address/key-params/materials, then description → big metrics → params+map → statuses → docs.
   function objHeroParams(o) {
+    const isOff = /off-plan/i.test(o.segment || '');
     const rows = [
       ['Класс', o.br],
-      ['Готовность', o.availability === 'available' ? 'Доступен для показа' : 'Требует проверки'],
-      ['Расположение', o.area + ((o.attrs && o.attrs.metro) ? ' · метро рядом' : '')],
+      ['Сегмент', o.segment || (isOff ? 'off-plan' : 'готовое')],
+      [isOff ? 'Срок сдачи' : 'Заселение', isOff ? (o.handover || '—') : (o.occupancy || 'Готов к заселению')],
       ['Комиссия агенту', o.commissionPct ? o.commissionPct + '%' : '—'],
     ];
     return '<dl class="ohero-meta">' + rows.map((r) => '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>').join('') + '</dl>';
+  }
+  // Deal-context block: the off-plan vs ready/secondary split decides which fields matter
+  // (developer, handover, payment plan, escrow for off-plan; occupancy for ready). From the Codex IA review.
+  function objDealContext(o) {
+    const isOff = /off-plan/i.test(o.segment || '');
+    const rows = [];
+    if (o.developer) rows.push(['Застройщик', o.developer]);
+    if (o.project) rows.push(['Проект · корпус', o.project]);
+    if (isOff) {
+      if (o.handover) rows.push(['Срок сдачи (handover)', o.handover]);
+      if (o.paymentPlan) rows.push(['План оплаты', o.paymentPlan]);
+      if (o.escrow) rows.push(['Escrow (DLD)', o.escrow]);
+    } else if (o.occupancy) {
+      rows.push(['Заселение', o.occupancy]);
+    }
+    if (o.serviceCharge) rows.push(['Service charge', o.serviceCharge]);
+    if (!rows.length) return '';
+    const seg = o.segment || (isOff ? 'off-plan' : 'готовое');
+    return dxSec('briefcase', 'Условия сделки · ' + seg, '', '<div class="dfields">' + rows.map((r) => dfPair(r[0], r[1])).join('') + '</div>');
   }
   function objHero(o) {
     const ph = objPhotos(o);
@@ -7067,7 +7095,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dxSec('compass', 'Расположение на карте', '', objMap(o)) + '</div>';
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
-    return back + objHero(o) + objSummary(o) + grid + statuses + docs;
+    const ctx = objDealContext(o);
+    return back + objHero(o) + objSummary(o) +
+      (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
