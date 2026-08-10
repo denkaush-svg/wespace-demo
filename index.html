@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:58</title>
+  <title>WESPACE · сборка 16:18</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:58';
+    window.WS_BUILD='16:18';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -520,6 +520,16 @@ button { font-family: inherit; cursor: pointer; }
 .obj-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 .obj-search { flex: 1; box-shadow: none; border-radius: var(--r); padding: 4px 4px 4px 14px; }
 .mini-sel { height: 40px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13px; padding: 0 10px; }
+.rp { display: flex; align-items: center; gap: 11px; padding: 11px 13px; margin-top: 10px;
+  background: var(--acc-soft); border: 1px solid var(--acc-line); border-radius: var(--r-sm); flex-wrap: wrap; }
+.rp-i { width: 32px; height: 32px; border-radius: 9px; background: #fff; border: 1px solid var(--acc-line);
+  display: grid; place-items: center; flex: none; color: var(--acc); }
+.rp-i svg { width: 16px; height: 16px; }
+.rp-t { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.rp-t b { font-size: 13px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-t span { font-size: 11px; color: var(--mut); }
+.rp-a { display: flex; gap: 7px; flex: none; }
+
 /* ---- analytical answer: the model names the shape, the code draws it ---- */
 .an { margin-top: 9px; }
 .an-lead { margin: 0 0 10px; line-height: 1.55; }
@@ -4026,6 +4036,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
       '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
+  // Russian prints a decimal comma, and no gap before a percent sign.
+  function anVal(v, suffix) {
+    const s = String(v == null ? '' : v).replace('.', ',');
+    const suf = String(suffix || '');
+    if (!suf) return s;
+    return suf === '%' ? s + suf : s + '\u00a0' + suf;
+  }
+
   // An analytical answer is a shape, not a wall of prose. The model names the
   // shape; the markup is built here, so nothing it returns can be markup.
   function blocksHtml(blocks) {
@@ -4062,7 +4080,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           const w = Math.max(3, Math.round(Math.abs(Number(x.value)) / max * 100));
           return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
             '<span class="bt"><i style="width:' + w + '%"></i></span>' +
-            '<span class="bv">' + esc(String(x.value) + (x.suffix ? ' ' + x.suffix : '')) + '</span></div>';
+            '<span class="bv">' + esc(anVal(x.value, x.suffix)) + '</span></div>';
         }).join('') + '</div>';
       }
       return '';
@@ -4070,8 +4088,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return out ? '<div class="an">' + out + '</div>' : '';
   }
 
+  // The file is offered, never pushed: a download that starts by itself in a
+  // demo reads as something going wrong.
+  function reportCard(rp) {
+    if (!rp) return '';
+    return '<div class="rp"><div class="rp-i">' + I('doc') + '</div>' +
+      '<div class="rp-t"><b>' + esc(rp.title) + '</b><span>' + esc(rp.name) + ' · ' +
+      rp.count + ' блоков</span></div>' +
+      '<div class="rp-a"><button class="btn sm" data-rpopen="' + esc(rp.id) + '">Открыть</button>' +
+      '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
+  }
+
   function answerCard(r) {
-    const body = blocksHtml(r.blocks);
+    const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
     return msg('ai', I('sparkle') + ' Консьерж', head + body + evChips(r.evidence) + nextChips(r.next));
@@ -4127,6 +4156,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge warn">' + I('warn') + esc(why) + '</span></div></div>');
     }
   }
+  function reportOpen(id) { if (WS.report) WS.report.openTab(id); }
+  function reportSave(id) {
+    if (WS.report && WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
+  }
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
   }
@@ -4163,7 +4196,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
-    agentConfirm, agentCancel, agentNext, agentCard,
+    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave,
     get lastReply() { return engine.lastReply; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
@@ -9321,6 +9354,197 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 </script>
   <script>
 /* ============================================================
+   The report file.
+
+   Same block vocabulary as an answer in the chat, but assembled into a
+   standalone document: its own styles, its own fonts, nothing referenced from
+   the stand. A broker forwards this file to a client, so it has to open
+   correctly on a phone that has never seen WESPACE.
+
+   Values are escaped here exactly as they are in the chat — a report is
+   built from a model's output and mailed onward, which is the worst possible
+   place for markup to slip through.
+   ============================================================ */
+(function (WS) {
+  const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESC[c]); }
+
+  const CSS = [
+    ':root{--ink:#171717;--ink2:#404040;--mut:#737373;--faint:#a3a3a3;--line:#e5e5e5;',
+    '--hair:#f0f0f0;--soft:#fafafa;--acc:#F26522;--acc-soft:#FFF3EC;--acc-line:#FBD5C0}',
+    '*{box-sizing:border-box}',
+    'body{margin:0;background:#f5f5f4;color:var(--ink);',
+    "font:15px/1.6 Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;",
+    '-webkit-text-size-adjust:100%}',
+    '.wrap{max-width:820px;margin:0 auto;padding:28px 20px 64px}',
+    '.sheet{background:#fff;border:1px solid var(--line);border-radius:16px;padding:34px 34px 30px}',
+    '.brand{display:flex;align-items:center;gap:9px;margin-bottom:26px}',
+    '.mark{width:26px;height:26px;border-radius:7px;background:var(--ink);color:#fff;',
+    'display:grid;place-items:center;font-weight:800;font-size:13px;flex:none}',
+    '.brand b{font-weight:800;letter-spacing:-.01em}.brand span{color:var(--acc);font-weight:800}',
+    'h1{margin:0 0 6px;font-size:27px;line-height:1.22;letter-spacing:-.02em;font-weight:800}',
+    '.sub{margin:0 0 4px;color:var(--mut);font-size:14px}',
+    '.meta{margin:14px 0 26px;padding-top:14px;border-top:1px solid var(--hair);',
+    'color:var(--faint);font-size:12px;display:flex;flex-wrap:wrap;gap:6px 18px}',
+    'h2{margin:26px 0 10px;font-size:11px;font-weight:800;letter-spacing:.07em;',
+    'text-transform:uppercase;color:var(--faint)}h2:first-of-type{margin-top:0}',
+    'p{margin:0 0 11px}ul{margin:0 0 13px;padding-left:19px}li{margin-bottom:4px}',
+    '.kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;',
+    'padding:8px 12px;background:var(--soft);border-radius:9px;margin-bottom:6px}',
+    '.kv .k{color:var(--mut);font-size:13.5px}',
+    '.kv .v{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}',
+    '.tw{overflow-x:auto;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}',
+    'th{text-align:left;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;',
+    'color:var(--faint);padding:0 12px 7px 0;white-space:nowrap}',
+    'td{padding:7px 12px 7px 0;border-top:1px solid var(--hair);font-variant-numeric:tabular-nums}',
+    'td:first-child{font-weight:600}',
+    '.bars{margin-bottom:14px}',
+    '.bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(70px,2.2fr) auto;',
+    'align-items:center;gap:11px;margin-bottom:7px}',
+    '.bar .bl{color:var(--ink2);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.bar .bt{height:8px;background:var(--soft);border-radius:99px;overflow:hidden}',
+    '.bar .bt i{display:block;height:100%;background:var(--acc);border-radius:99px}',
+    '.bar .bv{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:14px}',
+    '.note{display:flex;gap:9px;padding:12px 14px;background:var(--acc-soft);',
+    'border:1px solid var(--acc-line);border-radius:11px;color:var(--ink2);font-size:13px;margin-bottom:14px}',
+    '.foot{margin-top:30px;padding-top:15px;border-top:1px solid var(--hair);',
+    'color:var(--faint);font-size:11.5px;line-height:1.55}',
+    '@media(max-width:640px){.wrap{padding:14px 12px 40px}.sheet{padding:22px 17px 20px;border-radius:13px}',
+    'h1{font-size:22px}.bar{grid-template-columns:minmax(0,1fr) auto;}',
+    '.bar .bt{grid-column:1/-1;order:3}}',
+    '@media print{body{background:#fff}.wrap{padding:0}.sheet{border:0;border-radius:0;padding:0}}',
+  ].join('');
+
+  // Russian prints a decimal comma, and no gap before a percent sign. Left as
+  // «8.1 %» this reads as a machine artefact in a document sent to a client.
+  function val(v, suffix) {
+    const s = String(v == null ? '' : v).replace('.', ',');
+    const suf = String(suffix || '');
+    if (!suf) return s;
+    return suf === '%' ? s + suf : s + '\u00a0' + suf;
+  }
+
+  // The same shapes the chat renders, drawn for a standalone page.
+  function blockHtml(b) {
+    if (!b || typeof b !== 'object') return '';
+    const t = String(b.t || '');
+    if (t === 'h') return '<h2>' + esc(b.text) + '</h2>';
+    if (t === 'p') return '<p>' + esc(b.text) + '</p>';
+    if (t === 'note') return '<div class="note">' + esc(b.text) + '</div>';
+    if (t === 'list') {
+      const li = (b.items || []).slice(0, 20).map((x) => '<li>' + esc(x) + '</li>').join('');
+      return li ? '<ul>' + li + '</ul>' : '';
+    }
+    if (t === 'kv') {
+      return (b.rows || []).slice(0, 20).map((x) =>
+        '<div class="kv"><span class="k">' + esc(x && x.k) + '</span>' +
+        '<span class="v">' + esc(x && x.v) + '</span></div>').join('');
+    }
+    if (t === 'table') {
+      const head = (b.head || []).slice(0, 6);
+      const body = (b.rows || []).slice(0, 40).map((row) =>
+        '<tr>' + (Array.isArray(row) ? row : []).slice(0, 6).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
+      if (!body) return '';
+      return '<div class="tw"><table>' +
+        (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
+        '<tbody>' + body + '</tbody></table></div>';
+    }
+    if (t === 'bars') {
+      const rows = (b.rows || []).slice(0, 12).filter((x) => x && isFinite(Number(x.value)));
+      if (!rows.length) return '';
+      const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
+      return '<div class="bars">' + rows.map((x) => {
+        const w = Math.max(3, Math.round(Math.abs(Number(x.value)) / max * 100));
+        return '<div class="bar"><span class="bl">' + esc(x.label) + '</span>' +
+          '<span class="bt"><i style="width:' + w + '%"></i></span>' +
+          '<span class="bv">' + esc(val(x.value, x.suffix)) + '</span></div>';
+      }).join('') + '</div>';
+    }
+    return '';
+  }
+
+  // Whoever receives this file did not watch it being made, so the footer says
+  // what it is and where its figures came from. A demo figure leaving the
+  // stand unlabelled is the one failure this whole design exists to prevent.
+  function provenance() {
+    const rows = (WS.store && WS.store.data && WS.store.data.market) || [];
+    const demo = rows.some((r) => r.basis && r.basis !== 'публикация');
+    const who = (WS.store && WS.store.data && WS.store.data.tenant) || {};
+    return [
+      'Собрано Консьержем WESPACE' + (who.name ? ' · ' + who.name : '') + '.',
+      demo ? 'Рыночные величины в этом документе демонстрационные, не из публикации — проверьте перед отправкой клиенту.' : '',
+      'Показатели по сделкам и задачам посчитаны по данным рабочего места на момент сборки.',
+    ].filter(Boolean).join(' ');
+  }
+
+  function build(spec) {
+    const s = spec || {};
+    const title = esc(s.title || 'Аналитическая записка');
+    const blocks = (Array.isArray(s.blocks) ? s.blocks : []).map(blockHtml).join('');
+    const stamp = (WS.storeApi && WS.storeApi.clockLabel) ? WS.storeApi.clockLabel() : {};
+    const meta = [stamp.date, stamp.time].filter(Boolean)
+      .map((x) => '<span>' + esc(x) + '</span>').join('');
+    return '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' +
+      '<title>' + title + '</title>' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">' +
+      '<style>' + CSS + '</style></head><body><div class="wrap"><div class="sheet">' +
+      '<div class="brand"><span class="mark">W</span><b>WE<span>SPACE</span></b></div>' +
+      '<h1>' + title + '</h1>' +
+      (s.subtitle ? '<p class="sub">' + esc(s.subtitle) + '</p>' : '') +
+      (meta ? '<div class="meta">' + meta + '</div>' : '') +
+      blocks +
+      '<div class="foot">' + esc(provenance()) + '</div>' +
+      '</div></div></body></html>';
+  }
+
+  function fileName(title) {
+    const base = String(title || 'отчёт').toLowerCase().replace(/[^\wа-яё]+/gi, '-').replace(/^-+|-+$/g, '');
+    return 'wespace-' + (base || 'report').slice(0, 48) + '.html';
+  }
+
+  // Held so the chat card can offer the same document twice without rebuilding
+  // it, and so a test can read what was produced without a download.
+  const made = {};
+  let seq = 0;
+
+  function create(spec) {
+    seq++;
+    const id = 'rp' + seq;
+    const html = build(spec);
+    made[id] = { id: id, html: html, title: (spec && spec.title) || 'Аналитическая записка', name: fileName(spec && spec.title) };
+    return made[id];
+  }
+  function get(id) { return made[id] || null; }
+
+  function download(id) {
+    const r = made[id];
+    if (!r || typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) return false;
+    const url = URL.createObjectURL(new Blob([r.html], { type: 'text/html;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = r.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return true;
+  }
+
+  function openTab(id) {
+    const r = made[id];
+    if (!r || typeof Blob === 'undefined' || !URL.createObjectURL) return false;
+    const url = URL.createObjectURL(new Blob([r.html], { type: 'text/html;charset=utf-8' }));
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return true;
+  }
+
+  WS.report = { build, create, get, download, openTab, fileName, blockHtml };
+})(window.WS = window.WS || {});
+
+</script>
+  <script>
+/* ============================================================
    The live head.
 
    Everything here is transport. The model gets the question, a digest this
@@ -9472,9 +9696,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return out.length ? out : null;
   }
 
+  // A report is the same shapes, assembled into a file instead of a bubble.
+  function normReport(r) {
+    if (!r || typeof r !== 'object') return null;
+    const blocks = normBlocks(r.blocks);
+    if (!blocks) return null;
+    return {
+      title: String(r.title || 'Аналитическая записка').slice(0, 120),
+      subtitle: r.subtitle ? String(r.subtitle).slice(0, 200) : '',
+      blocks: blocks,
+    };
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
     const blocks = normBlocks(plan.blocks);
+    const report = normReport(plan.report);
     const evidence = evidenceFor(plan.read);
     let next = normNext(plan.next);
     const chip = openChip(plan.open);
@@ -9491,8 +9728,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         evidence: evidence, next: next,
       };
     }
-    if (!text && !blocks) return null;
-    return { kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next };
+    if (!text && !blocks && !report) return null;
+    const made = report ? WS.report.create(report) : null;
+    return {
+      kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next,
+      report: made ? { id: made.id, title: made.title, name: made.name, count: report.blocks.length } : null,
+    };
   }
 
   // ---------- transport ----------
@@ -9611,7 +9852,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.live = {
-    ask, probe, install, digest, history, toReply, normNext, normBlocks, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, toReply, normNext, normBlocks, normReport, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
@@ -9671,10 +9912,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-rpopen],[data-rpsave],[data-request],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
+    if (d.rpopen) return WS.engine.reportOpen(d.rpopen);
+    if (d.rpsave) return WS.engine.reportSave(d.rpsave);
     if (d.nav) { if (d.tab) store.clientsTab = d.tab; return WS.router.go(d.nav); }
     if (d.thread) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.openThread(d.thread, d.tlabel, d.ticon); }
     if (d.chain) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.startChain(d.chain); }

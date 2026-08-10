@@ -150,9 +150,22 @@
     return out.length ? out : null;
   }
 
+  // A report is the same shapes, assembled into a file instead of a bubble.
+  function normReport(r) {
+    if (!r || typeof r !== 'object') return null;
+    const blocks = normBlocks(r.blocks);
+    if (!blocks) return null;
+    return {
+      title: String(r.title || 'Аналитическая записка').slice(0, 120),
+      subtitle: r.subtitle ? String(r.subtitle).slice(0, 200) : '',
+      blocks: blocks,
+    };
+  }
+
   function toReply(say, plan) {
     const text = String(say || '').trim();
     const blocks = normBlocks(plan.blocks);
+    const report = normReport(plan.report);
     const evidence = evidenceFor(plan.read);
     let next = normNext(plan.next);
     const chip = openChip(plan.open);
@@ -169,8 +182,12 @@
         evidence: evidence, next: next,
       };
     }
-    if (!text && !blocks) return null;
-    return { kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next };
+    if (!text && !blocks && !report) return null;
+    const made = report ? WS.report.create(report) : null;
+    return {
+      kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next,
+      report: made ? { id: made.id, title: made.title, name: made.name, count: report.blocks.length } : null,
+    };
   }
 
   // ---------- transport ----------
@@ -289,7 +306,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, toReply, normNext, normBlocks, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, toReply, normNext, normBlocks, normReport, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

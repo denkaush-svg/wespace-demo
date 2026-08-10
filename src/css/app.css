@@ -378,6 +378,16 @@ button { font-family: inherit; cursor: pointer; }
 .obj-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
 .obj-search { flex: 1; box-shadow: none; border-radius: var(--r); padding: 4px 4px 4px 14px; }
 .mini-sel { height: 40px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13px; padding: 0 10px; }
+.rp { display: flex; align-items: center; gap: 11px; padding: 11px 13px; margin-top: 10px;
+  background: var(--acc-soft); border: 1px solid var(--acc-line); border-radius: var(--r-sm); flex-wrap: wrap; }
+.rp-i { width: 32px; height: 32px; border-radius: 9px; background: #fff; border: 1px solid var(--acc-line);
+  display: grid; place-items: center; flex: none; color: var(--acc); }
+.rp-i svg { width: 16px; height: 16px; }
+.rp-t { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.rp-t b { font-size: 13px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-t span { font-size: 11px; color: var(--mut); }
+.rp-a { display: flex; gap: 7px; flex: none; }
+
 /* ---- analytical answer: the model names the shape, the code draws it ---- */
 .an { margin-top: 9px; }
 .an-lead { margin: 0 0 10px; line-height: 1.55; }

@@ -693,6 +693,50 @@ setTimeout(async () => {
   if (WS.live) {
     const L = WS.live;
 
+    // The report leaves the stand and is forwarded to a client, so it has to
+    // stand alone — and it must not carry an unlabelled demo figure outside.
+    {
+      const spec = {
+        title: 'Срез по районам',
+        subtitle: 'Для инвестора',
+        blocks: [
+          { t: 'h', text: 'Доходность' },
+          { t: 'table', head: ['Район', 'Доходность'], rows: [['Arjan', '8,1%']] },
+          { t: 'bars', rows: [{ label: 'Arjan', value: 8.1, suffix: '%' }] },
+          { t: 'p', text: '<script>alert(1)</script>' },
+        ],
+      };
+      const html = WS.report.build(spec);
+      check('report · it is a whole document, not a fragment',
+        /^<!DOCTYPE html>/.test(html) && html.indexOf('</html>') > 0);
+      check('report · it carries its own styles, referencing nothing from the stand',
+        html.indexOf('<style>') >= 0 && html.indexOf('css/app.css') < 0);
+      check('report · it is readable on a phone', /name="viewport"[^>]*width=device-width/.test(html));
+      check('report · the title reaches the document title', html.indexOf('<title>Срез по районам</title>') >= 0);
+      check('report · a script inside a block is text, not a script',
+        html.indexOf('<script>alert') < 0 && html.indexOf('&lt;script&gt;alert') >= 0);
+      check('report · demo figures are labelled for whoever receives the file',
+        /демонстрационные/.test(html), html.slice(-260));
+
+      const made = WS.report.create(spec);
+      check('report · a built report can be fetched back by id', WS.report.get(made.id).html === html);
+      // «8.1 %» reads as a machine artefact in a document sent to a client.
+      check('report · measured values are printed the Russian way',
+        html.indexOf('8,1%') >= 0 && html.indexOf('8.1 %') < 0, (html.match(/8[.,]1[^<]*/) || [])[0]);
+      check('report · the subtitle is printed once, not twice',
+        (html.match(/Для инвестора/g) || []).length === 1);
+      check('report · the file name is safe and named after the report',
+        /^wespace-[^\\/:*?"<>|]+\.html$/.test(made.name), made.name);
+
+      const card = WS.engine.agentCard({
+        kind: 'answer', text: 'Собрал.', evidence: [], next: [],
+        report: { id: made.id, title: made.title, name: made.name, count: 4 },
+      });
+      const rb = doc.createElement('div'); rb.innerHTML = card;
+      check('report · the answer offers the file rather than pushing it',
+        rb.querySelectorAll('[data-rpopen]').length === 1 && rb.querySelectorAll('[data-rpsave]').length === 1);
+    }
+
     // The model names a shape; the markup is built by code. Nothing it returns
     // may become markup, and no shape outside the vocabulary may be invented.
     {

@@ -614,6 +614,14 @@
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
       '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
+  // Russian prints a decimal comma, and no gap before a percent sign.
+  function anVal(v, suffix) {
+    const s = String(v == null ? '' : v).replace('.', ',');
+    const suf = String(suffix || '');
+    if (!suf) return s;
+    return suf === '%' ? s + suf : s + '\u00a0' + suf;
+  }
+
   // An analytical answer is a shape, not a wall of prose. The model names the
   // shape; the markup is built here, so nothing it returns can be markup.
   function blocksHtml(blocks) {
@@ -650,7 +658,7 @@
           const w = Math.max(3, Math.round(Math.abs(Number(x.value)) / max * 100));
           return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
             '<span class="bt"><i style="width:' + w + '%"></i></span>' +
-            '<span class="bv">' + esc(String(x.value) + (x.suffix ? ' ' + x.suffix : '')) + '</span></div>';
+            '<span class="bv">' + esc(anVal(x.value, x.suffix)) + '</span></div>';
         }).join('') + '</div>';
       }
       return '';
@@ -658,8 +666,19 @@
     return out ? '<div class="an">' + out + '</div>' : '';
   }
 
+  // The file is offered, never pushed: a download that starts by itself in a
+  // demo reads as something going wrong.
+  function reportCard(rp) {
+    if (!rp) return '';
+    return '<div class="rp"><div class="rp-i">' + I('doc') + '</div>' +
+      '<div class="rp-t"><b>' + esc(rp.title) + '</b><span>' + esc(rp.name) + ' · ' +
+      rp.count + ' блоков</span></div>' +
+      '<div class="rp-a"><button class="btn sm" data-rpopen="' + esc(rp.id) + '">Открыть</button>' +
+      '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
+  }
+
   function answerCard(r) {
-    const body = blocksHtml(r.blocks);
+    const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
     return msg('ai', I('sparkle') + ' Консьерж', head + body + evChips(r.evidence) + nextChips(r.next));
@@ -715,6 +734,10 @@
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge warn">' + I('warn') + esc(why) + '</span></div></div>');
     }
   }
+  function reportOpen(id) { if (WS.report) WS.report.openTab(id); }
+  function reportSave(id) {
+    if (WS.report && WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
+  }
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
   }
@@ -751,7 +774,7 @@
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
-    agentConfirm, agentCancel, agentNext, agentCard,
+    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave,
     get lastReply() { return engine.lastReply; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
