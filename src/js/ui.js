@@ -1887,7 +1887,6 @@
   function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
   function requestAttrs(r) {
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const tag = (v) => v ? '<span class="badge">' + v + '</span>' : '';
     const pay = [r.paymentForm, (r.vat ? 'НДС 5%' : 'без НДС')].filter(Boolean).join(' · ');
     // Accent hero: the two facts a broker reads first — what the client wants + the budget.
     const hero = '<div class="req-hero">' +
@@ -1895,24 +1894,26 @@
         '<div class="rh-client">' + I('users') + (c.name || 'Клиент') + '</div>' +
         '<div class="rh-label">Что ищет клиент</div>' +
         '<div class="rh-interest">' + (r.interest || '—') + '</div>' +
-        '<div class="rh-tags">' + tag(r.goal) + tag(r.dealType) + '</div>' +
       '</div>' +
       '<div class="rh-budget">' +
         '<div class="rh-b-label">Бюджет</div>' +
         '<div class="rh-b-val">' + (r.budget ? WS.AED(r.budget) : '—') + '</div>' +
         (pay ? '<div class="rh-b-sub">' + pay + '</div>' : '') +
       '</div></div>';
-    // Remaining fields split into two labelled groups of stacked cells (no flat 13-row list).
-    const g1 = '<div class="dgroup-h">Критерии подбора</div><div class="dfields two">' +
+    // Every remaining attribute as a consistently-labelled field. Two side-by-side groups of four
+    // (even counts, no orphan cell) — same label/value treatment throughout, no mixed badges.
+    const grpA = '<div class="req-grp"><div class="dgroup-h">Критерии подбора</div><div class="dfields">' +
       dfPair('Тип объекта', r.objectType) +
       dfPair('Районы', (r.areas || []).join(', ')) +
-      dfPair('Срок', r.horizon) + '</div>';
-    const g2 = '<div class="dgroup-h">Источник и участники</div><div class="dfields two">' +
+      dfPair('Срок', r.horizon) +
+      dfPair('Цель', r.goal) + '</div></div>';
+    const grpB = '<div class="req-grp"><div class="dgroup-h">Условия и источник</div><div class="dfields">' +
+      dfPair('Тип сделки', r.dealType) +
       dfPair('Источник', r.source) +
       dfPair('Канал', r.channel || '—') +
-      dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div>';
+      dfPair('Агент-партнёр', r.partnerAgent ? agentName(r.partnerAgent) : '—') + '</div></div>';
     return dxSec('mail', 'Заявка · ' + r.title, (c.id ? '<button class="btn xs" data-client="' + c.id + '">' + I('users') + 'Клиент</button>' : ''),
-      hero + g1 + g2 +
+      hero + '<div class="req-groups">' + grpA + grpB + '</div>' +
       (r.note ? '<div class="req-note">' + I('sparkle') + '<span>' + r.note + '</span></div>' : ''));
   }
   const REQ_STATE = { selected: ['ok', 'Выбрал клиент', 'check'], rejected: ['stop', 'Отклонён', 'x'], offered: ['', 'Предложен', 'clock'] };
