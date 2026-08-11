@@ -556,9 +556,21 @@
     (WS.store.signals || (WS.store.signals = [])).push(text);
     const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Считаю по данным'] }, 1, false), threadId);
     await delay(560); if (!same()) return;
-    const reply = WS.agent.ask(text);
+    // The live head streams; the offline one returns at once. Both land in the
+    // same message, so the card simply fills in rather than being replaced.
+    const reply = await WS.agent.askAsync(text, {
+      onText: (partial) => {
+        if (!same() || !partial) return;
+        updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
+      },
+    });
+    // The reply is written back to the thread it was asked in, whether or not
+    // the agent has since walked to another one — messages are addressed, so
+    // this is safe, and returning early left a «Разбираю запрос» card there
+    // forever. Only the shared «last reply» state waits for the same thread.
+    updateMsg(workMid, agentCard(reply, workMid), threadId);
+    if (!same()) return;
     engine.lastReply = reply;
-    updateMsg(workMid, agentCard(reply), threadId);
   }
 
   function freeReplyLegacy(text) {
@@ -590,20 +602,112 @@
   // writes arrives as a proposal with the change spelled out, never as a fait
   // accompli; and an action we cannot actually perform arrives as the artifact
   // itself, labelled, rather than as an apology.
+  // A chip belongs to the message it sits under, not to whatever answered last.
+  // Addressed by index into a global, an older card's «откуда это число» opened
+  // the newest reply's rows — and a reply landing after the agent switched
+  // threads made that reachable in one click.
+  const replies = {};
+  let chipMid = null;
+  function replyFor(key) {
+    const mid = String(key || '').split(':')[0];
+    return (mid && replies[mid]) || engine.lastReply || null;
+  }
+  function chipIndex(key) { return Number(String(key || '').split(':').pop()); }
+  function chipKey(i) { return (chipMid ? chipMid + ':' : '') + i; }
+
   function evChips(ev) {
     if (!ev || !ev.length) return '';
     return '<div class="ev-cap">' + I('source') + 'откуда это число</div>' +
       '<div class="qa-row" style="margin-top:5px">' + ev.map((e, i) =>
-      '<button class="chip src" data-agev="' + i + '" title="показать записи, из которых это посчитано">' +
+      '<button class="chip src" data-agev="' + chipKey(i) + '" title="показать записи, из которых это посчитано">' +
       (e.money ? WS.AED(e.value) : e.value) + ' ' + esc(e.label) + '</button>').join('') + '</div>';
   }
   function nextChips(next) {
     if (!next || !next.length) return '';
     return '<div class="qa-row" style="margin-top:11px">' + next.map((n, i) =>
-      '<button class="chip" data-agnext="' + i + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
+      '<button class="chip" data-agnext="' + chipKey(i) + '">' + I(n.open ? 'users' : 'sparkle') + esc(n.label) + '</button>').join('') + '</div>';
   }
-  function answerCard(r) {
-    return msg('ai', I('sparkle') + ' Консьерж', esc(r.text) + evChips(r.evidence) + nextChips(r.next));
+  // Russian prints a decimal comma, and no gap before a percent sign.
+  function anVal(v, suffix) {
+    const s = String(v == null ? '' : v).replace('.', ',');
+    const suf = String(suffix || '');
+    if (!suf) return s;
+    return suf === '%' ? s + suf : s + '\u00a0' + suf;
+  }
+
+  // An analytical answer is a shape, not a wall of prose. The model names the
+  // shape; the markup is built here, so nothing it returns can be markup.
+  function blocksHtml(blocks) {
+    if (!Array.isArray(blocks) || !blocks.length) return '';
+    const out = blocks.map((b) => {
+      if (!b || typeof b !== 'object') return '';
+      const t = String(b.t || '');
+      if (t === 'p') return '<p class="an-p">' + esc(b.text) + '</p>';
+      if (t === 'h') return '<div class="an-h">' + esc(b.text) + '</div>';
+      if (t === 'note') return '<div class="an-note">' + I('shield') + '<span>' + esc(b.text) + '</span></div>';
+      if (t === 'list') {
+        const li = (Array.isArray(b.items) ? b.items : []).slice(0, 8).map((x) => '<li>' + esc(x) + '</li>').join('');
+        return li ? '<ul class="an-list">' + li + '</ul>' : '';
+      }
+      if (t === 'kv') {
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8).map((x) =>
+          '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
+        return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
+      }
+      if (t === 'table') {
+        const head = (Array.isArray(b.head) ? b.head : []).slice(0, 5);
+        const body = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8)
+          .map((row) => '<tr>' + (Array.isArray(row) ? row : []).slice(0, 5).map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
+        if (!body) return '';
+        return '<div class="an-tw"><table class="an-t">' +
+          (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
+          '<tbody>' + body + '</tbody></table></div>';
+      }
+      if (t === 'bars') {
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
+        if (!rows.length) return '';
+        const max = Math.max.apply(null, rows.map((x) => Math.abs(Number(x.value)))) || 1;
+        return '<div class="an-bars">' + rows.map((x) => {
+          const w = Math.max(3, Math.round(Math.abs(Number(x.value)) / max * 100));
+          return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
+            '<span class="bt"><i style="width:' + w + '%"></i></span>' +
+            '<span class="bv">' + esc(anVal(x.value, x.suffix)) + '</span></div>';
+        }).join('') + '</div>';
+      }
+      return '';
+    }).join('');
+    return out ? '<div class="an">' + out + '</div>' : '';
+  }
+
+  // The file is offered, never pushed: a download that starts by itself in a
+  // demo reads as something going wrong.
+  function reportCard(rp) {
+    if (!rp) return '';
+    return '<div class="rp"><div class="rp-i">' + I('doc') + '</div>' +
+      '<div class="rp-t"><b>' + esc(rp.title) + '</b><span>' + esc(rp.name) + ' · ' +
+      rp.count + ' блоков</span></div>' +
+      '<div class="rp-a"><button class="btn sm" data-rpopen="' + esc(rp.id) + '">Открыть</button>' +
+      '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
+  }
+
+  // Offered, never automatic — and only where the browser can actually speak,
+  // so nobody presses a button that was never going to do anything. Carries its
+  // own message id: an answer from ten minutes ago must not read out the latest.
+  function sayBtn(r, mid) {
+    if (!WS.voice || !WS.voice.canSpeak() || !WS.voice.spokenText(r)) return '';
+    return '<div class="qa-row" style="margin-top:9px">' +
+      '<button class="chip say" data-agsay="' + esc(mid || '') + '" title="Зачитать ответ вслух">' +
+      I('voice2') + '<span class="lb">Прослушать</span></button></div>';
+  }
+
+  function answerCard(r, mid) {
+    chipMid = mid || null;
+    if (mid) replies[mid] = r;
+    const body = blocksHtml(r.blocks) + reportCard(r.report);
+    // The prose is the fallback: with no shape declared, it is the whole answer.
+    const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
+    return msg('ai', I('sparkle') + ' Консьерж',
+      head + body + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>
@@ -611,14 +715,17 @@
     const badge = p.tier === 'guarded'
       ? '<span class="lvl-tag a3 lvl">нужно подтверждение</span>'
       : '<span class="lvl-tag a1 lvl">безопасное</span>';
+    // The live head says something before it proposes; the offline one does not.
+    const said = p.text ? '<div style="margin:0 0 9px;line-height:1.5">' + esc(p.text) + '</div>' : '';
     return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
+      said +
       '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
       '<div class="t">' + esc(p.title) + '</div>' + badge + '</div>' +
       '<div class="pb">' + lines + '</div>' +
       '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
       '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +
       '<button class="btn primary cta-hint" data-agok="' + p.id + '">' + I('check') + 'Подтвердить</button></div>' +
-      '</div></div></div>';
+      '</div></div>' + nextChips(p.next) + '</div>';
   }
   function draftCard(r) {
     const a = r.artifact || {};
@@ -628,12 +735,16 @@
       '<div class="prov" style="margin-top:10px"><span class="badge demo">' + I('lock') + esc(a.note || '') + '</span></div>' +
       nextChips(r.next) + '</div></div>';
   }
-  function agentCard(r) {
+  // The message id travels with the reply so the chips under it stay bound to
+  // it — the whole point of addressing them was lost if this dropped it.
+  function agentCard(r, mid) {
     if (!r) return msg('ai', I('sparkle') + ' Консьерж', 'Слушаю.');
+    chipMid = mid || null;
+    if (mid) replies[mid] = r;
     if (r.kind === 'proposal') return proposalCard(r);
     if (r.kind === 'draft') return draftCard(r);
     if (r.kind === 'error') return msg('ai', I('warn') + ' Консьерж', esc(r.text) + nextChips(r.next));
-    return answerCard(r);
+    return answerCard(r, mid);
   }
 
   function agentConfirm(id) {
@@ -653,18 +764,41 @@
         '<div class="card pad" style="border-color:var(--stop-line)"><span class="badge warn">' + I('warn') + esc(why) + '</span></div></div>');
     }
   }
+  // A card left over from a previous session points at a document that no
+  // longer exists. Saying so is the whole fix: silence looked like a dead button.
+  const GONE = 'Файл собран в прошлой сессии — попросите собрать заново';
+  function reportOpen(id) {
+    if (!WS.report || !WS.report.get(id)) return WS.storeApi.toast(GONE);
+    WS.report.openTab(id);
+  }
+  function reportSave(id) {
+    if (!WS.report || !WS.report.get(id)) return WS.storeApi.toast(GONE);
+    if (WS.report.download(id)) WS.storeApi.toast('Отчёт сохранён', 'ok');
+  }
   function agentCancel() {
     pushMsg(msg('ai', I('sparkle') + ' Консьерж', 'Отменил. Ничего не записано.'));
   }
+  // Screens the Concierge may open on its own. A whitelist rather than
+  // whatever string came back, so a wrong guess is ignored instead of
+  // navigating the stand somewhere that does not render.
+  const OPENABLE = ['start', 'concierge', 'clients', 'objects', 'calc', 'finance',
+    'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'];
+  function navigateTo(o) {
+    if (!o) return;
+    const v = String(o.view || '');
+    if (v === 'contact' && o.id) return WS.ui.clientCard(o.id);
+    if (v === 'company' && o.id) return WS.ui.companyCard(o.id);
+    if (v === 'deal' && o.id) return WS.ui.dealCard(o.id);
+    if (OPENABLE.indexOf(v) >= 0) return WS.router.go(v);
+  }
+
   // Chips under a reply: either another question, or a card to open.
-  function agentNext(i) {
-    const r = engine.lastReply;
-    const n = r && r.next && r.next[i];
+  function agentNext(key) {
+    const r = replyFor(key);
+    const n = r && r.next && r.next[chipIndex(key)];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
-    if (n.open === 'contact') return WS.ui.clientCard(n.id);
-    if (n.open === 'company') return WS.ui.companyCard(n.id);
-    if (n.open === 'deal') return WS.ui.dealCard(n.id);
+    if (n.open) return navigateTo({ view: n.open, id: n.id });
   }
 
   function restartScene() {
@@ -677,7 +811,7 @@
 
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
-    agentConfirm, agentCancel, agentNext, agentCard,
+    agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     get lastReply() { return engine.lastReply; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,

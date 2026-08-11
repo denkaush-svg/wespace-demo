@@ -687,37 +687,582 @@ setTimeout(async () => {
   });
 
   // ============================================================
+  //  The live head: a model may speak, but it may not supply a number, write
+  //  anything, or take the stand down when it fails.
+  // ============================================================
+  if (WS.live) {
+    const L = WS.live;
+
+    // A shape whose fields are the wrong type used to pass the check and then
+    // throw mid-render, stranding the «Разбираю запрос» card.
+    {
+      check('live · a block with the wrong field type is dropped',
+        L.normBlocks([{ t: 'list', items: {} }, { t: 'bars', rows: 'нет' }, { t: 'p', text: 'ок' }]).length === 1);
+      let threw = false;
+      try { WS.engine.agentCard({ kind: 'answer', text: 'x', blocks: [{ t: 'list', items: {} }, { t: 'table', rows: 7 }] }); }
+      catch (e) { threw = true; }
+      check('live · and the renderer survives one that slips through', threw === false);
+    }
+
+    // Chat threads are persisted; the documents behind them are not.
+    {
+      const a = WS.report.create({ title: 'Первый', blocks: [{ t: 'p', text: 'a' }] });
+      const b = WS.report.create({ title: 'Второй', blocks: [{ t: 'p', text: 'b' }] });
+      check('report · ids are unique within a session', a.id !== b.id);
+      check('report · an id carries the page load that built it', /^rp\d+_\d+$/.test(a.id), a.id);
+      check('report · a card from a past session finds nothing rather than the wrong file',
+        WS.report.get('rp1') === null && WS.report.get('rp00000000_1') === null);
+    }
+
+    // The report leaves the stand and is forwarded to a client, so it has to
+    // stand alone — and it must not carry an unlabelled demo figure outside.
+    {
+      const spec = {
+        title: 'Срез по районам',
+        subtitle: 'Для инвестора',
+        blocks: [
+          { t: 'h', text: 'Доходность' },
+          { t: 'table', head: ['Район', 'Доходность'], rows: [['Arjan', '8,1%']] },
+          { t: 'bars', rows: [{ label: 'Arjan', value: 8.1, suffix: '%' }] },
+          { t: 'p', text: '<script>alert(1)</script>' },
+        ],
+      };
+      const html = WS.report.build(spec);
+      check('report · it is a whole document, not a fragment',
+        /^<!DOCTYPE html>/.test(html) && html.indexOf('</html>') > 0);
+      check('report · it carries its own styles, referencing nothing from the stand',
+        html.indexOf('<style>') >= 0 && html.indexOf('css/app.css') < 0);
+      check('report · it is readable on a phone', /name="viewport"[^>]*width=device-width/.test(html));
+      check('report · the title reaches the document title', html.indexOf('<title>Срез по районам</title>') >= 0);
+      check('report · a script inside a block is text, not a script',
+        html.indexOf('<script>alert') < 0 && html.indexOf('&lt;script&gt;alert') >= 0);
+      check('report · demo figures are labelled for whoever receives the file',
+        /демонстрационные/.test(html), html.slice(-260));
+
+      const made = WS.report.create(spec);
+      check('report · a built report can be fetched back by id', WS.report.get(made.id).html === html);
+      // «8.1 %» reads as a machine artefact in a document sent to a client.
+      check('report · measured values are printed the Russian way',
+        html.indexOf('8,1%') >= 0 && html.indexOf('8.1 %') < 0, (html.match(/8[.,]1[^<]*/) || [])[0]);
+      check('report · the subtitle is printed once, not twice',
+        (html.match(/Для инвестора/g) || []).length === 1);
+      check('report · the file name is safe and named after the report',
+        /^wespace-[^\\/:*?"<>|]+\.html$/.test(made.name), made.name);
+
+      const card = WS.engine.agentCard({
+        kind: 'answer', text: 'Собрал.', evidence: [], next: [],
+        report: { id: made.id, title: made.title, name: made.name, count: 4 },
+      });
+      const rb = doc.createElement('div'); rb.innerHTML = card;
+      check('report · the answer offers the file rather than pushing it',
+        rb.querySelectorAll('[data-rpopen]').length === 1 && rb.querySelectorAll('[data-rpsave]').length === 1);
+    }
+
+    // A chip must open its own message's rows, not the newest reply's.
+    {
+      const older = { kind: 'answer', text: 'старый', evidence: [{ label: 'старое', value: 1, query: { from: 'deals' } }], next: [{ label: 'a', ask: 'a' }] };
+      const newer = { kind: 'answer', text: 'новый', evidence: [{ label: 'новое', value: 2, query: { from: 'deals' } }], next: [{ label: 'b', ask: 'b' }] };
+      const h1 = WS.engine.agentCard(older, 'mOld');
+      WS.engine.agentCard(newer, 'mNew');
+      const bx = doc.createElement('div'); bx.innerHTML = h1;
+      const key = bx.querySelector('[data-agev]').getAttribute('data-agev');
+      check('live · a chip is addressed to its own message', key.indexOf('mOld:') === 0, key);
+      check('live · and resolves to that message’s reply',
+        WS.engine.replyFor(key).evidence[0].label === 'старое');
+      check('live · an unknown address falls back rather than throwing',
+        WS.engine.replyFor('mGone:0') !== undefined);
+    }
+
+    // The model names a shape; the markup is built by code. Nothing it returns
+    // may become markup, and no shape outside the vocabulary may be invented.
+    {
+      check('live · an unknown block shape is dropped',
+        L.normBlocks([{ t: 'script', text: 'x' }, { t: 'p', text: 'ок' }]).length === 1);
+      check('live · block lists are capped',
+        L.normBlocks(Array.from({ length: 30 }, () => ({ t: 'p', text: 'x' }))).length === 10);
+      check('live · a reply that is only blocks still stands',
+        (L.toReply('', { blocks: [{ t: 'p', text: 'только разбор' }] }) || {}).kind === 'answer');
+
+      const card = WS.engine.agentCard({
+        kind: 'answer', text: 'Ведущая фраза.', evidence: [], next: [{ label: 'ещё', ask: 'ещё' }],
+        blocks: [
+          { t: 'h', text: '<img src=x onerror=alert(1)>' },
+          { t: 'table', head: ['Район'], rows: [['<b>Arjan</b>']] },
+          { t: 'bars', rows: [{ label: 'Arjan', value: 8.1, suffix: '%' }, { label: 'JVC', value: 7.6, suffix: '%' }] },
+          { t: 'kv', rows: [{ k: 'Доходность', v: '8,1%' }] },
+        ],
+      });
+      const box = doc.createElement('div'); box.innerHTML = card;
+      check('live · a table renders as a table', box.querySelectorAll('.an-t td').length === 1);
+      check('live · bars are drawn to scale, longest first at full width',
+        (box.querySelectorAll('.an-bar .bt i')[0] || {}).style.width === '100%');
+      check('live · markup inside a block is text, never markup',
+        box.querySelectorAll('img').length === 0 && box.querySelectorAll('.an-t b').length === 0);
+      check('live · the escaped tag is still shown to the reader',
+        (box.textContent || '').indexOf('onerror') >= 0);
+      check('live · evidence and follow-ups survive the shaped answer',
+        box.querySelectorAll('[data-agnext]').length > 0);
+    }
+
+    check('live · a plain reply becomes an answer',
+      L.toReply('Четыре сделки.', {}).kind === 'answer');
+
+    // The generic deals rule used to fire first, so a question about
+    // commission came back with deal counts — an answer to another question.
+    {
+      const a = WS.agent.ask('какая комиссия набегает по активным сделкам');
+      check('offline · a commission question is answered about commission',
+        /комисси/i.test(a.text || ''), a.text);
+      const b = WS.agent.ask('сколько сделок в работе и на какую сумму');
+      check('offline · a deals question still answers about deals',
+        /сдел/i.test(b.text || '') && !/комисси/i.test(b.text || ''), b.text);
+    }
+
+    // A count declines the noun after it, and these labels are the chip text.
+    {
+      const pl = WS.agent.tools.plural;
+      const F = ['задача', 'задачи', 'задач'];
+      const got = [0, 1, 2, 4, 5, 11, 12, 21, 22, 25, 101, 111].map((n) => n + ' ' + pl(n, F)).join(', ');
+      const want = '0 задач, 1 задача, 2 задачи, 4 задачи, 5 задач, 11 задач, 12 задач, ' +
+        '21 задача, 22 задачи, 25 задач, 101 задача, 111 задач';
+      check('live · counted nouns are declined, not left in one form', got === want, got);
+      check('live · a label that is not a count is left alone', pl(3, 'на сумму') === 'на сумму');
+      const one = WS.agent.READINGS.tasks_overdue.label;
+      check('live · reading labels carry all three forms', Array.isArray(one) && one.length === 3);
+    }
+
+    // Evidence is re-read from the store, so the figure on a chip is the
+    // store's figure whatever the model said around it.
+    const ev = L.evidenceFor(['deals_active']);
+    const truth = WS.query.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } });
+    check('live · evidence values come from the store, not the model',
+      ev.length === 1 && ev[0].value === truth.value, 'chip=' + (ev[0] && ev[0].value) + ' store=' + truth.value);
+    check('live · an unknown reading is dropped rather than shown',
+      L.evidenceFor(['deals_active', 'выдуманный_показатель']).length === 1);
+    check('live · evidence survives a non-array', L.evidenceFor('deals_active').length === 0);
+
+    check('live · follow-ups are capped at three',
+      (L.normNext([1, 2, 3, 4, 5].map((i) => ({ label: 'п' + i, ask: 'в' + i }))) || []).length === 3);
+    check('live · a malformed follow-up is dropped',
+      (L.normNext([{ ask: 'нет метки' }, { label: 'есть', ask: 'да' }, null]) || []).length === 1);
+    check('live · a follow-up with no action is dropped',
+      L.normNext([{ label: 'пусто' }]) === null);
+
+    // Navigating the moment it answers threw the reply off a phone screen —
+    // the person was still reading it. It offers, they decide.
+    {
+      const r = L.toReply('Вот по сделке.', { open: { view: 'deal', id: 'd_anna' }, next: [{ label: 'Ещё', ask: 'что ещё' }] });
+      check('live · a screen the model wants shown becomes a chip', !!(r.next || []).some((n) => n.open === 'deal' && n.id === 'd_anna'),
+        JSON.stringify(r.next));
+      check('live · and never a jump', r.open === undefined, JSON.stringify(r.open));
+      const c = L.toReply('Смотри контакт.', { open: { view: 'contact', id: 'c_anna' } });
+      check('live · an entity chip is named, not called «contact»',
+        /Анна/.test(((c.next || [])[0] || {}).label || ''), JSON.stringify((c.next || [])[0]));
+      const bad = L.toReply('Текст.', { open: { view: 'нет_такого_экрана', id: 'x' } });
+      check('live · an unknown screen is ignored',
+        !(bad.next || []).some((n) => n.open === 'нет_такого_экрана'));
+    }
+
+    // A write instruction from the model is a proposal, never a write.
+    {
+      const before = (dd().contactTimeline['c_anna'] || []).length;
+      const r = L.toReply('Записал бы так.', {
+        act: { op: 'addEvent', scope: 'contact', id: 'c_anna', type: 'note', text: 'ЖИВАЯ ГОЛОВА: проверка' },
+      });
+      check('live · an action from the model becomes a proposal', r && r.kind === 'proposal', r && r.kind);
+      check('live · the proposal carries what the model said', r && r.text === 'Записал бы так.');
+      check('live · nothing is written by proposing',
+        (dd().contactTimeline['c_anna'] || []).length === before);
+    }
+    // An impossible action is refused as a dry run and answered honestly.
+    {
+      const r = L.toReply('Попробую.', { act: { op: 'dealStage', id: 'нет_такой_сделки', stage: 'done' } });
+      check('live · an impossible action does not become a proposal', r && r.kind !== 'proposal', r && r.kind);
+      check('live · and the refusal is said out loud', r && /Записать не выйдет/.test(r.text || ''), r && r.text);
+    }
+
+    // `WS.engine.threads` is not exported, so the obvious spelling returned an
+    // empty history and every follow-up reached the model with no memory.
+    {
+      WS.engine.openThread('probe:hist', 'История', 'chat');
+      WS.engine.pushText('me', 'текст', 'первый вопрос', 'probe:hist');
+      WS.engine.pushText('ai', 'Консьерж', 'первый ответ', 'probe:hist');
+      const hist = (function () { try { return JSON.parse(JSON.stringify(WS.live.history ? WS.live.history() : [])); } catch (e) { return []; } })();
+      check('live · the conversation so far reaches the model',
+        hist.length >= 2 && /первый вопрос/.test(JSON.stringify(hist)), JSON.stringify(hist).slice(0, 120));
+      // A client's own words handed over as the Concierge's leaves the model
+      // reasoning from a conversation that never happened.
+      WS.engine.pushText('user', 'Sarah', 'ещё ищу 1BR в JVC', 'probe:hist');
+      const withClient = WS.live.history();
+      check('live · a client is a third voice, not the Concierge',
+        withClient.some((m) => m.role === 'client' && /1BR/.test(m.text)),
+        JSON.stringify(withClient.map((m) => m.role)));
+      check('live · and each turn is attributed to a speaker',
+        hist.some((m) => m.role === 'user') && hist.some((m) => m.role === 'agent'), JSON.stringify(hist.map((m) => m.role)));
+    }
+
+    // Entities the interface already shows must be visible to the model too,
+    // or it answers "нет данных" about something on screen.
+    {
+      const d = L.digest();
+      check('live · requests reach the model', Array.isArray(d.заявки) && d.заявки.length > 0,
+        'заявки=' + (d.заявки || []).length);
+      const multi = (d.сделки || []).find((x) => x.лоты && x.лоты.length > 1);
+      check('live · a multi-lot deal carries its lots', !!multi, JSON.stringify((d.сделки || [])[0]));
+    }
+
+    // Lots do not share a commission rate; charging the whole contract at the
+    // first lot's rate produced a figure the stand then called verified.
+    {
+      const deal = (dd().deals || []).find((x) => x.lots && x.lots.length > 1);
+      if (deal) {
+        const objs = dd().objects || [];
+        const lots = deal.lots.map((id) => objs.find((o) => o.id === id)).filter(Boolean);
+        const rates = lots.map((o) => (o.commissionPct || 2));
+        const got = WS.ui.dealCommission(deal);
+        const first = Math.round((deal.amount || 0) * rates[0] / 100);
+        const differ = rates.some((r) => r !== rates[0]);
+        check('live · a multi-lot commission is not the first lot rate alone',
+          !differ || got !== first, 'got=' + got + ' first-rate=' + first + ' rates=' + rates.join('/'));
+        const lo = Math.min.apply(null, rates), hi = Math.max.apply(null, rates);
+        check('live · and it lands between the lot rates',
+          got >= Math.round(deal.amount * lo / 100) - 1 && got <= Math.round(deal.amount * hi / 100) + 1,
+          'got=' + got + ' range=' + Math.round(deal.amount * lo / 100) + '..' + Math.round(deal.amount * hi / 100));
+      } else { check('a multi-lot deal exists to check', false); }
+    }
+
+    // The market slice is read through the same layer as everything else, so a
+    // figure about Dubai is openable exactly like a figure about the pipeline.
+    {
+      const q = WS.query.run({ from: 'market', where: [{ field: 'район', op: 'eq', value: 'Downtown Dubai' }] });
+      check('market · a district is queryable like any other collection',
+        q.ok && q.rows.length === 1, JSON.stringify(q).slice(0, 120));
+      const all = WS.query.run({ from: 'market' });
+      check('market · every row declares where its numbers come from',
+        all.ok && all.rows.every((r) => !!r.basis), 'rows=' + (all.rows || []).length);
+      check('market · rent, price and yield cannot contradict each other',
+        all.rows.every((r) => Math.abs(r.арендаЗаМетрВГод - Math.round(r.ценаЗаМетр * r.доходностьПроцент / 100)) <= 1));
+      // Downtown came back as «нет данных» in the live breadth pass.
+      const areas = (dd().objects || []).map((o) => o.area);
+      check('market · it covers the districts the stand already sells in',
+        areas.every((a) => all.rows.some((r) => r.район === a)), areas.join('/'));
+      check('market · the model is given the slice with its provenance intact',
+        (L.digest().рынок_дубая || []).some((r) => r.basis === 'иллюстративно'));
+    }
+
+    check('live · the digest carries the readings the answer may use',
+      !!L.digest().показатели.deals_active);
+    // Left out, the model answered «комиссии в данных нет» while the analytics
+    // screen was showing the figure — the live head contradicting the stand.
+    {
+      const shown = WS.ui.metricsSnapshot().metrics.expected_commission;
+      const sent = L.digest().показатели_экранов.expected_commission;
+      check('live · the model sees every figure the screens show',
+        !!sent && sent.value === shown.v, 'sent=' + (sent && sent.value) + ' screen=' + shown.v);
+    }
+    check('live · the digest names entities so the model can refer to them',
+      (L.digest().контакты || []).some((c) => c.id === 'c_anna'));
+    // Sending only the stage code put «две сделки на стадии docs» into a reply.
+    {
+      const deal = (L.digest().сделки || [])[0];
+      check('live · a stage reaches the model as words, not a code',
+        !!deal && !/^(new|work|docs|done)$/.test(deal.стадия), deal && deal.стадия);
+      check('live · and the code is still there to write a change with',
+        !!deal && /^(new|work|docs|done)$/.test(deal.стадия_код), deal && deal.стадия_код);
+    }
+
+    // A bad second at page load must not cost the visitor the live Concierge
+    // for the whole session — the head goes in even when the probe fails.
+    {
+      const hadFetch = win.fetch;
+      win.fetch = () => Promise.reject(new Error('сеть недоступна'));
+      WS.agent.setAsyncHead(null);
+      const put = L.install();
+      check('live · the head is installed even when the probe cannot answer',
+        put === true && WS.agent.hasAsyncHead() === true, 'install=' + put);
+      if (hadFetch === undefined) delete win.fetch; else win.fetch = hadFetch;
+      WS.agent.setAsyncHead(null);
+    }
+
+    // The boot probe is still in flight when the first question is typed. It
+    // used to be answered with the stale «not ready», so that question fell to
+    // the offline planner without a word.
+    {
+      L.disable('reset');
+      const a1 = L.probe();
+      const a2 = L.probe();
+      check('live · a second probe waits on the first instead of answering «no»',
+        a1 === a2, 'same promise=' + (a1 === a2));
+      const both = await Promise.all([a1, a2]);
+      check('live · and both callers get the same verdict', both[0] === both[1]);
+      L.disable('done');
+    }
+
+    // Two failures and the live head steps aside for the rest of the session.
+    {
+      WS.agent.setAsyncHead(() => { throw new Error('проверка'); });
+      check('live · a live head can be installed', WS.agent.hasAsyncHead() === true);
+      L.noteFailure('раз');
+      check('live · one hiccup does not cost the session its live head', WS.agent.hasAsyncHead() === true);
+      L.noteFailure('два');
+      check('live · a service that stays down is stopped being retried', WS.agent.hasAsyncHead() === false);
+    }
+  } else {
+    check('live head module present', false);
+  }
+
+  // A failing live head must answer anyway, through the offline planner.
+  if (WS.agent && WS.agent.askAsync) {
+    WS.agent.setAsyncHead(async () => { throw new Error('сеть легла'); });
+    const fallback = await WS.agent.askAsync('сколько сделок в работе');
+    check('live · a failed live call still produces an answer',
+      !!fallback && fallback.kind === 'answer' && /\d/.test(fallback.text || ''), fallback && fallback.text);
+    WS.agent.setAsyncHead(async () => ({ kind: 'answer', text: 'Живой ответ.', evidence: [], next: [] }));
+    const live = await WS.agent.askAsync('что там');
+    check('live · a working live call is used', live.text === 'Живой ответ.');
+    check('live · a live reply still gets follow-ups', (live.next || []).length > 0);
+    WS.agent.setAsyncHead(null);
+  }
+
+  // ============================================================
+  //  Voice. Both halves belong to the browser, so both are faked here — what
+  //  is being tested is the wiring: that dictation reaches the composer and
+  //  survives a re-render, and that a spoken answer is the answer's own.
+  // ============================================================
+  if (WS.voice) {
+    const V = WS.voice;
+
+    // ---- what a reply sounds like ----
+    check('voice · the model’s spoken form wins', V.spokenText({ speak: 'Коротко вслух.', text: 'Длинный текст.' }) === 'Коротко вслух.');
+    check('voice · without one, the prose is read', V.spokenText({ text: 'Четыре сделки в работе.' }) === 'Четыре сделки в работе.');
+    check('voice · a table is never read aloud, even one carrying a caption',
+      V.spokenText({ text: '', blocks: [
+        { t: 'table', text: 'Сравнение районов', head: ['a'], rows: [['b']] },
+        { t: 'bars', text: 'Доходность', rows: [{ label: 'Arjan', value: 8.1 }] },
+        { t: 'p', text: 'Суть.' },
+      ] }) === 'Суть.');
+    check('voice · nothing to say produces nothing', V.spokenText({}) === '' && V.spokenText(null) === '');
+    check('voice · a spoken form is clipped', V.spokenText({ speak: 'а'.repeat(900) }).length === 600);
+    if (WS.live) {
+      check('voice · the live head carries the spoken form', WS.live.toReply('текст', { say_aloud: '  вслух   так  ' }).speak === 'вслух так');
+      check('voice · and drops anything that is not a phrase', WS.live.normSay({ x: 1 }) === null);
+    }
+
+    // ---- dictation ----
+    function FakeRec() { this.calls = []; FakeRec.last = this; }
+    FakeRec.prototype.start = function () { this.started = true; };
+    FakeRec.prototype.stop = function () { this.stopped = true; if (this.onend) this.onend(); };
+    FakeRec.prototype.emit = function (text, isFinal) {
+      const res = [Object.assign([{ transcript: text }], { isFinal: !!isFinal })];
+      if (this.onresult) this.onresult({ resultIndex: 0, results: res });
+    };
+    win.SpeechRecognition = FakeRec;
+    check('voice · dictation is offered where the browser has it', V.canDictate() === true);
+
+    WS.router.go('concierge');
+    const micBtn = doc.querySelector('[data-act="voice"]');
+    const input = doc.getElementById('cgPrompt');
+    check('voice · the composer has a microphone and a field', !!micBtn && !!input);
+    if (micBtn && input) {
+      input.value = 'для Анны';
+      micBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('voice · a press starts listening', V.dictating() === true);
+      check('voice · and the button says so without a re-render', micBtn.classList.contains('rec'));
+
+      FakeRec.last.emit('подбери', false);
+      check('voice · a half-said phrase is already in the field', input.value.indexOf('подбери') >= 0);
+      FakeRec.last.emit('подбери две однушки', true);
+      check('voice · what was typed before is kept, not overwritten',
+        input.value.indexOf('для Анны') === 0 && input.value.indexOf('две однушки') > 0, input.value);
+
+      // The composer is rebuilt on almost any state change; the words must not
+      // fall on the floor when it is.
+      WS.storeApi.emit();
+      const fresh = doc.getElementById('cgPrompt');
+      check('voice · a re-render replaces the field', fresh !== input);
+      FakeRec.last.emit('подбери две однушки до двух миллионов', true);
+      check('voice · dictation follows it', (fresh.value || '').indexOf('двух миллионов') > 0, fresh.value);
+
+      const micNow = doc.querySelector('[data-act="voice"]');
+      micNow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('voice · a second press stops listening', V.dictating() === false);
+      check('voice · and the button stops saying it is', !micNow.classList.contains('rec'));
+
+      // A field that has gone for good stops the recogniser instead of typing
+      // into a node nobody can see.
+      micNow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      WS.router.go('clients');
+      FakeRec.last.emit('в пустоту', true);
+      check('voice · a field that is gone ends the dictation', V.dictating() === false);
+    }
+
+    delete win.SpeechRecognition;
+    check('voice · a browser without it says so rather than pretending', V.canDictate() === false);
+    WS.router.go('concierge');
+    const micGone = doc.querySelector('[data-act="voice"]');
+    if (micGone) {
+      micGone.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('voice · and pressing it is harmless', V.dictating() === false);
+    }
+
+    // ---- the answer said out loud ----
+    check('voice · no listen button where the browser cannot speak',
+      V.canSpeak() === false &&
+      String(WS.engine.agentCard({ kind: 'answer', text: 'Ответ.', evidence: [], next: [] }, 'mQuiet')).indexOf('data-agsay') < 0);
+
+    const spoken = [];
+    win.SpeechSynthesisUtterance = function (t) { this.text = t; };
+    win.speechSynthesis = {
+      canceled: 0,
+      cancel() { this.canceled += 1; },
+      speak(u) { spoken.push(u); },
+      getVoices() { return [{ lang: 'en-US', name: 'Alex' }, { lang: 'ru-RU', name: 'Milena' }]; },
+    };
+    check('voice · speaking is offered where the browser has it', V.canSpeak() === true);
+
+    {
+      const older = { kind: 'answer', text: 'старый ответ', speak: 'Старое вслух.', evidence: [], next: [] };
+      const newer = { kind: 'answer', text: 'новый ответ', speak: 'Новое вслух.', evidence: [], next: [] };
+      WS.engine.openThread('probe:say', 'Голос', 'chat');
+      WS.router.go('concierge');
+      const midOld = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(midOld, WS.engine.agentCard(older, midOld));
+      const midNew = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(midNew, WS.engine.agentCard(newer, midNew));
+
+      const btns = doc.getElementById('chat').querySelectorAll('[data-agsay]');
+      check('voice · every answer offers to be read out', btns.length === 2);
+      if (btns.length === 2) {
+        // Through the real click path — the handlers were right and the
+        // delegation was not, which is how this class of bug survives.
+        btns[0].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('voice · the button speaks its own answer, not the newest',
+          spoken.length === 1 && spoken[0].text === 'Старое вслух.', spoken.length ? spoken[0].text : 'nothing spoken');
+        check('voice · in Russian, with a Russian voice when there is one',
+          !!spoken[0] && spoken[0].lang === 'ru-RU' && !!spoken[0].voice && spoken[0].voice.name === 'Milena');
+        check('voice · and shows that it is the one speaking', btns[0].classList.contains('on'));
+        btns[0].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('voice · pressing it again stops', V.speaking() === null && win.speechSynthesis.canceled > 0);
+        check('voice · and the button lets go of the state', !btns[0].classList.contains('on'));
+
+        btns[1].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('voice · a different answer speaks its own words',
+          spoken.length === 2 && !!spoken[1] && spoken[1].text === 'Новое вслух.',
+          spoken.map((u) => u.text).join(' | '));
+        V.stopSpeech();
+
+        // Chrome cuts a single utterance at about fifteen seconds, mid-word.
+        // A long spoken form has to arrive as several short ones.
+        spoken.length = 0;
+        const longSay = 'Первое предложение про Business Bay и его доходность. ' +
+          'Второе предложение про JVC и сроки сдачи. Третье предложение про комиссию по сделке. ' +
+          'Четвёртое предложение про то, что делать дальше и кому позвонить сегодня.';
+        V.say(longSay, 'mLong');
+        check('voice · a long answer is spoken in pieces, not one long breath',
+          spoken.length > 1 && spoken.every((u) => u.text.length <= 200), 'pieces=' + spoken.length);
+        check('voice · and the pieces are the whole answer, in order',
+          spoken.map((u) => u.text).join(' ').replace(/\s+/g, ' ') === longSay.trim().replace(/\s+/g, ' '),
+          spoken.map((u) => u.text).join(' | '));
+        spoken.length = 0;
+        V.say('Одна короткая фраза.', 'mShort');
+        check('voice · a short answer is not chopped up', spoken.length === 1);
+        V.stopSpeech();
+      }
+      const mute = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [] }, 'mMute');
+      check('voice · an answer with nothing to say offers no button', String(mute).indexOf('data-agsay') < 0);
+    }
+  } else {
+    check('voice module present', false);
+  }
+
+  // ============================================================
   //  End to end: what actually happens when a person types into the Concierge.
   //  The module tests above prove the reasoning; this proves the wiring.
   // ============================================================
   const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
+  // The Concierge answers on a scripted delay, so waiting a fixed span races it
+  // on a busy machine — and a race here used to surface as a TypeError three
+  // lines later rather than as a failed check. Wait for the thing itself.
+  async function waitFor(cond, ms) {
+    const until = Date.now() + (ms || 6000);
+    while (Date.now() < until) {
+      try { if (cond()) return true; } catch (e) { /* not there yet */ }
+      await wait(60);
+    }
+    return false;
+  }
   if (WS.agent && typeof WS.router.routePrompt === 'function') {
     WS.engine.openThread('probe:e2e', 'Сквозная', 'chat');
     WS.router.go('concierge');
 
     WS.router.routePrompt('сколько сделок в работе и на какую сумму');
-    await wait(1500);
+    await waitFor(() => doc.getElementById('chat').querySelector('[data-agev]'));
     const chat1 = doc.getElementById('chat');
     const html1 = chat1 ? chat1.innerHTML : '';
     const liveActive = dd().deals.filter((d) => d.stage !== 'done').length;
     check('e2e · a typed question produces an answer in the chat', html1.indexOf(String(liveActive)) >= 0, 'looking for ' + liveActive);
-    check('e2e · the answer offers openable evidence', (chat1 && chat1.querySelectorAll('[data-agev]').length) > 0);
+    const chip = chat1 && chat1.querySelector('[data-agev]');
+    check('e2e · the answer offers openable evidence', !!chip);
     check('e2e · no Wizard-of-Oz fallback left', html1.indexOf('Wizard-of-Oz') < 0 && html1.indexOf('подготовлены близкие результаты') < 0);
 
     // Clicking the evidence chip opens the records the number came from.
-    const chip = chat1.querySelector('[data-agev]');
-    chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    await wait(80);
-    const modalHtml = doc.getElementById('modal').innerHTML;
-    check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
-    WS.ui.closeModal();
+    if (chip) {
+      chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await waitFor(() => doc.getElementById('modal').innerHTML.indexOf('Откуда это число') >= 0, 1000);
+      const modalHtml = doc.getElementById('modal').innerHTML;
+      check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
+      WS.ui.closeModal();
+    } else {
+      check('e2e · evidence opens the underlying records', false, 'no evidence chip to click');
+    }
+
+    // The same addressing, through the click. Resolving the chip key was
+    // correct and the delegation coerced it with + — which turns «m3:0» into
+    // NaN, and NaN into the first row of whatever answered last. Every check
+    // that called the handler directly stayed green while every chip in the
+    // running stand opened the wrong answer.
+    {
+      const first = { kind: 'answer', text: 'первый', next: [{ label: 'ещё', ask: 'вопрос первого' }],
+        evidence: [{ label: 'сделок в первом', value: 1, query: { from: 'deals' } }] };
+      const second = { kind: 'answer', text: 'второй', next: [{ label: 'ещё', ask: 'вопрос второго' }],
+        evidence: [{ label: 'сделок во втором', value: 2, query: { from: 'deals' } }] };
+      const m1 = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(m1, WS.engine.agentCard(first, m1));
+      const m2 = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(m2, WS.engine.agentCard(second, m2));
+
+      const evs = doc.getElementById('chat').querySelectorAll('[data-agev]');
+      const olderEv = Array.prototype.filter.call(evs, (b) => b.getAttribute('data-agev').indexOf(m1 + ':') === 0)[0];
+      if (olderEv) {
+        olderEv.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        await waitFor(() => doc.getElementById('modal').innerHTML.indexOf('Откуда это число') >= 0, 1500);
+        const mh = doc.getElementById('modal').innerHTML;
+        check('e2e · a chip opens its own answer’s rows, not the newest',
+          mh.indexOf('сделок в первом') >= 0 && mh.indexOf('сделок во втором') < 0, mh.slice(0, 120));
+        WS.ui.closeModal();
+      } else {
+        check('e2e · a chip opens its own answer’s rows, not the newest', false, 'no chip under the older answer');
+      }
+
+      const nexts = doc.getElementById('chat').querySelectorAll('[data-agnext]');
+      const olderNext = Array.prototype.filter.call(nexts, (b) => b.getAttribute('data-agnext').indexOf(m1 + ':') === 0)[0];
+      if (olderNext) {
+        olderNext.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        await waitFor(() => doc.getElementById('chat').innerHTML.indexOf('вопрос первого') >= 0, 1500);
+        const ch = doc.getElementById('chat').innerHTML;
+        check('e2e · a follow-up asks its own answer’s question',
+          ch.indexOf('вопрос первого') >= 0 && ch.indexOf('вопрос второго') < 0);
+      } else {
+        check('e2e · a follow-up asks its own answer’s question', false, 'no follow-up under the older answer');
+      }
+    }
 
     // A write instruction reaches a proposal, and only a click applies it.
     const feedWas = (dd().contactTimeline['c_anna'] || []).length;
     WS.router.routePrompt('запиши по Анне: проверка сквозного пути');
-    await wait(1500);
+    await waitFor(() => doc.getElementById('chat').querySelector('[data-agok]'));
     const chat2 = doc.getElementById('chat');
-    const okBtn = chat2.querySelector('[data-agok]');
+    const okBtn = chat2 && chat2.querySelector('[data-agok]');
     check('e2e · a write instruction produces a confirm button', !!okBtn);
     check('e2e · still nothing written before the click',
       (dd().contactTimeline['c_anna'] || []).length === feedWas);

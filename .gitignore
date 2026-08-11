@@ -2,3 +2,4 @@ node_modules/
 .shots/
 package-lock.json
 *.log
+server/OFF

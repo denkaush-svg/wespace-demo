@@ -16,6 +16,7 @@
     events: 'события календаря',
     companies: 'компании',
     inbox: 'входящие',
+    market: 'районы рынка Дубая',
   };
 
   const num = (v) => (typeof v === 'number' ? v : parseFloat(v));
