@@ -100,6 +100,50 @@ function pureChecks() {
   // assertion to the total made it fail for a reason it was not testing.
   ok('an oversized digest is clipped', p3.indexOf('д'.repeat(CFG.maxDigestChars + 1)) < 0 && p3.indexOf('д'.repeat(1000)) >= 0);
 
+  // Данные стенда — это списки. Резать их строкой значит отдать модели JSON,
+  // оборванный посреди записи: она дочитает сколько сможет и ответит по
+  // половине фикстуры, не зная об этом.
+  {
+    const many = (n, tag) => Array.from({ length: n }, (_, i) => ({ id: tag + i, текст: 'ю'.repeat(400) }));
+    const big = { сделки: many(60, 'd'), объекты: many(60, 'o'), ревизия: 7 };
+    const fitted = P.fitDigest(big, 6000);
+    let parsed = null;
+    try { parsed = JSON.parse(fitted); } catch (e) { parsed = null; }
+    ok('an oversized digest stays valid JSON', !!parsed, fitted.slice(-60));
+    ok('it is shortened by dropping list tails, not by cutting a record',
+      !!parsed && parsed.сделки.length < 60 && parsed.сделки[0].id === 'd0' && parsed.ревизия === 7);
+    ok('and it says what was left out',
+      !!parsed && !!parsed._обрезано && parsed._обрезано.сделки.всего === 60 &&
+      parsed._обрезано.сделки.показано === parsed.сделки.length,
+      JSON.stringify(parsed && parsed._обрезано));
+    ok('a digest that fits is passed through untouched',
+      P.fitDigest({ a: [1, 2, 3] }, 6000) === JSON.stringify({ a: [1, 2, 3] }));
+    ok('the current stand fits with room to spare', CFG.maxDigestChars >= 24 * 1024, String(CFG.maxDigestChars));
+
+    // Through the prompt builder, not the helper: testing fitDigest on its own
+    // left the call site free to go back to clipping a string.
+    const huge = { сделки: many(400, 'd'), ревизия: 3 };
+    const prompt = buildPrompt({ text: 'вопрос', digest: huge });
+    // Everything between the two markers, and nothing else: the rules above
+    // contain example objects, so «every line that looks like JSON» swept them
+    // in and the check failed for a reason it was not testing.
+    const between = prompt.split('=== ДАННЫЕ')[1] || '';
+    const block = (between.split('=== КОНЕЦ ДАННЫХ ===')[0] || '').split('\n').slice(1).join('\n').trim();
+    let inPrompt = null;
+    try { inPrompt = JSON.parse(block); } catch (e) { inPrompt = null; }
+    ok('the data block in the prompt is parseable JSON', !!inPrompt, block.slice(-70));
+    ok('and it admits the list was shortened',
+      !!inPrompt && !!inPrompt._обрезано && inPrompt._обрезано.сделки.всего === 400);
+  }
+
+  // Экраны и операции, которые модель называет, должны существовать в стенде.
+  ok('the funnel the stand runs on is in the rules',
+    p2.indexOf('заявка → сделки → лоты') >= 0 && p2.indexOf('updateRequest') >= 0);
+  ok('the screens it may name are enumerated',
+    p2.indexOf('ЭКРАНЫ для open') >= 0 && p2.indexOf('requests (Заявки)') >= 0);
+  ok('a feed entry may be filed against a request, and not against an object',
+    /addEvent","scope":"contact\|company\|deal\|request"/.test(p2), 'scope list drifted');
+
   // the bucket holds `perIpBurst`, then refuses
   state.ips.clear();
   let taken = 0;

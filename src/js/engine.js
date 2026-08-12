@@ -781,14 +781,20 @@
   // Screens the Concierge may open on its own. A whitelist rather than
   // whatever string came back, so a wrong guess is ignored instead of
   // navigating the stand somewhere that does not render.
-  const OPENABLE = ['start', 'concierge', 'clients', 'objects', 'calc', 'finance',
-    'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'];
+  // Kept level with the navigation: the stand grew Заявки, Лиды, Показы,
+  // Партнёры, Команда, Услуги, Согласования, and a whitelist frozen at the old
+  // set quietly meant the Concierge could not offer to open the screen the
+  // whole funnel now runs through.
+  const OPENABLE = ['start', 'concierge', 'clients', 'companies', 'objects', 'requests', 'leads',
+    'calc', 'valuation', 'finance', 'tasks', 'shows', 'docs', 'analytics', 'club', 'partners',
+    'team', 'services', 'approvals', 'promotion', 'profile', 'settings'];
   function navigateTo(o) {
     if (!o) return;
     const v = String(o.view || '');
     if (v === 'contact' && o.id) return WS.ui.clientCard(o.id);
     if (v === 'company' && o.id) return WS.ui.companyCard(o.id);
     if (v === 'deal' && o.id) return WS.ui.dealCard(o.id);
+    if (v === 'request' && o.id) return WS.ui.requestCard(o.id);
     if (OPENABLE.indexOf(v) >= 0) return WS.router.go(v);
   }
 

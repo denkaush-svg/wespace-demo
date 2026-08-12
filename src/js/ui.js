@@ -2519,6 +2519,7 @@
     const data = D();
     if (scope === 'contact') return (data.clients || []).find((x) => x.id === id);
     if (scope === 'company') return (data.companies || []).find((x) => x.id === id);
+    if (scope === 'request') return (data.requests || []).find((x) => x.id === id);
     return (data.deals || []).find((x) => x.id === id);
   }
   function openEventForm(scope, id) {
@@ -2547,7 +2548,10 @@
     if (ta && spec) ta.setAttribute('placeholder', spec[4]);
   }
   // Which timeline a scope writes into. One place, so callers can't disagree.
-  const TIMELINE_KEY = { contact: 'contactTimeline', company: 'companyTimeline', deal: 'dealTimeline' };
+  // The request grew its own timeline and the card renders it, but the headless
+  // write path did not know the scope existed — so a note the Concierge was
+  // asked to file against a заявка was refused as an unknown entity.
+  const TIMELINE_KEY = { contact: 'contactTimeline', company: 'companyTimeline', deal: 'dealTimeline', request: 'requestTimeline' };
   function timelineFor(scope) {
     const data = D(); const key = TIMELINE_KEY[scope];
     if (!key) return null;

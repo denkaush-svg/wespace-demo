@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:27</title>
+  <title>WESPACE · сборка 15:22</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:27';
+    window.WS_BUILD='15:22';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3371,6 +3371,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       safe: ['title', 'due', 'kind', 'assignee'],
       guarded: ['status', 'when'],
     },
+    // Заявка — верх воронки. Заметка и параметры поиска правятся сразу;
+    // всё, чем лид оценивается и кому принадлежит, требует подтверждения.
+    // offered/kp сюда не входят: их меняет ход сделки, а не реплика в чате.
+    requests: {
+      safe: ['note', 'areas', 'horizon', 'bedrooms', 'goal', 'nextContact'],
+      guarded: ['leadStatus', 'temperature', 'assignee', 'budget', 'paymentForm', 'funding', 'source', 'title'],
+    },
   };
 
   const OP_SPEC = {
@@ -3379,6 +3386,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
     updateTask: { coll: 'tasks', kind: 'patch' },
+    updateRequest: { coll: 'requests', kind: 'patch' },
     dealStage: { coll: 'deals', kind: 'stage' },
     addTask: { coll: 'tasks', kind: 'add' },
     removeTask: { coll: 'tasks', kind: 'remove' },
@@ -3572,6 +3580,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     tasks: 'задачи',
     events: 'события календаря',
     companies: 'компании',
+    requests: 'заявки',
     inbox: 'входящие',
     market: 'районы рынка Дубая',
   };
@@ -4466,14 +4475,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Screens the Concierge may open on its own. A whitelist rather than
   // whatever string came back, so a wrong guess is ignored instead of
   // navigating the stand somewhere that does not render.
-  const OPENABLE = ['start', 'concierge', 'clients', 'objects', 'calc', 'finance',
-    'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'];
+  // Kept level with the navigation: the stand grew Заявки, Лиды, Показы,
+  // Партнёры, Команда, Услуги, Согласования, and a whitelist frozen at the old
+  // set quietly meant the Concierge could not offer to open the screen the
+  // whole funnel now runs through.
+  const OPENABLE = ['start', 'concierge', 'clients', 'companies', 'objects', 'requests', 'leads',
+    'calc', 'valuation', 'finance', 'tasks', 'shows', 'docs', 'analytics', 'club', 'partners',
+    'team', 'services', 'approvals', 'promotion', 'profile', 'settings'];
   function navigateTo(o) {
     if (!o) return;
     const v = String(o.view || '');
     if (v === 'contact' && o.id) return WS.ui.clientCard(o.id);
     if (v === 'company' && o.id) return WS.ui.companyCard(o.id);
     if (v === 'deal' && o.id) return WS.ui.dealCard(o.id);
+    if (v === 'request' && o.id) return WS.ui.requestCard(o.id);
     if (OPENABLE.indexOf(v) >= 0) return WS.router.go(v);
   }
 
@@ -7382,6 +7397,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const data = D();
     if (scope === 'contact') return (data.clients || []).find((x) => x.id === id);
     if (scope === 'company') return (data.companies || []).find((x) => x.id === id);
+    if (scope === 'request') return (data.requests || []).find((x) => x.id === id);
     return (data.deals || []).find((x) => x.id === id);
   }
   function openEventForm(scope, id) {
@@ -7410,7 +7426,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (ta && spec) ta.setAttribute('placeholder', spec[4]);
   }
   // Which timeline a scope writes into. One place, so callers can't disagree.
-  const TIMELINE_KEY = { contact: 'contactTimeline', company: 'companyTimeline', deal: 'dealTimeline' };
+  // The request grew its own timeline and the card renders it, but the headless
+  // write path did not know the scope existed — so a note the Concierge was
+  // asked to file against a заявка was refused as an unknown entity.
+  const TIMELINE_KEY = { contact: 'contactTimeline', company: 'companyTimeline', deal: 'dealTimeline', request: 'requestTimeline' };
   function timelineFor(scope) {
     const data = D(); const key = TIMELINE_KEY[scope];
     if (!key) return null;
@@ -9962,6 +9981,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     clients_no_consent: { label: ['контакт без согласия', 'контакта без согласия', 'контактов без согласия'], q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
     objects_total: { label: ['объект', 'объекта', 'объектов'], q: { from: 'objects', aggregate: { fn: 'count' } } },
     companies_total: { label: ['компания', 'компании', 'компаний'], q: { from: 'companies', aggregate: { fn: 'count' } } },
+    // Заявка — верх воронки стенда. Без этих чтений цифру по лидам можно было
+    // назвать, но нельзя было открыть: «откуда это число» не имело источника.
+    requests_total: { label: ['заявка', 'заявки', 'заявок'], q: { from: 'requests', aggregate: { fn: 'count' } } },
+    requests_hot: { label: ['горячая заявка', 'горячие заявки', 'горячих заявок'], q: { from: 'requests', where: [{ field: 'temperature', op: 'eq', value: 'hot' }], aggregate: { fn: 'count' } } },
+    requests_budget_sum: { label: 'бюджета в заявках', money: true, q: { from: 'requests', aggregate: { fn: 'sum', field: 'budget' } } },
   };
 
   function read(key) {
@@ -10527,14 +10551,38 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
       // only the code got «две сделки на стадии docs» into an answer.
+      // Срок следующего шага, дни на стадии и задаток — то, из чего
+      // складывается ответ «что мешает закрыть». Без них Консьерж знал сумму
+      // и стадию, но не знал, где сделка стоит.
       сделки: take(d.deals, (x) => ({
         id: x.id, название: x.title, сумма: x.amount,
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
+        воронка: x.dealType || x.funnel, ответственный: x.agent,
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, лоты: x.lots || null,
         заявка: x.requestId || null, горячая: !!x.hot,
+        срок_шага: x.nextDue || null, дней_на_стадии: x.stageDays,
+        задаток: x.deposit ? { вид: x.deposit.kind, сумма: x.deposit.amount, оплачен: !!x.deposit.paid, возвратный: !!x.deposit.refundable } : null,
       })),
-      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
-      заявки: take(d.requests, (r) => ({ id: r.id, что: r.title || r.goal, контакт: r.clientId, статус: r.status, бюджет: r.budget })),
+      // Названия и цены брались из полей title/rate, которых у объектов нет —
+      // модель получала безымянные строки и отвечала про район вместо дома.
+      объекты: take(d.objects, (o) => ({
+        id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
+        спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
+        тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
+      })),
+      // Заявка стала главной сущностью стенда: под ней живут предложенные
+      // объекты, выбор клиента и КП. Раньше сюда уходил только бюджет, а
+      // статус читался из поля status, которого больше нет, — Консьерж не
+      // видел ни воронку лида, ни то, что клиенту уже отправили.
+      заявки: take(d.requests, (r) => ({
+        id: r.id, что: r.title || r.goal, контакт: r.clientId, канал: r.channel, создана: r.createdAt,
+        статус: r.leadStatus, температура: r.temperature, ответственный: r.assignee,
+        следующий_контакт: r.nextContact, бюджет: r.budget, районы: r.areas,
+        спален: r.bedrooms, срок: r.horizon, оплата: r.paymentForm, финансирование: r.funding,
+        предложено: (r.offered || []).map((x) => ({ объект: x.id, состояние: x.state, причина: x.reason || null })),
+        кп: r.kp && r.kp.formed ? { когда: r.kp.at, объекты: r.kp.objectIds } : null,
+        заметка: r.note,
+      })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       // Каждая строка несёт своё происхождение, чтобы модель не выдала
       // иллюстративную величину за опубликованную.
@@ -10588,9 +10636,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // A screen the model wants shown becomes a chip, not a jump. Navigating the
   // moment it answers throws the reply off a phone screen entirely — the
   // person was still reading it.
-  const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', objects: 'Объекты',
-    tasks: 'Задачи', docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
-    club: 'Клуб', network: 'Сеть', profile: 'Профиль', settings: 'Настройки' };
+  const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', companies: 'Компании',
+    objects: 'Объекты', requests: 'Заявки', leads: 'Лиды', tasks: 'Задачи', shows: 'Показы',
+    docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
+    valuation: 'Оценка объекта', club: 'Клуб', partners: 'Партнёры', team: 'Команда',
+    services: 'Услуги', approvals: 'Согласования', promotion: 'Продвижение',
+    profile: 'Профиль', settings: 'Настройки' };
 
   function openChip(open) {
     if (!open || !open.view) return null;
@@ -10601,6 +10652,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (v === 'contact' && id) return { label: 'Открыть ' + (named(d.clients).name || 'контакт'), open: 'contact', id: id };
     if (v === 'company' && id) return { label: 'Открыть ' + (named(d.companies).name || 'компанию'), open: 'company', id: id };
     if (v === 'deal' && id) return { label: 'Открыть сделку', open: 'deal', id: id };
+    if (v === 'request' && id) return { label: 'Открыть заявку', open: 'request', id: id };
     if (VIEW_RU[v]) return { label: 'Открыть «' + VIEW_RU[v] + '»', open: v, id: '' };
     return null;
   }

@@ -275,6 +275,13 @@
       safe: ['title', 'due', 'kind', 'assignee'],
       guarded: ['status', 'when'],
     },
+    // Заявка — верх воронки. Заметка и параметры поиска правятся сразу;
+    // всё, чем лид оценивается и кому принадлежит, требует подтверждения.
+    // offered/kp сюда не входят: их меняет ход сделки, а не реплика в чате.
+    requests: {
+      safe: ['note', 'areas', 'horizon', 'bedrooms', 'goal', 'nextContact'],
+      guarded: ['leadStatus', 'temperature', 'assignee', 'budget', 'paymentForm', 'funding', 'source', 'title'],
+    },
   };
 
   const OP_SPEC = {
@@ -283,6 +290,7 @@
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
     updateTask: { coll: 'tasks', kind: 'patch' },
+    updateRequest: { coll: 'requests', kind: 'patch' },
     dealStage: { coll: 'deals', kind: 'stage' },
     addTask: { coll: 'tasks', kind: 'add' },
     removeTask: { coll: 'tasks', kind: 'remove' },

@@ -47,6 +47,11 @@
     clients_no_consent: { label: ['контакт без согласия', 'контакта без согласия', 'контактов без согласия'], q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
     objects_total: { label: ['объект', 'объекта', 'объектов'], q: { from: 'objects', aggregate: { fn: 'count' } } },
     companies_total: { label: ['компания', 'компании', 'компаний'], q: { from: 'companies', aggregate: { fn: 'count' } } },
+    // Заявка — верх воронки стенда. Без этих чтений цифру по лидам можно было
+    // назвать, но нельзя было открыть: «откуда это число» не имело источника.
+    requests_total: { label: ['заявка', 'заявки', 'заявок'], q: { from: 'requests', aggregate: { fn: 'count' } } },
+    requests_hot: { label: ['горячая заявка', 'горячие заявки', 'горячих заявок'], q: { from: 'requests', where: [{ field: 'temperature', op: 'eq', value: 'hot' }], aggregate: { fn: 'count' } } },
+    requests_budget_sum: { label: 'бюджета в заявках', money: true, q: { from: 'requests', aggregate: { fn: 'sum', field: 'budget' } } },
   };
 
   function read(key) {

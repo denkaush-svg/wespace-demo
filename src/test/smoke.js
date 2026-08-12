@@ -758,6 +758,104 @@ setTimeout(async () => {
         rb.querySelectorAll('[data-rpopen]').length === 1 && rb.querySelectorAll('[data-rpsave]').length === 1);
     }
 
+    // The stand's entity model moved on — заявка → сделки → лоты — and what the
+    // model is handed has to move with it. Every field below is read from the
+    // fixtures at runtime, so a rename shows up as a failing check rather than
+    // as an answer that quietly says «такого в данных нет».
+    {
+      const dg = L.digest();
+      const req = (dd().requests || [])[0];
+      const dgReq = (dg.заявки || [])[0] || {};
+      check('digest · a request carries its funnel state, not just a budget',
+        dgReq.статус === req.leadStatus && !!dgReq.статус &&
+        dgReq.температура === req.temperature && dgReq.ответственный === req.assignee,
+        JSON.stringify(dgReq).slice(0, 120));
+      check('digest · and what the client was already shown',
+        Array.isArray(dgReq.предложено) && dgReq.предложено.length === (req.offered || []).length &&
+        dgReq.предложено[0].состояние === req.offered[0].state);
+      check('digest · and whether a КП has gone out',
+        !!dgReq.кп && dgReq.кп.когда === req.kp.at);
+
+      const obj = (dd().objects || [])[0];
+      const dgObj = (dg.объекты || [])[0] || {};
+      check('digest · an object arrives with a name and a price',
+        dgObj.название === obj.name && !!dgObj.название && dgObj.цена === obj.price,
+        JSON.stringify(dgObj).slice(0, 120));
+
+      const stuckSrc = (dd().deals || []).find((x) => x.nextDue);
+      const stuck = (dg.сделки || []).find((x) => x.id === (stuckSrc || {}).id);
+      check('digest · a deal says where it is stuck, not only what it is worth',
+        !!stuck && stuck.срок_шага === stuckSrc.nextDue && stuck.дней_на_стадии === stuckSrc.stageDays,
+        JSON.stringify(stuck && { s: stuck.срок_шага, d: stuck.дней_на_стадии }));
+      const withDep = (dg.сделки || []).find((x) => x.задаток);
+      check('digest · and whether the deposit is actually paid',
+        !!withDep && typeof withDep.задаток.оплачен === 'boolean');
+
+      // Every id the model may be told to write against must resolve.
+      check('digest · request ids are real', (dg.заявки || []).every((r) => (dd().requests || []).some((x) => x.id === r.id)));
+    }
+
+    // «Откуда это число» over the top of the funnel: a lead figure has to be
+    // openable like any other, which needs the collection in the read layer.
+    {
+      const res = WS.query.run({ from: 'requests', aggregate: { fn: 'count' } });
+      check('read layer · requests are addressable', res.ok === true && res.value === (dd().requests || []).length,
+        res.error || String(res.value));
+      const r = WS.agent.tools.read('requests_hot');
+      check('read layer · a lead figure comes back with its rows',
+        !!r && r.value === (dd().requests || []).filter((x) => x.temperature === 'hot').length && !!r.query);
+      check('read layer · and reads the stand, not a constant',
+        !!WS.agent.tools.read('requests_budget_sum') &&
+        WS.agent.tools.read('requests_budget_sum').value ===
+          (dd().requests || []).reduce((s, x) => s + (x.budget || 0), 0));
+    }
+
+    // A screen the Concierge may offer to open has to exist in the stand.
+    {
+      const chip = L.toReply('смотри заявки', { open: { view: 'requests' } });
+      check('навигация · the Concierge can offer the Заявки screen',
+        !!chip && (chip.next || []).some((n) => n.open === 'requests'), JSON.stringify(chip && chip.next));
+      const card = L.toReply('вот заявка', { open: { view: 'request', id: (dd().requests[0] || {}).id } });
+      check('навигация · and a request card by id',
+        !!card && (card.next || []).some((n) => n.open === 'request' && n.id === dd().requests[0].id));
+      check('навигация · an invented screen is still refused',
+        !((L.toReply('x', { open: { view: 'admin_panel' } }) || {}).next || []).some((n) => n.open === 'admin_panel'));
+
+      // Offering the screen and being able to open it are two different lists
+      // in two different files. Checking only the chip left the second one free
+      // to fall behind the navigation — the chip appears and the click is dead.
+      WS.engine.openThread('probe:nav', 'Навигация', 'chat');
+      WS.router.go('concierge');
+      const navMid = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(navMid, WS.engine.agentCard(chip, navMid));
+      const navBtn = doc.getElementById('chat').querySelector('[data-agnext]');
+      const viewWas = WS.store.view;
+      if (navBtn) navBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('навигация · and the click actually gets there',
+        WS.store.view === 'requests', 'was ' + viewWas + ', now ' + WS.store.view);
+      WS.router.go('concierge');
+    }
+
+    // Writing against a заявка: the same one path, the same confirmation.
+    {
+      const r0 = dd().requests[0];
+      const dry = WS.storeApi.preview([{ op: 'updateRequest', id: r0.id, patch: { leadStatus: 'Подписант' } }]);
+      check('запись · a lead can be moved along the funnel', dry.ok === true, dry.error || '');
+      check('запись · and moving it asks for a confirmation', dry.tier === 'guarded', dry.tier);
+      const note = WS.storeApi.preview([{ op: 'updateRequest', id: r0.id, patch: { note: 'перезвонить в среду' } }]);
+      check('запись · a note on it does not', note.ok === true && note.tier === 'safe', note.tier || note.error);
+      const bad = WS.storeApi.preview([{ op: 'updateRequest', id: r0.id, patch: { kp: { formed: false } } }]);
+      check('запись · what the deal owns is not writable from a chat', bad.ok === false && bad.code === 'field_not_writable', bad.code);
+      const ghost = WS.storeApi.preview([{ op: 'updateRequest', id: 'r_nope', patch: { note: 'x' } }]);
+      check('запись · an invented request id is refused', ghost.ok === false && ghost.code === 'not_found');
+
+      const feedWas = ((dd().requestTimeline || {})[r0.id] || []).length;
+      const ev = WS.storeApi.apply([{ op: 'addEvent', scope: 'request', id: r0.id, type: 'call', text: 'созвон по подбору' }], { confirmed: true });
+      check('запись · a call can be filed against a request', ev.ok === true, ev.error || '');
+      check('запись · and it lands in that request’s own history',
+        ((dd().requestTimeline || {})[r0.id] || []).length === feedWas + 1);
+    }
+
     // A chip must open its own message's rows, not the newest reply's.
     {
       const older = { kind: 'answer', text: 'старый', evidence: [{ label: 'старое', value: 1, query: { from: 'deals' } }], next: [{ label: 'a', ask: 'a' }] };

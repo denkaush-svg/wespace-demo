@@ -66,14 +66,38 @@
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
       // only the code got «две сделки на стадии docs» into an answer.
+      // Срок следующего шага, дни на стадии и задаток — то, из чего
+      // складывается ответ «что мешает закрыть». Без них Консьерж знал сумму
+      // и стадию, но не знал, где сделка стоит.
       сделки: take(d.deals, (x) => ({
         id: x.id, название: x.title, сумма: x.amount,
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
+        воронка: x.dealType || x.funnel, ответственный: x.agent,
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, лоты: x.lots || null,
         заявка: x.requestId || null, горячая: !!x.hot,
+        срок_шага: x.nextDue || null, дней_на_стадии: x.stageDays,
+        задаток: x.deposit ? { вид: x.deposit.kind, сумма: x.deposit.amount, оплачен: !!x.deposit.paid, возвратный: !!x.deposit.refundable } : null,
       })),
-      объекты: take(d.objects, (o) => ({ id: o.id, название: o.title, район: o.area, ставка: o.rate, комиссия_процент: o.commissionPct })),
-      заявки: take(d.requests, (r) => ({ id: r.id, что: r.title || r.goal, контакт: r.clientId, статус: r.status, бюджет: r.budget })),
+      // Названия и цены брались из полей title/rate, которых у объектов нет —
+      // модель получала безымянные строки и отвечала про район вместо дома.
+      объекты: take(d.objects, (o) => ({
+        id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
+        спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
+        тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
+      })),
+      // Заявка стала главной сущностью стенда: под ней живут предложенные
+      // объекты, выбор клиента и КП. Раньше сюда уходил только бюджет, а
+      // статус читался из поля status, которого больше нет, — Консьерж не
+      // видел ни воронку лида, ни то, что клиенту уже отправили.
+      заявки: take(d.requests, (r) => ({
+        id: r.id, что: r.title || r.goal, контакт: r.clientId, канал: r.channel, создана: r.createdAt,
+        статус: r.leadStatus, температура: r.temperature, ответственный: r.assignee,
+        следующий_контакт: r.nextContact, бюджет: r.budget, районы: r.areas,
+        спален: r.bedrooms, срок: r.horizon, оплата: r.paymentForm, финансирование: r.funding,
+        предложено: (r.offered || []).map((x) => ({ объект: x.id, состояние: x.state, причина: x.reason || null })),
+        кп: r.kp && r.kp.formed ? { когда: r.kp.at, объекты: r.kp.objectIds } : null,
+        заметка: r.note,
+      })),
       задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       // Каждая строка несёт своё происхождение, чтобы модель не выдала
       // иллюстративную величину за опубликованную.
@@ -127,9 +151,12 @@
   // A screen the model wants shown becomes a chip, not a jump. Navigating the
   // moment it answers throws the reply off a phone screen entirely — the
   // person was still reading it.
-  const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', objects: 'Объекты',
-    tasks: 'Задачи', docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
-    club: 'Клуб', network: 'Сеть', profile: 'Профиль', settings: 'Настройки' };
+  const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', companies: 'Компании',
+    objects: 'Объекты', requests: 'Заявки', leads: 'Лиды', tasks: 'Задачи', shows: 'Показы',
+    docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
+    valuation: 'Оценка объекта', club: 'Клуб', partners: 'Партнёры', team: 'Команда',
+    services: 'Услуги', approvals: 'Согласования', promotion: 'Продвижение',
+    profile: 'Профиль', settings: 'Настройки' };
 
   function openChip(open) {
     if (!open || !open.view) return null;
@@ -140,6 +167,7 @@
     if (v === 'contact' && id) return { label: 'Открыть ' + (named(d.clients).name || 'контакт'), open: 'contact', id: id };
     if (v === 'company' && id) return { label: 'Открыть ' + (named(d.companies).name || 'компанию'), open: 'company', id: id };
     if (v === 'deal' && id) return { label: 'Открыть сделку', open: 'deal', id: id };
+    if (v === 'request' && id) return { label: 'Открыть заявку', open: 'request', id: id };
     if (VIEW_RU[v]) return { label: 'Открыть «' + VIEW_RU[v] + '»', open: v, id: '' };
     return null;
   }
