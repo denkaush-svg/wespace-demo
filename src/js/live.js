@@ -107,21 +107,66 @@
     };
   }
 
+  // What a follow-up needs from the turn before it. Scraping the markup gave
+  // the model back its own table as a run-on line — «Район Цена/м² Доходность
+  // Arjan 11 600 8,1% JVC 13 800 7,6%» — so «а если бюджет 1,5 млн» meant
+  // re-deriving a comparison it had just made. The reply objects are still
+  // held by the chat, so the last answer is handed back in its own shape.
+  function shapeOf(r) {
+    if (!r || !Array.isArray(r.blocks)) return null;
+    const out = [];
+    r.blocks.slice(0, 3).forEach((b) => {
+      if (!b || typeof b !== 'object') return;
+      if (b.t === 'table') {
+        out.push({ t: 'table', head: (b.head || []).slice(0, 5), rows: (b.rows || []).slice(0, 6).map((row) => (row || []).slice(0, 5)) });
+      } else if (b.t === 'bars') {
+        out.push({ t: 'bars', rows: (b.rows || []).slice(0, 6).map((x) => ({ label: x && x.label, value: x && x.value, suffix: x && x.suffix })) });
+      } else if (b.t === 'kv') {
+        out.push({ t: 'kv', rows: (b.rows || []).slice(0, 6) });
+      } else if (b.text) {
+        out.push({ t: b.t, text: String(b.text).slice(0, 200) });
+      }
+    });
+    return out.length ? out : null;
+  }
+
   function history() {
     // `WS.engine.threads` is not exported and `activeThreadId` is a function, so
     // the obvious spelling silently produced an empty history and every
     // follow-up reached the model with no memory of the conversation.
     const th = (WS.engine && WS.engine.activeThread) ? WS.engine.activeThread() : null;
     const items = (th && th.items) || [];
-    return items.slice(-8)
-      .map((m) => ({
+    const taken = items.slice(-8);
+    // Only the newest answer keeps its shape: it is the one a follow-up points
+    // at, and carrying every table back would cost more prompt than it earns.
+    let lastAgent = -1;
+    taken.forEach((m, i) => { if (!/class="msg me|class="msg user/.test(m.html || '')) lastAgent = i; });
+
+    return taken
+      .map((m, i) => {
         // Three voices, not two. A client's message carries `msg user`, and
         // calling it «agent» handed the model the client's words as its own.
-        role: /class="msg me/.test(m.html || '') ? 'user'
-          : (/class="msg user/.test(m.html || '') ? 'client' : 'agent'),
-        text: String(m.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400),
-      }))
-      .filter((m) => m.text);
+        const role = /class="msg me/.test(m.html || '') ? 'user'
+          : (/class="msg user/.test(m.html || '') ? 'client' : 'agent');
+        const entry = {
+          role: role,
+          text: String(m.html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 600),
+        };
+        if (role === 'agent' && i === lastAgent && WS.engine && WS.engine.replyFor) {
+          const shape = shapeOf(WS.engine.replyFor(m.id));
+          if (shape) { entry.blocks = shape; entry.text = entry.text.slice(0, 300); }
+        }
+        return entry;
+      })
+      .filter((m) => m.text || (m.blocks && m.blocks.length));
+  }
+
+  // Which conversation this is. Threads are per deal, per object, per lead, and
+  // the model was answering every one of them as if it were the general chat.
+  function scope() {
+    const th = (WS.engine && WS.engine.activeThread) ? WS.engine.activeThread() : null;
+    if (!th) return null;
+    return { id: th.id, о_чём: th.label || th.id, реплик: (th.items || []).length };
   }
 
   // ---------- what comes back ----------
@@ -245,7 +290,7 @@
     const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: text, digest: digest(), history: history() }),
+      body: JSON.stringify({ text: text, digest: digest(), history: history(), scope: scope() }),
     });
     if (!res.ok || !res.body) throw new Error('http ' + res.status);
 
@@ -355,7 +400,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, scope, shapeOf, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

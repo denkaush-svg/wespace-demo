@@ -856,6 +856,36 @@ setTimeout(async () => {
         ((dd().requestTimeline || {})[r0.id] || []).length === feedWas + 1);
     }
 
+    // What the next question is answered against. Scraped from markup, the
+    // Concierge's own table came back as a run-on line.
+    {
+      WS.engine.openThread('probe:ctx', 'Контекст', 'chat');
+      WS.router.go('concierge');
+      const cmid = WS.engine.pushMsg('<div></div>');
+      WS.engine.updateMsg(cmid, WS.engine.agentCard({
+        kind: 'answer', text: 'Под аренду лучше Arjan.', evidence: [], next: [],
+        blocks: [{ t: 'table', head: ['Район', 'Цена/м²'], rows: [['Arjan', '11 600'], ['JVC', '13 800']] }],
+      }, cmid));
+      WS.engine.pushText('me', 'я', 'а если бюджет 1,5 млн?', 'probe:ctx');
+
+      const h = L.history();
+      const agentTurn = h.filter((x) => x.role === 'agent').pop();
+      check('контекст · the last answer travels in its own shape',
+        !!agentTurn && Array.isArray(agentTurn.blocks) && agentTurn.blocks[0].t === 'table' &&
+        agentTurn.blocks[0].rows[0][0] === 'Arjan', JSON.stringify(agentTurn && agentTurn.blocks));
+      check('контекст · and the broker’s own words are still the broker’s',
+        h[h.length - 1].role === 'user' && h[h.length - 1].text.indexOf('1,5 млн') >= 0);
+
+      const sc = L.scope();
+      check('контекст · the conversation says which one it is',
+        !!sc && sc.id === 'probe:ctx' && !!sc['о_чём'], JSON.stringify(sc));
+
+      // Не всякое сообщение в треде — ответ Консьержа: сценарные карточки
+      // приходят готовой разметкой, и для них форма просто отсутствует.
+      check('контекст · a scripted card without a reply object still travels',
+        L.shapeOf(null) === null && L.shapeOf({ blocks: 'нет' }) === null);
+    }
+
     // A chip must open its own message's rows, not the newest reply's.
     {
       const older = { kind: 'answer', text: 'старый', evidence: [{ label: 'старое', value: 1, query: { from: 'deals' } }], next: [{ label: 'a', ask: 'a' }] };

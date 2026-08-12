@@ -57,7 +57,9 @@ const CFG = {
   maxBody: 96 * 1024,
   bodyTimeoutMs: Number(process.env.WESPACE_PROXY_BODY_TIMEOUT_MS || 8000),
   maxText: 1000,
-  maxHistory: 6,
+  // Совпадает с тем, сколько отдаёт страница: раньше здесь стояло больше,
+  // но браузер уже обрезал реплику, и запас ничего не значил.
+  maxHistory: 8,
   maxHistoryChars: 600,
   // A local CLI on a subscription: a bigger prompt costs latency, not money.
   // The old 8k ceiling sat right under the stand's own data — the entity model
@@ -260,6 +262,33 @@ function fitDigest(obj, max) {
   return json.length > max ? json.slice(0, max) + '…"ДАННЫЕ ОБРЕЗАНЫ"' : json;
 }
 
+// A turn the model itself produced comes back in the shape it produced it in.
+// Flattened to prose, its own table reached it as a run-on line and a
+// follow-up meant re-deriving the comparison it had just finished.
+function turnText(h) {
+  const said = clip(h && h.text, CFG.maxHistoryChars);
+  const blocks = Array.isArray(h && h.blocks) ? h.blocks.slice(0, 3) : [];
+  if (!blocks.length) return said;
+  const shown = blocks.map((b) => {
+    if (!b || typeof b !== 'object') return '';
+    if (b.t === 'table') {
+      const head = (Array.isArray(b.head) ? b.head : []).join(' | ');
+      const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6)
+        .map((r) => (Array.isArray(r) ? r : []).join(' | ')).join('\n    ');
+      return '  таблица: ' + head + (rows ? '\n    ' + rows : '');
+    }
+    if (b.t === 'bars' || b.t === 'kv') {
+      const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).map((r) => {
+        if (!r || typeof r !== 'object') return '';
+        return r.label != null ? r.label + ': ' + r.value + (r.suffix || '') : r.k + ': ' + r.v;
+      }).filter(Boolean).join('; ');
+      return rows ? '  ' + (b.t === 'bars' ? 'сравнение' : 'показатели') + ': ' + rows : '';
+    }
+    return b.text ? '  ' + clip(b.text, 200) : '';
+  }).filter(Boolean).join('\n');
+  return shown ? said + '\n' + shown : said;
+}
+
 function buildPrompt(body) {
   const text = clip(body.text, CFG.maxText).trim();
   const digest = fitDigest(body.digest, CFG.maxDigestChars);
@@ -270,8 +299,13 @@ function buildPrompt(body) {
     // happened.
     .map((h) => (h && h.role === 'agent' ? 'Консьерж: '
       : h && h.role === 'client' ? 'Клиент: ' : 'Брокер: ')
-      + clip(h && h.text, CFG.maxHistoryChars))
+      + turnText(h))
     .join('\n');
+
+  // Threads are per deal, per object, per lead. Without this the model answered
+  // a conversation about one client as if it were the general chat.
+  const sc = body.scope && typeof body.scope === 'object' ? body.scope : null;
+  const scope = sc ? 'Этот диалог: «' + clip(sc.о_чём, 120) + '» (' + clip(sc.id, 60) + ').' : '';
 
   return [
     SYSTEM,
@@ -280,6 +314,7 @@ function buildPrompt(body) {
     digest,
     '=== КОНЕЦ ДАННЫХ ===',
     '',
+    scope,
     hist ? '=== ПРЕДЫДУЩИЕ РЕПЛИКИ ===\n' + hist + '\n=== КОНЕЦ ===\n' : '',
     '=== ВОПРОС БРОКЕРА ===',
     text,
@@ -543,4 +578,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CFG, buildPrompt, fitDigest, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM };
+module.exports = { CFG, buildPrompt, fitDigest, turnText, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM };
