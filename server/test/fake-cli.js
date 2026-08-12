@@ -38,6 +38,13 @@ function run() {
     process.stderr.write('fake failure\n');
     process.exit(2);
   }
+  // The dangerous shape: it says something, then dies. Nothing marks the text
+  // as incomplete except the exit code.
+  if (MODE === 'partial-then-die') {
+    delta('Ближе всего к закрытию две сделки — ');
+    process.stderr.write('connection reset\n');
+    return setTimeout(() => process.exit(1), 20);
+  }
   // What an expired token actually looks like: exit 0, subtype "success",
   // the failure carried only by is_error / api_error_status.
   if (MODE === 'apierr') {

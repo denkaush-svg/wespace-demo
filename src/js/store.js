@@ -256,6 +256,9 @@
   //   guarded — needs an explicit confirmation (money, stage, ownership, status)
   //   absent  — not writable here at all: identity fields, provenance, and consent,
   //             which is a legal fact recorded from the client, not ours to grant
+  // Ids for records a conversation creates; stable within a session.
+  let addSeq = 0;
+
   const WRITABLE = {
     deals: {
       safe: ['tags', 'sub', 'title', 'updated', 'note', 'nextStep', 'consideredProjects'],
@@ -327,8 +330,14 @@
     if (!Array.isArray(coll)) return fail('no_collection', at + 'нет коллекции ' + spec.coll);
 
     if (spec.kind === 'add') {
-      const rec = o.task || o.obj || o.record;
-      if (!rec || !rec.id) return fail('bad_record', at + 'нет записи или её id');
+      const src = o.task || o.obj || o.record;
+      if (!src || typeof src !== 'object') return fail('bad_record', at + 'нет записи');
+      // The id is ours to assign, not the caller's to invent. Demanding one
+      // meant every «поставь задачу на завтра» came back as «нет записи или её
+      // id» — the model was following the contract it was given and the layer
+      // refused it anyway.
+      const rec = Object.assign({}, src);
+      if (!rec.id) rec.id = 't_ag' + (++addSeq) + '_' + spec.coll;
       if (coll.some((x) => x.id === rec.id)) return fail('duplicate', at + 'запись ' + rec.id + ' уже есть');
       return { ok: true, tier: 'safe', summary: o.op + ' ' + rec.id, run: () => { coll.unshift(rec); } };
     }
@@ -343,6 +352,13 @@
 
     if (spec.kind === 'stage') {
       if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      // A stage the board has no column for takes the deal off the board. The
+      // contract named four codes; nothing was checking that the answer used
+      // one of them.
+      const stages = (WS.ui && WS.ui.STAGE_CODES) || ['new', 'work', 'docs', 'done'];
+      if (stages.indexOf(o.stage) < 0) {
+        return fail('bad_value', at + 'нет такой стадии «' + o.stage + '»', { stages: stages });
+      }
       return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
     }
 

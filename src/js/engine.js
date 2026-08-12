@@ -517,20 +517,43 @@
   function mount(container, onUpdate) { engine.container = container; engine.onUpdate = onUpdate; }
   function reset() { engine.session = null; engine.threads = {}; engine.activeThreadId = null; seedThreads(); }
   // persistence hooks (audit P0-6): threads survive a page reload
-  function exportThreads() { return engine.threads; }
+  // The chat is persisted as markup, and the buttons under it point at reply
+  // objects that only lived in memory. After a reload every «откуда это число»,
+  // every follow-up and every «прослушать» under an older answer resolved to
+  // nothing and did nothing at all. The replies ride along with their messages.
+  function exportThreads() {
+    const out = {};
+    Object.keys(engine.threads).forEach((k) => {
+      const t = engine.threads[k];
+      out[k] = Object.assign({}, t, {
+        items: (t.items || []).map((m) => (replies[m.id] ? Object.assign({}, m, { reply: replies[m.id] }) : m)),
+      });
+    });
+    return out;
+  }
   // Threads come back from localStorage and are then written into the DOM, so they are
   // treated as input: anything that is not a well-formed thread is dropped rather than
   // trusted. Without this, a tampered or half-written snapshot becomes persistent markup.
   function importThreads(obj) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
     const clean = {};
+    // The whole set of threads is being replaced, so the answers behind them
+    // are too: keeping the old map would leave replies from a previous
+    // snapshot addressable under ids the new one reuses.
+    Object.keys(replies).forEach((k) => { delete replies[k]; });
     Object.keys(obj).forEach((k) => {
       const t = obj[k];
       if (!t || typeof t !== 'object' || !Array.isArray(t.items)) return;
       const list = t.items
-        .map((m) => (m && typeof m === 'object' && typeof m.html === 'string')
-          ? { id: typeof m.id === 'string' && m.id ? m.id : nextMid(), html: m.html }
-          : null)
+        .map((m) => {
+          if (!m || typeof m !== 'object' || typeof m.html !== 'string') return null;
+          const id = typeof m.id === 'string' && m.id ? m.id : nextMid();
+          // The reply is restored beside its message, and it is snapshot input
+          // like everything else here: a shape the renderers do not expect is
+          // dropped rather than handed to them.
+          if (m.reply && typeof m.reply === 'object' && !Array.isArray(m.reply)) replies[id] = m.reply;
+          return { id: id, html: m.html };
+        })
         .filter(Boolean);
       clean[k] = {
         id: String(t.id || k), label: String(t.label || k), icon: String(t.icon || 'chat'),
@@ -608,9 +631,19 @@
   // threads made that reachable in one click.
   const replies = {};
   let chipMid = null;
+  // An addressed key resolves to its own reply or to nothing. Falling through
+  // to «whatever answered last» is how a chip under an old card opened the
+  // newest answer's rows; the fallback is only for keys from before chips
+  // carried an address at all.
+  // Callers address a reply three ways: «m12:3» from a chip, a bare «m12» from
+  // the listen button and from history, and a bare index from a snapshot taken
+  // before chips carried an address. Only the last of those may fall through to
+  // whatever answered most recently.
   function replyFor(key) {
-    const mid = String(key || '').split(':')[0];
-    return (mid && replies[mid]) || engine.lastReply || null;
+    const s = String(key == null ? '' : key);
+    const mid = s.indexOf(':') >= 0 ? s.split(':')[0] : (/^\d*$/.test(s) ? '' : s);
+    if (mid) return replies[mid] || null;
+    return engine.lastReply || null;
   }
   function chipIndex(key) { return Number(String(key || '').split(':').pop()); }
   function chipKey(i) { return (chipMid ? chipMid + ':' : '') + i; }
@@ -799,9 +832,11 @@
   }
 
   // Chips under a reply: either another question, or a card to open.
+  const LOST = 'Этот ответ из прошлой сессии — спросите ещё раз, соберу заново';
   function agentNext(key) {
     const r = replyFor(key);
-    const n = r && r.next && r.next[chipIndex(key)];
+    if (!r) return WS.storeApi.toast(LOST);
+    const n = r.next && r.next[chipIndex(key)];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
     if (n.open) return navigateTo({ view: n.open, id: n.id });

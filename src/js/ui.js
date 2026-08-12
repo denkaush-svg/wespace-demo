@@ -234,7 +234,10 @@
     // Addressed to its own message: a chip under an older answer opens that
     // answer's rows, not whatever replied most recently.
     const reply = WS.engine.replyFor ? WS.engine.replyFor(key) : WS.engine.lastReply;
-    const r = reply && reply.evidence;
+    // Silence read as a dead button. If the answer behind the chip is gone,
+    // that is what the person is told.
+    if (!reply) return WS.storeApi.toast('Этот ответ из прошлой сессии — спросите ещё раз, соберу заново');
+    const r = reply.evidence;
     const e = r && r[Number(String(key || '').split(':').pop())];
     if (!e) return;
     const res = WS.query.run(Object.assign({}, e.query, { aggregate: null }));
@@ -5042,7 +5045,7 @@
       '<button class="btn" data-act="closeModal">Оставить как есть</button><button class="btn primary" data-act="reset">Безопасный сброс</button>');
   }
 
-  WS.ui = { render, stageLabel, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+  WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

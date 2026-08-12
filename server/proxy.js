@@ -346,6 +346,7 @@ function callModel(prompt, onDelta) {
     let out = '';        // text assembled from deltas
     let result = null;   // text from the final result event, if any
     let errBuf = '';
+    let sawResult = false;   // a proper `result` event, success or not
     let line = '';
     let settled = false;
 
@@ -392,6 +393,7 @@ function callModel(prompt, onDelta) {
           return;
         }
         if (typeof ev.result === 'string') result = ev.result;
+        sawResult = true;
       }
     }
 
@@ -409,7 +411,14 @@ function callModel(prompt, onDelta) {
     child.on('error', (e) => finish(new Error('spawn:' + e.message)));
     child.on('close', (code) => {
       if (settled) return;
-      if (code !== 0 && !out && !result) { finish(new Error('exit ' + code + ': ' + errBuf.trim().slice(0, 300))); return; }
+      // A process that died is a failed call even if it managed to stream a
+      // sentence first. Serving that sentence handed the visitor half an
+      // answer, cut mid-thought, as though it were the whole one — the offline
+      // planner would have answered properly.
+      if (code !== 0 && !sawResult) {
+        finish(new Error('exit ' + code + ': ' + (errBuf.trim() || out.trim()).slice(0, 300)));
+        return;
+      }
       finish(null);
     });
 
@@ -506,23 +515,28 @@ async function handleAsk(req, res) {
   if (dailyLeft() <= 0) { bump('daily'); return json(res, 503, { ok: false, code: 'daily' }); }
   if (!takeToken(clientIp(req))) { bump('rate'); return json(res, 429, { ok: false, code: 'rate' }); }
 
-  // The concurrency slot is claimed BEFORE the first await: reading the body
-  // yields, and two requests that both checked the cap at zero would both have
-  // passed it. The DAILY count is not claimed here — it counts calls to the
-  // model, and charging it for an empty or malformed body let anyone drain the
-  // day's allowance without the model ever running.
+  // Both slots are claimed BEFORE the first await: reading the body yields, and
+  // two requests that each saw one slot left would both have passed. The day's
+  // allowance is REFUNDED if the model never runs — charging it for an empty or
+  // malformed body let anyone drain the day without a single call.
   state.inFlight += 1;
+  state.dayCount += 1;
   let released = false;
-  const release = () => { if (!released) { released = true; state.inFlight -= 1; } };
+  const release = (refundDay) => {
+    if (released) return;
+    released = true;
+    state.inFlight -= 1;
+    if (refundDay) state.dayCount = Math.max(0, state.dayCount - 1);
+  };
 
   let body;
   try { body = await readBody(req); }
-  catch (e) { release(); return json(res, 400, { ok: false, code: 'bad_request', error: e.message }); }
+  catch (e) { release(true); return json(res, 400, { ok: false, code: 'bad_request', error: e.message }); }
 
   const text = clip(body && body.text, CFG.maxText).trim();
-  if (!text) { release(); return json(res, 400, { ok: false, code: 'empty' }); }
+  if (!text) { release(true); return json(res, 400, { ok: false, code: 'empty' }); }
 
-  state.dayCount += 1;                 // from here on the model is actually called
+  // From here on the model is actually called, so the day stays charged.
   const send = sse(res);
   let aborted = false;
   req.on('close', () => { aborted = true; });

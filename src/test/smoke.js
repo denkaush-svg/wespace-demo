@@ -856,6 +856,75 @@ setTimeout(async () => {
         ((dd().requestTimeline || {})[r0.id] || []).length === feedWas + 1);
     }
 
+    // Findings from the cross-model round.
+    {
+      // Everything the stand knows is posted to whatever ?api= names.
+      check('адрес службы · a stranger’s host is ignored, not obeyed',
+        L.allowed('https://evil.example') === false && L.allowed('https://wespace.201-51-22-106.sslip.io') === true);
+      check('адрес службы · off and same-origin still work',
+        L.allowed('off') === true && L.allowed('/ask') === true);
+      check('адрес службы · a lookalike host does not pass',
+        L.allowed('https://wespace.201-51-22-106.sslip.io.evil.example') === false &&
+        L.allowed('https://evil.example/?x=wespace.201-51-22-106.sslip.io') === false);
+
+      // Through the reader, not the predicate: checking `allowed` on its own
+      // left the caller free to keep obeying whatever the link named.
+      {
+        const envWas = WS.env;
+        WS.env = { search: '?api=https://evil.example/collect' };
+        const picked = L.configuredUrl();
+        WS.env = { search: '?api=off' };
+        const off = L.configuredUrl();
+        WS.env = envWas;
+        check('адрес службы · a crafted link cannot redirect the stand',
+          picked.indexOf('evil.example') < 0, picked);
+        check('адрес службы · and turning the model off still works', off === 'off');
+      }
+
+      // The contract handed to the model has no id in it, and the write layer
+      // demanded one — so «поставь задачу» came back as an error.
+      const before = (dd().tasks || []).length;
+      const dry = WS.storeApi.preview([{ op: 'addTask', task: { title: 'перезвонить Анне', due: 'завтра', when: 'tomorrow', kind: 'manual', status: 'open' } }]);
+      check('задача · a task the model describes can actually be created', dry.ok === true, dry.error || '');
+      const done = WS.storeApi.apply([{ op: 'addTask', task: { title: 'перезвонить Анне', due: 'завтра', when: 'tomorrow', kind: 'manual', status: 'open' } }], { confirmed: true });
+      check('задача · and it lands with an id of ours',
+        done.ok === true && (dd().tasks || []).length === before + 1 && !!(dd().tasks || [])[0].id,
+        done.error || '');
+
+      // A stage the board has no column for takes the deal off the board.
+      const okStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: 'docs' }]);
+      const badStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: 'подписан' }]);
+      check('стадия · a real stage passes', okStage.ok === true, okStage.error || '');
+      check('стадия · an invented one is refused', badStage.ok === false && badStage.code === 'bad_value', badStage.code);
+
+      // The chat survives a reload; the answers under it used to not.
+      {
+        WS.engine.openThread('probe:reload', 'Перезагрузка', 'chat');
+        const rmid = WS.engine.pushMsg('<div></div>');
+        WS.engine.updateMsg(rmid, WS.engine.agentCard({
+          kind: 'answer', text: 'до перезагрузки', speak: 'До перезагрузки.', next: [{ label: 'ещё', ask: 'ещё' }],
+          evidence: [{ label: 'сделок', value: 3, query: { from: 'deals' } }],
+        }, rmid));
+        const snapshot = JSON.parse(JSON.stringify(WS.engine.exportThreads()));
+        check('перезагрузка · the answer is stored beside its message',
+          !!(snapshot['probe:reload'].items.find((m) => m.id === rmid) || {}).reply);
+        WS.engine.importThreads(snapshot);
+        const back = WS.engine.replyFor(rmid + ':0');
+        check('перезагрузка · and comes back addressable',
+          !!back && back.evidence[0].label === 'сделок', JSON.stringify(back && back.text));
+        check('перезагрузка · a missing answer resolves to nothing, not to the newest',
+          WS.engine.replyFor('mGhost:0') === null);
+        check('перезагрузка · a malformed stored answer is dropped, not trusted',
+          (() => {
+            const bad = JSON.parse(JSON.stringify(snapshot));
+            bad['probe:reload'].items.forEach((m) => { if (m.id === rmid) m.reply = 'строка'; });
+            WS.engine.importThreads(bad);
+            return WS.engine.replyFor(rmid + ':0') === null;
+          })());
+        WS.engine.importThreads(snapshot);
+      }
+    }
+
     // What the next question is answered against. Scraped from markup, the
     // Concierge's own table came back as a run-on line.
     {
@@ -1332,6 +1401,12 @@ setTimeout(async () => {
     const chip = chat1 && chat1.querySelector('[data-agev]');
     check('e2e · the answer offers openable evidence', !!chip);
     check('e2e · no Wizard-of-Oz fallback left', html1.indexOf('Wizard-of-Oz') < 0 && html1.indexOf('подготовлены близкие результаты') < 0);
+
+    // With an answer on screen — so there IS a newest reply to wrongly fall back
+    // to — an address that resolves to nothing must stay nothing.
+    check('e2e · an address with no answer behind it does not borrow the newest',
+      !!WS.engine.lastReply && WS.engine.replyFor('mGhost:0') === null,
+      'lastReply=' + !!WS.engine.lastReply);
 
     // Clicking the evidence chip opens the records the number came from.
     if (chip) {

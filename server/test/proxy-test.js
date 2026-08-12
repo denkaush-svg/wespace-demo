@@ -233,6 +233,19 @@ async function modelChecks() {
   ok('the plan arrives parsed', !!done && done.data.plan.read.indexOf('deals_active') >= 0);
   ok('the narration is free of the fenced block', !!done && done.data.say.indexOf('```') < 0);
 
+  // A process that died is a failed call even if it streamed a sentence first.
+  // Serving that sentence handed the visitor half an answer, cut mid-thought,
+  // as though it were whole.
+  refill();
+  res = await ask({ text: 'вопрос' }, 'partial-then-die');
+  {
+    const evs = events(res.body);
+    const bad = evs.find((e) => e.event === 'error');
+    const okDone = evs.find((e) => e.event === 'done');
+    ok('a model that dies mid-sentence is a failure, not a short answer', !!bad && !okDone,
+      okDone ? 'served: ' + String(okDone.data.say).slice(0, 60) : (bad ? bad.data.error.slice(0, 60) : 'nothing'));
+  }
+
   refill();
   res = await ask({ text: 'вопрос' }, 'whole');
   evs = events(res.body);

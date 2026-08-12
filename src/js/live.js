@@ -24,12 +24,27 @@
   const GIVE_UP_AFTER = 2;
 
   // ?api=… for a demo against another host, ?api=off to force the planner.
+  // The parameter picks from a list rather than accepting a URL: everything the
+  // stand knows — contacts, deals, the conversation, the question being typed —
+  // is posted to whatever it names, so a crafted link was a way to point a
+  // visitor's stand at somebody else's server and read all of it.
+  const ALLOWED_HOSTS = ['wespace.201-51-22-106.sslip.io', 'localhost', '127.0.0.1'];
+  function allowed(url) {
+    const u = String(url || '');
+    if (u === 'off') return true;
+    if (/^\//.test(u)) return true;                       // same origin, no host to check
+    const m = /^https?:\/\/([^/:?#]+)/i.exec(u);
+    return !!m && ALLOWED_HOSTS.indexOf(m[1].toLowerCase()) >= 0;
+  }
   function configuredUrl() {
     let q = '';
     try { q = (WS.env && WS.env.search) || (typeof location !== 'undefined' ? location.search : ''); } catch (e) { q = ''; }
     const m = /[?&]api=([^&]*)/.exec(q || '');
-    if (m) return decodeURIComponent(m[1]);
-    return DEFAULT_URL;
+    if (!m) return DEFAULT_URL;
+    const asked = decodeURIComponent(m[1]);
+    // An unknown host is ignored rather than obeyed. Falling back to the
+    // default keeps the demo working; obeying it would be the whole bug.
+    return allowed(asked) ? asked : DEFAULT_URL;
   }
 
   // ---------- what the model is allowed to see ----------
@@ -400,7 +415,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

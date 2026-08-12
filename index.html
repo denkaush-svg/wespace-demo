@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:13</title>
+  <title>WESPACE · сборка 01:44</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:13';
+    window.WS_BUILD='01:44';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3352,6 +3352,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   //   guarded — needs an explicit confirmation (money, stage, ownership, status)
   //   absent  — not writable here at all: identity fields, provenance, and consent,
   //             which is a legal fact recorded from the client, not ours to grant
+  // Ids for records a conversation creates; stable within a session.
+  let addSeq = 0;
+
   const WRITABLE = {
     deals: {
       safe: ['tags', 'sub', 'title', 'updated', 'note', 'nextStep', 'consideredProjects'],
@@ -3423,8 +3426,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!Array.isArray(coll)) return fail('no_collection', at + 'нет коллекции ' + spec.coll);
 
     if (spec.kind === 'add') {
-      const rec = o.task || o.obj || o.record;
-      if (!rec || !rec.id) return fail('bad_record', at + 'нет записи или её id');
+      const src = o.task || o.obj || o.record;
+      if (!src || typeof src !== 'object') return fail('bad_record', at + 'нет записи');
+      // The id is ours to assign, not the caller's to invent. Demanding one
+      // meant every «поставь задачу на завтра» came back as «нет записи или её
+      // id» — the model was following the contract it was given and the layer
+      // refused it anyway.
+      const rec = Object.assign({}, src);
+      if (!rec.id) rec.id = 't_ag' + (++addSeq) + '_' + spec.coll;
       if (coll.some((x) => x.id === rec.id)) return fail('duplicate', at + 'запись ' + rec.id + ' уже есть');
       return { ok: true, tier: 'safe', summary: o.op + ' ' + rec.id, run: () => { coll.unshift(rec); } };
     }
@@ -3439,6 +3448,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
     if (spec.kind === 'stage') {
       if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      // A stage the board has no column for takes the deal off the board. The
+      // contract named four codes; nothing was checking that the answer used
+      // one of them.
+      const stages = (WS.ui && WS.ui.STAGE_CODES) || ['new', 'work', 'docs', 'done'];
+      if (stages.indexOf(o.stage) < 0) {
+        return fail('bad_value', at + 'нет такой стадии «' + o.stage + '»', { stages: stages });
+      }
       return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
     }
 
@@ -4211,20 +4227,43 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function mount(container, onUpdate) { engine.container = container; engine.onUpdate = onUpdate; }
   function reset() { engine.session = null; engine.threads = {}; engine.activeThreadId = null; seedThreads(); }
   // persistence hooks (audit P0-6): threads survive a page reload
-  function exportThreads() { return engine.threads; }
+  // The chat is persisted as markup, and the buttons under it point at reply
+  // objects that only lived in memory. After a reload every «откуда это число»,
+  // every follow-up and every «прослушать» under an older answer resolved to
+  // nothing and did nothing at all. The replies ride along with their messages.
+  function exportThreads() {
+    const out = {};
+    Object.keys(engine.threads).forEach((k) => {
+      const t = engine.threads[k];
+      out[k] = Object.assign({}, t, {
+        items: (t.items || []).map((m) => (replies[m.id] ? Object.assign({}, m, { reply: replies[m.id] }) : m)),
+      });
+    });
+    return out;
+  }
   // Threads come back from localStorage and are then written into the DOM, so they are
   // treated as input: anything that is not a well-formed thread is dropped rather than
   // trusted. Without this, a tampered or half-written snapshot becomes persistent markup.
   function importThreads(obj) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
     const clean = {};
+    // The whole set of threads is being replaced, so the answers behind them
+    // are too: keeping the old map would leave replies from a previous
+    // snapshot addressable under ids the new one reuses.
+    Object.keys(replies).forEach((k) => { delete replies[k]; });
     Object.keys(obj).forEach((k) => {
       const t = obj[k];
       if (!t || typeof t !== 'object' || !Array.isArray(t.items)) return;
       const list = t.items
-        .map((m) => (m && typeof m === 'object' && typeof m.html === 'string')
-          ? { id: typeof m.id === 'string' && m.id ? m.id : nextMid(), html: m.html }
-          : null)
+        .map((m) => {
+          if (!m || typeof m !== 'object' || typeof m.html !== 'string') return null;
+          const id = typeof m.id === 'string' && m.id ? m.id : nextMid();
+          // The reply is restored beside its message, and it is snapshot input
+          // like everything else here: a shape the renderers do not expect is
+          // dropped rather than handed to them.
+          if (m.reply && typeof m.reply === 'object' && !Array.isArray(m.reply)) replies[id] = m.reply;
+          return { id: id, html: m.html };
+        })
         .filter(Boolean);
       clean[k] = {
         id: String(t.id || k), label: String(t.label || k), icon: String(t.icon || 'chat'),
@@ -4302,9 +4341,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // threads made that reachable in one click.
   const replies = {};
   let chipMid = null;
+  // An addressed key resolves to its own reply or to nothing. Falling through
+  // to «whatever answered last» is how a chip under an old card opened the
+  // newest answer's rows; the fallback is only for keys from before chips
+  // carried an address at all.
+  // Callers address a reply three ways: «m12:3» from a chip, a bare «m12» from
+  // the listen button and from history, and a bare index from a snapshot taken
+  // before chips carried an address. Only the last of those may fall through to
+  // whatever answered most recently.
   function replyFor(key) {
-    const mid = String(key || '').split(':')[0];
-    return (mid && replies[mid]) || engine.lastReply || null;
+    const s = String(key == null ? '' : key);
+    const mid = s.indexOf(':') >= 0 ? s.split(':')[0] : (/^\d*$/.test(s) ? '' : s);
+    if (mid) return replies[mid] || null;
+    return engine.lastReply || null;
   }
   function chipIndex(key) { return Number(String(key || '').split(':').pop()); }
   function chipKey(i) { return (chipMid ? chipMid + ':' : '') + i; }
@@ -4493,9 +4542,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   // Chips under a reply: either another question, or a card to open.
+  const LOST = 'Этот ответ из прошлой сессии — спросите ещё раз, соберу заново';
   function agentNext(key) {
     const r = replyFor(key);
-    const n = r && r.next && r.next[chipIndex(key)];
+    if (!r) return WS.storeApi.toast(LOST);
+    const n = r.next && r.next[chipIndex(key)];
     if (!n) return;
     if (n.ask) return freeReply(n.ask);
     if (n.open) return navigateTo({ view: n.open, id: n.id });
@@ -5112,7 +5163,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // Addressed to its own message: a chip under an older answer opens that
     // answer's rows, not whatever replied most recently.
     const reply = WS.engine.replyFor ? WS.engine.replyFor(key) : WS.engine.lastReply;
-    const r = reply && reply.evidence;
+    // Silence read as a dead button. If the answer behind the chip is gone,
+    // that is what the person is told.
+    if (!reply) return WS.storeApi.toast('Этот ответ из прошлой сессии — спросите ещё раз, соберу заново');
+    const r = reply.evidence;
     const e = r && r[Number(String(key || '').split(':').pop())];
     if (!e) return;
     const res = WS.query.run(Object.assign({}, e.query, { aggregate: null }));
@@ -9920,7 +9974,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn" data-act="closeModal">Оставить как есть</button><button class="btn primary" data-act="reset">Безопасный сброс</button>');
   }
 
-  WS.ui = { render, stageLabel, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+  WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
@@ -10509,12 +10563,27 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const GIVE_UP_AFTER = 2;
 
   // ?api=… for a demo against another host, ?api=off to force the planner.
+  // The parameter picks from a list rather than accepting a URL: everything the
+  // stand knows — contacts, deals, the conversation, the question being typed —
+  // is posted to whatever it names, so a crafted link was a way to point a
+  // visitor's stand at somebody else's server and read all of it.
+  const ALLOWED_HOSTS = ['wespace.201-51-22-106.sslip.io', 'localhost', '127.0.0.1'];
+  function allowed(url) {
+    const u = String(url || '');
+    if (u === 'off') return true;
+    if (/^\//.test(u)) return true;                       // same origin, no host to check
+    const m = /^https?:\/\/([^/:?#]+)/i.exec(u);
+    return !!m && ALLOWED_HOSTS.indexOf(m[1].toLowerCase()) >= 0;
+  }
   function configuredUrl() {
     let q = '';
     try { q = (WS.env && WS.env.search) || (typeof location !== 'undefined' ? location.search : ''); } catch (e) { q = ''; }
     const m = /[?&]api=([^&]*)/.exec(q || '');
-    if (m) return decodeURIComponent(m[1]);
-    return DEFAULT_URL;
+    if (!m) return DEFAULT_URL;
+    const asked = decodeURIComponent(m[1]);
+    // An unknown host is ignored rather than obeyed. Falling back to the
+    // default keeps the demo working; obeying it would be the whole bug.
+    return allowed(asked) ? asked : DEFAULT_URL;
   }
 
   // ---------- what the model is allowed to see ----------
@@ -10885,7 +10954,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
