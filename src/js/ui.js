@@ -1071,7 +1071,7 @@
   function psychBlock(c) {
     const p = c.psych;
     if (!p || !p.filled) {
-      return '<div class="section-label" style="margin-top:16px">Персонализация коммуникации</div>' +
+      return '<div class="section-label" style="margin-top:16px">Портрет клиента</div>' +
         '<div class="psych-empty">' + I('sparkle') +
         '<div><div style="font-weight:700;color:var(--ink)">Профиль не заполнен</div>' +
         '<div style="font-size:12px;color:var(--mut);margin-top:2px">Параметры стиля общения помогут вести персонализированную коммуникацию в мессенджерах и соцсетях (за согласием клиента).</div></div>' +
@@ -1080,7 +1080,7 @@
     const chip = (ic, t) => t ? '<span class="badge">' + I(ic) + t + '</span>' : '';
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
     const tips = commTips(p).map((t) => '<div class="chg-row">' + I('check') + '<span>' + t + '</span></div>').join('');
-    return '<div class="section-label" style="margin-top:16px">Психологический профиль · персонализация</div>' +
+    return '<div class="section-label" style="margin-top:16px">Портрет клиента</div>' +
       '<div class="prov" style="margin-bottom:8px">' + chip('users', p.decision) + chip('flame', p.pace) + chip('shield', p.risk) + '</div>' +
       '<div class="prov" style="margin-bottom:8px">' + vals + '</div>' +
       row('Канал и тон', (p.channel || '') + (p.tone ? ' · ' + p.tone : '')) +
@@ -1181,30 +1181,39 @@
     agent: { phone: '+971 50 123 4417', whatsapp: '+971 50 123 4417', telegram: '@marina_dxb', instagram: '@marina.dubai.realty', email: 'marina@harbourkey.ae' },
     manager: { phone: '+971 50 447 2210', whatsapp: '+971 50 447 2210', telegram: '@omar_hk', instagram: '@omar.harbourkey', email: 'omar@harbourkey.ae' },
   };
-  // Contact info surfaced explicitly at the top of the client overview — proper vCard, all channels.
+  // Contact info surfaced explicitly at the top of the client overview — compact row of preferred + filled channels.
   function contactBlock(c) {
     const dealForC = D().deals.find((x) => x.clientId === c.id);
     const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const pref = prefChannel(c);
     const prefLabel = chanMeta(pref)[1];
-    const consent = c.consent
-      ? '<span class="badge ok">' + I('check') + 'согласие (PDPL)</span>'
-      : '<span class="badge stop">' + I('lock') + 'нет согласия</span>';
-    const inner = contactVCard(clientContactVals(c), pref) +
-      '<div class="cd-foot"><div class="prov"><span class="badge">' + I('flame') + c.lang + '</span>' + consent + '</div>' +
-      '<button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + c.name + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
+    const vals = clientContactVals(c);
+    // Preferred channel first, then the ones that actually hold a value — an empty channel used to
+    // take a full row saying «—», which is how five contacts filled the whole fold.
+    const shown = [pref].concat(CONTACT_ORDER.filter((ch) => ch !== pref && vals[ch] && vals[ch] !== '—'));
+    const channels = shown.map((ch) => {
+      const m = chanMeta(ch);
+      const isPref = ch === pref;
+      return '<div class="cd-row' + (isPref ? ' on' : '') + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
+        '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
+        (isPref ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
+    }).join('');
+    // Language and consent are stated once, up in the hero and the status chip — the foot keeps only
+    // the action.
+    const inner = '<div class="cd-list">' + channels + '</div>' +
+      '<div class="cd-foot"><button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
     return dxSec('phone', 'Контактные данные', '', inner);
   }
-  // Психологический профиль — сводка на основной вкладке (полная версия — во вкладке «Персонализация»).
+  // Client portrait — the summary shown on the overview tab; the full version lives on its own tab.
   function psychSummary(c) {
     const p = c.psych;
     if (!p || !p.filled) {
-      return dxSec('sparkle', 'Психологический профиль', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
+      return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
         '<div style="font-size:12.5px;color:var(--mut)">Профиль стиля общения не заполнен — поможет вести персонализированную коммуникацию в мессенджерах и соцсетях.</div>');
     }
     const chips = [p.decision, p.pace, p.risk].filter(Boolean).map((x) => '<span class="badge">' + x + '</span>').join('');
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
-    return dxSec('sparkle', 'Психологический профиль', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
+    return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
       '<div class="prov">' + chips + vals + '</div>' +
       '<div style="font-size:12.5px;color:var(--mut);margin-top:8px">Канал и тон: ' + ((p.channel || '—') + (p.tone ? ' · ' + p.tone : '')) + '</div>');
   }
@@ -1214,6 +1223,78 @@
     (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
     if (!all.length) return '';
     return reqPrefProfile({ offered: all });
+  }
+  // Справка Консьержа — human handover brief for the next agent picking up this client.
+  // Handover brief on the client card — what one agent tells another before picking this client up.
+  // Every clause is built from the client's own records and disappears when the data is absent, so a
+  // bare new contact yields two honest sentences instead of a skeleton of dashes. Phrases are shaped
+  // to avoid Russian case agreement: a name never lands in a slot that would require declension.
+  function clientBriefSentences(c) {
+    const out = [];
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const active = deals.filter((d) => d.stage !== 'done');
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+
+    // 1. Who and what the request is.
+    const want = [];
+    if (c.goal) want.push(lowerFirst(c.goal) + (c.budget ? ' до ' + WS.AED(c.budget) : ''));
+    else if (c.budget) want.push('бюджет до ' + WS.AED(c.budget));
+    if ((c.areas || []).length) want.push('районы ' + joinRu(c.areas));
+    if (c.horizon) want.push('срок ' + c.horizon);
+    out.push(c.name + (c.lang ? ', ' + c.lang : '') + '. ' + (want.length ? 'Запрос — ' + want.join('; ') + '.' : 'Запрос ещё не зафиксирован.'));
+
+    // 2. Where the client stands right now.
+    if (active.length) {
+      const d0 = active[0];
+      const stageL = funnelSteps(d0).cols[funnelSteps(d0).idx];
+      let line = 'В работе ' + active.length + ' ' + plural(active.length, 'сделка', 'сделки', 'сделок') +
+        ': «' + d0.title + '», стадия «' + stageL + '»';
+      if (d0.amount) line += ', ' + WS.AED(d0.amount);
+      out.push(line + '; ведёт ' + agentName(d0.agent) + '.');
+    } else if (reqs.length) {
+      const offered = reqs.reduce((n, r) => n + ((r.offered || []).length), 0);
+      out.push('Активных сделок нет: ' + reqs.length + ' ' + plural(reqs.length, 'заявка', 'заявки', 'заявок') +
+        (offered ? ', предложено ' + offered + ' ' + plural(offered, 'объект', 'объекта', 'объектов') : '') + '.');
+    } else {
+      out.push('Активных сделок и заявок пока нет — контакт в базе, работа не начата.');
+    }
+
+    // 3. The last thing that actually happened. The feed also carries planned shows and open tasks
+    // («что было и что предстоит» share one ribbon) — a 16:00 показ is not a «последнее касание» at
+    // 9:12, so anything dated in the future is skipped here.
+    const feed = contactFeedEntries(c).filter((e) => !(e.ord > NOW_ORD));
+    if (feed.length) {
+      const last = feed[0];
+      const what = (last.text || last.t || '').replace(/\s+/g, ' ').trim();
+      if (what) out.push('Последнее касание — ' + (last.at || 'недавно') + ': ' + lowerFirst(what.length > 90 ? what.slice(0, 90).replace(/\s+\S*$/, '') + '…' : what.replace(/[.!?]*$/, '')) + '.');
+    }
+
+    // 4. What to watch out for.
+    const watch = [];
+    const k = kycOf(c);
+    if (k.st !== 'ok') watch.push(lowerFirst(k.label));
+    if (c.consent === false) watch.push('нет согласия на связь (PDPL)');
+    const overdue = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue').length;
+    if (overdue) watch.push(overdue + ' ' + plural(overdue, 'просроченная задача', 'просроченные задачи', 'просроченных задач'));
+    const sig = (D().clientSignals || {})[c.id];
+    if (sig) (sig.signals || []).filter((x) => !x.ok).forEach((x) => watch.push(lowerFirst(x.t)));
+    if (watch.length) out.push('Внимание: ' + joinRu(watch) + '.');
+
+    // 5. How to talk to them — only when the портрет is filled in.
+    const p = c.psych;
+    if (p && p.filled) {
+      const how = [lowerFirst(commTips(p)[0])];
+      if (p.channel) how.push('канал — ' + p.channel);            // «WhatsApp» is a name, not a word to lowercase
+      if (p.bestTime) how.push('лучшее время — ' + lowerFirst(p.bestTime));
+      out.push('Как говорить: ' + how.join(', ') + '.');
+    }
+    return out;
+  }
+  function conciergeClientHandover(c) {
+    const p = c.psych;
+    const tag = (p && p.filled) ? 'портрет + история' : 'по данным карточки';
+    return dxSec('sparkle', 'Справка Консьержа', '<span class="badge ai-b">' + I('sparkle') + tag + '</span>',
+      '<p class="deal-brief">' + clientBriefSentences(c).join(' ') + '</p>');
   }
   // Client-level lead ops (derived): owner from the active deal, lifecycle stage, next contact from tasks.
   function clientOps(c) {
@@ -1233,7 +1314,7 @@
   }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
-      return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
+      return dxSec('sparkle', 'Портрет клиента', '', psychInner(c));
     }
     if (tab === 'kyc') {
       const k = kycOf(c);
@@ -1267,8 +1348,7 @@
     const s = (D().clientSignals || {})[c.id];
     const prio = s ? '<span class="prio prio-' + s.priority + '">' + s.priority + '</span>' : '';
     const key = dxSec('users', 'Ключевое', '', '<div class="dfields">' +
-      dfPair('Цель', c.goal) + dfPair('Бюджет', c.budget ? WS.AED(c.budget) : '—') +
-      dfPair('Районы', (c.areas || []).join(', ')) + dfPair('Срок покупки', c.horizon) +
+      dfPair('Цель', c.goal) + dfPair('Районы', (c.areas || []).join(', ')) +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
       (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : ''));
     const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
@@ -1282,7 +1362,9 @@
       '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
     const pref = clientPrefProfile(c);
-    return clientOps(c) + contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
+    return clientOps(c) + '<div style="margin-top:14px">' + conciergeClientHandover(c) + '</div>' +
+      '<div style="margin-top:14px">' + contactBlock(c) + '</div>' +
+      '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
       (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
       '<div style="margin-top:14px">' + actions + '</div>' +
@@ -1294,16 +1376,15 @@
     const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const k = kycOf(c);
     const dealsCount = D().deals.filter((x) => x.clientId === id).length;
-    const cm = chanMeta(prefChannel(c));
+    // KYC, the preferred channel and the language now live in the compact hero — repeating them as
+    // chips right underneath was the same fact stated twice. Only the consent flag, which the hero
+    // does not carry and which gates every outbound touch, stays.
     const status = statusChip([
-      { icon: 'shield', label: k.label, tone: k.st },
-      { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие есть' : 'Нет согласия', tone: c.consent ? 'ok' : 'stop' },
-      { icon: cm[0], label: cm[1] },
-      { icon: 'flame', label: c.lang },
+      { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие на связь есть' : 'Нет согласия на связь', tone: c.consent ? 'ok' : 'stop' },
     ]);
     return {
       type: 'contact', id: id, title: c.name, status: clientHero(c) + status,
-      tabs: [['overview', 'Обзор'], ['profile', 'Персонализация'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+      tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
       pageActs: '<button class="btn sm primary" data-act="newDeal" data-cid="' + id + '">' + I('briefcase') + 'Создать сделку</button>' +
@@ -3139,7 +3220,7 @@
     const m = Object.assign(WS.storeApi.clone(D().refModel), { objectId: o.id, price: o.price });
     return WS.finance.compute(m).netYield;
   }
-  // ---------------- MATCHING (качественный + психологический подбор) ----------------
+  // ---------------- MATCHING (quality criteria + client-portrait fit) ----------------
   const QUAL = [
     { k: 'water', label: 'Вид на воду', test: (o) => o.attrs && o.attrs.view === 'water' },
     { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floor === 'high' },
@@ -3201,9 +3282,9 @@
       '<div class="arow" style="margin-top:10px"><div class="alabel"><label>Целевая доходность</label></div>' +
         '<div class="actl"><input type="range" id="m_yield" min="0.03" max="0.08" step="0.005" value="' + m.yield + '"><span class="av" id="av_m_yield">' + (Math.round(m.yield * 1000) / 10) + '%</span></div></div>' +
       '<div class="section-label" style="margin:12px 0 6px">Качественные критерии</div><div class="qa-row">' + qualChips + '</div>' +
-      '<div class="section-label" style="margin:12px 0 6px">Психологический мэтч</div><div class="qa-row">' + psychToggle +
-        (psychAvail ? '' : '<span class="badge">' + I('lock') + 'заполните профиль в карточке контакта</span>') + '</div>' +
-      (psychAvail ? '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + I('sparkle') + ' Профиль: <b>' + c.psych.decision + '</b> · важно: ' + (c.psych.values || []).join(', ') + '</div>' : '') +
+      '<div class="section-label" style="margin:12px 0 6px">Мэтч по портрету клиента</div><div class="qa-row">' + psychToggle +
+        (psychAvail ? '' : '<span class="badge">' + I('lock') + 'заполните портрет в карточке контакта</span>') + '</div>' +
+      (psychAvail ? '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + I('sparkle') + ' Портрет: <b>' + c.psych.decision + '</b> · важно: ' + (c.psych.values || []).join(', ') + '</div>' : '') +
       '</div>';
     const sl = S().shortlist || [];
     let base = sl.length ? D().objects.filter((o) => sl.indexOf(o.id) >= 0) : D().objects.slice();
@@ -3612,7 +3693,7 @@
       { h: 'Сравнение объектов' }, { k: 'Creekline 1208', v: 'ROI 39,40% · net 5,28%' }, { k: 'Palm Court 704', v: 'ниже бюджета · net 5,67% (предпочитает)' },
       { h: 'Аргументы (с источниками)' }, { k: 'Доходность', v: 'финмодель по объекту · допущения видны' }, { k: 'Клуб', v: 'Palm Court — эксклюзив клуба' },
       { h: 'Факты ↔ гипотезы' }, { k: 'Факт', v: 'бюджет до 2 млн, срок 1–3 мес' }, { k: 'Гипотеза', v: 'чувствителен к первому платежу (не подтверждено)' },
-      { h: 'Психологический профиль (сигналы стиля)' },
+      { h: 'Портрет клиента (сигналы стиля)' },
       { k: 'Тип решения', v: 'Аналитик — цифры и факты' }, { k: 'Что важно', v: 'доходность, безопасность сделки' },
       { k: 'Тон', v: 'по делу, с расчётами, без давления' }, { k: 'Триггеры', v: 'график первого платежа, подтверждённая доходность' },
       { k: 'Как вести', v: 'дать цифры и источники; для мессенджеров — короткие сообщения с конкретикой' },
@@ -4284,7 +4365,7 @@
     const body = wsDocHead('Переговорный бриф', 'К звонку · ' + c.name, 'Цель: согласовать объект и снять возражение по первому платежу') +
       '<div class="section-label">Сравнение объектов · чистая доходность</div>' +
       barChart([{ label: 'Creekline 1208', value: nyC, fmt: WS.finance.pct(nyC), hot: nyC >= 0.05 }, { label: 'Palm Court 704', value: nyP, fmt: WS.finance.pct(nyP), hot: nyP >= 0.05 }]) +
-      '<div class="section-label">Психологический профиль</div>' +
+      '<div class="section-label">Портрет клиента</div>' +
       '<div class="prov">' + (p.decision ? '<span class="badge">' + I('users') + p.decision + '</span>' : '') + (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('') + '</div>' +
       '<div class="ws-flag" style="margin-top:8px">' + I('sparkle') + ' <b>Как вести разговор:</b> ' + (p.tone || 'по делу, с расчётами') + '. Триггеры: ' + ((p.triggers || []).join(', ') || '—') + '.</div>' +
       '<div class="section-label">Аргументы (с источниками)</div>' +
