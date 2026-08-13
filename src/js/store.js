@@ -25,6 +25,9 @@
     objFilter: 'all', objSearch: '', objSort: 'default', objArea: 'all', objBr: 'all', objPrice: 'all',
     shortlist: [], podborClient: 'c_anna', match: null, matchClient: null,
     docSearch: '', docTab: 'all', calType: 'all', calDir: 'all', calObj: 'all', calClient: 'all', calWeek: 0, calDay: -1,
+    contactsSearch: '', companiesSearch: '', conciergeSearch: '',
+    contactsFilters: { priority: 'all', psych: 'all', object: 'all' },
+    companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     capture: {}, dealFunnel: 'sale_offplan', dealsFilter: {}, savedView: null,
@@ -143,6 +146,9 @@
     store.objSearch = ''; store.objSort = 'default'; store.objArea = 'all'; store.objBr = 'all'; store.objPrice = 'all';
     store.shortlist = []; store.podborClient = 'c_anna'; store.match = null; store.matchClient = null;
     store.docSearch = ''; store.docTab = 'all'; store.calType = 'all'; store.calDir = 'all'; store.calObj = 'all'; store.calClient = 'all'; store.calWeek = 0; store.calDay = -1;
+    store.contactsSearch = ''; store.companiesSearch = ''; store.conciergeSearch = '';
+    store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' };
+    store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.capture = {}; store.dealFunnel = 'sale_offplan'; store.dealsFilter = {}; store.savedView = null;

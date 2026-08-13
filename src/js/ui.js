@@ -632,8 +632,18 @@
       '</section>' +
     '</div>';
   }
+  function conciergeThreads() {
+    const q = (S().conciergeSearch || '').toLowerCase().trim();
+    return (WS.engine.threadList() || []).slice()
+      .sort((a, b) => (b.unread || 0) - (a.unread || 0))
+      .filter((t) => matchConciergeThread(t, q));
+  }
   function conciergeRail(activeTid) {
-    const threads = WS.engine.threadList().slice().sort((a, b) => (b.unread || 0) - (a.unread || 0));
+    const q = S().conciergeSearch || '';
+    const threads = conciergeThreads();
+
+    const searchBox_ = searchBox('conciergeSearch', 'Поиск по диалогам…', q, 'cg-rail-search');
+
     const rows = threads.map((t) => {
       const on = t.id === activeTid ? ' is-active' : '';
       const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
@@ -642,11 +652,24 @@
       return '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + t.label + '" data-ticon="' + t.icon + '">' +
         '<span class="fi i-acc">' + I(t.icon) + '</span>' +
         '<span class="ft"><span class="t">' + t.label + time + '</span><span class="m">' + preview + '</span></span>' + unread + '</button>';
-    }).join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.</div></div>';
-    return '<div class="cg-rail-head"><span class="section-label" style="margin:0">Диалоги · ' + threads.length + '</span>' +
+    }).join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>' + (q ? 'По запросу ничего не найдено' : 'Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.') + '</div></div>';
+
+    return '<div class="cg-rail-head"><span class="section-label cg-rail-count" style="margin:0">Диалоги · ' + threads.length + '</span>' +
       '<div class="cg-rail-head-btns"><button class="btn sm" data-act="newThread">' + I('plus') + 'Новый</button>' +
       '<button class="cg-rail-collapse" data-act="cgRailToggle" title="Свернуть диалоги">' + I('chevLeft') + '</button></div></div>' +
-      '<div class="cg-rail-list">' + rows + '</div>';
+      searchBox_ + '<div class="cg-rail-list">' + rows + '</div>';
+  }
+  // A keystroke in the rail search repaints the rail list only. A full store emit would remount the
+  // chat (see render() -> mountConcierge) and jump the transcript on every character.
+  function refreshCgRail() {
+    const list = document.querySelector('.cg-rail-list'); if (!list) return;
+    const active = WS.engine.activeThreadId();
+    const html = conciergeRail(active);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    list.innerHTML = (tmp.querySelector('.cg-rail-list') || { innerHTML: '' }).innerHTML;
+    const cnt = document.querySelector('.cg-rail-count');
+    if (cnt) cnt.textContent = 'Диалоги · ' + conciergeThreads().length;
   }
   function conciergeHomeMain(st) {
     return '<div class="cg-main-inner">' +
@@ -790,37 +813,167 @@
     }
     return head(title, desc, actions) + body;
   }
+  // ---- Search and filter helpers ----
+  // One search field for every list — same affordance, same shape, wherever a broker looks for
+  // something. `extraCls` lets a host (the Concierge rail) tighten the spacing without a second
+  // component.
+  function searchBox(inputId, placeholder, value, extraCls) {
+    const v = value || '';
+    return '<div class="prompt obj-search ' + (extraCls || '') + '"><span class="ico">' + I('search') + '</span>' +
+      '<input id="' + inputId + '" type="search" placeholder="' + escAttr(placeholder) + '" value="' + escAttr(v) + '" autocomplete="off">' +
+      (v ? '<button class="voice" data-act="' + inputId + 'Clear" title="Очистить">' + I('x') + '</button>' : '') + '</div>';
+  }
+  // Filter helpers
+  function matchContactsFilters(c) {
+    const st = S().contactsFilters || {};
+    // Priority filter
+    if (st.priority && st.priority !== 'all') {
+      const sig = (D().clientSignals || {})[c.id];
+      if (st.priority === 'none' ? sig && sig.priority : !sig || sig.priority !== st.priority) return false;
+    }
+    // Portrait filters
+    if (st.psych && st.psych !== 'all') {
+      if (st.psych === 'empty') { if (c.psych && c.psych.filled) return false; }
+      else {
+        const val = st.psych.split(':')[0];
+        const sub = st.psych.split(':')[1];
+        const p = c.psych || {};
+        if (val === 'decision' && p.decision !== sub) return false;
+        if (val === 'risk' && p.risk !== sub) return false;
+        if (val === 'values') { if (!p.values || p.values.indexOf(sub) < 0) return false; }
+      }
+    }
+    // Object filter
+    if (st.object && st.object !== 'all') {
+      const hasObj = (D().deals || []).some((d) => d.clientId === c.id && d.objectId === st.object) ||
+                     (D().requests || []).some((r) => r.clientId === c.id && (r.offered || []).indexOf(st.object) >= 0);
+      if (!hasObj) return false;
+    }
+    return true;
+  }
+
+  function matchCompaniesFilters(co) {
+    const st = S().companiesFilters || {};
+    if (st.client && st.client !== 'all') {
+      const hasCo = (D().deals || []).some((d) => d.companyId === co.id && d.clientId === st.client);
+      if (!hasCo) return false;
+    }
+    return true;
+  }
+
+  // Match threads by label + preview text for Concierge
+  function matchConciergeThread(t, query) {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const label = (t.label || '').toLowerCase();
+    const preview = (t.preview || '').toLowerCase();
+    return label.indexOf(q) >= 0 || preview.indexOf(q) >= 0;
+  }
+
   // Контакты = a people registry with TYPES. "Клиент" is one type; a contact may be a
   // partner, an intermediary, or a company contact. Resolves the deals/clients/contacts dilemma.
   const CONTACT_TYPES = [
     { k: 'all', t: 'Все' }, { k: 'client', t: 'Клиенты' }, { k: 'partner', t: 'Партнёры' },
     { k: 'intermediary', t: 'Посредники' }, { k: 'transferred', t: 'Замещение' },
   ];
+  // Text a broker would actually type into a contact search: the person, how to reach them, what
+  // they want, where, and the company they sit behind.
+  function contactHaystack(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const cos = deals.map((d) => (D().companies || []).find((x) => x.id === d.companyId)).filter(Boolean);
+    return [c.name, c.phone, c.goal, c.horizon, c.lang, (c.areas || []).join(' '),
+      clientContactVals(c).email, deals.map((d) => d.title).join(' '), cos.map((x) => x.name).join(' ')]
+      .filter(Boolean).join(' ').toLowerCase();
+  }
+  function contactsSearchList() {
+    const cur = S().contactType || 'all';
+    const q = (S().contactsSearch || '').trim().toLowerCase();
+    const cl = D().clients || [];
+    let list = cl.map((c, i) => ({ id: c.id, name: c.name, role: c.goal, budget: c.budget, c: c, transferred: i >= cl.length - 2 }));
+    if (cur === 'transferred') list = list.filter((p) => p.transferred);
+    if (q) list = list.filter((p) => contactHaystack(p.c).indexOf(q) >= 0);
+    return list.filter((p) => matchContactsFilters(p.c));
+  }
+  function contactRow(p) {
+    const k = kycOf(p.c);
+    const deal = (D().deals || []).find((d) => d.clientId === p.id);
+    const dealBtn = deal ? '<button class="btn sm ghost" data-deal="' + deal.id + '">' + I('briefcase') + 'Сделка</button>' : '';
+    const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
+      '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
+      (p.c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>') + dealBtn;
+    return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
+      '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
+      '<div class="m">' + (p.role || '') + (p.budget ? ' · ' + WS.AED(p.budget) : '') + '</div></div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
+  }
+  function contactsFilterCount() {
+    const f = S().contactsFilters || {};
+    return ['priority', 'psych', 'object'].filter((k) => f[k] && f[k] !== 'all').length;
+  }
+  // "Nothing found" must say what was searched and offer the way back out.
+  function listEmptyState(q, hasFilters, clearAct) {
+    const what = q ? 'по запросу «' + escAttr(q) + '»' : 'под выбранные фильтры';
+    return '<div class="empty" style="padding:24px 16px">' + I('search') +
+      '<div style="font-weight:700;color:var(--ink)">Ничего не нашлось ' + what + '</div>' +
+      '<div style="margin-top:4px">Попробуйте короче или другими словами' + (hasFilters ? ', либо снимите фильтры' : '') + '.</div>' +
+      '<div class="qa-row" style="justify-content:center;margin-top:12px"><button class="chip" data-act="' + clearAct + '">' + I('x') + 'Сбросить</button></div></div>';
+  }
+  function contactsListInner() {
+    const list = contactsSearchList();
+    if (!list.length) return listEmptyState((S().contactsSearch || '').trim(), contactsFilterCount() > 0, 'clearContactsFilters');
+    return '<div class="feed" style="padding:0 16px 8px">' + list.map(contactRow).join('') + '</div>';
+  }
+  function contactsCountLabel() {
+    return ((S().contactType === 'transferred') ? 'Замещение' : 'Клиенты') + ' · ' + contactsSearchList().length;
+  }
   function contactsPeople() {
     const cur = S().contactType || 'all';
-    const cl = D().clients || [];
-    let clients = cl.map((c, i) => ({ id: c.id, name: c.name, role: c.goal, budget: c.budget, c: c, transferred: i >= cl.length - 2 }));
-    if (cur === 'transferred') clients = clients.filter((p) => p.transferred);
+    const q = S().contactsSearch || '';
+    const f = S().contactsFilters || {};
+    const open = !!S().contactsFiltersOpen;
+    const n = contactsFilterCount();
+
     const FILTERS = [{ k: 'all', t: 'Все клиенты' }, { k: 'transferred', t: 'Замещение' }];
-    const rows = clients.map((p) => {
-      const k = kycOf(p.c);
-      const deal = (D().deals || []).find((d) => d.clientId === p.id);
-      const dealBtn = deal ? '<button class="btn sm ghost" data-deal="' + deal.id + '">' + I('briefcase') + 'Сделка</button>' : '';
-      const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
-        '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
-        (p.c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>') + dealBtn;
-      return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
-        '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
-        '<div class="m">' + (p.role || '') + (p.budget ? ' · ' + WS.AED(p.budget) : '') + '</div></div>' +
-        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
-    }).join('');
-    const filter = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
-      (cur === ct.k ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + ct.t + '</button>').join('');
+    const on = ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"';
+    const typeChips = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
+      (cur === ct.k ? on : '') + '>' + ct.t + '</button>').join('');
+    const prio = ['all', 'A', 'B', 'C'].map((k) => '<button class="chip' + ((f.priority || 'all') === k ? '' : ' mut') +
+      '" data-contactfilter="priority:' + k + '"' + ((f.priority || 'all') === k ? on : '') + '>' +
+      (k === 'all' ? 'Любой приоритет' : 'Приоритет ' + k) + '</button>').join('');
+
+    // Portrait and object filters sit behind a disclosure so the default view stays calm; the toggle
+    // carries the count, so an applied filter is never invisible.
+    const toggle = '<button class="chip' + (n ? '' : ' mut') + '" data-act="contactsFiltersToggle"' + (n ? on : '') + '>' +
+      I('menu') + 'Фильтры' + (n ? ' · ' + n : '') + I(open ? 'chevUp' : 'chevDown') + '</button>';
+    const clear = (n || q) ? '<button class="view-clear" data-act="clearContactsFilters">' + I('x') + 'сбросить</button>' : '';
+
+    let panel = '';
+    if (open) {
+      const psychOpts = [['all', 'Любой портрет'], ['empty', 'портрет не заполнен']]
+        .concat(PSYCH_OPTS.decision.map((d) => ['decision:' + d, d]))
+        .concat(PSYCH_OPTS.risk.map((r) => ['risk:' + r, r]))
+        .concat(PSYCH_OPTS.values.map((v) => ['values:' + v, 'важно: ' + v]));
+      const objOpts = [['all', 'Любой объект']].concat((D().objects || []).map((o) => [o.id, o.name.split(',')[0]]));
+      panel = '<div class="list-filters">' +
+        '<label class="lf-fld"><span>Портрет клиента</span>' + miniSel('cfPsych', f.psych || 'all', psychOpts) + '</label>' +
+        '<label class="lf-fld"><span>Смотрел объект</span>' + miniSel('cfObject', f.object || 'all', objOpts) + '</label>' +
+        '<div class="lf-hint">Фильтры складываются с поиском. Поиск по клиенту идёт строкой — имя, телефон, компания.</div></div>';
+    }
+
     const note = cur === 'transferred'
       ? '<div class="ws-flag" style="margin:0 0 12px">' + I('users') + ' Клиенты, переданные вам от коллеги на время его отсутствия. Режим замещения включается в Настройках.</div>' : '';
-    return '<div class="qa-row" style="margin-bottom:14px">' + filter + '</div>' + note +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">' + (cur === 'transferred' ? 'Замещение' : 'Клиенты') + ' · ' + clients.length + '</div>' +
-      '<div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+
+    return '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
+      searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
+      '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + '</div>' + panel +
+      '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
+      '<div class="contacts-list">' + contactsListInner() + '</div></div>';
+  }
+  function refreshContacts() {
+    const box = document.querySelector('.contacts-list'); if (!box) return;
+    box.innerHTML = contactsListInner();
+    const cnt = document.querySelector('.contacts-count');
+    if (cnt) cnt.textContent = contactsCountLabel();
   }
   // R7: saved deterministic views — same query → same list. Applied on top of the funnel filter.
   const SAVED_VIEWS = [
@@ -989,15 +1142,48 @@
     return '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Контакты · ' + D().clients.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' + companiesBlock();
   }
   // R5: Company entity (agency/developer/corp/fund) with KYC STATUS (not a rating).
+  function companyHaystack(co) {
+    const people = (co.people || []).map((x) => x.name + ' ' + x.role).join(' ');
+    return [co.name, co.kind, co.license, co.trn, co.address, co.commission, people].filter(Boolean).join(' ').toLowerCase();
+  }
+  function companiesSearchList() {
+    const q = (S().companiesSearch || '').trim().toLowerCase();
+    let cos = D().companies || [];
+    if (q) cos = cos.filter((co) => companyHaystack(co).indexOf(q) >= 0);
+    return cos.filter((co) => matchCompaniesFilters(co));
+  }
+  function companyRow(co) {
+    const linked = (D().deals || []).filter((d) => d.companyId === co.id).length;
+    const people = (co.people || []).length;
+    const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
+    const meta = co.kind + ' · сделок: ' + linked + (people ? ' · ' + people + ' ' + plural(people, 'контакт', 'контакта', 'контактов') : '');
+    return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div>' +
+      '<div class="ft"><div class="t">' + co.name + '</div><div class="m">' + meta + '</div></div>' + kyc + I('arrowRight') + '</div>';
+  }
+  function companiesListInner() {
+    const cos = companiesSearchList();
+    if (!cos.length) return listEmptyState((S().companiesSearch || '').trim(), (S().companiesFilters || {}).client !== 'all', 'clearCompaniesFilters');
+    return '<div class="feed" style="padding:0 16px 8px">' + cos.map(companyRow).join('') + '</div>';
+  }
   function companiesBlock() {
-    const cos = D().companies || [];
-    const rows = cos.map((co) => {
-      const linked = (D().deals || []).filter((d) => d.companyId === co.id).length;
-      const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
-      return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div>' +
-        '<div class="ft"><div class="t">' + co.name + '</div><div class="m">' + co.kind + ' · сделок: ' + linked + '</div></div>' + kyc + I('arrowRight') + '</div>';
-    }).join('');
-    return '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Компании · ' + cos.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+    const q = S().companiesSearch || '';
+    const f = S().companiesFilters || {};
+    // Only clients that actually reach a company through a deal — an option that filters to nothing
+    // is a dead control.
+    const linkedClients = (D().clients || []).filter((c) => (D().deals || []).some((d) => d.clientId === c.id && d.companyId));
+    const clientOpts = [['all', 'Любой клиент']].concat(linkedClients.map((c) => [c.id, c.name]));
+    const clear = (q || (f.client && f.client !== 'all')) ? '<button class="view-clear" data-act="clearCompaniesFilters">' + I('x') + 'сбросить</button>' : '';
+    const bar = '<div class="qa-row" style="margin:10px 0 0;align-items:center">' +
+      '<label class="lf-fld inline"><span>Связана с клиентом</span>' + miniSel('cofClient', f.client || 'all', clientOpts) + '</label>' + clear + '</div>';
+    return searchBox('companiesSearch', 'Поиск: название, тип, лицензия, контактное лицо…', q) + bar +
+      '<div class="card" style="margin-top:12px"><div class="section-label companies-count" style="padding:12px 16px 4px">Компании · ' + companiesSearchList().length + '</div>' +
+      '<div class="companies-list">' + companiesListInner() + '</div></div>';
+  }
+  function refreshCompanies() {
+    const box = document.querySelector('.companies-list'); if (!box) return;
+    box.innerHTML = companiesListInner();
+    const cnt = document.querySelector('.companies-count');
+    if (cnt) cnt.textContent = 'Компании · ' + companiesSearchList().length;
   }
   // ---- Company card v2: same universal shell (static type → status chip, dx-sec tabs) ----
   // Handover brief on the company card — the counterpart of clientBriefSentences: who this legal
@@ -2975,6 +3161,23 @@
       '<div class="obj-count section-label" style="margin-bottom:8px">Найдено: ' + objs.length + ' из ' + D().objects.length + '</div>' +
       '<div class="obj-list">' + cards + '</div>';
   }
+  // List search + filter controls repaint their own subtree, the way bindObjects/refreshObjects do.
+  function bindListSearch() {
+    const wire = (id, key, refresh) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', (e) => { S()[key] = e.target.value; refresh(); });
+    };
+    wire('contactsSearch', 'contactsSearch', refreshContacts);
+    wire('companiesSearch', 'companiesSearch', refreshCompanies);
+    wire('conciergeSearch', 'conciergeSearch', refreshCgRail);
+    const sel = (id, apply) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', (e) => apply(e.target.value));
+    };
+    sel('cfPsych', (v) => { S().contactsFilters = Object.assign({}, S().contactsFilters, { psych: v }); WS.storeApi.emit(); });
+    sel('cfObject', (v) => { S().contactsFilters = Object.assign({}, S().contactsFilters, { object: v }); WS.storeApi.emit(); });
+    sel('cofClient', (v) => { S().companiesFilters = Object.assign({}, S().companiesFilters, { client: v }); WS.storeApi.emit(); });
+  }
   function bindObjects() {
     const s = document.getElementById('objSearch');
     if (s) s.addEventListener('input', (e) => { S().objSearch = e.target.value; refreshObjects(); });
@@ -4714,8 +4917,10 @@
       '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
+  // Компании — legal entities (developers, funds, corporates, agencies). The list, its search and
+  // its filter live in companiesBlock() so the same block serves this screen and the contacts one.
   function viewCompanies() {
-    return head('Компании', 'Юрлица: застройщики, фонды, корпоративные клиенты, агентства. KYC-статус (не рейтинг) и связанные сделки. Клик по строке — карточка компании.',
+    return head('Компании', 'Юрлица: застройщики, фонды, корпоративные клиенты, агентства. KYC-статус (не рейтинг), контактные лица с ролями и связанные сделки. Клик по строке — карточка компании.',
       '<button class="btn sm primary" data-act="newContact">' + I('plus') + 'Добавить компанию</button>') + companiesBlock();
   }
   // Аналитика — team funnel + canonical metrics (reuses manager blocks).
@@ -5352,6 +5557,7 @@
 
     if (st.view === 'concierge') mountConcierge();
     if (st.view === 'objects') bindObjects();
+    bindListSearch();
     if (st.view === 'finance') renderFinance();
     // Hide the floating Concierge launcher (W) on the Concierge screen itself — it's redundant there.
     const _fab = document.querySelector('.fab-w'); if (_fab) _fab.style.display = (st.view === 'concierge') ? 'none' : '';

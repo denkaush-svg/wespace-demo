@@ -1615,3 +1615,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .docchain-row.wait .docchain-k { color: var(--mut); }
 .docchain-s { font-size: 11.5px; color: var(--mut); margin-top: 1px; }
 .docchain-row .badge { margin-left: auto; flex: 0 0 auto; }
+
+/* List search + filter bar — one shape across contacts, companies and the Concierge rail. */
+.obj-search input[type="search"]::-webkit-search-cancel-button { display: none; }
+.list-filters { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--acc-line); border-radius: var(--r); background: var(--acc-soft); }
+.lf-fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lf-fld.inline { flex-direction: row; align-items: center; gap: 8px; }
+.lf-fld > span { font-size: 11.5px; font-weight: 600; color: var(--mut); }
+.lf-hint { flex: 1 1 100%; font-size: 11px; color: var(--faint); }
+.cg-rail-search { flex: none; margin: 8px; padding: 4px 4px 4px 12px; border-radius: var(--r); box-shadow: none; }  /* the rail is a flex COLUMN — .obj-search's flex:1 would stretch the field down the whole panel */
+.cg-rail-search input { font-size: 13px; padding: 8px 0; }
+.cg-rail-search .ico svg { width: 15px; height: 15px; }

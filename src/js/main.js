@@ -47,7 +47,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
@@ -138,6 +138,7 @@
     if (d.company) return WS.ui.companyCard(d.company);
     if (d.savedview) { store.savedView = store.savedView === d.savedview ? null : d.savedview; return api.emit(); }
     if (d.exresolve) { return WS.ui.resolveException(d.exresolve); }
+    if (d.contactfilter) { const p = d.contactfilter.split(':'); store.contactsFilters = store.contactsFilters || {}; store.contactsFilters[p[0]] = p[1]; return api.emit(); }
     if (d.eng) return WS.engine.handle(d.eng, d);
 
     if (d.act) return handleAct(d.act, t);
@@ -232,6 +233,12 @@
       case 'calDayClear': store.calDay = -1; api.emit(); break;
       case 'doctab': store.docTab = t.dataset.tab; api.emit(); break;
       case 'docClear': store.docSearch = ''; api.emit(); break;
+      case 'contactsSearchClear': store.contactsSearch = ''; api.emit(); break;
+      case 'companiesSearchClear': store.companiesSearch = ''; api.emit(); break;
+      case 'conciergeSearchClear': store.conciergeSearch = ''; api.emit(); break;
+      case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
+      case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
+      case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' }; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
       case 'endTour': store.tour = { active: false, scenarioId: null, stepIndex: 0 }; api.emit(); break;
