@@ -10,8 +10,20 @@
   const tenant = { name: 'Harbour Key Realty LLC', city: 'Dubai', plan: 'Demo tenant' };
 
   const users = {
-    agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina' },
-    manager: { id: 'u_omar',   name: 'Омар Рахман',    role: 'Руководитель', init: 'ОР' },
+    agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina',
+      goals: [
+        { id: 'g_commission', metric: 'commission', target: 1200000, period: 'quarter', label: 'Заработать 1,2 млн комиссии за квартал', pinned: true },
+        { id: 'g_pipeline', metric: 'pipeline', target: 5000000, period: 'month', label: 'Держать 5 млн в активных сделках', pinned: true },
+        { id: 'g_deals', metric: 'deals', target: 14, period: 'quarter', label: 'Закрыть 14 сделок за квартал', pinned: false },
+      ]
+    },
+    manager: { id: 'u_omar',   name: 'Омар Рахман',    role: 'Руководитель', init: 'ОР',
+      goals: [
+        { id: 'g_team_commission', metric: 'commission', target: 3500000, period: 'quarter', label: 'План отдела по комиссии за квартал', pinned: true },
+        { id: 'g_team_deals', metric: 'deals', target: 18, period: 'quarter', label: 'Закрыть 18 сделок командой', pinned: true },
+        { id: 'g_team_pipeline', metric: 'pipeline', target: 15000000, period: 'month', label: 'Пайплайн отдела 15 млн', pinned: false },
+      ]
+    },
     partner: { id: 'u_yusef',  name: 'Юсеф Хаддад',     role: 'Клубный партнёр', init: 'ЮХ' },
   };
 

@@ -212,6 +212,117 @@
     const closed = deals.filter((d) => d.stage === 'done');
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
   }
+
+  // ---- Goal progress computation — per metric from demo data ----
+  // ---- Personal / team goals ----------------------------------------------------------------
+  // Progress is DERIVED from the demo's own records, never stored: a counter nothing updates would
+  // drift away from the board the moment a scenario moves a deal.
+  //
+  // Scope: an agent's goal counts that agent's own book; the manager's goals count the department,
+  // so the same component serves «моя цель» and «план отдела».
+  const GOAL_METRICS = {
+    commission: { label: 'Комиссия', unit: 'money', hint: 'закрытые сделки периода' },
+    deals: { label: 'Закрытые сделки', unit: 'count', word: ['сделка', 'сделки', 'сделок'], hint: 'стадия «закрыта»' },
+    pipeline: { label: 'Пайплайн в работе', unit: 'money', hint: 'сумма активных сделок' },
+    shows: { label: 'Показы', unit: 'count', word: ['показ', 'показа', 'показов'], hint: 'встречи на объектах' },
+    leads: { label: 'Новые клиенты', unit: 'count', word: ['клиент', 'клиента', 'клиентов'], hint: 'заведены в книгу' },
+  };
+  // May in the demo week; a quarter is Apr–Jun, so a quarterly goal is 44 days in on 14 May.
+  const DAYS_IN_MONTH = 31;
+  const QUARTER_ELAPSED_BEFORE_MAY = 30 + 31; // April has 30, March 31 — the quarter starts 1 April
+  const DAYS_IN_QUARTER = 91;
+  function goalOwnerId(scope) {
+    const u = D().users[scope === 'team' ? 'manager' : S().role];
+    return u ? u.id : null;
+  }
+  function goalDeals(scope) {
+    const all = D().deals || [];
+    if (scope === 'team') return all;
+    const me = goalOwnerId(scope);
+    return all.filter((d) => d.agent === me);   // d.agent holds a user id (u_marina), not a role name
+  }
+  function goalFact(goal, scope) {
+    const deals = goalDeals(scope);
+    // Closed business lives in `attribution` — the period's book by source, which is also what the
+    // Пульс reports as «комиссия на лид». Deals still on the board contribute the moment they close,
+    // so the number moves during a demo instead of sitting on the seeded total.
+    const attr = D().attribution || [];
+    if (goal.metric === 'commission') {
+      const closedNow = deals.filter((d) => d.stage === 'done').reduce((s2, d) => s2 + dealCommission(d), 0);
+      return Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + closedNow);
+    }
+    if (goal.metric === 'deals') {
+      return attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + deals.filter((d) => d.stage === 'done').length;
+    }
+    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => d.stage !== 'done').reduce((s2, d) => s2 + (d.amount || 0), 0));
+    if (goal.metric === 'shows') {
+      // Events carry no owner, so a show counts as mine when its client is on one of my deals.
+      const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
+      return (D().events || []).filter((e) => e.kind === 'show' && (scope === 'team' || mine[e.clientId])).length;
+    }
+    if (goal.metric === 'leads') {
+      if (scope === 'team') return (D().clients || []).length;
+      const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
+      return (D().clients || []).filter((c) => mine[c.id]).length;
+    }
+    return 0;
+  }
+  function goalValue(metric, n) {
+    const m = GOAL_METRICS[metric] || {};
+    if (m.unit === 'money') return WS.AED(n);
+    return n + (m.word ? ' ' + plural(n, m.word[0], m.word[1], m.word[2]) : '');
+  }
+  function computeGoalProgress(goal, scope) {
+    const fact = goalFact(goal, scope);
+    const target = goal.target || 0;
+    const pct = target ? Math.round((fact / target) * 100) : 0;
+    const now = WS.fixtures.DEMO_NOW;
+    const elapsed = goal.period === 'quarter' ? (QUARTER_ELAPSED_BEFORE_MAY + now.d) : now.d;
+    const span = goal.period === 'quarter' ? DAYS_IN_QUARTER : DAYS_IN_MONTH;
+    const projected = elapsed > 0 ? Math.round(fact / elapsed * span) : 0;
+    const share = target ? Math.round(projected / target * 100) : 0;
+    // Days by which the current rate beats (or misses) the finish line.
+    const daysAhead = (fact && target) ? Math.round(span - (target / (fact / elapsed))) : 0;
+    let pace;
+    // Pace only means something for a metric that ACCUMULATES over the period. Pipeline is a stock —
+    // how much sits in work right now — so projecting it forward by a daily rate is nonsense.
+    const cumulative = goal.metric !== 'pipeline';
+    if (!cumulative) pace = fact >= target ? 'план по загрузке держится' : 'до нормы не хватает ' + goalValue(goal.metric, target - fact);
+    else if (!target) pace = 'цель не задана';
+    else if (fact >= target) pace = 'цель закрыта';
+    else if (share >= 100) pace = 'идёте с опережением — на ' + Math.max(1, daysAhead) + ' ' + plural(Math.max(1, daysAhead), 'день', 'дня', 'дней') + ' раньше срока';
+    else pace = 'при текущем темпе — ' + share + '% к концу ' + (goal.period === 'quarter' ? 'квартала' : 'месяца');
+    return { fact: fact, target: target, pct: pct, remaining: Math.max(0, target - fact), pace: pace, behind: share < 100 && fact < target };
+  }
+  // One row, used by the agent's «Мои цели» and by the manager's «План отдела».
+  function goalRow(goal, scope) {
+    const p = computeGoalProgress(goal, scope);
+    const bar = Math.max(2, Math.min(100, p.pct));
+    return '<div class="goal-row">' +
+      '<div class="goal-head"><span class="goal-label">' + escAttr(goal.label) + '</span>' +
+      '<span class="goal-num">' + goalValue(goal.metric, p.fact) + ' <i>из ' + goalValue(goal.metric, p.target) + '</i></span></div>' +
+      '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
+      '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
+      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span>' +
+      '<span class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + p.pace + '</span></div></div>';
+  }
+  function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
+  function pulseMyGoals() {
+    const goals = goalsOf(S().role);
+    const pinned = goals.filter((g) => g.pinned);
+    const head = '<div class="wq-head" style="margin-top:24px"><div class="section-label" style="margin:0">' +
+      (S().role === 'manager' ? 'План отдела' : 'Мои цели') + '</div>' +
+      '<button class="btn sm" data-nav="profile">' + I('target') + 'Настроить цели</button></div>';
+    if (!pinned.length) {
+      const why = goals.length
+        ? 'Ни одна цель не закреплена на Пульсе. Откройте профиль и отметьте те, за которыми хотите следить каждый день.'
+        : 'Цели ещё не заданы. Поставьте одну — комиссия за месяц, число сделок, показы — и Пульс будет считать прогресс сам, по вашим сделкам.';
+      return head + '<div class="card" style="padding:16px"><div style="font-size:12.5px;color:var(--mut);max-width:62ch">' + why + '</div>' +
+        '<button class="btn sm primary" data-act="addGoal" style="margin-top:10px">' + I('plus') + 'Поставить цель</button></div>';
+    }
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    return head + '<div class="card goal-card">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
+  }
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
   // never computes its own. Each entry: a value plus a human label, addressable by a stable key.
@@ -393,6 +504,7 @@
         heroViz('pulse', 'Пульс команды', greet + ', ' + firstName + '. Обзор отдела на смене — план, SLA, распределение и согласования.', { descBig: true }) +
         cgComposer('startPrompt', 'Спросите Консьержа по команде — «кто перегружен», «что нарушает SLA», «сводка за неделю»…', 'startSend', 'prompt-lead') +
         '<div class="qa-row" style="margin-top:16px">' + mgrQa + '</div>' +
+        pulseMyGoals() +
         mgrTiles() +
         canonMetrics() +
         '<div class="section-label" style="margin-top:28px">Команда и исключения</div>' + workQueueManager() +
@@ -460,6 +572,7 @@
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
+      pulseMyGoals() +
       '<div class="tiles dash" style="margin-top:20px">' + tiles + '</div>' +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
@@ -2975,6 +3088,106 @@
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
   }
+
+  // ---- Goals edit (profile) ----
+  function openGoalEdit(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    const metricOpts = ['commission', 'deals', 'pipeline', 'shows', 'leads']
+      .map((m) => '<option value="' + m + '"' + (m === g.metric ? ' selected' : '') + '>' + ({ commission: 'Заработанная комиссия', deals: 'Закрытые сделки', pipeline: 'Сумма пайплайна', shows: 'Проведённые показы', leads: 'Новые клиенты' })[m] + '</option>').join('');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Цель на период. Прогресс считается автоматически из данных демо. Выводить на Пульс — показывает только закреплённые цели.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Цель</span><input id="gf_label" type="text" value="' + ((g.label || '').replace(/"/g, '&quot;')) + '"></label>' +
+      '<label class="fld"><span>Метрика</span><select id="gf_metric">' + metricOpts + '</select></label>' +
+      '<label class="fld"><span>Целевое значение</span><input id="gf_target" type="number" value="' + (g.target || '') + '"></label>' +
+      '<label class="fld"><span>Период</span><select id="gf_period"><option value="month"' + (g.period === 'month' ? ' selected' : '') + '>Месяц</option><option value="quarter"' + (g.period === 'quarter' ? ' selected' : '') + '>Квартал</option></select></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned"' + (g.pinned ? ' checked' : '') + '> Показывать в Пульсе</label>';
+    openModal('Редактировать цель · ' + g.label, body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveGoal" data-goal="' + goalId + '">' + I('check') + 'Сохранить</button>');
+  }
+  function saveGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    const gv = (k) => { const el = document.getElementById('gf_' + k); return el ? el.value : g[k]; };
+    const target = parseInt(gv('target'), 10);
+    if (!gv('label').trim() || !target) { WS.storeApi.toast('Укажите цель и значение', 'warn'); return; }
+    g.label = gv('label');
+    g.metric = gv('metric');
+    g.target = target;
+    g.period = gv('period');
+    g.pinned = !!(document.getElementById('gf_pinned') || {}).checked;
+    closeModal();
+    WS.storeApi.toast('Цель сохранена', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  function deleteGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const ix = goals.findIndex((x) => x.id === goalId);
+    if (ix >= 0) {
+      const g = goals[ix];
+      openModal('Удалить цель', '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Удалить цель «' + escAttr(g.label) + '»? Действие необратимо.</p>',
+        '<button class="btn" data-act="closeModal">Отмена</button><button class="btn danger" data-act="confirmDeleteGoal" data-goal="' + goalId + '">' + I('x') + 'Удалить</button>');
+    }
+  }
+  function confirmDeleteGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const ix = goals.findIndex((x) => x.id === goalId);
+    if (ix >= 0) {
+      goals.splice(ix, 1);
+      closeModal();
+      WS.storeApi.toast('Цель удалена', 'ok');
+      WS.storeApi.save(); WS.storeApi.emit();
+    }
+  }
+  function addGoal() {
+    const u = D().users[S().role];
+    if (!u.goals) u.goals = [];
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Добавить новую цель на период. Прогресс считается автоматически.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Цель</span><input id="gf_label" type="text" placeholder="Например: Заработать 300 тыс. комиссии в мае"></label>' +
+      '<label class="fld"><span>Метрика</span><select id="gf_metric"><option value="commission">Заработанная комиссия</option><option value="deals">Закрытые сделки</option><option value="pipeline">Сумма пайплайна</option><option value="shows">Проведённые показы</option><option value="leads">Новые клиенты</option></select></label>' +
+      '<label class="fld"><span>Целевое значение</span><input id="gf_target" type="number" placeholder="Например: 300000"></label>' +
+      '<label class="fld"><span>Период</span><select id="gf_period"><option value="month">Месяц</option><option value="quarter">Квартал</option></select></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned" checked> Показывать в Пульсе</label>';
+    openModal('Добавить цель', body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createGoal">' + I('plus') + 'Создать</button>');
+  }
+  function createGoal() {
+    const u = D().users[S().role];
+    if (!u.goals) u.goals = [];
+    const gv = (k) => { const el = document.getElementById('gf_' + k); return el ? el.value : ''; };
+    const label = gv('label').trim();
+    const target = parseInt(gv('target'), 10);
+    if (!label || !target) { WS.storeApi.toast('Укажите цель и значение', 'warn'); return; }
+    u.goals.push({
+      id: 'g_' + Math.round(performance.now()),
+      metric: gv('metric'),
+      target: target,
+      period: gv('period'),
+      label: label,
+      pinned: !!(document.getElementById('gf_pinned') || {}).checked,
+    });
+    closeModal();
+    WS.storeApi.toast('Цель добавлена', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  // Pin / unpin decides what the Pulse carries — the client asked to configure exactly that.
+  function toggleGoalPin(goalId) {
+    const u = D().users[S().role];
+    const g = ((u && u.goals) || []).find((x) => x.id === goalId);
+    if (!g) return;
+    g.pinned = !g.pinned;
+    WS.storeApi.toast(g.pinned ? 'Цель выведена на Пульс' : 'Цель убрана с Пульса', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
   // Event types an agent can log by hand (IA §6.2 «Примечания / События»).
   // ch = channel icon bucket; kind 'note' stays editable, logged facts are immutable like channel raw.
   const FEED_TYPES = [
@@ -4206,6 +4419,7 @@
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Мой день · сегодня ' + today.length + od + '</div>' +
       '<button class="btn sm" data-nav="tasks">' + I('arrowRight') + 'Все задачи</button></div>' + top;
   }
+
   // ---- Экран «Задачи» ----
   function tasksInsights() {
     return '<div class="section-label" style="margin:4px 0 8px;display:flex;align-items:center;gap:8px">Инсайты · группы задач <span class="badge ai-b">' + I('sparkle') + 'AI-сгенерировано</span></div>' + insightCards();
@@ -4473,19 +4687,33 @@
     const meta = TEAM_META[id] || { focus: '—', load: 50, conv: 30, sla: 90 };
     return { list: list, val: val, active: active, deals: list.length, meta: meta };
   }
+  // A head of brokerage opens the morning on money against plan, who will miss it, what is stuck and
+  // who is drowning. «Агентов на смене · вся команда активна» was a constant that decided nothing;
+  // «План месяца · N / 12» hard-coded the plan. Both are gone.
   function mgrTiles() {
-    const active = D().deals.filter((d) => d.stage !== 'done');
+    const deals = D().deals || [];
+    const active = deals.filter((d) => d.stage !== 'done');
     const pipeline = Math.round(active.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
-    const closed = D().deals.filter((d) => d.stage === 'done').length;
+    // Closed business for the period lives in `attribution` — the same book the goals read, so the
+    // Пульс cannot contradict «План отдела» two blocks below it.
+    const attr = D().attribution || [];
+    const earned = attr.reduce((s, x) => s + (x.commission || 0), 0) +
+      Math.round(deals.filter((d) => d.stage === 'done').reduce((s, d) => s + dealCommission(d), 0));
+    const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter((d) => d.stage === 'done').length;
     const unassigned = (D().inbox || []).length;
-    const slaBreaches = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
+    const atRisk = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
+    const avgSla = Math.round(Object.keys(TEAM_META).reduce((s, k) => s + TEAM_META[k].sla, 0) / Object.keys(TEAM_META).length);
+    const stuckPred = (SAVED_VIEWS.find((v) => v.k === 'stuck') || {}).pred || (() => false);
+    const stuck = deals.filter(stuckPred);
+    const stuckSum = Math.round(stuck.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
     return '<div class="tiles" style="margin-top:20px">' +
-      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активные сделки всех агентов', 'up', 'accent', 'data-nav="clients"') +
-      tile('target', 'План месяца', closed + ' / 12', 'сделок', '', 'Закрыто из цели отдела', '', '', 'data-nav="analytics"') +
-      tile('warn', 'Нарушения SLA', slaBreaches, '', '', 'Агенты вне норматива', '', '', 'data-nav="team"') +
-      tile('mail', 'Нераспределённые', unassigned, '', '', 'Заявки ждут агента', '', '', 'data-nav="leads"') +
+      tile('money', 'Комиссия отдела за квартал', WS.AED(earned), '', '', closedN + ' ' + plural(closedN, 'закрытая сделка', 'закрытые сделки', 'закрытых сделок'), 'up', 'accent', 'data-nav="analytics"') +
+      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активных сделок — ' + active.length, 'up', '', 'data-nav="clients"') +
+      tile('clock', 'Застряли в стадии', stuck.length, '', '', stuckSum ? stuckSum.toLocaleString('ru-RU') + ' млн AED без движения 5+ дней' : 'всё движется', '', stuck.length ? 'accent' : '', 'data-savedview="stuck"') +
+      tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
+      tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
+      tile('mail', 'Нераспределённые заявки', unassigned, '', '', unassigned ? 'Ждут агента — назначить' : 'Все заявки распределены', '', unassigned > 0 ? 'accent' : '', 'data-nav="leads"') +
       tile('check', 'На согласовании', MGR_APPROVALS.length - (S().apprDone || []).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
-      tile('users', 'Агентов на смене', Object.keys(TEAM_META).length, '', '', 'Вся команда активна', '', '', 'data-nav="team"') +
       '</div>';
   }
   function viewTeam() {
@@ -5157,7 +5385,7 @@
     // Private metrics — visible only to the broker (not on the public витрина).
     const priv = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 10px;display:flex;align-items:center;gap:8px">Личная статистика <span class="badge demo">' + I('lock') + 'только вам</span></div>' +
       '<div class="fin-kpis">' +
-      '<div class="kpi"><div class="kv">214 000</div><div class="kk">Комиссия · квартал, AED</div></div>' +
+      '<div class="kpi"><div class="kv">' + WS.AED(goalFact({ metric: 'commission' }, S().role === 'manager' ? 'team' : 'me')) + '</div><div class="kk">Комиссия · квартал</div></div>' +
       '<div class="kpi"><div class="kv">34%</div><div class="kk">Конверсия лид → сделка</div></div>' +
       '<div class="kpi"><div class="kv">1,7</div><div class="kk">Средний чек, млн AED</div></div>' +
       '<div class="kpi"><div class="kv">28%</div><div class="kk">Повторные клиенты</div></div></div></div>';
@@ -5176,7 +5404,32 @@
       '</div>';
     const profileContact = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 10px">Контактные данные</div>' +
       contactVCard(USER_CONTACTS[S().role] || USER_CONTACTS.agent, 'whatsapp') + '</div>';
-    return header + profileContact + kpis + priv + about + objectsCard + svcAcc + links;
+    // Goals are configured here and surfaced on the Pulse; the row renderer is shared with
+    // pulseMyGoals so the two screens can never drift apart.
+    const goals = (u && u.goals) || [];
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    const goalsRows = goals.map((g) => {
+      const p = computeGoalProgress(g, scope);
+      const m = GOAL_METRICS[g.metric] || { label: g.metric };
+      const bar = Math.max(2, Math.min(100, p.pct));
+      const pin = '<button class="btn xs' + (g.pinned ? ' primary' : '') + '" data-act="toggleGoalPin" data-goal="' + g.id + '" title="' +
+        (g.pinned ? 'Убрать с Пульса' : 'Показывать на Пульсе') + '">' + I(g.pinned ? 'check' : 'plus') + 'На Пульсе</button>';
+      return '<div class="goal-row">' +
+        '<div class="goal-head"><span class="goal-label">' + escAttr(g.label) + '</span>' +
+        '<span class="goal-num">' + goalValue(g.metric, p.fact) + ' <i>из ' + goalValue(g.metric, p.target) + '</i></span></div>' +
+        '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
+        '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
+        '<span>' + m.label + ' · ' + (g.period === 'quarter' ? 'квартал' : 'месяц') + '</span>' +
+        '<span class="goal-acts">' + pin +
+        '<button class="btn xs" data-act="editGoal" data-goal="' + g.id + '">' + I('pencil') + 'Изменить</button>' +
+        '<button class="btn xs" data-act="deleteGoal" data-goal="' + g.id + '" title="Удалить цель">' + I('x') + '</button></span></div></div>';
+    }).join('');
+    const goalsEmpty = '<div style="font-size:12.5px;color:var(--mut);max-width:64ch">Целей пока нет. Поставьте первую — комиссия за месяц, число закрытых сделок, показы или новые клиенты. Прогресс Пульс посчитает сам, по вашим сделкам, и покажет темп против календаря.</div>';
+    const goalsCard = '<div class="card pad" style="margin-bottom:14px">' +
+      '<div class="wq-head" style="margin:0 0 12px"><div class="section-label" style="margin:0">' + (scope === 'team' ? 'Цели отдела' : 'Мои цели') + '</div>' +
+      '<button class="btn sm primary" data-act="addGoal">' + I('plus') + 'Добавить цель</button></div>' +
+      (goals.length ? goalsRows : goalsEmpty) + '</div>';
+    return header + profileContact + kpis + priv + about + goalsCard + objectsCard + svcAcc + links;
   }
 
   // ---------------- КЛУБНЫЕ (портал закрытого клуба брокеров и инвесторов) ----------------
@@ -5581,8 +5834,8 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab };
 })(window.WS = window.WS || {});

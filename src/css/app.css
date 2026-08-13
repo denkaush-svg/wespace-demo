@@ -189,6 +189,21 @@ button { font-family: inherit; cursor: pointer; }
 .meter { height: 7px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin-top: 12px; }
 .meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc), var(--acc-2)); border-radius: 999px; }
 
+/* goals (personal targets) */
+/* Goal progress — one row shared by the Pulse block and the profile editor. */
+.goal-card { padding: 6px 16px 14px; }
+.goal-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.goal-row:last-child { border-bottom: 0; }
+.goal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.goal-label { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.goal-num { font-size: 13.5px; font-weight: 700; color: var(--acc-deep); white-space: nowrap; }
+.goal-num i { font-style: normal; font-weight: 500; color: var(--mut); }
+.goal-meter.is-behind i { background: var(--warn, #c98a3a); }
+.goal-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
+.goal-pct { font-weight: 700; color: var(--ink); }
+.goal-pace.is-behind { color: var(--stop); }
+.goal-acts { display: flex; gap: 6px; margin-left: auto; }
+
 /* attention feed (single inbox) */
 .feed { margin-top: 12px; display: flex; flex-direction: column; }
 .feed-row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--hair); transition: .14s var(--ease); }

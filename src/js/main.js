@@ -188,6 +188,13 @@
       case 'auditLog': WS.ui.openAuditLog(); break;
       case 'editDeal': WS.ui.openDealEdit(t.dataset.deal); break;
       case 'saveDeal': WS.ui.saveDealEdit(t.dataset.deal); break;
+      case 'editGoal': WS.ui.openGoalEdit(t.dataset.goal); break;
+      case 'toggleGoalPin': WS.ui.toggleGoalPin(t.dataset.goal); break;
+      case 'saveGoal': WS.ui.saveGoal(t.dataset.goal); break;
+      case 'deleteGoal': WS.ui.deleteGoal(t.dataset.goal); break;
+      case 'confirmDeleteGoal': WS.ui.confirmDeleteGoal(t.dataset.goal); break;
+      case 'addGoal': WS.ui.addGoal(); break;
+      case 'createGoal': WS.ui.createGoal(); break;
       case 'addEvent': { const sc = t.dataset.scope || 'deal'; WS.ui.openEventForm(sc, sc === 'contact' ? t.dataset.cid : sc === 'company' ? t.dataset.coid : t.dataset.deal); break; }
       case 'saveEventEntry': WS.ui.saveEventEntry(t.dataset.scope || 'deal', t.dataset.eid); break;
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
