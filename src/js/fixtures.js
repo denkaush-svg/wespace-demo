@@ -226,13 +226,34 @@
   // Companies (R5, A10) — entity above contacts/deals; carries KYC STATUS (not a rating).
   const companies = [
     { id: 'co_emaar', name: 'Emaar Properties', kind: 'Застройщик', kyc: 'verified', note: 'Крупный застройщик, эскроу-счета DLD.',
-      trn: '100 4567 8901 0003', license: 'DLD · застройщик', address: 'Downtown Dubai, Emaar Square, Building 3', contactPerson: 'Fatima Al Nuaimi', contactRole: 'Broker Relations Director', phone: '+971 4 367 3333', email: 'brokers@emaar.ae', commission: '2–4% off-plan · выплата от застройщика · эскроу DLD', escrow: true },
+      trn: '100 4567 8901 0003', license: 'DLD · застройщик', address: 'Downtown Dubai, Emaar Square, Building 3', contactPerson: 'Fatima Al Nuaimi', contactRole: 'Broker Relations Director', phone: '+971 4 367 3333', email: 'brokers@emaar.ae', commission: '2–4% off-plan · выплата от застройщика · эскроу DLD', escrow: true,
+      people: [
+        { name: 'Fatima Al Nuaimi', role: 'Директор по работе с брокерами', decision: 'ЛПР', phone: '+971 4 367 3333', email: 'fatima@emaar.ae', channel: 'email', primary: true, note: 'Согласование аллокации и условия co-broking' },
+        { name: 'Mohammed Al Mazrouei', role: 'Менеджер проектов', decision: 'влияет', phone: '+971 50 123 4456', email: 'mohamm@emaar.ae', channel: 'whatsapp', note: 'Сроки поставки, изменения в плане' },
+        { name: 'Layla Al Mansouri', role: 'Юрист проекта', decision: 'исполнитель', phone: '+971 4 367 3400', email: 'layla.mansouri@emaar.ae', channel: 'email', note: 'Документооборот, контракты' },
+        { name: 'Rashid Al Ketbi', role: 'Финансовый контроллер', decision: 'влияет', phone: '+971 50 234 5678', email: 'rashid.ketbi@emaar.ae', channel: 'email', note: 'Условия оплаты и комиссии' },
+      ] },
     { id: 'co_altura', name: 'Altura Capital', kind: 'Фонд', kyc: 'verified', note: 'Инвестфонд, портфельные сделки.',
-      trn: '100 7789 2210 0007', license: 'DIFC · инвестиционный фонд', address: 'DIFC, Gate Village 4', contactPerson: 'Сергей Орлов', contactRole: 'Portfolio Manager', phone: '+971 4 401 9900', email: 's.orlov@altura.capital', commission: 'по договору · портфельные закрытия', escrow: false },
+      trn: '100 7789 2210 0007', license: 'DIFC · инвестиционный фонд', address: 'DIFC, Gate Village 4', contactPerson: 'Сергей Орлов', contactRole: 'Portfolio Manager', phone: '+971 4 401 9900', email: 's.orlov@altura.capital', commission: 'по договору · портфельные закрытия', escrow: false,
+      people: [
+        { name: 'Сергей Орлов', role: 'Менеджер портфеля', decision: 'ЛПР', phone: '+971 4 401 9900', email: 's.orlov@altura.capital', channel: 'email', primary: true, note: 'Утверждение сделок, условия инвестиций' },
+        { name: 'Natasha Volkova', role: 'Аналитик инвестиций', decision: 'влияет', phone: '+971 50 345 6789', email: 'n.volkova@altura.capital', channel: 'whatsapp', note: 'Оценка доходности, финмодели' },
+        { name: 'Dr. Omar Al Shami', role: 'Генеральный партнёр', decision: 'ЛПР', phone: '+971 4 401 9901', email: 'o.alshami@altura.capital', channel: 'email', note: 'Стратегические решения, мегасделки' },
+      ] },
     { id: 'co_meydan', name: 'Meydan Group', kind: 'Корпоративный клиент', kyc: 'pending', note: 'Корпоративный арендатор, проверка KYC идёт.',
-      trn: '—', license: 'DED · трейд-лицензия', address: 'Meydan, Nad Al Sheba', contactPerson: 'Ahmed Rashid', contactRole: 'Procurement Lead', phone: '+971 4 381 3700', email: 'procurement@meydan.ae', commission: 'аренда · годовой чек', escrow: false },
+      trn: '—', license: 'DED · трейд-лицензия', address: 'Meydan, Nad Al Sheba', contactPerson: 'Ahmed Rashid', contactRole: 'Procurement Lead', phone: '+971 4 381 3700', email: 'procurement@meydan.ae', commission: 'аренда · годовой чек', escrow: false,
+      people: [
+        { name: 'Ahmed Rashid', role: 'Начальник закупок', decision: 'ЛПР', phone: '+971 4 381 3700', email: 'ahmed.rashid@meydan.ae', channel: 'whatsapp', primary: true, note: 'Согласование аренды, переговоры' },
+        { name: 'Khalil Al Shami', role: 'Операционный директор', decision: 'ЛПР', phone: '+971 50 456 7890', email: 'khalil@meydan.ae', channel: 'email', note: 'Утверждение бюджетов, сроков' },
+        { name: 'Fatima Al Dhaheri', role: 'Администратор объектов', decision: 'исполнитель', phone: '+971 4 381 3800', email: 'fatima.dhaheri@meydan.ae', channel: 'whatsapp', note: 'Обслуживание, коммунальные платежи' },
+      ] },
     { id: 'co_harbour', name: 'Harbour Key Realty', kind: 'Агентство', kyc: 'verified', note: 'Наше агентство.',
-      trn: '100 2231 4456 0001', license: 'RERA ORN 28114', address: 'Business Bay, Bay Square, Building 10', contactPerson: 'Марина Волкова', contactRole: 'Managing Broker', phone: '+971 50 118 2244', email: 'marina@harbourkey.ae', commission: 'co-broking 50 / 50', escrow: false },
+      trn: '100 2231 4456 0001', license: 'RERA ORN 28114', address: 'Business Bay, Bay Square, Building 10', contactPerson: 'Марина Волкова', contactRole: 'Managing Broker', phone: '+971 50 118 2244', email: 'marina@harbourkey.ae', commission: 'co-broking 50 / 50', escrow: false,
+      people: [
+        { name: 'Марина Волкова', role: 'Управляющий брокер', decision: 'ЛПР', phone: '+971 50 118 2244', email: 'marina@harbourkey.ae', channel: 'whatsapp', primary: true, note: 'Основной контакт, координация сделок' },
+        { name: 'Омар Рахман', role: 'Старший агент', decision: 'влияет', phone: '+971 50 447 2210', email: 'omar@harbourkey.ae', channel: 'whatsapp', note: 'Крупные сделки, переговоры' },
+        { name: 'Лина Хассан', role: 'Операционный менеджер', decision: 'исполнитель', phone: '+971 50 556 7890', email: 'lina@harbourkey.ae', channel: 'email', note: 'Документооборот, отчётность' },
+      ] },
   ];
 
   // Per-deal timeline (R4) — channel history. kind:'raw' immutable source event; 'note' editable;
@@ -285,13 +306,13 @@
   const companyTimeline = {
     co_emaar: [
       { at: '02 мая · 11:00', ord: 21100, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: застройщик, эскроу-счета DLD.' },
-      { at: '05 мая · 15:20', ord: 51520, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча с Fatima Al Nuaimi — аллокация в Bayline Terraces.' },
+      { at: '05 мая · 15:20', ord: 51520, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча с Fatima Al Nuaimi — аллокация в Bayline Terraces.', person: 0 },
       { at: '07 мая · 10:40', ord: 71040, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Получен прайс-лист и график платежей по проекту.' },
-      { at: '11 мая · 09:30', ord: 110930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Комиссия 4% подтверждена на квартал — фиксируем в сделках.' },
+      { at: '11 мая · 09:30', ord: 110930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Комиссия 4% подтверждена на квартал — фиксируем в сделках.', person: 3 },
     ],
     co_altura: [
       { at: '04 мая · 13:15', ord: 41315, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: инвестфонд DIFC, портфельные сделки.' },
-      { at: '09 мая · 16:00', ord: 91600, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 12:30 — мандат фонда на доходные активы в DIFC.', capture: true },
+      { at: '09 мая · 16:00', ord: 91600, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 12:30 — мандат фонда на доходные активы в DIFC.', capture: true, person: 0 },
       { at: '12 мая · 11:45', ord: 121145, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Два запроса фонда сведены в один портфель — предложено вести как пакет.' },
     ],
     co_meydan: [

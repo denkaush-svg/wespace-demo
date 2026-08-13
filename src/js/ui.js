@@ -1000,8 +1000,98 @@
     return '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Компании · ' + cos.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
   }
   // ---- Company card v2: same universal shell (static type → status chip, dx-sec tabs) ----
+  // Handover brief on the company card — the counterpart of clientBriefSentences: who this legal
+  // entity is · how much of our book runs through it · whom we actually talk to · on what terms ·
+  // what to watch. Clauses drop out when their data is absent, and no name lands in a slot that
+  // would require Russian declension.
+  function companyBriefSentences(co) {
+    const out = [];
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const people = co.people || [];
+
+    // 1. Who this is.
+    let who = co.name + ' — ' + lowerFirst(co.kind || 'контрагент');
+    if (co.license) who += ', ' + co.license;
+    out.push(who + '.' + (co.note ? ' ' + co.note : ''));
+
+    // 2. How much of our book runs through it.
+    if (deals.length) {
+      const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
+      const open = deals.filter((d) => d.stage !== 'done');
+      let vol = 'Через компанию идёт ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
+        ' на ' + WS.AED(total);
+      if (open.length) {
+        const stages = joinRu(Array.from(new Set(open.map((d) => '«' + funnelSteps(d).cols[funnelSteps(d).idx] + '»'))));
+        vol += '; в работе ' + open.length + ' — ' + plural(open.length, 'стадия', 'стадии', 'стадии') + ' ' + stages;
+      }
+      out.push(vol + '.');
+    } else {
+      out.push('Сделок через компанию пока не было — контрагент заведён, история пустая.');
+    }
+
+    // 3. Whom we actually talk to.
+    if (people.length) {
+      const primary = people.find((p) => p.primary) || people[0];
+      const lpr = people.filter((p) => p.decision === 'ЛПР' && p !== primary);
+      let line = 'Основной контакт — ' + primary.name + ', ' + lowerFirst(primary.role);
+      if (lpr.length) line += '; решение принимает ' + joinRu(lpr.map((p) => p.name + ' (' + lowerFirst(p.role) + ')'));
+      const rest = people.length - 1 - lpr.length;
+      if (rest > 0) line += '; ещё ' + rest + ' ' + plural(rest, 'человек', 'человека', 'человек') + ' в контуре';
+      out.push(line + '.');
+    }
+
+    // 4. On what terms.
+    const terms = [];
+    if (co.commission) terms.push('комиссия — ' + lowerFirst(co.commission));
+    if (co.escrow) terms.push('расчёты через эскроу-счета DLD');
+    if (terms.length) out.push(capFirst(joinRu(terms)) + '.');
+
+    // 5. What to watch.
+    const watch = [];
+    if (co.kyc !== 'verified') watch.push('KYC ещё на проверке — до его завершения договор не подписываем');
+    if (!co.escrow && /застройщик/i.test(co.kind || '')) watch.push('эскроу-счёт не подтверждён');
+    if (!co.trn || co.trn === '—') watch.push('нет TRN — счёт с VAT не выставить');
+    if (watch.length) out.push('Внимание: ' + joinRu(watch) + '.');
+
+    return out;
+  }
+  function companyOps(co) {
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const activeDeal = deals.find((d) => d.stage !== 'done');
+    const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
+    const primary = (co.people || []).find((p) => p.primary) || (co.people || [])[0];
+    return opsStrip([
+      ['building', 'Тип', co.kind],
+      deals.length ? ['briefcase', 'Сделок в работе', String(deals.length)] : null,
+      total ? ['money', 'Суммарный объём', WS.AED(total)] : null,
+      primary ? ['users', 'Основной контакт', primary.name] : null,
+    ], null);
+  }
   function companyTabContent(co, tab) {
     const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    if (tab === 'people') {
+      const people = co.people || [];
+      if (!people.length) {
+        return dxSec('users', 'Люди компании', '',
+          '<div style="font-size:12.5px;color:var(--mut);padding:6px 0">Контактные лица не заведены. Добавьте их, чтобы вести переписку с тем, кто отвечает за свою часть сделки.</div>');
+      }
+      const rows = people.map((p, i) => {
+        const dec = ({ 'ЛПР': ['ok', 'target'], 'влияет': ['warn', 'star'] })[p.decision] || ['', 'check'];
+        const decision = '<span class="badge ' + dec[0] + '">' + I(dec[1]) + (p.decision || 'исполнитель') + '</span>';
+        const ch = chanMeta(p.channel || 'email');
+        const val = personChannelValue(p);
+        const star = p.primary ? '<span class="c-star" title="Основной контакт">' + I('star') + '</span>' : '';
+        const sub = [p.role, val].filter(Boolean).join(' · ');
+        const main = '<div class="dc-main"><div class="fi i-acc">' + I(ch[0]) + '</div>' +
+          '<div class="ft"><div class="t">' + p.name + star + '</div><div class="m">' + sub + '</div>' +
+          (p.note ? '<div class="m" style="color:var(--faint)">' + p.note + '</div>' : '') + '</div></div>';
+        const acts = '<div class="dc-acts">' + decision +
+          '<button class="btn sm" data-thread="company:' + co.id + ':' + i + '" data-tlabel="' + escAttr(p.name + ' · ' + co.name) + '" data-ticon="building">' + I('chat') + 'Написать</button></div>';
+        return '<div class="dc-row">' + main + acts + '</div>';
+      }).join('');
+      const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">ЛПР принимает решение, «влияет» — согласует свою часть, «исполнитель» — ведёт операционные шаги. Переписка ведётся с каждым отдельно и попадает в историю компании.</div>';
+      return dxSec('users', 'Люди компании · ' + people.length, '', '<div class="dc-list">' + rows + '</div>' + hint);
+    }
     if (tab === 'details') {
       const escrow = co.escrow ? '<span class="badge ok">' + I('shield') + 'Эскроу DLD</span>' : '';
       const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
@@ -1016,36 +1106,58 @@
     }
     if (tab === 'history') return companyFeedBlock(co);
     // overview
-    const key = dxSec('building', 'Реквизиты и статус', '', '<div class="dfields">' +
+    return companyOps(co) + '<div style="margin-top:14px">' + dxSec('sparkle', 'Справка Консьержа', '', '<p class="deal-brief">' + companyBriefSentences(co).join(' ') + '</p>') + '</div>' +
+      '<div style="margin-top:14px">' + dxSec('building', 'Реквизиты', '', '<div class="dfields">' +
       dfPair('Тип', co.kind) +
       dfPair('Лицензия / ORN', co.license || '—') +
       dfPair('TRN', co.trn || '—') +
       dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
       dfPair('Условия комиссии', co.commission) +
       dfPair('Сделок', String(deals.length)) + '</div>' +
-      (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''));
-    const contact = dxSec('users', 'Контактное лицо', '', '<div class="dfields">' +
-      dfPair(co.contactPerson || 'Контакт', co.contactRole || '—') + dfPair('Телефон', co.phone) +
-      dfPair('Email', co.email) + dfPair('Адрес', co.address) + '</div>');
-    return '<div class="dx-grid2">' + key + contact + '</div>' +
+      (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : '')) + '</div>' +
       '<div style="margin-top:14px">' + companyFeedBlock(co, 5) + '</div>';
   }
-  function companyCard(id) {
-    const co = (D().companies || []).find((x) => x.id === id); if (!co) return;
+  // Same band as the client hero — the markup contract is `.chero > img + scrim + content(avatar,
+  // info(name, facts))`; anything else lands unstyled on a dark gradient and reads as broken.
+  // A person's reachable value depends on the channel they prefer: messengers ride the phone number,
+  // mail rides the address. `p[p.channel]` silently produced an email under a WhatsApp icon.
+  function personChannelValue(p) {
+    const ch = p.channel || 'email';
+    if (ch === 'email') return p.email || p.phone || '';
+    return p.phone || p.email || '';
+  }
+  function companyHero(co) {
+    const bg = (WS.photos && (WS.photos.o_marina || WS.photos.o_interior)) || '';
+    const init = (co.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const people = (co.people || []).length;
+    const verified = co.kyc === 'verified';
+    const facts = [
+      ['building', co.kind || 'Компания'],
+      ['shield', co.license || 'лицензия не указана'],
+      [verified ? 'check' : 'clock', verified ? 'KYC пройден' : 'KYC на проверке'],
+      ['users', people ? people + ' ' + plural(people, 'контактное лицо', 'контактных лица', 'контактных лиц') : 'контактов нет'],
+    ];
+    const factsHtml = '<div class="chero-facts">' + facts.map((f) => '<div class="chero-fact"><span class="chero-fact-icon">' + I(f[0]) + '</span><span>' + f[1] + '</span></div>').join('') + '</div>';
+    return '<div class="chero">' + (bg ? '<img class="chero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="chero-scrim"></div>' +
+      '<div class="chero-content"><div class="chero-avatar">' + init + '</div>' +
+      '<div class="chero-info"><h1 class="chero-name">' + co.name + '</h1>' + factsHtml + '</div></div></div>';
+  }
+  function companySpec(id) {
+    const co = (D().companies || []).find((x) => x.id === id); if (!co) return null;
     const kyc = co.kyc === 'verified' ? { icon: 'check', label: 'KYC пройден', tone: 'ok' } : { icon: 'clock', label: 'KYC на проверке', tone: 'warn' };
-    const chips = [{ icon: 'building', label: co.kind, tone: 'acc' }, kyc];
-    if (co.escrow) chips.push({ icon: 'shield', label: 'Эскроу DLD', tone: 'ok' });
-    chips.push({ icon: 'lock', label: 'статус, не рейтинг', tone: 'demo' });
     const dealsCount = (D().deals || []).filter((d) => d.companyId === id).length;
-    entityCard({
-      type: 'company', id: id, title: co.name, status: statusChip(chips),
-      tabs: [['overview', 'Обзор'], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+    const peopleCount = (co.people || []).length;
+    const status = statusChip([kyc]);
+    return {
+      type: 'company', id: id, title: co.name, status: companyHero(co) + status,
+      tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
-      footer: '<button class="btn" data-act="closeModal">Закрыть</button>' +
-        '<button class="btn primary" data-thread="company:' + co.id + '" data-tlabel="' + co.name + ' · компания" data-ticon="building">' + I('chat') + 'Чат по компании</button>',
-    });
+      pageActs: '<button class="btn sm primary" data-thread="company:' + co.id + '" data-tlabel="' + escAttr(co.name) + ' · компания" data-ticon="building">' + I('chat') + 'Чат по компании</button>',
+    };
   }
+  function companyCard(id) { S().companyId = id; WS.router.go('companyDetail'); }
 
   // ---------------- PSYCH PROFILE (персонализация коммуникации) ----------------
   const PSYCH_OPTS = {
@@ -1414,7 +1526,7 @@
     return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
       dealField('Источник (из заявки)', d.source, p.source, d.id + ':source') +
-      dealField('Компания', co ? co.name + ' · ' + co.kind : '—', 'confirmed') +
+      dealField('Компания', co ? '<span data-company="' + co.id + '" style="cursor:pointer;border-bottom:1px solid var(--acc-line)">' + co.name + '</span> · ' + co.kind : '—', 'confirmed') +
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
   }
@@ -1477,7 +1589,10 @@
     const edit = del ? '<button class="tl-ic-btn" ' + del + ' title="Удалить заметку">' + I('x') + '</button>' : '';
     // The lock sits with the timestamp; the tag row carries only real labels, so it never
     // renders as a lone stray icon under the text.
-    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') +
+    // On a company feed the counterpart matters as much as the channel: «с кем именно говорили»
+    // is the difference between a conversation with the ЛПР and one with an operations manager.
+    const who = e._person ? '<span class="tl-src">' + I('users') + escAttr(e._person) + '</span>' : '';
+    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') + who +
       (e.src ? '<span class="tl-src">' + I('briefcase') + escAttr(e.src) + '</span>' : '');
     return '<div class="evc ' + e.kind + '">' +
       '<div class="evc-top"><span class="evc-ic ' + s.cls + '">' + I(chIcon(e.ch)) + '</span>' +
@@ -1546,7 +1661,11 @@
     const out = [];
     const isContact = kind === 'contact';
     const own = isContact ? (data.contactTimeline || {}) : (data.companyTimeline || {});
-    (own[ent.id] || []).forEach((e, i) => out.push(Object.assign({}, e, { _ci: i })));
+    const roster = (!isContact && ent.people) || [];
+    (own[ent.id] || []).forEach((e, i) => {
+      const per = (e.person != null && roster[e.person]) ? roster[e.person] : null;
+      out.push(Object.assign({}, e, { _ci: i }, per ? { _person: per.name + ' · ' + lowerFirst(per.role) } : {}));
+    });
     const deals = (data.deals || []).filter((d) => isContact ? d.clientId === ent.id : d.companyId === ent.id);
     deals.forEach((d) => {
       const lbl = isContact ? dealFeedLabel(d, ent) : (d.title || d.sub || 'сделка');
@@ -3212,6 +3331,11 @@
     const spec = clientSpec(id);
     if (!spec) return viewClients();
     return entityPage(spec, 'clients', 'contacts', 'Назад к клиентам');
+  }
+  function viewCompanyDetail(id) {
+    const spec = companySpec(id);
+    if (!spec) return viewCompanies();
+    return entityPage(spec, 'companies', '', 'Назад к компаниям');
   }
 
   // ---------------- ПОДБОР ПОД СДЕЛКУ (matching workspace) ----------------
@@ -5186,6 +5310,7 @@
       case 'objectDetail': return wrap(viewObjectDetail(S().objectId));
       case 'dealDetail': return wrap(viewDealDetail(S().dealId));
       case 'clientDetail': return wrap(viewClientDetail(S().clientId));
+      case 'companyDetail': return wrap(viewCompanyDetail(S().companyId));
       case 'tasks': return wrap(viewTasks());
       case 'team': return S().role === 'manager' ? wrap(viewTeam()) : viewStart();
       case 'leads': return S().role === 'manager' ? wrap(viewLeadsDistribution()) : wrap(viewRequests());
