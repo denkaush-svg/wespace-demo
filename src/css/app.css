@@ -698,6 +698,10 @@ button { font-family: inherit; cursor: pointer; }
 .obj-toolbar .mini-sel { flex: 0 0 auto; }
 /* matching panel (подбор) + psych form */
 .match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.match-grid .wide { grid-column: 1 / -1; }
+/* Grouped forms: the group heading needs air above it, or it collides with the field before. */
+.match-grid + .section-label, .form-grid + .section-label { margin-top: 16px; }
+.section-label + .match-grid, .section-label + .form-grid { margin-top: 6px; }
 .match-grid .fld { display: flex; flex-direction: column; gap: 5px; }
 .match-grid .fld > span { font-size: 12px; color: var(--mut); font-weight: 600; }
 .match-grid .fld input, .match-grid .fld select { height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
@@ -1480,6 +1484,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dhero-info { flex: 1; min-width: 0; }
 .dhero-name { font-family: var(--font-disp); font-size: 21px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
 .dhero-sub { margin-top: 5px; font-size: 13px; color: rgba(255,255,255,.86); }
+/* The deal's essence, edited in place. The label carries the affordance so the line below it can
+   stay plain text until touched; only the text node is focusable, so there is one tab stop. */
+.deal-title-edit { display: block; margin-bottom: 12px; }
+.deal-title-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
+.deal-title-lbl svg { width: 11px; height: 11px; }
+.deal-title-text { display: block; padding: 6px 10px; margin-left: -10px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ink); cursor: text; outline: none; transition: background .18s var(--ease), border-color .18s var(--ease); }
+.deal-title-text:hover { background: var(--surface-2); border-color: var(--line); }
+.deal-title-text:focus { background: var(--surface); border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.deal-title-edit:hover .deal-title-lbl { color: var(--acc-ink); }
+/* Handover brief — prose, so it reads as sentences rather than as another field grid. */
+.deal-brief { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink); max-width: 74ch; text-wrap: pretty; }
 /* Narrow stepper directly under the hero. */
 .deal-stepper-compact { margin-bottom: 12px; }
 .deal-stepper-compact .dx-stepper { margin: 8px 0 2px; }

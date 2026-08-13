@@ -678,7 +678,7 @@
   }
   // "Новый диалог" — pick the entity the conversation is about.
   function openNewThread() {
-    const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + (c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
+    const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
@@ -1415,7 +1415,10 @@
     const tl = (D().dealTimeline || {})[d.id] || [];
     const cap = S().capture || {};
     const on = (d.id in cap) ? cap[d.id] : true;
-    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i })))
+    const born = dealCreationEntry(d);
+    const pairs = tl.map((e, i) => ({ e: e, i: i }));
+    if (born) pairs.push({ e: born, i: -1 });   // i = -1: synthetic, never a deletable note
+    const rows = feedSortDesc(pairs)
       .map((p) => tlRow(p.e, p.e.kind === 'note' ? 'data-notedel="' + d.id + ':' + p.i + '"' : ''))
       .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">пока нет истории по каналам</div>';
     const privacy = '<div class="cap-toggle"><span>' + I('lock') + 'Запись разговоров по сделке (A7)</span>' +
@@ -1526,9 +1529,22 @@
       '<div style="font-size:12px;color:var(--faint);padding:8px 0">по выбранному фильтру событий нет</div>';
     return '<div class="timeline">' + rows + '</div>';
   }
+  // The deal's birth is a real event, but it lives on the deal record rather than in the timeline
+  // fixtures — so it is synthesised at render time and sorts to the bottom (oldest) of the ribbon.
+  function dealCreationEntry(d) {
+    if (!d.createdAt) return null;
+    const day = (d.createdAt.match(/^(\d+)/) || [])[1];
+    return {
+      at: d.createdAt, ord: day ? ORD(parseInt(day, 10), 0, 1) : 1,
+      ch: 'crm', kind: 'ai', by: 'Консьерж', t: 'Сделка заведена',
+      text: 'Сделка заведена в системе' + (d.requestId ? ' из заявки' : '') + '.',
+    };
+  }
   function dealLineageEntries(d) {
     const data = D();
     const out = [];
+    const born = dealCreationEntry(d);
+    if (born) out.push(Object.assign({}, born, { src: 'Сделка', _origin: { type: 'deal', id: d.id } }));
     ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка', _origin: { type: 'deal', id: d.id } })));
     if (d.requestId) {
       const r = requestById(d.requestId);
@@ -1665,7 +1681,7 @@
   }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
-      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + d.title + '" data-ticon="briefcase">' +
+      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
       '<div class="w">W</div><div class="ph">Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
       '<div class="send">' + I('arrowRight') + '</div></div>';
   }
@@ -1807,6 +1823,14 @@
       '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Без клиента') + '</div>' +
       '<div class="dhero-sub">' + sub + '</div></div></div></div>';
   }
+  // The deal's essence, editable in place: one tab stop, a real textbox role, and a label that
+  // says what the line is — a bare bold sentence under the hero reads as decoration, not a field.
+  function dealTitleEdit(d) {
+    return '<div class="deal-title-edit" data-deal="' + d.id + '">' +
+      '<span class="deal-title-lbl">' + I('pencil') + 'Суть сделки</span>' +
+      '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Суть сделки — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';
+  }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
   function dealClientCard(d) {
     const c = D().clients.find((x) => x.id === d.clientId);
@@ -1849,13 +1873,23 @@
   }
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   function dealChipRow(d) {
-    const s = funnelSteps(d);
     const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const now = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14 };
+    const createdDaysAgo = (function() {
+      if (!d.createdAt) return null;
+      const dayMatch = d.createdAt.match(/^(\d+)/);
+      if (!dayMatch) return null;
+      const createdDay = parseInt(dayMatch[1], 10);
+      const daysAgo = now.d - createdDay;
+      if (daysAgo === 0) return 'сегодня';
+      if (daysAgo === 1) return '1 дн. назад';
+      return daysAgo + ' дн. назад';
+    })();
     return '<div class="dnb-chips">' +
-      '<span class="chip on">' + I('trend') + s.cols[s.idx] + '</span>' +
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
-      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
+      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') +
+      (d.createdAt && createdDaysAgo ? '<span class="chip">' + I('calendar') + 'создана ' + d.createdAt + ' · ' + createdDaysAgo + '</span>' : '') + '</div>';
   }
   function dealNextStepCard(d) {
     const a = nbaActions(d);
@@ -1902,27 +1936,92 @@
       dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
       (dep ? dealField('Задаток / EOI', dep, 'confirmed') : '') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal') +
-      dealField('Тип сделки', d.dealType, p.dealType) +
       dealField('Комиссия', comm, 'confirmed') +
       dealField('Co-broking', cobro, 'confirmed') + '</div>');
   }
-  // Essence status phrase — one short line high on the card, so "what's happening now" is
-  // visible without scrolling. Doc-oriented, keyed off the deal stage.
-  function dealStatusPhrase(d) {
-    return ({
-      new: 'квалифицируем клиента и готовим показ объектов.',
-      work: 'отправили предложение — ждём решение клиента.',
-      docs: 'готовим документы на подписание, ожидаем подписание клиентом.',
-      done: 'сделка закрыта, комиссия зафиксирована.',
-    })[d.stage] || ('стадия «' + funnelSteps(d).cols[funnelSteps(d).idx] + '».');
+  // Handover brief — what one agent tells another when passing a deal over. Four movements, each
+  // a sentence assembled from the deal's own records: where we stand · what is already settled ·
+  // what is holding it up · whose move it is. Every clause is dropped when its data is absent, so a
+  // brand-new deal yields two honest sentences instead of a skeleton full of dashes.
+  function dealBriefSentences(d) {
+    const s = funnelSteps(d);
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const out = [];
+
+    // 1. Where we stand.
+    const days = d.stageDays || 0;
+    let stand = 'Сделка на стадии «' + s.cols[s.idx] + '»';
+    if (days > 0) stand += ', ' + days + '-й день';
+    if (d.createdAt) stand += '; заведена ' + d.createdAt;
+    out.push(stand + '.');
+
+    // 2. What is already settled — money, paper, inventory.
+    const settled = [];
+    const dep = d.deposit;
+    if (dep && dep.paid) settled.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' внесён' + (dep.at ? ' ' + dep.at : ''));
+    const kpN = dealKpObjects(d).length;
+    if (kpN) settled.push('КП на ' + kpN + ' ' + plural(kpN, 'объект', 'объекта', 'объектов') + ' отправлено');
+    const lots = dealLots(d);
+    if (lots.length === 1) settled.push('выбран ' + lots[0].name.split(',')[0]);
+    else if (lots.length > 1) settled.push('в пакете ' + lots.length + ' ' + plural(lots.length, 'лот', 'лота', 'лотов'));
+    if (d.partnerAgent) settled.push('в сделке участвует партнёр ' + agentName(d.partnerAgent));
+    if (settled.length) out.push(capFirst(joinRu(settled)) + '.');
+
+    // 3. What is holding it up.
+    const risks = [];
+    if (/просроч/i.test(d.nextDue || '')) risks.push('касание просрочено');
+    const cf = (D().conflicts || {})[d.id];
+    if (cf) risks.push('по полю «' + cf.field + '» расходятся два источника');
+    if (c.consent === false) risks.push('от клиента нет согласия на связь');
+    if (dep && !dep.paid) risks.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' ещё не внесён');
+    const openTasks = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done').length;
+    if (openTasks) risks.push('по клиенту ' + plural(openTasks, 'висит', 'висят', 'висят') + ' ' + openTasks + ' ' + plural(openTasks, 'задача', 'задачи', 'задач'));
+    if (risks.length) out.push('Мешает: ' + joinRu(risks) + '.');
+
+    // 4. Whose move. The agent's name goes after a dash rather than into a case-inflected phrase —
+    // "Ход за Марина Волкова" is the kind of un-Russian line a template produces.
+    if (d.stage !== 'done') {
+      const step = nbaActions(d).doIt[0] || 'Согласовать следующий шаг с клиентом';
+      // `nextDue` holds either a date («сегодня 16:00») or an overdue marker («просрочено (касание)»);
+      // only the former makes sense after the word «срок», and the latter is already in «Мешает».
+      const due = /просроч/i.test(d.nextDue || '') ? '' : (d.nextDue ? ', срок ' + d.nextDue : '');
+      out.push('Следующий шаг — ' + lowerFirst(step) + due + '; ведёт ' + agentName(d.agent) + '.');
+    } else {
+      out.push('Сделка закрыта, комиссия зафиксирована — остаётся запросить отзыв у клиента.');
+    }
+    return out;
   }
-  // Header order (client feedback v2): compact hero → narrow stepper → one-line essence status →
+  // Deposit kind reads as a label ("EOI", "Бронирование (booking)") — lowercasing it mangles the
+  // acronym, so only the first letter of a word-form is dropped.
+  function depKind(dep) {
+    const k = dep.kind || 'задаток';
+    return /^[A-ZА-Я]{2,}$/.test(k.split(' ')[0]) ? k : lowerFirst(k);
+  }
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+  function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function lowerFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+  // Russian enumeration: «a, b и c» — a bare " · " list would read as a table, not as a sentence.
+  function joinRu(list) {
+    if (list.length <= 1) return list[0] || '';
+    return list.slice(0, -1).join(', ') + ' и ' + list[list.length - 1];
+  }
+  function dealStatusBrief(d) {
+    return dxSec('sparkle', 'Справка по сделке', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<p class="deal-brief">' + dealBriefSentences(d).join(' ') + '</p>');
+  }
+  // Header order (client feedback v2): compact hero → inline-editable title → narrow stepper → one-line essence status →
   // facing cards (LEFT key params · RIGHT client contacts + objects) → "что сейчас" detail.
   function dealHeader(d) {
     return dealHero(d) +
+      dealTitleEdit(d) +
       '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       dealChipRow(d) +
-      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
+      dealStatusBrief(d) +
       '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
       '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
       dealLotsBlock(d);
@@ -1948,9 +2047,9 @@
       status: dealHeader(d),
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
-      concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),
+      concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
       pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
-        '<button class="btn sm primary" data-thread="deal:' + d.id + '" data-tlabel="' + d.title + '" data-ticon="briefcase">' + I('chat') + 'Чат по сделке</button>',
+        '<button class="btn sm primary" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' + I('chat') + 'Чат по сделке</button>',
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
@@ -2460,11 +2559,15 @@
   function openDealEdit(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
     const sel = (k, label) => '<label class="fld"><span>' + label + '</span><select id="df_' + k + '">' + DEAL_ENUMS[k].map((o) => '<option' + (o === d[k] ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
+    const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '"' + (co.id === d.companyId ? ' selected' : '') + '>' + co.name + '</option>').join('');
+    const agentOpts = TEAM.map((a) => '<option value="' + a.id + '"' + (a.id === d.agent ? ' selected' : '') + '>' + a.name + '</option>').join('');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Прямое редактирование первоклассно. Сохранение помечает поля как «подтверждено человеком».</p>' +
       '<div class="match-grid">' +
       '<label class="fld"><span>Бюджет, AED</span><input id="df_amount" type="text" value="' + (d.amount || '') + '"></label>' +
       sel('dealType', 'Тип сделки') + sel('objectType', 'Тип объекта') + sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
       '<label class="fld"><span>Цель</span><input id="df_goal" type="text" value="' + ((d.goal || '').replace(/"/g, '&quot;')) + '"></label>' +
+      '<label class="fld"><span>Компания</span><select id="df_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="df_vat"' + (d.vat ? ' checked' : '') + '> Применяется VAT 5%</label>';
     openModal('Параметры сделки · ' + d.title, body,
@@ -2475,7 +2578,12 @@
     const g = (k) => { const el = document.getElementById('df_' + k); return el ? el.value : d[k]; };
     const amt = parseInt((g('amount') || '').toString().replace(/\D/g, ''), 10);
     d.amount = amt || d.amount;
-    ['dealType', 'objectType', 'paymentForm', 'source', 'goal'].forEach((k) => { d[k] = g(k); });
+    ['dealType', 'objectType', 'paymentForm', 'source', 'goal', 'company', 'agent'].forEach((k) => {
+      const val = g(k);
+      if (k === 'company') d.companyId = val || null;
+      else if (k === 'agent') d.agent = val;
+      else d[k] = val;
+    });
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
     d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' });
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
@@ -3871,20 +3979,54 @@
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '"' + (c.id === prefClient ? ' selected' : '') + '>' + c.name + '</option>').join('');
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
     const stageOpts = STAGES.map((s) => '<option value="' + s.k + '">' + s.label + '</option>').join('');
+    const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
+    const agentOpts = TEAM.map((a) => '<option value="' + a.id + '">' + a.name + '</option>').join('');
+    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '">' + dt + '</option>').join('');
+    const objectTypeOpts = DEAL_ENUMS.objectType.map((ot) => '<option value="' + ot + '">' + ot + '</option>').join('');
+    const paymentFormOpts = DEAL_ENUMS.paymentForm.map((pf) => '<option value="' + pf + '">' + pf + '</option>').join('');
+    const sourceOpts = DEAL_ENUMS.source.map((s) => '<option value="' + s + '">' + s + '</option>').join('');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Создать сделку вручную — из формы, приложенной заявки или PDF (в демо — форма). Это структурированный экран, а не диалог с Консьержем.</p>' +
-      '<div class="form-grid">' +
+      '<div class="section-label">Кто и что</div><div class="match-grid">' +
+      '<label class="fld wide"><span>Суть сделки</span><input id="nd_title" type="text" placeholder="Напр.: Инвест-квартира в Business Bay"></label>' +
       '<label class="fld"><span>Клиент</span><select id="nd_client">' + clientOpts + '</select></label>' +
       '<label class="fld"><span>Объект</span><select id="nd_object">' + objOpts + '</select></label>' +
       '<label class="fld"><span>Сумма, AED</span><input id="nd_amount" type="number" step="50000"></label>' +
       '<label class="fld"><span>Стадия</span><select id="nd_stage">' + stageOpts + '</select></label>' +
+      '</div><div class="section-label">Условия</div><div class="match-grid">' +
+      '<label class="fld"><span>Тип сделки</span><select id="nd_dealType">' + dealTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Тип объекта</span><select id="nd_objectType">' + objectTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Форма оплаты</span><select id="nd_paymentForm">' + paymentFormOpts + '</select></label>' +
+      '<label class="fld"><span>Источник</span><select id="nd_source">' + sourceOpts + '</select></label>' +
+      '<label class="fld"><span>Цель</span><input id="nd_goal" type="text"></label>' +
+      '<label class="pcheck wide"><input type="checkbox" id="nd_vat"> Применяется VAT 5%</label>' +
+      '</div><div class="section-label">Ответственность</div><div class="match-grid">' +
+      '<label class="fld"><span>Компания</span><select id="nd_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      '<label class="fld"><span>Ответственный агент</span><select id="nd_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<div class="prov" style="margin-top:10px"><span class="badge">' + I('upload') + 'Приложить заявку (PDF) — демо</span><span class="badge demo">' + I('lock') + 'ручное создание</span></div>';
     openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>');
   }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
+    const dealType = _g('nd_dealType') || 'Продажа · off-plan';
+    const funnelMap = {
+      'Продажа · off-plan': 'sale_offplan',
+      'Продажа · готовое': 'sale_ready',
+      'Аренда': 'rent',
+      'Fit-out': 'fitout',
+      'Готовый арендный бизнес': 'rental_biz',
+      'Передано партнёру': 'referral'
+    };
+    // The essence is what the deal is called everywhere afterwards; fall back to the client's name
+    // only when the agent left it blank, which is what the card used to do unconditionally.
+    const title = (_g('nd_title') || '').trim() || c.name || 'Сделка';
     const id = 'dm_' + Math.round(performance.now());
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'new', title: c.name || 'Сделка', sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас' } }]);
+    const createdAt = (function() {
+      const now = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, mo: 5 };
+      const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+      return now.d + ' ' + months[now.mo];
+    })();
+    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'new', title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnelMap[dealType] || 'sale_offplan', dealType: dealType, objectType: _g('nd_objectType') || 'off-plan', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
     closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 

@@ -270,7 +270,16 @@
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
-    if (e.key === 'Escape') { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
+    // Deal title inline edit: save on Enter, restore on Escape
+    if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('deal-title-text')) {
+      e.preventDefault(); const box = e.target.parentElement;
+      if (box && box.dataset.deal) { const newTitle = (e.target.textContent || '').trim(); if (newTitle) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); } } }
+    }
+    if (e.key === 'Escape') {
+      if (e.target.classList && e.target.classList.contains('deal-title-text')) {
+        e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.deal) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
+      } else { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
+    }
     // focus trap: keep Tab within the open modal or navigator drawer (a11y §17)
     if (e.key === 'Tab') {
       const modal = document.querySelector('.modal-wrap.show .modal');
@@ -301,6 +310,21 @@
     if (el && (el.id === 'm_min' || el.id === 'm_max') && store.match) { store.match[el.id === 'm_min' ? 'min' : 'max'] = parseInt(el.value, 10) || 0; api.emit(); }
     if (el && el.id === 'm_yield' && store.match) { store.match.yield = parseFloat(el.value); const lab = document.getElementById('av_m_yield'); if (lab) lab.textContent = (Math.round(store.match.yield * 1000) / 10) + '%'; }
   });
+
+  // ---- Deal title inline edit: save on blur ----
+  document.addEventListener('blur', (e) => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('deal-title-text')) {
+      const box = el.closest('.deal-title-edit');
+      if (box && box.dataset.deal) {
+        const newTitle = (el.textContent || '').trim();
+        if (newTitle) {
+          const d = store.data.deals.find((x) => x.id === box.dataset.deal);
+          if (d && d.title !== newTitle) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); }
+        }
+      }
+    }
+  }, true);
 
   // matching selects + yield commit (re-rank on change)
   document.addEventListener('change', (e) => {
