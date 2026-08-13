@@ -856,6 +856,125 @@ setTimeout(async () => {
         ((dd().requestTimeline || {})[r0.id] || []).length === feedWas + 1);
     }
 
+    // The invariant the whole stand claims: the model narrates, the code owns
+    // every number. It held for the evidence chips and not for the answer — a
+    // table's cells were whatever the model typed, checked for shape and never
+    // for value. These checks are about the figures a person actually reads.
+    {
+      const mk = (m) => (dd().market || []).map((r) => r[m]);
+
+      // A table the model describes rather than types.
+      const backed = L.normBlocks([{
+        t: 'table',
+        from: { from: 'market', sort: { field: 'доходностьПроцент', dir: 'desc' }, limit: 3 },
+        columns: [{ field: 'район', label: 'Район' }, { field: 'доходностьПроцент', label: 'Доходность' }],
+      }]);
+      check('числа · a table can be built from a query, not typed',
+        !!backed && backed[0].src === 'data' && backed[0].rows.length === 3,
+        JSON.stringify(backed && backed[0] && backed[0].rows));
+      const top = (dd().market || []).slice().sort((a, b) => b['доходностьПроцент'] - a['доходностьПроцент'])[0];
+      check('числа · and the cells are the stand’s own values',
+        !!backed && backed[0].rows[0][0] === top['район'] &&
+        backed[0].rows[0][1] === String(top['доходностьПроцент']).replace('.', ','),
+        JSON.stringify(backed && backed[0].rows[0]) + ' vs ' + top['район']);
+      check('числа · the head comes from the requested columns',
+        !!backed && backed[0].head.join('|') === 'Район|Доходность');
+
+      const bars = L.normBlocks([{ t: 'bars', from: { from: 'market', limit: 4 }, label: 'район', value: 'доходностьПроцент', suffix: '%' }]);
+      check('числа · bars too', !!bars && bars[0].src === 'data' && bars[0].rows.length === 4 &&
+        mk('доходностьПроцент').indexOf(bars[0].rows[0].value) >= 0, JSON.stringify(bars && bars[0].rows));
+
+      const kv = L.normBlocks([{ t: 'kv', reads: ['deals_active', 'deals_active_sum'] }]);
+      const active = WS.agent.tools.read('deals_active');
+      check('числа · kv is built from named readings, the same ones the chips open',
+        !!kv && kv[0].src === 'data' && kv[0].rows[0].v === String(active.value),
+        JSON.stringify(kv && kv[0].rows));
+
+      // The attack this whole mechanism exists for: a block that names a query
+      // AND carries its own rows. The rows must be ignored — otherwise the
+      // «from» is decoration and the figures are still the model's.
+      const smuggled = L.normBlocks([{
+        t: 'table',
+        from: { from: 'market', limit: 2 },
+        columns: [{ field: 'район', label: 'Район' }, { field: 'ценаЗаМетр', label: 'Цена/м²' }],
+        rows: [['Arjan', '999 999'], ['JVC', '888 888']],
+        head: ['Подделка', 'Подделка'],
+      }]);
+      const flat = JSON.stringify(smuggled);
+      check('числа · rows smuggled alongside a query are ignored',
+        !!smuggled && flat.indexOf('999 999') < 0 && flat.indexOf('888 888') < 0, flat.slice(0, 120));
+      check('числа · and the head is the requested one, not the smuggled one',
+        !!smuggled && smuggled[0].head.join('|') === 'Район|Цена/м²', JSON.stringify(smuggled && smuggled[0].head));
+
+      // A block that meant to be data-backed and could not be is dropped, not
+      // quietly replaced by whatever the model typed beside it.
+      const broken = L.normBlocks([
+        { t: 'table', from: { from: 'нет_такой' }, columns: [{ field: 'a' }], rows: [['999']] },
+        { t: 'p', text: 'ок' },
+      ]);
+      check('числа · a query that does not resolve drops its block',
+        !!broken && broken.length === 1 && broken[0].t === 'p', JSON.stringify(broken));
+
+      // A literal block still renders — and says whose numbers those are.
+      const literal = L.normBlocks([{ t: 'table', head: ['Район'], rows: [['999999']] }]);
+      check('числа · a typed table survives', !!literal && literal[0].src !== 'data');
+      const card = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [], blocks: literal }, 'mLit');
+      const bx = doc.createElement('div'); bx.innerHTML = card;
+      check('числа · and is marked as not checked against the data',
+        (bx.textContent || '').indexOf('собрано моделью') >= 0, (bx.textContent || '').slice(0, 90));
+
+      const cardB = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [], blocks: backed }, 'mBak');
+      const bb = doc.createElement('div'); bb.innerHTML = cardB;
+      check('числа · a data-backed table says where it came from instead',
+        (bb.textContent || '').indexOf('из данных') >= 0 && (bb.textContent || '').indexOf('собрано моделью') < 0,
+        (bb.textContent || '').slice(0, 90));
+
+      // The digest is read through the same layer the chips read, so a figure
+      // on a tile and a figure in the prompt cannot drift apart.
+      const dg = L.digest();
+      check('числа · the digest carries the real field names to query by',
+        Array.isArray(dg.схема) && dg.схема.some((c) => c.name === 'market' && c.fields.indexOf('доходностьПроцент') >= 0),
+        JSON.stringify((dg.схема || []).map((c) => c.name)));
+      check('числа · and holds as many rows as the read layer reports',
+        dg.сделки.length === WS.query.run({ from: 'deals' }).rows.length);
+
+      // The example in the server's rules is the one thing the model copies
+      // verbatim. Written with invented field names it teaches a query that
+      // resolves to nothing, and the answer silently loses its table.
+      // Read out of the server's own rules rather than restated here — a copy
+      // in the test drifts from the shipped text without either side noticing.
+      {
+        const rules = fs.readFileSync(path.join(D, '..', 'server', 'proxy.js'), 'utf8');
+        const m = /\{"t":"table","from":\{[\s\S]*?\}\]\}/.exec(rules.replace(/',\s*\n\s*'/g, ''));
+        let example = null;
+        try { example = m ? JSON.parse(m[0]) : null; } catch (e) { example = null; }
+        check('числа · the table example in the rules is parseable', !!example, m ? m[0].slice(0, 80) : 'not found');
+        const asDocumented = example ? L.normBlocks([example]) : null;
+        check('числа · and the query it teaches actually resolves against this stand',
+          !!asDocumented && asDocumented[0].src === 'data' && asDocumented[0].rows.length > 0 &&
+          asDocumented[0].rows.every((r) => r.every((c) => c !== '')),
+          JSON.stringify(asDocumented && asDocumented[0] && asDocumented[0].rows[0]));
+        const sortField = example && example.from && example.from.sort && example.from.sort.field;
+        check('числа · including the field it sorts by',
+          !sortField || (dd().market || []).every((r) => r[sortField] !== undefined), String(sortField));
+      }
+
+      // Evidence carries the revision it was read at.
+      const ev = L.evidenceFor(['deals_active']);
+      check('основания · a chip remembers the revision it was read at',
+        ev.length === 1 && ev[0].revision === WS.store.dataRevision, JSON.stringify(ev[0]));
+
+      // A write may not name an entity that does not exist.
+      const ghostRef = WS.storeApi.preview([{ op: 'addTask', task: { title: 'x', clientId: 'c_nope' } }]);
+      check('запись · a task cannot hang off a contact that is not there',
+        ghostRef.ok === false && ghostRef.code === 'bad_ref', ghostRef.code);
+      const goodRef = WS.storeApi.preview([{ op: 'addTask', task: { title: 'x', clientId: dd().clients[0].id } }]);
+      check('запись · and a real one passes', goodRef.ok === true, goodRef.error || '');
+      const badPatch = WS.storeApi.preview([{ op: 'updateDeal', id: dd().deals[0].id, patch: { companyId: 'co_nope' } }]);
+      check('запись · the same applies to a field being changed',
+        badPatch.ok === false && badPatch.code === 'bad_ref', badPatch.code);
+    }
+
     // Findings from the cross-model round.
     {
       // Everything the stand knows is posted to whatever ?api= names.

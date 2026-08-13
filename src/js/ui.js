@@ -248,7 +248,15 @@
         '<div class="t">' + escAttr(title) + '</div>' +
         (sub ? '<div class="m">' + escAttr(sub) + '</div>' : '') + '</div></div>';
     }).join('');
+    // The answer was written at one revision and these rows are read at
+    // another. Usually the same; when not, that is worth a line rather than a
+    // silent difference between an answer and its own evidence.
+    const moved = e.revision != null && e.revision !== res.revision
+      ? '<div class="prov" style="margin-bottom:10px"><span class="badge warn">' + I('warn') +
+        'Данные изменились после ответа: было на ревизии ' + e.revision + ', показано на ' + res.revision + '</span></div>'
+      : '';
     openModal('Откуда это число · ' + escAttr(e.label),
+      moved +
       '<div class="card pad" style="margin-bottom:10px"><span class="badge acc">' + I('calc') +
       (e.money ? WS.AED(e.value) : e.value) + ' ' + escAttr(e.label) + '</span>' +
       '<div style="margin-top:6px;font-size:12px;color:var(--mut)">Посчитано из ' + (res.rows || []).length +

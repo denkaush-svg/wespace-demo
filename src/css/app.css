@@ -424,6 +424,13 @@ button { font-family: inherit; cursor: pointer; }
 .an-t th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); padding: 0 10px 5px 0; white-space: nowrap; }
 .an-t td { padding: 5px 10px 5px 0; border-top: 1px solid var(--hair); font-variant-numeric: tabular-nums; }
 .an-t td:first-child { color: var(--ink); font-weight: 600; }
+/* Where a block's figures came from. Built by the code from a query it is quiet;
+   typed by the model it says so — the same answer must not present both kinds
+   as one thing. */
+.an-src { display: flex; align-items: center; gap: 4px; margin: -4px 0 10px; font-size: 10.5px;
+  color: var(--faint); font-weight: 600; }
+.an-src svg { width: 11px; height: 11px; color: var(--faint); }
+.an-src.ok svg { color: var(--ok); }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

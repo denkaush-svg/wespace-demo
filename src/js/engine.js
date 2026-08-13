@@ -670,6 +670,26 @@
 
   // An analytical answer is a shape, not a wall of prose. The model names the
   // shape; the markup is built here, so nothing it returns can be markup.
+  // Where the figures in a block came from. Built by the code from a query, it
+  // says so quietly; typed by the model, it says that too — the same answer
+  // should not present both kinds as if they were one thing.
+  function srcNote(b) {
+    const t = String(b && b.t);
+    if (t !== 'table' && t !== 'bars' && t !== 'kv') return '';
+    if (b.src === 'data') {
+      return '<div class="an-src ok">' + I('source') + 'из данных' +
+        (b.count ? ' · ' + b.count + ' ' + plural(b.count, ['запись', 'записи', 'записей']) : '') + '</div>';
+    }
+    return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
+  }
+  function plural(n, forms) {
+    const a = Math.abs(n) % 100; const b = a % 10;
+    if (a > 10 && a < 20) return forms[2];
+    if (b > 1 && b < 5) return forms[1];
+    if (b === 1) return forms[0];
+    return forms[2];
+  }
+
   function blocksHtml(blocks) {
     if (!Array.isArray(blocks) || !blocks.length) return '';
     const out = blocks.map((b) => {
@@ -685,7 +705,7 @@
       if (t === 'kv') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8).map((x) =>
           '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
-        return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
+        return rows ? '<div class="an-kvs">' + rows + '</div>' + srcNote(b) : '';
       }
       if (t === 'table') {
         const head = (Array.isArray(b.head) ? b.head : []).slice(0, 5);
@@ -694,7 +714,7 @@
         if (!body) return '';
         return '<div class="an-tw"><table class="an-t">' +
           (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
-          '<tbody>' + body + '</tbody></table></div>';
+          '<tbody>' + body + '</tbody></table></div>' + srcNote(b);
       }
       if (t === 'bars') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
@@ -705,7 +725,7 @@
           return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
             '<span class="bt"><i style="width:' + w + '%"></i></span>' +
             '<span class="bv">' + esc(anVal(x.value, x.suffix)) + '</span></div>';
-        }).join('') + '</div>';
+        }).join('') + '</div>' + srcNote(b);
       }
       return '';
     }).join('');

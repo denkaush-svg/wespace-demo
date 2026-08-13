@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:44</title>
+  <title>WESPACE · сборка 16:09</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:44';
+    window.WS_BUILD='16:09';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -566,6 +566,13 @@ button { font-family: inherit; cursor: pointer; }
 .an-t th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); padding: 0 10px 5px 0; white-space: nowrap; }
 .an-t td { padding: 5px 10px 5px 0; border-top: 1px solid var(--hair); font-variant-numeric: tabular-nums; }
 .an-t td:first-child { color: var(--ink); font-weight: 600; }
+/* Where a block's figures came from. Built by the code from a query it is quiet;
+   typed by the model it says so — the same answer must not present both kinds
+   as one thing. */
+.an-src { display: flex; align-items: center; gap: 4px; margin: -4px 0 10px; font-size: 10.5px;
+  color: var(--faint); font-weight: 600; }
+.an-src svg { width: 11px; height: 11px; color: var(--faint); }
+.an-src.ok svg { color: var(--ok); }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3403,6 +3410,32 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return Object.assign({ ok: false, code: code, error: message }, extra || {});
   }
 
+  // Which fields are references, and to what. A write that names an entity must
+  // name one that exists — for the same reason ids in a proposal have to come
+  // from the data rather than from a sentence.
+  const REFS = {
+    clientId: 'clients', companyId: 'companies', objectId: 'objects',
+    dealId: 'deals', requestId: 'requests', assignee: 'users', agent: 'users',
+  };
+  function refError(rec, at) {
+    const d = store.data || {};
+    const keys = Object.keys(rec || {});
+    for (let i = 0; i < keys.length; i++) {
+      const f = keys[i];
+      const coll = REFS[f];
+      const val = rec[f];
+      if (!coll || val == null || val === '') continue;
+      // `users` is a map in this store, everything else is a list.
+      const exists = coll === 'users'
+        ? !!(d.users && d.users[val]) || (d.roster || []).some((u) => u.id === val)
+        : (d[coll] || []).some((x) => x.id === val);
+      if (!exists) {
+        return fail('bad_ref', at + 'нет такой записи: ' + f + ' = ' + val, { field: f, collection: coll });
+      }
+    }
+    return null;
+  }
+
   // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
   function planOp(o, i) {
     const at = 'операция ' + (i + 1) + ': ';
@@ -3428,6 +3461,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (spec.kind === 'add') {
       const src = o.task || o.obj || o.record;
       if (!src || typeof src !== 'object') return fail('bad_record', at + 'нет записи');
+      // A record may point at a contact, a deal or an object. Pointing it at an
+      // id that does not exist created a task hanging off nothing — it renders,
+      // it just belongs to no one.
+      const badRef = refError(src, at);
+      if (badRef) return badRef;
       // The id is ours to assign, not the caller's to invent. Demanding one
       // meant every «поставь задачу на завтра» came back as «нет записи или её
       // id» — the model was following the contract it was given and the layer
@@ -3462,6 +3500,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!patch || typeof patch !== 'object') return fail('bad_patch', at + 'нет полей для изменения');
     const keys = Object.keys(patch);
     if (!keys.length) return fail('bad_patch', at + 'пустой набор полей');
+    const badPatchRef = refError(patch, at);
+    if (badPatchRef) return badPatchRef;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
     for (let k = 0; k < keys.length; k++) {
@@ -4380,6 +4420,26 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // An analytical answer is a shape, not a wall of prose. The model names the
   // shape; the markup is built here, so nothing it returns can be markup.
+  // Where the figures in a block came from. Built by the code from a query, it
+  // says so quietly; typed by the model, it says that too — the same answer
+  // should not present both kinds as if they were one thing.
+  function srcNote(b) {
+    const t = String(b && b.t);
+    if (t !== 'table' && t !== 'bars' && t !== 'kv') return '';
+    if (b.src === 'data') {
+      return '<div class="an-src ok">' + I('source') + 'из данных' +
+        (b.count ? ' · ' + b.count + ' ' + plural(b.count, ['запись', 'записи', 'записей']) : '') + '</div>';
+    }
+    return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
+  }
+  function plural(n, forms) {
+    const a = Math.abs(n) % 100; const b = a % 10;
+    if (a > 10 && a < 20) return forms[2];
+    if (b > 1 && b < 5) return forms[1];
+    if (b === 1) return forms[0];
+    return forms[2];
+  }
+
   function blocksHtml(blocks) {
     if (!Array.isArray(blocks) || !blocks.length) return '';
     const out = blocks.map((b) => {
@@ -4395,7 +4455,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       if (t === 'kv') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8).map((x) =>
           '<div class="an-kv"><span class="k">' + esc(x && x.k) + '</span><span class="v">' + esc(x && x.v) + '</span></div>').join('');
-        return rows ? '<div class="an-kvs">' + rows + '</div>' : '';
+        return rows ? '<div class="an-kvs">' + rows + '</div>' + srcNote(b) : '';
       }
       if (t === 'table') {
         const head = (Array.isArray(b.head) ? b.head : []).slice(0, 5);
@@ -4404,7 +4464,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         if (!body) return '';
         return '<div class="an-tw"><table class="an-t">' +
           (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
-          '<tbody>' + body + '</tbody></table></div>';
+          '<tbody>' + body + '</tbody></table></div>' + srcNote(b);
       }
       if (t === 'bars') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
@@ -4415,7 +4475,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           return '<div class="an-bar"><span class="bl">' + esc(x.label) + '</span>' +
             '<span class="bt"><i style="width:' + w + '%"></i></span>' +
             '<span class="bv">' + esc(anVal(x.value, x.suffix)) + '</span></div>';
-        }).join('') + '</div>';
+        }).join('') + '</div>' + srcNote(b);
       }
       return '';
     }).join('');
@@ -5177,7 +5237,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="t">' + escAttr(title) + '</div>' +
         (sub ? '<div class="m">' + escAttr(sub) + '</div>' : '') + '</div></div>';
     }).join('');
+    // The answer was written at one revision and these rows are read at
+    // another. Usually the same; when not, that is worth a line rather than a
+    // silent difference between an answer and its own evidence.
+    const moved = e.revision != null && e.revision !== res.revision
+      ? '<div class="prov" style="margin-bottom:10px"><span class="badge warn">' + I('warn') +
+        'Данные изменились после ответа: было на ревизии ' + e.revision + ', показано на ' + res.revision + '</span></div>'
+      : '';
     openModal('Откуда это число · ' + escAttr(e.label),
+      moved +
       '<div class="card pad" style="margin-bottom:10px"><span class="badge acc">' + I('calc') +
       (e.money ? WS.AED(e.value) : e.value) + ' ' + escAttr(e.label) + '</span>' +
       '<div style="margin-top:6px;font-size:12px;color:var(--mut)">Посчитано из ' + (res.rows || []).length +
@@ -10611,19 +10679,27 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   function digest() {
     const d = (WS.store && WS.store.data) || {};
-    const take = (list, fn) => (list || []).map(fn);
+    // Read through the query layer, not around it. Reaching into the store
+    // directly made «one read path» an aspiration: the figures a person sees on
+    // a tile and the figures the model is handed came from two different
+    // places, and only one of them was governed.
+    const rows = (name) => {
+      const res = WS.query.run({ from: name });
+      return (res && res.ok !== false && Array.isArray(res.rows)) ? res.rows : (d[name] || []);
+    };
+    const take = (name, fn) => rows(name).map(fn);
     return {
       показатели: readings(),
       показатели_экранов: screenMetrics(),
-      контакты: take(d.clients, (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
-      компании: take(d.companies, (c) => ({ id: c.id, имя: c.name })),
+      контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
+      компании: take('companies', (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
       // only the code got «две сделки на стадии docs» into an answer.
       // Срок следующего шага, дни на стадии и задаток — то, из чего
       // складывается ответ «что мешает закрыть». Без них Консьерж знал сумму
       // и стадию, но не знал, где сделка стоит.
-      сделки: take(d.deals, (x) => ({
+      сделки: take('deals', (x) => ({
         id: x.id, название: x.title, сумма: x.amount,
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
         воронка: x.dealType || x.funnel, ответственный: x.agent,
@@ -10634,7 +10710,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       })),
       // Названия и цены брались из полей title/rate, которых у объектов нет —
       // модель получала безымянные строки и отвечала про район вместо дома.
-      объекты: take(d.objects, (o) => ({
+      объекты: take('objects', (o) => ({
         id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
         спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
         тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
@@ -10643,7 +10719,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // объекты, выбор клиента и КП. Раньше сюда уходил только бюджет, а
       // статус читался из поля status, которого больше нет, — Консьерж не
       // видел ни воронку лида, ни то, что клиенту уже отправили.
-      заявки: take(d.requests, (r) => ({
+      заявки: take('requests', (r) => ({
         id: r.id, что: r.title || r.goal, контакт: r.clientId, канал: r.channel, создана: r.createdAt,
         статус: r.leadStatus, температура: r.temperature, ответственный: r.assignee,
         следующий_контакт: r.nextContact, бюджет: r.budget, районы: r.areas,
@@ -10652,11 +10728,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         кп: r.kp && r.kp.formed ? { когда: r.kp.at, объекты: r.kp.objectIds } : null,
         заметка: r.note,
       })),
-      задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
+      задачи: take('tasks', (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       // Каждая строка несёт своё происхождение, чтобы модель не выдала
       // иллюстративную величину за опубликованную.
-      рынок_дубая: take(d.market, (m) => m),
+      рынок_дубая: take('market', (m) => m),
       инвентарь: WS.agent.tools.inventory(),
+      // Настоящие имена полей — чтобы модель могла описать запрос, из которого
+      // код построит таблицу. В остальном она читает русские ключи выше.
+      схема: WS.query.collections(),
       ревизия: WS.store.dataRevision,
     };
   }
@@ -10744,7 +10823,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function evidenceFor(keys) {
     if (!Array.isArray(keys)) return [];
     return keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
-      .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count }));
+      // The revision travels with the figure. Without it the chip re-ran the
+      // query at whatever the data had become, and an answer could disagree
+      // with its own evidence without either side saying so.
+      .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count, revision: r.revision }));
   }
 
   // A screen the model wants shown becomes a chip, not a jump. Navigating the
@@ -10777,16 +10859,96 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // then threw on .slice() while the chat was mid-render, stranding the card.
   // Every shape declares which of its fields must be arrays.
   const BLOCK_ARRAYS = { p: [], h: [], note: [], list: ['items'], kv: ['rows'], table: ['rows'], bars: ['rows'] };
+
+  /* ---------- blocks built from data, not from the model's text ----------
+
+     The stand is built on «the model narrates, the code owns every number», and
+     that held for the evidence chips and not for the answer itself: a table's
+     cells were whatever the model typed, validated for shape and never for
+     value. An invented figure could not reach a chip, but it could reach the
+     row a person actually reads.
+
+     So a block may now name the query its rows come from instead of carrying
+     them. The model describes the shape — collection, filter, columns — and the
+     code runs it and fills every cell. A figure in such a block cannot be
+     invented, because the model never wrote it.
+
+     A block that still carries its own rows is rendered, and marked. Marking is
+     honest and it makes the right path visibly the better one.                */
+
+  function fmtCell(v, money) {
+    if (v == null) return '';
+    if (money && isFinite(Number(v))) return WS.AED(Number(v));
+    if (typeof v === 'number') return String(v).replace('.', ',');
+    return String(v);
+  }
+
+  function runSpec(spec) {
+    if (!spec || typeof spec !== 'object') return null;
+    let res = null;
+    try { res = WS.query.run(Object.assign({}, spec, { aggregate: null })); } catch (e) { return null; }
+    if (!res || res.ok === false || !Array.isArray(res.rows)) return null;
+    return res;
+  }
+
+  function fillTable(b) {
+    const cols = (Array.isArray(b.columns) ? b.columns : []).filter((c) => c && c.field).slice(0, 5);
+    if (!cols.length) return null;
+    const res = runSpec(b.from);
+    if (!res) return null;
+    const rows = res.rows.slice(0, 8).map((r) => cols.map((c) => fmtCell(r[c.field], c.money)));
+    if (!rows.length) return null;
+    return { t: 'table', head: cols.map((c) => String(c.label || c.field)), rows: rows, src: 'data', count: res.count };
+  }
+
+  function fillBars(b) {
+    if (!b.label || !b.value) return null;
+    const res = runSpec(b.from);
+    if (!res) return null;
+    const rows = res.rows.slice(0, 6)
+      .filter((r) => isFinite(Number(r[b.value])))
+      .map((r) => ({ label: String(r[b.label]), value: Number(r[b.value]), suffix: b.suffix ? String(b.suffix) : '' }));
+    if (!rows.length) return null;
+    return { t: 'bars', rows: rows, src: 'data', count: res.count };
+  }
+
+  // A kv block over named readings: the same figures the tiles and the chips
+  // show, by construction the same numbers.
+  function fillKv(b) {
+    const keys = (Array.isArray(b.reads) ? b.reads : []).slice(0, 8);
+    if (!keys.length) return null;
+    const rows = keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
+      .map((r) => ({ k: r.label, v: r.money ? WS.AED(r.value) : String(r.value) }));
+    if (!rows.length) return null;
+    return { t: 'kv', rows: rows, src: 'data' };
+  }
+
+  function resolve(b) {
+    const t = String(b.t);
+    if (t === 'table' && b.from) return fillTable(b);
+    if (t === 'bars' && b.from) return fillBars(b);
+    if (t === 'kv' && Array.isArray(b.reads)) return fillKv(b);
+    return null;
+  }
+
   function normBlocks(list) {
     if (!Array.isArray(list)) return null;
-    const out = list.filter((b) => {
-      if (!b || typeof b !== 'object') return false;
-      const need = BLOCK_ARRAYS[String(b.t)];
-      if (!need) return false;
-      if (!need.every((f) => Array.isArray(b[f]))) return false;
-      if (b.head != null && !Array.isArray(b.head)) return false;
-      return true;
-    }).slice(0, 10);
+    const out = [];
+    list.forEach((b) => {
+      if (out.length >= 10) return;
+      if (!b || typeof b !== 'object') return;
+      const t = String(b.t);
+      if (!BLOCK_ARRAYS[t]) return;
+      // Preferred: the block names its data and the code builds it.
+      const built = resolve(b);
+      if (built) { out.push(built); return; }
+      // A block that meant to be data-backed and could not be is dropped rather
+      // than quietly falling back to whatever the model typed alongside it.
+      if (b.from || Array.isArray(b.reads)) return;
+      if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) return;
+      if (b.head != null && !Array.isArray(b.head)) return;
+      out.push(b);
+    });
     return out.length ? out : null;
   }
 

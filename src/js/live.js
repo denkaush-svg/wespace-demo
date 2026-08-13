@@ -72,19 +72,27 @@
 
   function digest() {
     const d = (WS.store && WS.store.data) || {};
-    const take = (list, fn) => (list || []).map(fn);
+    // Read through the query layer, not around it. Reaching into the store
+    // directly made «one read path» an aspiration: the figures a person sees on
+    // a tile and the figures the model is handed came from two different
+    // places, and only one of them was governed.
+    const rows = (name) => {
+      const res = WS.query.run({ from: name });
+      return (res && res.ok !== false && Array.isArray(res.rows)) ? res.rows : (d[name] || []);
+    };
+    const take = (name, fn) => rows(name).map(fn);
     return {
       показатели: readings(),
       показатели_экранов: screenMetrics(),
-      контакты: take(d.clients, (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
-      компании: take(d.companies, (c) => ({ id: c.id, имя: c.name })),
+      контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
+      компании: take('companies', (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
       // only the code got «две сделки на стадии docs» into an answer.
       // Срок следующего шага, дни на стадии и задаток — то, из чего
       // складывается ответ «что мешает закрыть». Без них Консьерж знал сумму
       // и стадию, но не знал, где сделка стоит.
-      сделки: take(d.deals, (x) => ({
+      сделки: take('deals', (x) => ({
         id: x.id, название: x.title, сумма: x.amount,
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
         воронка: x.dealType || x.funnel, ответственный: x.agent,
@@ -95,7 +103,7 @@
       })),
       // Названия и цены брались из полей title/rate, которых у объектов нет —
       // модель получала безымянные строки и отвечала про район вместо дома.
-      объекты: take(d.objects, (o) => ({
+      объекты: take('objects', (o) => ({
         id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
         спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
         тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
@@ -104,7 +112,7 @@
       // объекты, выбор клиента и КП. Раньше сюда уходил только бюджет, а
       // статус читался из поля status, которого больше нет, — Консьерж не
       // видел ни воронку лида, ни то, что клиенту уже отправили.
-      заявки: take(d.requests, (r) => ({
+      заявки: take('requests', (r) => ({
         id: r.id, что: r.title || r.goal, контакт: r.clientId, канал: r.channel, создана: r.createdAt,
         статус: r.leadStatus, температура: r.temperature, ответственный: r.assignee,
         следующий_контакт: r.nextContact, бюджет: r.budget, районы: r.areas,
@@ -113,11 +121,14 @@
         кп: r.kp && r.kp.formed ? { когда: r.kp.at, объекты: r.kp.objectIds } : null,
         заметка: r.note,
       })),
-      задачи: take(d.tasks, (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
+      задачи: take('tasks', (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
       // Каждая строка несёт своё происхождение, чтобы модель не выдала
       // иллюстративную величину за опубликованную.
-      рынок_дубая: take(d.market, (m) => m),
+      рынок_дубая: take('market', (m) => m),
       инвентарь: WS.agent.tools.inventory(),
+      // Настоящие имена полей — чтобы модель могла описать запрос, из которого
+      // код построит таблицу. В остальном она читает русские ключи выше.
+      схема: WS.query.collections(),
       ревизия: WS.store.dataRevision,
     };
   }
@@ -205,7 +216,10 @@
   function evidenceFor(keys) {
     if (!Array.isArray(keys)) return [];
     return keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
-      .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count }));
+      // The revision travels with the figure. Without it the chip re-ran the
+      // query at whatever the data had become, and an answer could disagree
+      // with its own evidence without either side saying so.
+      .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count, revision: r.revision }));
   }
 
   // A screen the model wants shown becomes a chip, not a jump. Navigating the
@@ -238,16 +252,96 @@
   // then threw on .slice() while the chat was mid-render, stranding the card.
   // Every shape declares which of its fields must be arrays.
   const BLOCK_ARRAYS = { p: [], h: [], note: [], list: ['items'], kv: ['rows'], table: ['rows'], bars: ['rows'] };
+
+  /* ---------- blocks built from data, not from the model's text ----------
+
+     The stand is built on «the model narrates, the code owns every number», and
+     that held for the evidence chips and not for the answer itself: a table's
+     cells were whatever the model typed, validated for shape and never for
+     value. An invented figure could not reach a chip, but it could reach the
+     row a person actually reads.
+
+     So a block may now name the query its rows come from instead of carrying
+     them. The model describes the shape — collection, filter, columns — and the
+     code runs it and fills every cell. A figure in such a block cannot be
+     invented, because the model never wrote it.
+
+     A block that still carries its own rows is rendered, and marked. Marking is
+     honest and it makes the right path visibly the better one.                */
+
+  function fmtCell(v, money) {
+    if (v == null) return '';
+    if (money && isFinite(Number(v))) return WS.AED(Number(v));
+    if (typeof v === 'number') return String(v).replace('.', ',');
+    return String(v);
+  }
+
+  function runSpec(spec) {
+    if (!spec || typeof spec !== 'object') return null;
+    let res = null;
+    try { res = WS.query.run(Object.assign({}, spec, { aggregate: null })); } catch (e) { return null; }
+    if (!res || res.ok === false || !Array.isArray(res.rows)) return null;
+    return res;
+  }
+
+  function fillTable(b) {
+    const cols = (Array.isArray(b.columns) ? b.columns : []).filter((c) => c && c.field).slice(0, 5);
+    if (!cols.length) return null;
+    const res = runSpec(b.from);
+    if (!res) return null;
+    const rows = res.rows.slice(0, 8).map((r) => cols.map((c) => fmtCell(r[c.field], c.money)));
+    if (!rows.length) return null;
+    return { t: 'table', head: cols.map((c) => String(c.label || c.field)), rows: rows, src: 'data', count: res.count };
+  }
+
+  function fillBars(b) {
+    if (!b.label || !b.value) return null;
+    const res = runSpec(b.from);
+    if (!res) return null;
+    const rows = res.rows.slice(0, 6)
+      .filter((r) => isFinite(Number(r[b.value])))
+      .map((r) => ({ label: String(r[b.label]), value: Number(r[b.value]), suffix: b.suffix ? String(b.suffix) : '' }));
+    if (!rows.length) return null;
+    return { t: 'bars', rows: rows, src: 'data', count: res.count };
+  }
+
+  // A kv block over named readings: the same figures the tiles and the chips
+  // show, by construction the same numbers.
+  function fillKv(b) {
+    const keys = (Array.isArray(b.reads) ? b.reads : []).slice(0, 8);
+    if (!keys.length) return null;
+    const rows = keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
+      .map((r) => ({ k: r.label, v: r.money ? WS.AED(r.value) : String(r.value) }));
+    if (!rows.length) return null;
+    return { t: 'kv', rows: rows, src: 'data' };
+  }
+
+  function resolve(b) {
+    const t = String(b.t);
+    if (t === 'table' && b.from) return fillTable(b);
+    if (t === 'bars' && b.from) return fillBars(b);
+    if (t === 'kv' && Array.isArray(b.reads)) return fillKv(b);
+    return null;
+  }
+
   function normBlocks(list) {
     if (!Array.isArray(list)) return null;
-    const out = list.filter((b) => {
-      if (!b || typeof b !== 'object') return false;
-      const need = BLOCK_ARRAYS[String(b.t)];
-      if (!need) return false;
-      if (!need.every((f) => Array.isArray(b[f]))) return false;
-      if (b.head != null && !Array.isArray(b.head)) return false;
-      return true;
-    }).slice(0, 10);
+    const out = [];
+    list.forEach((b) => {
+      if (out.length >= 10) return;
+      if (!b || typeof b !== 'object') return;
+      const t = String(b.t);
+      if (!BLOCK_ARRAYS[t]) return;
+      // Preferred: the block names its data and the code builds it.
+      const built = resolve(b);
+      if (built) { out.push(built); return; }
+      // A block that meant to be data-backed and could not be is dropped rather
+      // than quietly falling back to whatever the model typed alongside it.
+      if (b.from || Array.isArray(b.reads)) return;
+      if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) return;
+      if (b.head != null && !Array.isArray(b.head)) return;
+      out.push(b);
+    });
     return out.length ? out : null;
   }
 

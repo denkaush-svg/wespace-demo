@@ -180,12 +180,22 @@ const SYSTEM = [
   '',
   'BLOCKS. Разбор — сравнение районов, расклад по воронке, оценка варианта — выдаётся ТОЛЬКО через blocks.',
   'Сравнил две и более величины и не положил их в blocks — это ошибка: сплошной текст с цифрами не читается.',
-  'В тексте оставляй одну ведущую фразу: вывод, а не пересказ таблицы. Виды блоков:',
+  'В тексте оставляй одну ведущую фразу: вывод, а не пересказ таблицы.',
+  '',
+  'ЧИСЛА В БЛОКАХ ТЫ НЕ ПИШЕШЬ. Ты описываешь запрос, а таблицу по нему строит код.',
+  'В ДАННЫЕ.схема лежат коллекции и НАСТОЯЩИЕ имена полей — запрос пиши в них.',
+  '   {"t":"table","from":{"from":"market","sort":{"field":"доходностьПроцент","dir":"desc"},"limit":6},',
+  '    "columns":[{"field":"район","label":"Район"},{"field":"ценаЗаМетр","label":"Цена/м²"},{"field":"доходностьПроцент","label":"Доходность"}]}',
+  '   {"t":"bars","from":{"from":"market","limit":6},"label":"район","value":"доходностьПроцент","suffix":"%"}',
+  'Имена полей в примере — из этого стенда; всегда сверяйся со схемой, не угадывай.',
+  '   {"t":"kv","reads":["deals_active","deals_active_sum"]}   — ключи из ДАННЫЕ.показатели',
+  'В from можно where: [{"field":"stage","op":"eq","value":"docs"}], sort, limit.',
+  'Блок с готовыми rows тоже примут, но под ним встанет пометка «собрано моделью, не сверено с данными».',
+  'Каждый раз, когда величины можно взять запросом, — бери запросом. Пометка на таблице читается как слабость ответа.',
+  '',
+  'Текстовые блоки — как раньше:',
   '   {"t":"h","text":"заголовок"}   {"t":"p","text":"абзац"}   {"t":"note","text":"оговорка"}',
   '   {"t":"list","items":["...","..."]}',
-  '   {"t":"kv","rows":[{"k":"Доходность","v":"8,1%"}]}',
-  '   {"t":"table","head":["Район","Цена/м²","Доходность"],"rows":[["Arjan","11 600","8,1%"]]}',
-  '   {"t":"bars","rows":[{"label":"Arjan","value":8.1,"suffix":"%"}]}  — для сравнения величин',
   'Не больше десяти блоков, до восьми строк в каждом. Знаков разметки в тексте не пиши — ни звёздочек, ни решёток: оформит код.',
   '',
   'ВОРОНКА СТЕНДА: заявка → сделки → лоты. Заявка — верх воронки: в ней предложенные объекты,',
@@ -334,8 +344,12 @@ function cliArgs() {
 
 /* Runs one CLI call and reports text as it arrives.
    Resolves with the full text; rejects with a tagged error. */
-function callModel(prompt, onDelta) {
-  return new Promise((resolve, reject) => {
+/* Starts one call and hands back both halves of it: the promise, and the way
+   to stop it. Passing a shared object in for the cancel to be written into was
+   too clever by half — this is the same thing, spelled out. */
+function startCall(prompt, onDelta) {
+  let cancel = () => {};
+  const promise = new Promise((resolve, reject) => {
     try { fs.mkdirSync(CFG.workDir, { recursive: true }); } catch (e) { /* best effort */ }
 
     const child = spawn(CFG.cli, cliArgs(), {
@@ -397,6 +411,11 @@ function callModel(prompt, onDelta) {
       }
     }
 
+    // A visitor who closes the tab used to leave this process running to
+    // completion, holding one of two slots for up to the full timeout. Two
+    // closed tabs took the live Concierge down for everyone.
+    cancel = () => { if (!settled) finish(new Error('client gone')); };
+
     child.stdout.on('data', (chunk) => {
       line += chunk.toString('utf8');
       let nl;
@@ -425,7 +444,12 @@ function callModel(prompt, onDelta) {
     child.stdin.on('error', () => { /* closed early; the close handler reports */ });
     child.stdin.end(prompt, 'utf8');
   });
+  // The executor above runs synchronously, so `cancel` is real by now.
+  return { promise: promise, cancel: () => cancel() };
 }
+
+// Kept for callers that only want the answer.
+function callModel(prompt, onDelta) { return startCall(prompt, onDelta).promise; }
 
 // ---------- reply shape ----------
 
@@ -542,8 +566,14 @@ async function handleAsk(req, res) {
   req.on('close', () => { aborted = true; });
 
   const started = Date.now();
+  // Listen on the RESPONSE, not the request: the request stream is already
+  // finished the moment its body has been read, so its `close` fires long
+  // before the visitor goes anywhere. The response closes when the connection
+  // actually drops.
+  const call = startCall(buildPrompt(body), (t) => { if (!aborted) send('delta', { t: t }); });
+  res.on('close', () => { if (!res.writableEnded) call.cancel(); });
   try {
-    const full = await callModel(buildPrompt(body), (t) => { if (!aborted) send('delta', { t: t }); });
+    const full = await call.promise;
     const parts = splitReply(full);
     if (!aborted) {
       send('done', { say: parts.say, plan: parts.plan, ms: Date.now() - started, model: CFG.model });
@@ -592,4 +622,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CFG, buildPrompt, fitDigest, turnText, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM };
+module.exports = { CFG, buildPrompt, fitDigest, turnText, startCall, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM };

@@ -119,6 +119,16 @@ function pureChecks() {
   ok('the spoken form is part of the contract',
     p2.indexOf('say_aloud') >= 0 && p2.indexOf('ГОЛОС.') >= 0);
 
+  // The stand claims the code owns every number. That only holds if the rules
+  // actually tell the model to describe a query instead of typing figures, and
+  // tell it that a typed table gets marked.
+  ok('the rules forbid typing numbers into blocks',
+    p2.indexOf('ЧИСЛА В БЛОКАХ ТЫ НЕ ПИШЕШЬ') >= 0);
+  ok('and point at the schema it must query by',
+    p2.indexOf('ДАННЫЕ.схема') >= 0 && p2.indexOf('"columns"') >= 0);
+  ok('and say what an unbacked table costs',
+    p2.indexOf('собрано моделью') >= 0);
+
   const p3 = buildPrompt({ text: 'x', digest: { s: 'д'.repeat(CFG.maxDigestChars + 2000) } });
   // Measure the digest, not the prompt: the system rules grow, and tying the
   // assertion to the total made it fail for a reason it was not testing.
@@ -281,12 +291,16 @@ async function modelChecks() {
     !doneA || (doneA.data.say || '').indexOf('authenticate') < 0);
 
   refill();
-  res = await ask({ text: 'проверка', digest: { показатели: { deals_active: 4 } } }, 'echo');
+  // A marker that exists nowhere in the rules: the rules now quote reading keys
+  // as examples, so asserting on one of those measured the wrong thing.
+  res = await ask({ text: 'проверка', digest: { показатели: { deals_active: 4 }, метка: 'ТОЛЬКО_В_ДАННЫХ' } }, 'echo');
   const sent = events(res.body).filter((e) => e.event === 'delta').map((e) => e.data.t).join('');
   ok('the instructions are composed here, not by the browser',
     sent.indexOf('Ты — Консьерж') >= 0 && sent.indexOf('=== ВОПРОС БРОКЕРА ===') >= 0);
   ok('what the browser sent arrives fenced as data',
-    sent.indexOf('=== ДАННЫЕ') >= 0 && sent.indexOf('=== ДАННЫЕ') < sent.indexOf('deals_active'));
+    sent.indexOf('=== ДАННЫЕ') >= 0 &&
+    sent.indexOf('=== ДАННЫЕ') < sent.indexOf('ТОЛЬКО_В_ДАННЫХ') &&
+    sent.indexOf('ТОЛЬКО_В_ДАННЫХ') < sent.indexOf('=== КОНЕЦ ДАННЫХ ==='));
 }
 
 // ---------- guards ----------
@@ -330,6 +344,31 @@ async function guardChecks() {
   res = await ask({ text: 'вопрос' });
   ok('calls beyond the concurrency cap are refused', res.status === 503 && JSON.parse(res.body).code === 'busy');
   state.inFlight = inWas;
+
+  // A visitor who closes the tab used to leave the model running to completion,
+  // holding one of two slots for the full timeout. Two closed tabs took the live
+  // Concierge down for everybody.
+  {
+    refill();
+    process.env.FAKE_CLI_MODE = 'slow';
+    const before = state.inFlight;
+    await new Promise((resolve) => {
+      const r = http.request({ host: '127.0.0.1', port: PORT, method: 'POST', path: '/ask',
+        headers: { 'content-type': 'application/json' } }, () => {});
+      r.on('error', () => {});
+      r.write(JSON.stringify({ text: 'вопрос, который бросят' }));
+      r.end();
+      // Let the call start, then walk away.
+      setTimeout(() => { r.destroy(); resolve(); }, 350);
+    });
+    let freed = false;
+    for (let i = 0; i < 40 && !freed; i++) {
+      await new Promise((r2) => setTimeout(r2, 50));
+      freed = state.inFlight === before;
+    }
+    ok('a client that walks away frees the slot instead of holding it',
+      freed, 'inFlight=' + state.inFlight + ' was=' + before);
+  }
 
   refill();
   const tWas = CFG.callTimeoutMs;

@@ -307,6 +307,32 @@
     return Object.assign({ ok: false, code: code, error: message }, extra || {});
   }
 
+  // Which fields are references, and to what. A write that names an entity must
+  // name one that exists — for the same reason ids in a proposal have to come
+  // from the data rather than from a sentence.
+  const REFS = {
+    clientId: 'clients', companyId: 'companies', objectId: 'objects',
+    dealId: 'deals', requestId: 'requests', assignee: 'users', agent: 'users',
+  };
+  function refError(rec, at) {
+    const d = store.data || {};
+    const keys = Object.keys(rec || {});
+    for (let i = 0; i < keys.length; i++) {
+      const f = keys[i];
+      const coll = REFS[f];
+      const val = rec[f];
+      if (!coll || val == null || val === '') continue;
+      // `users` is a map in this store, everything else is a list.
+      const exists = coll === 'users'
+        ? !!(d.users && d.users[val]) || (d.roster || []).some((u) => u.id === val)
+        : (d[coll] || []).some((x) => x.id === val);
+      if (!exists) {
+        return fail('bad_ref', at + 'нет такой записи: ' + f + ' = ' + val, { field: f, collection: coll });
+      }
+    }
+    return null;
+  }
+
   // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
   function planOp(o, i) {
     const at = 'операция ' + (i + 1) + ': ';
@@ -332,6 +358,11 @@
     if (spec.kind === 'add') {
       const src = o.task || o.obj || o.record;
       if (!src || typeof src !== 'object') return fail('bad_record', at + 'нет записи');
+      // A record may point at a contact, a deal or an object. Pointing it at an
+      // id that does not exist created a task hanging off nothing — it renders,
+      // it just belongs to no one.
+      const badRef = refError(src, at);
+      if (badRef) return badRef;
       // The id is ours to assign, not the caller's to invent. Demanding one
       // meant every «поставь задачу на завтра» came back as «нет записи или её
       // id» — the model was following the contract it was given and the layer
@@ -366,6 +397,8 @@
     if (!patch || typeof patch !== 'object') return fail('bad_patch', at + 'нет полей для изменения');
     const keys = Object.keys(patch);
     if (!keys.length) return fail('bad_patch', at + 'пустой набор полей');
+    const badPatchRef = refError(patch, at);
+    if (badPatchRef) return badPatchRef;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
     for (let k = 0; k < keys.length; k++) {
