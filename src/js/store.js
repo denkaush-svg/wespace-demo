@@ -343,6 +343,15 @@
 
     if (spec.kind === 'stage') {
       if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      // Stages belong to a funnel. The spoken vocabulary is global, so «переведи в выполнение работ»
+      // would otherwise park a Продажа deal on a stage that funnel has no column for — the deal
+      // vanishes from the board with nothing to say where it went.
+      const fn = (WS.FUNNELS || []).find((x) => x.k === (rec.funnel || 'sale'));
+      const allowed = (fn && fn.stages) || [];
+      if (allowed.length && allowed.indexOf(o.stage) < 0) {
+        return fail('bad_value', at + 'в воронке «' + ((fn && fn.label) || rec.funnel) + '» нет такой стадии',
+          { stage: o.stage, available: allowed });
+      }
       return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
     }
 
@@ -436,6 +445,11 @@
     store.dataRevision++; save(); emit();
   }
 
+  // A hand edit is a data change like any other. Writing through save() alone left dataRevision
+  // untouched, so a Concierge proposal built before the edit still matched `expectedRevision` and
+  // stayed confirmable — the stale-proposal guard silently stopped guarding.
+  function touch() { store.dataRevision++; save(); emit(); }
+
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
@@ -461,6 +475,6 @@
   WS.store = store;
   WS.storeApi = {
     boot, subscribe, emit, save, resetAll, resetScene,
-    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
+    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});

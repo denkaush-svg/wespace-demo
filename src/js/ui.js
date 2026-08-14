@@ -3259,7 +3259,7 @@
     if (!d || !GATES[parts[1]]) return;
     d.gates = Object.assign({}, d.gates);
     d.gates[parts[1]] = !d.gates[parts[1]];
-    WS.storeApi.save();
+    WS.storeApi.touch();
     WS.storeApi.toast('«' + GATES[parts[1]].label + '» — ' + (d.gates[parts[1]] ? 'отмечено' : 'снята отметка'), 'ok');
     setEntityTab('deal', d.id, 'docs');
   }
@@ -3319,6 +3319,20 @@
     if (current && ids.indexOf(current) < 0) ids.push(current);
     return ids.map((id) => '<option value="' + id + '"' + (id === current ? ' selected' : '') + '>' + agentName(id) + '</option>').join('');
   }
+  // «Тип сделки» IS the funnel; they were two fields that could disagree, and only one of them
+  // drove the board and the gates. Editing the type now moves the deal, and a stage the new funnel
+  // does not have is pulled back to one it does rather than leaving the deal on no board at all.
+  const FUNNEL_BY_TYPE = {
+    'Продажа': 'sale', 'Аренда': 'rent', 'Управление арендой': 'manage',
+    'Эксклюзив': 'exclusive', 'Кросс-продажи': 'cross', 'Консалтинг': 'consult',
+  };
+  function funnelForType(t) { return FUNNEL_BY_TYPE[t] || 'sale'; }
+  function clampStage(funnelKey, stage) {
+    const f = (WS.FUNNELS || []).find((x) => x.k === funnelKey);
+    const list = (f && f.stages) || [];
+    if (!list.length) return stage;
+    return list.indexOf(stage) >= 0 ? stage : list[0];
+  }
   const DEAL_ENUMS = {
     dealType: ['Продажа', 'Аренда', 'Управление арендой', 'Эксклюзив', 'Кросс-продажи', 'Консалтинг'],
     // Readiness and the kind of transfer used to be smuggled into «тип объекта» («off-plan» sat in
@@ -3361,9 +3375,13 @@
       else if (k === 'agent') d.agent = val;
       else d[k] = val;
     });
+    // The service decides the board and the gate set, so it has to follow the field the agent
+    // actually edited. Leaving d.funnel behind kept a re-typed lease on the sale board.
+    const nf = funnelForType(d.dealType);
+    if (nf !== d.funnel) { d.funnel = nf; d.stage = clampStage(nf, d.stage); }
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
     d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed' });
-    WS.storeApi.save();
+    WS.storeApi.touch();
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
   }
@@ -4881,12 +4899,16 @@
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
     // Stage options follow the funnel the form is currently on. Offering every stage of every
     // funnel would let an agent file a lease deal at «Бронь (EOI)», which that funnel does not have.
+    // Stage options belong to ONE funnel — the board the agent is standing on — and «Тип сделки»
+    // is preselected to the same service, so the two cannot start out disagreeing. createDeal
+    // clamps anyway, because the type select is still free to change afterwards.
     const curFunnel = (WS.FUNNELS || []).find((x) => x.k === (S().dealFunnel || 'sale')) || (WS.FUNNELS || [])[0] || { stages: [] };
     const stageOpts = (curFunnel.stages || []).filter((k) => k !== 'lost')
       .map((k) => '<option value="' + k + '">' + stageLabel(k) + '</option>').join('');
     const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
     const agentOpts = dealAgentOptions(null);
-    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '">' + dt + '</option>').join('');
+    const curType = (DEAL_ENUMS.dealType.find((t) => funnelForType(t) === curFunnel.k)) || DEAL_ENUMS.dealType[0];
+    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '"' + (dt === curType ? ' selected' : '') + '>' + dt + '</option>').join('');
     const objectTypeOpts = DEAL_ENUMS.objectType.map((ot) => '<option value="' + ot + '">' + ot + '</option>').join('');
     const paymentFormOpts = DEAL_ENUMS.paymentForm.map((pf) => '<option value="' + pf + '">' + pf + '</option>').join('');
     const sourceOpts = DEAL_ENUMS.source.map((s) => '<option value="' + s + '">' + s + '</option>').join('');
@@ -4917,14 +4939,11 @@
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
     const dealType = _g('nd_dealType') || 'Продажа';
-    const funnelMap = {
-      'Продажа': 'sale',
-      'Аренда': 'rent',
-      'Управление арендой': 'manage',
-      'Эксклюзив': 'exclusive',
-      'Кросс-продажи': 'cross',
-      'Консалтинг': 'consult'
-    };
+    const funnel = funnelForType(dealType);
+    // The stage list came from the board in view; the funnel comes from the chosen service. If the
+    // agent changed the service after opening the form, the stage is pulled into the new funnel
+    // instead of filing the deal where no column can draw it.
+    const stage = clampStage(funnel, _g('nd_stage') || 'work');
     // The essence is what the deal is called everywhere afterwards; fall back to the client's name
     // only when the agent left it blank, which is what the card used to do unconditionally.
     const title = (_g('nd_title') || '').trim() || c.name || 'Сделка';
@@ -4934,7 +4953,7 @@
       const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
       return now.d + ' ' + months[now.mo];
     })();
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'work', title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnelMap[dealType] || 'sale', dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: _g('nd_readiness') || 'готовый', saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
+    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: stage, title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnel, dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: _g('nd_readiness') || 'готовый', saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
     closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 
@@ -6102,7 +6121,11 @@
       '<div class="feed" style="padding:2px 16px 10px">' + rows + '</div></div>';
   }
   function contractMilestones(k, forClient) {
-    const rows = (k.milestones || []).map((m, i) => {
+    // `internalOnly` is a promise the model makes: such a milestone never reaches the client side,
+    // however the cabinet is eventually built. Honouring it only in a comment is worse than not
+    // making the promise — the preview would be showing what it claims it never shows.
+    const src = (k.milestones || []).filter((m) => !(forClient && m.internalOnly));
+    const rows = src.map((m, i) => {
       const cls = m.state === 'done' ? 'done' : (m.state === 'now' ? 'now' : 'wait');
       const icon = m.state === 'done' ? 'check' : (m.state === 'now' ? 'clock' : 'dot');
       const text = forClient ? (m.client || m.label) : m.label;
@@ -6110,7 +6133,10 @@
         '<span class="ms-t"><span class="ms-l">' + text + '</span>' +
         '<span class="ms-a">' + (m.at || '—') + '</span></span></div>';
     }).join('');
-    return '<div class="ms-list">' + rows + '</div>';
+    const hidden = (k.milestones || []).length - src.length;
+    return '<div class="ms-list">' + rows + '</div>' +
+      (forClient && hidden ? '<div class="gate-foot">Скрыто от клиента: ' + hidden + ' ' +
+        plural(hidden, 'внутренняя веха', 'внутренние вехи', 'внутренних вех') + '.</div>' : '');
   }
   function contractMoney(k) {
     const m = commissionState(k);

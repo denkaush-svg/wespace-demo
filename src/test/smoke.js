@@ -678,13 +678,86 @@ setTimeout(async () => {
   }
 
   // ---- regression: main screens still render ----
-  ['start', 'concierge', 'clients', 'objects', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
+  ['start', 'concierge', 'clients', 'objects', 'contracts', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
     try {
       WS.router.go(v);
       const h = doc.getElementById('app').innerHTML;
       check('screen ' + v + ' renders', h && h.length > 400, 'len=' + (h || '').length);
     } catch (e) { check('screen ' + v + ' renders', false, e.message); }
   });
+
+  // ---- every data-* control the UI renders must be caught by the delegated click handler ----
+  // A handler behind a selector that does not list its attribute is dead markup: the function is
+  // there, the button is there, and clicking does nothing. Only a real click proves the wiring.
+  {
+    const clickable = ['data-gate', 'data-contract', 'data-deal', 'data-client', 'data-savedview', 'data-funnel'];
+    const sel = (() => {
+      // Read the live handler's own selector out of the built markup rather than restating it here,
+      // so this test cannot drift into agreeing with a copy of the list it is supposed to check.
+      const m = /const t = e\.target\.closest\('([^']+)'\)/.exec(read('js/main.js'));
+      return m ? m[1] : null;
+    })();
+    if (sel) {
+      clickable.forEach((attr) => {
+        check('delegation · ' + attr + ' is reachable by click', sel.indexOf('[' + attr + ']') >= 0, sel.slice(0, 60));
+      });
+    }
+    // And the round trip: a rendered gate row, clicked, actually flips the gate.
+    const gd = dd().deals.find((d) => d.funnel === 'sale');
+    WS.ui.dealCard(gd.id); WS.ui.setEntityTab('deal', gd.id, 'docs');
+    const scope = doc.getElementById('modal').innerHTML.indexOf('gate-row') >= 0 ? doc.getElementById('modal') : doc.getElementById('app');
+    const row = scope.querySelector('[data-gate]');
+    check('gate · a row is rendered to click', !!row);
+    if (row) {
+      const key = row.getAttribute('data-gate').split('~')[1];
+      const was = !!((gd.gates || {})[key]);
+      row.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      const now = !!((dd().deals.find((d) => d.id === gd.id).gates || {})[key]);
+      check('gate · clicking the row toggles the gate', now === !was, 'was=' + was + ' now=' + now);
+    }
+    // A contract row, clicked, opens that contract.
+    WS.router.go('contracts');
+    const krow = doc.getElementById('app').querySelector('[data-contract]');
+    check('contract · a row is rendered to click', !!krow);
+    if (krow) {
+      const kid = krow.getAttribute('data-contract');
+      krow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('contract · clicking the row opens the contract', WS.store.view === 'contractDetail' && WS.store.contractId === kid,
+        'view=' + WS.store.view + ' id=' + WS.store.contractId);
+    }
+  }
+
+  // ---- a stage that the deal's funnel does not have is refused, not silently applied ----
+  {
+    const sd = dd().deals.find((d) => d.funnel === 'sale' && d.stage !== 'won' && d.stage !== 'lost');
+    const was = sd.stage;
+    const bad = sapi.apply([{ op: 'dealStage', id: sd.id, stage: 'exec' }], { confirmed: true });
+    check('stage · a stage outside the funnel is refused', !bad || bad.ok === false, JSON.stringify(bad));
+    check('stage · the refused change left the deal alone', dd().deals.find((d) => d.id === sd.id).stage === was);
+  }
+
+  // ---- the client register never shows a milestone marked internal ----
+  {
+    const withInternal = (dd().contracts || []).find((k) => (k.milestones || []).some((m) => m.internalOnly));
+    if (withInternal) {
+      const m = withInternal.milestones.find((x) => x.internalOnly);
+      WS.ui.contractCard(withInternal.id);
+      WS.ui.setEntityTab('contract', withInternal.id, 'client');
+      const h = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+      check('contract · an internal milestone stays out of the client view', h.indexOf(m.label) < 0, m.label);
+      WS.ui.setEntityTab('contract', withInternal.id, 'milestones');
+      const h2 = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+      check('contract · the internal milestone is still on our side', h2.indexOf(m.label) >= 0);
+    }
+  }
+
+  // ---- a hand edit moves the revision, or a stale proposal stays confirmable ----
+  {
+    const revWas = WS.store.dataRevision;
+    sapi.touch();
+    check('store · touch() advances the revision', WS.store.dataRevision === revWas + 1,
+      'was=' + revWas + ' now=' + WS.store.dataRevision);
+  }
 
   // ============================================================
   //  End to end: what actually happens when a person types into the Concierge.

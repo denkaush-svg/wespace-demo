@@ -501,6 +501,7 @@
         { k: 'pay10', label: 'Платёж 10% на escrow', client: 'Первый платёж принят застройщиком', at: '28 апреля', state: 'done' },
         { k: 'oqood', label: 'Регистрация Oqood', client: 'Сделка зарегистрирована в реестре DLD', at: '06 мая', state: 'done' },
         { k: 'pay25', label: 'Платёж 25% по графику', client: 'Ожидается платёж по графику — этап 2 из 4', at: 'до 20 июня', state: 'now' },
+        { k: 'comm_chase', label: 'Дожать остаток комиссии с застройщика', internalOnly: true, at: 'после платежа 25%', state: 'now' },
         { k: 'built', label: 'Объект построен', client: 'Строительство завершено', at: 'IV квартал 2027', state: 'wait' },
         { k: 'keys', label: 'Ключи переданы, snag list закрыт', client: 'Приёмка объекта и передача ключей', at: '—', state: 'wait' },
         { k: 'title', label: 'Title Deed получен', client: 'Право собственности оформлено', at: '—', state: 'wait' },

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:38</title>
+  <title>WESPACE · сборка 01:02</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:38';
+    window.WS_BUILD='01:02';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2741,6 +2741,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         { k: 'pay10', label: 'Платёж 10% на escrow', client: 'Первый платёж принят застройщиком', at: '28 апреля', state: 'done' },
         { k: 'oqood', label: 'Регистрация Oqood', client: 'Сделка зарегистрирована в реестре DLD', at: '06 мая', state: 'done' },
         { k: 'pay25', label: 'Платёж 25% по графику', client: 'Ожидается платёж по графику — этап 2 из 4', at: 'до 20 июня', state: 'now' },
+        { k: 'comm_chase', label: 'Дожать остаток комиссии с застройщика', internalOnly: true, at: 'после платежа 25%', state: 'now' },
         { k: 'built', label: 'Объект построен', client: 'Строительство завершено', at: 'IV квартал 2027', state: 'wait' },
         { k: 'keys', label: 'Ключи переданы, snag list закрыт', client: 'Приёмка объекта и передача ключей', at: '—', state: 'wait' },
         { k: 'title', label: 'Title Deed получен', client: 'Право собственности оформлено', at: '—', state: 'wait' },
@@ -3655,6 +3656,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
     if (spec.kind === 'stage') {
       if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      // Stages belong to a funnel. The spoken vocabulary is global, so «переведи в выполнение работ»
+      // would otherwise park a Продажа deal on a stage that funnel has no column for — the deal
+      // vanishes from the board with nothing to say where it went.
+      const fn = (WS.FUNNELS || []).find((x) => x.k === (rec.funnel || 'sale'));
+      const allowed = (fn && fn.stages) || [];
+      if (allowed.length && allowed.indexOf(o.stage) < 0) {
+        return fail('bad_value', at + 'в воронке «' + ((fn && fn.label) || rec.funnel) + '» нет такой стадии',
+          { stage: o.stage, available: allowed });
+      }
       return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
     }
 
@@ -3748,6 +3758,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     store.dataRevision++; save(); emit();
   }
 
+  // A hand edit is a data change like any other. Writing through save() alone left dataRevision
+  // untouched, so a Concierge proposal built before the edit still matched `expectedRevision` and
+  // stayed confirmable — the stale-proposal guard silently stopped guarding.
+  function touch() { store.dataRevision++; save(); emit(); }
+
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
@@ -3773,7 +3788,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   WS.store = store;
   WS.storeApi = {
     boot, subscribe, emit, save, resetAll, resetScene,
-    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
+    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});
 
@@ -8211,7 +8226,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!d || !GATES[parts[1]]) return;
     d.gates = Object.assign({}, d.gates);
     d.gates[parts[1]] = !d.gates[parts[1]];
-    WS.storeApi.save();
+    WS.storeApi.touch();
     WS.storeApi.toast('«' + GATES[parts[1]].label + '» — ' + (d.gates[parts[1]] ? 'отмечено' : 'снята отметка'), 'ok');
     setEntityTab('deal', d.id, 'docs');
   }
@@ -8271,6 +8286,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (current && ids.indexOf(current) < 0) ids.push(current);
     return ids.map((id) => '<option value="' + id + '"' + (id === current ? ' selected' : '') + '>' + agentName(id) + '</option>').join('');
   }
+  // «Тип сделки» IS the funnel; they were two fields that could disagree, and only one of them
+  // drove the board and the gates. Editing the type now moves the deal, and a stage the new funnel
+  // does not have is pulled back to one it does rather than leaving the deal on no board at all.
+  const FUNNEL_BY_TYPE = {
+    'Продажа': 'sale', 'Аренда': 'rent', 'Управление арендой': 'manage',
+    'Эксклюзив': 'exclusive', 'Кросс-продажи': 'cross', 'Консалтинг': 'consult',
+  };
+  function funnelForType(t) { return FUNNEL_BY_TYPE[t] || 'sale'; }
+  function clampStage(funnelKey, stage) {
+    const f = (WS.FUNNELS || []).find((x) => x.k === funnelKey);
+    const list = (f && f.stages) || [];
+    if (!list.length) return stage;
+    return list.indexOf(stage) >= 0 ? stage : list[0];
+  }
   const DEAL_ENUMS = {
     dealType: ['Продажа', 'Аренда', 'Управление арендой', 'Эксклюзив', 'Кросс-продажи', 'Консалтинг'],
     // Readiness and the kind of transfer used to be smuggled into «тип объекта» («off-plan» sat in
@@ -8313,9 +8342,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       else if (k === 'agent') d.agent = val;
       else d[k] = val;
     });
+    // The service decides the board and the gate set, so it has to follow the field the agent
+    // actually edited. Leaving d.funnel behind kept a re-typed lease on the sale board.
+    const nf = funnelForType(d.dealType);
+    if (nf !== d.funnel) { d.funnel = nf; d.stage = clampStage(nf, d.stage); }
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
     d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed' });
-    WS.storeApi.save();
+    WS.storeApi.touch();
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
   }
@@ -9833,12 +9866,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
     // Stage options follow the funnel the form is currently on. Offering every stage of every
     // funnel would let an agent file a lease deal at «Бронь (EOI)», which that funnel does not have.
+    // Stage options belong to ONE funnel — the board the agent is standing on — and «Тип сделки»
+    // is preselected to the same service, so the two cannot start out disagreeing. createDeal
+    // clamps anyway, because the type select is still free to change afterwards.
     const curFunnel = (WS.FUNNELS || []).find((x) => x.k === (S().dealFunnel || 'sale')) || (WS.FUNNELS || [])[0] || { stages: [] };
     const stageOpts = (curFunnel.stages || []).filter((k) => k !== 'lost')
       .map((k) => '<option value="' + k + '">' + stageLabel(k) + '</option>').join('');
     const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
     const agentOpts = dealAgentOptions(null);
-    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '">' + dt + '</option>').join('');
+    const curType = (DEAL_ENUMS.dealType.find((t) => funnelForType(t) === curFunnel.k)) || DEAL_ENUMS.dealType[0];
+    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '"' + (dt === curType ? ' selected' : '') + '>' + dt + '</option>').join('');
     const objectTypeOpts = DEAL_ENUMS.objectType.map((ot) => '<option value="' + ot + '">' + ot + '</option>').join('');
     const paymentFormOpts = DEAL_ENUMS.paymentForm.map((pf) => '<option value="' + pf + '">' + pf + '</option>').join('');
     const sourceOpts = DEAL_ENUMS.source.map((s) => '<option value="' + s + '">' + s + '</option>').join('');
@@ -9869,14 +9906,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
     const dealType = _g('nd_dealType') || 'Продажа';
-    const funnelMap = {
-      'Продажа': 'sale',
-      'Аренда': 'rent',
-      'Управление арендой': 'manage',
-      'Эксклюзив': 'exclusive',
-      'Кросс-продажи': 'cross',
-      'Консалтинг': 'consult'
-    };
+    const funnel = funnelForType(dealType);
+    // The stage list came from the board in view; the funnel comes from the chosen service. If the
+    // agent changed the service after opening the form, the stage is pulled into the new funnel
+    // instead of filing the deal where no column can draw it.
+    const stage = clampStage(funnel, _g('nd_stage') || 'work');
     // The essence is what the deal is called everywhere afterwards; fall back to the client's name
     // only when the agent left it blank, which is what the card used to do unconditionally.
     const title = (_g('nd_title') || '').trim() || c.name || 'Сделка';
@@ -9886,7 +9920,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
       return now.d + ' ' + months[now.mo];
     })();
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'work', title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnelMap[dealType] || 'sale', dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: _g('nd_readiness') || 'готовый', saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
+    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: stage, title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnel, dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: _g('nd_readiness') || 'готовый', saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
     closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 
@@ -11054,7 +11088,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="feed" style="padding:2px 16px 10px">' + rows + '</div></div>';
   }
   function contractMilestones(k, forClient) {
-    const rows = (k.milestones || []).map((m, i) => {
+    // `internalOnly` is a promise the model makes: such a milestone never reaches the client side,
+    // however the cabinet is eventually built. Honouring it only in a comment is worse than not
+    // making the promise — the preview would be showing what it claims it never shows.
+    const src = (k.milestones || []).filter((m) => !(forClient && m.internalOnly));
+    const rows = src.map((m, i) => {
       const cls = m.state === 'done' ? 'done' : (m.state === 'now' ? 'now' : 'wait');
       const icon = m.state === 'done' ? 'check' : (m.state === 'now' ? 'clock' : 'dot');
       const text = forClient ? (m.client || m.label) : m.label;
@@ -11062,7 +11100,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<span class="ms-t"><span class="ms-l">' + text + '</span>' +
         '<span class="ms-a">' + (m.at || '—') + '</span></span></div>';
     }).join('');
-    return '<div class="ms-list">' + rows + '</div>';
+    const hidden = (k.milestones || []).length - src.length;
+    return '<div class="ms-list">' + rows + '</div>' +
+      (forClient && hidden ? '<div class="gate-foot">Скрыто от клиента: ' + hidden + ' ' +
+        plural(hidden, 'внутренняя веха', 'внутренние вехи', 'внутренних вех') + '.</div>' : '');
   }
   function contractMoney(k) {
     const m = commissionState(k);
@@ -11583,7 +11624,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-act]');
     if (!t) return;
     const d = t.dataset;
 
