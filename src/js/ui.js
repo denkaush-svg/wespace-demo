@@ -206,10 +206,11 @@
     const A = D().attribution || []; const deals = D().deals || [];
     const leads = A.reduce((s, x) => s + x.leads, 0);
     const won = A.reduce((s, x) => s + x.deals, 0);
-    const saleFunnels = ['sale_offplan', 'sale_ready', 'rental_biz', 'referral'];
-    const activeSales = deals.filter((d) => d.stage !== 'done' && saleFunnels.indexOf(d.funnel) >= 0);
+    // Every funnel earns a commission now — the old list named four product boards, which is the
+    // very distinction the service axis removed.
+    const activeSales = deals.filter((d) => !dealClosed(d));
     const expectedComm = Math.round(activeSales.reduce((s, d) => s + dealCommission(d), 0));
-    const closed = deals.filter((d) => d.stage === 'done');
+    const closed = deals.filter(dealWon);
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
   }
 
@@ -247,7 +248,7 @@
   // Either way, a deal that closes DURING the demo is added on top, so the figure moves on screen.
   function closedBook(scope, period) {
     const deals = goalDeals(scope);
-    const live = deals.filter((d) => d.stage === 'done');
+    const live = deals.filter(dealWon);
     if (scope === 'team') {
       const attr = D().attribution || [];
       return {
@@ -265,7 +266,7 @@
     const deals = goalDeals(scope);
     if (goal.metric === 'commission') return closedBook(scope, goal.period).commission;
     if (goal.metric === 'deals') return closedBook(scope, goal.period).deals;
-    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => d.stage !== 'done').reduce((s2, d) => s2 + (d.amount || 0), 0));
+    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => !dealClosed(d)).reduce((s2, d) => s2 + (d.amount || 0), 0));
     if (goal.metric === 'shows') {
       // Events carry no owner, so a show counts as mine when its client is on one of my deals — and
       // only once it has actually happened: a viewing booked for 16:00 is not a показ at 9:12.
@@ -370,7 +371,7 @@
     const m = computeMetrics();
     // Goes through the query layer rather than filtering here, so the headline number
     // and the records a person can open behind it are produced by the same code path.
-    const ACTIVE = [{ field: 'stage', op: 'ne', value: 'done' }];
+    const ACTIVE = [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }];
     const qActive = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } });
     const qActiveSum = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } });
     const active = qActive.rows;
@@ -405,7 +406,7 @@
     const tasks = D().tasks || []; const events = D().events || []; const deals = D().deals || [];
     const overdue = tasks.filter((t) => t.status !== 'done' && t.when === 'overdue').length;
     const shows = events.filter((e) => e.kind === 'show').length;
-    const closed = deals.filter((d) => d.stage === 'done').length;
+    const closed = deals.filter(dealWon).length;
     const hot = deals.filter((d) => d.hot).length;
     const row = (ic, tone, label, val, act) => '<button class="digest-row" ' + act + '><span class="di ' + tone + '">' + I(ic) + '</span><span class="dl">' + label + '</span><span class="dvv">' + val + '</span>' + I('arrowRight') + '</button>';
     return '<div class="section-label" style="margin-top:24px">Дайджест дня <span class="badge demo">' + I('lock') + 'демо</span></div>' +
@@ -459,9 +460,9 @@
       rows = list.map((t) => { const c = D().clients.find((x) => x.id === t.clientId) || {}; return '<div class="feed-row" data-client="' + t.clientId + '" style="cursor:pointer"><div class="fi i-stop">' + I('warn') + '</div><div class="ft"><div class="t">' + t.title + '</div><div class="m">' + (c.name || '') + ' · ' + t.due + '</div></div>' + I('arrowRight') + '</div>'; }).join('');
     } else {
       let list = deals;
-      if (kind === 'closed') { title = 'Закрытые сделки'; list = deals.filter((d) => d.stage === 'done'); }
+      if (kind === 'closed') { title = 'Успешные сделки'; list = deals.filter(dealWon); }
       else if (kind === 'hot') { title = 'Горячие сделки · SLA < 2 ч'; list = deals.filter((d) => d.hot); }
-      else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => d.stage !== 'done'); }
+      else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d)); }
       else if (kind.indexOf('src:') === 0) { const s = kind.slice(4); title = 'Сделки · источник «' + s + '»'; list = deals.filter((d) => d.source === s); }
       rows = list.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') + '</div></div>' + I('arrowRight') + '</div>').join('');
     }
@@ -497,7 +498,7 @@
   function viewStart() {
     const st = S();
     const a = D().analytics;
-    const _active = (D().deals || []).filter((x) => x.stage !== 'done');
+    const _active = (D().deals || []).filter((x) => !dealClosed(x));
     const _dealsActive = _active.length;
     const _pipeline = Math.round(_active.reduce((s2, x) => s2 + (x.amount || 0), 0) / 1e5) / 10;
     const hour = WS.fixtures.DEMO_NOW.h;
@@ -1182,10 +1183,11 @@
   }
   // R7: saved deterministic views — same query → same list. Applied on top of the funnel filter.
   const SAVED_VIEWS = [
-    { k: 'nocontact', label: 'Без движения сегодня', pred: (d) => d.stageDays >= 1 && d.stage !== 'done' },
-    { k: 'nonext', label: 'Без плана действий', pred: (d) => !d.hot && d.stage === 'new' },
-    { k: 'commissions', label: 'Ожидаемые комиссии', pred: (d) => ['sale_offplan', 'sale_ready', 'rental_biz'].indexOf(d.funnel) >= 0 && d.stage !== 'done' },
-    { k: 'nodocs', label: 'Без документов', pred: (d) => d.stage === 'new' || d.stage === 'work' },
+    { k: 'nocontact', label: 'Без движения сегодня', pred: (d) => d.stageDays >= 1 && !dealClosed(d) },
+    { k: 'nonext', label: 'Без плана действий', pred: (d) => !d.hot && d.stage === 'work' },
+    { k: 'commissions', label: 'Ожидаемые комиссии', pred: (d) => !dealClosed(d) && (d.amount || 0) > 0 },
+    // «Без документов» = still on the approach, before anything is drafted: подбор, КП, показ, осмотр.
+    { k: 'nodocs', label: 'Без документов', pred: (d) => ['work', 'pick', 'kp', 'req', 'show', 'visit'].indexOf(d.stage) >= 0 },
     { k: 'stuck', label: 'Застряли в стадии', pred: (d) => d.stageDays >= 5 },
   ];
   function activeViewPred() { const v = SAVED_VIEWS.find((x) => x.k === S().savedView); return v ? v.pred : null; }
@@ -1198,9 +1200,9 @@
   }
   // R2: funnel switcher — each funnel is the same 4-column board, columns relabeled as its milestones.
   function funnelSwitcher() {
-    const fk = S().dealFunnel || 'sale_offplan';
+    const fk = S().dealFunnel || 'sale';
     const btns = (WS.FUNNELS || []).map((f) => {
-      const n = D().deals.filter((d) => (d.funnel || 'sale_offplan') === f.k).length;
+      const n = D().deals.filter((d) => (d.funnel || 'sale') === f.k).length;
       return '<button class="fn-pill' + (f.k === fk ? ' on' : '') + '" data-funnel="' + f.k + '">' + f.label + '<span class="fn-n">' + n + '</span></button>';
     }).join('');
     return '<div class="funnel-switch">' + btns + '</div>';
@@ -1256,25 +1258,44 @@
       '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + ds.length + ' сделок</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
   }
-  const STAGES = [{ k: 'new', label: 'Новая заявка' }, { k: 'work', label: 'В работе' }, { k: 'docs', label: 'Документы' }, { k: 'done', label: 'Закрыта' }];
-  function stageLabel(k) { const s = STAGES.find((x) => x.k === k); return s ? s.label : k; }
+  // Stages live in fixtures next to the funnels that order them. STAGES is the canonical SPINE —
+  // every stage any funnel uses, in the order work → … → won → lost. It is what cross-funnel views
+  // (the manager's consolidated funnel, the stage breakdown) group by; a single funnel's board uses
+  // its own subset instead.
+  const STAGE_LABELS = (WS.fixtures && WS.fixtures.STAGE_LABELS) || {};
+  const STAGES = Object.keys(STAGE_LABELS).map((k) => ({ k: k, label: STAGE_LABELS[k] }));
+  function stageLabel(k) { return STAGE_LABELS[k] || k; }
+  function funnelOf(d) {
+    return (WS.FUNNELS || []).find((x) => x.k === (d && d.funnel)) || (WS.FUNNELS || [])[0] || { k: '', label: '', stages: [] };
+  }
+  // The path a deal walks. «Проигрыш» is an exit, not a step, so it is off the path: the stepper
+  // draws a route, and a route with a dead end drawn as its last milestone reads as the goal.
+  function funnelPath(d) { return (funnelOf(d).stages || []).filter((k) => k !== 'lost'); }
+  // Terminal state. `closed` = off the board either way; `won` = business we actually earned on.
+  // Every money figure must use `dealWon`, every «в работе» figure `!dealClosed` — a lost deal
+  // counted as closed revenue is the single most expensive mistake this split can make.
+  function dealClosed(d) { return !!d && (d.stage === 'won' || d.stage === 'lost'); }
+  function dealWon(d) { return !!d && d.stage === 'won'; }
   function dealFireBadge() { return '<span class="deal-fire" title="Требует действия">' + I('flame') + '</span>'; }
   function kanbanDeals(isMgr) {
     // R2: board is scoped to the selected funnel; the 4 stage-columns are relabeled as
     // that funnel's milestone projection. Manual move (◀▶) still writes a stage event.
-    const fk = S().dealFunnel || 'sale_offplan';
+    const fk = S().dealFunnel || 'sale';
     const funnel = (WS.FUNNELS || []).find((x) => x.k === fk) || (WS.FUNNELS || [])[0];
     const pred = activeViewPred();
-    const cols = STAGES.map((sg, si) => {
-      const colLabel = (funnel && funnel.cols[si]) || sg.label;
-      const ds = D().deals.filter((d) => d.stage === sg.k && (d.funnel || 'sale_offplan') === fk && (!pred || pred(d)) && dealExtraPred(d));
+    const stages = (funnel && funnel.stages) || [];
+    const path = stages.filter((k) => k !== 'lost');
+    const cols = stages.map((sk) => {
+      const colLabel = stageLabel(sk);
+      const ds = D().deals.filter((d) => d.stage === sk && (d.funnel || 'sale') === fk && (!pred || pred(d)) && dealExtraPred(d));
       const cards = ds.map((d) => {
         const c = D().clients.find((x) => x.id === d.clientId) || {};
         const o = dealObject(d);
         const tags = (d.tags || []).map((t) => '<span class="badge">' + t + '</span>').join('');
         const consent = c.consent === false ? '<span class="badge stop">' + I('lock') + 'нет согласия</span>' : '';
         const agent = isMgr ? '<span class="badge info">' + I('users') + agentName(d.agent) + '</span>' : '';
-        const canPrev = si > 0, canNext = si < STAGES.length - 1;
+        const pi = path.indexOf(d.stage);
+        const canPrev = pi > 0, canNext = pi >= 0 && pi < path.length - 1;
         const move = '<div class="dmove">' +
           '<button class="kmv" data-dealmove="' + d.id + '" data-dir="prev" title="Назад по стадии"' + (canPrev ? '' : ' disabled') + '>' + I('chevLeft') + '</button>' +
           '<button class="kmv" data-dealmove="' + d.id + '" data-dir="next" title="Вперёд по стадии"' + (canNext ? '' : ' disabled') + '>' + I('chevRight') + '</button></div>';
@@ -1284,9 +1305,15 @@
           '<div class="dm">' + (o ? o.name.split(',')[0] : d.sub) + ' · ' + WS.AED(d.amount || 0) + '</div>' +
           '<div class="dfoot"><div class="dtag">' + tags + consent + agent + '</div>' + move + '</div></div></div>';
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 6px">пусто</div>';
-      return '<div class="kcol"><div class="kh"><span>' + colLabel + '</span><span class="c">' + ds.length + '</span></div>' + cards + '</div>';
+      const term = sk === 'won' ? ' kcol-won' : (sk === 'lost' ? ' kcol-lost' : '');
+      return '<div class="kcol' + term + '"><div class="kh"><span>' + colLabel + '</span><span class="c">' + ds.length + '</span></div>' + cards + '</div>';
     }).join('');
-    return '<div class="kanban">' + cols + '</div>';
+    // Nine or ten columns do not fit any screen, so the board scrolls sideways. A scroller with no
+    // affordance reads as a board that ends where the viewport does — say how many stages there are.
+    const hint = stages.length > 4
+      ? '<div class="kanban-hint">' + I('arrowRight') + 'Стадий в воронке — ' + stages.length + ' · доска прокручивается вбок</div>'
+      : '';
+    return hint + '<div class="kanban">' + cols + '</div>';
   }
   // Table view of deals (item 3): sortable-feeling list with object photo + client + amount (+agent for manager)
   function dealsTable(isMgr) {
@@ -1310,11 +1337,15 @@
   }
   function moveDealDir(id, dir) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
-    const i = STAGES.findIndex((s) => s.k === d.stage);
+    const path = funnelPath(d);
+    // A lost deal is not on the path. Stepping it back reopens it onto the last working stage,
+    // which is what «вернуть в работу» means; stepping it forward does nothing.
+    let i = path.indexOf(d.stage);
+    if (i < 0) i = d.stage === 'lost' ? path.length - 1 : 0;
     const ni = dir === 'next' ? i + 1 : i - 1;
-    if (ni < 0 || ni >= STAGES.length) return;
-    WS.storeApi.setDealStage(id, STAGES[ni].k);
-    WS.storeApi.toast('Сделка «' + d.title + '» → ' + STAGES[ni].label, 'ok');
+    if (ni < 0 || ni >= path.length) return;
+    WS.storeApi.setDealStage(id, path[ni]);
+    WS.storeApi.toast('Сделка «' + d.title + '» → ' + stageLabel(path[ni]), 'ok');
   }
   // demo KYC state per contact (physical person screening)
   function kycOf(c) {
@@ -1408,7 +1439,7 @@
     // 2. How much of our book runs through it.
     if (deals.length) {
       const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
-      const open = deals.filter((d) => d.stage !== 'done');
+      const open = deals.filter((d) => !dealClosed(d));
       let vol = 'Через компанию идёт ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
         ' на ' + WS.AED(total);
       if (open.length) {
@@ -1448,7 +1479,7 @@
   }
   function companyOps(co) {
     const deals = (D().deals || []).filter((d) => d.companyId === co.id);
-    const activeDeal = deals.find((d) => d.stage !== 'done');
+    const activeDeal = deals.find((d) => !dealClosed(d));
     const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
     const primary = (co.people || []).find((p) => p.primary) || (co.people || [])[0];
     return opsStrip([
@@ -1735,7 +1766,7 @@
   function clientBriefSentences(c) {
     const out = [];
     const deals = (D().deals || []).filter((d) => d.clientId === c.id);
-    const active = deals.filter((d) => d.stage !== 'done');
+    const active = deals.filter((d) => !dealClosed(d));
     const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
 
     // 1. Who and what the request is.
@@ -1802,7 +1833,7 @@
   // Client-level lead ops (derived): owner from the active deal, lifecycle stage, next contact from tasks.
   function clientOps(c) {
     const deals = (D().deals || []).filter((d) => d.clientId === c.id);
-    const deal = deals.find((d) => d.stage !== 'done') || deals[0];
+    const deal = deals.find((d) => !dealClosed(d)) || deals[0];
     const owner = deal ? agentName(deal.agent) : 'не назначен';
     const stage = deal ? ({ new: 'Новый лид', work: 'В переговорах', docs: 'Документы', done: 'Закрыт' })[deal.stage] : 'Без активной сделки';
     const nextTask = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done')
@@ -1915,6 +1946,9 @@
     const co = (D().companies || []).find((x) => x.id === d.companyId);
     const p = d.prov || {};
     return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
+      dealField('Готовность', d.readiness, p.readiness, d.id + ':readiness') +
+      (d.saleKind ? dealField('Вид сделки', d.saleKind, p.saleKind, d.id + ':saleKind') : '') +
+      dealField('Сторона клиента', d.side, p.side, d.id + ':side') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
       dealField('Источник (из заявки)', d.source, p.source, d.id + ':source') +
       dealField('Компания', co ? '<span data-company="' + co.id + '" style="cursor:pointer;border-bottom:1px solid var(--acc-line)">' + co.name + '</span> · ' + co.kind : '—', 'confirmed') +
@@ -2255,20 +2289,22 @@
   // Deal card = the DEAL (not the contact). Contacts are one click away.
   // ---- Deal card v2: tabbed shell + funnel-aware stage stepper + context Concierge ----
   function funnelSteps(d) {
-    const f = (WS.FUNNELS || []).find((x) => x.k === d.funnel);
-    const cols = (f && f.cols) || ['Новая заявка', 'В работе', 'Документы', 'Закрыта'];
-    const order = ['new', 'work', 'docs', 'done'];
+    const f = funnelOf(d);
+    const order = funnelPath(d);
     const idx = Math.max(0, order.indexOf(d.stage));
-    return { cols: cols, idx: idx, order: order, label: (f && f.label) || stageLabel(d.stage) };
+    return { cols: order.map(stageLabel), idx: idx, order: order, label: f.label || stageLabel(d.stage), lost: d.stage === 'lost' };
   }
   function dealStepper(d) {
     const s = funnelSteps(d);
+    // A lost deal has no current step on the path — showing one would claim progress it does not
+    // have. The route is drawn as history, and the exit is stated once, plainly.
     const steps = s.cols.map((c, i) => {
-      const cls = i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo');
-      const inner = i < s.idx ? I('check') : String(i + 1);
+      const cls = s.lost ? 'todo' : (i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo'));
+      const inner = (!s.lost && i < s.idx) ? I('check') : String(i + 1);
       return '<button class="dx-step ' + cls + '" data-dealstage="' + d.id + '" data-stage="' + s.order[i] + '"><span class="d">' + inner + '</span><span class="l">' + c + '</span></button>';
     }).join('');
-    return '<div class="dx-stepper">' + steps + '</div>';
+    const lostChip = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
+    return '<div class="dx-stepper' + (s.cols.length > 7 ? ' long' : '') + '">' + steps + '</div>' + lostChip;
   }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
@@ -2344,7 +2380,7 @@
     if (tab === 'docs') {
       const kpN = dealKpObjects(d).length;
       const kpBtn = kpN ? '<button class="btn xs" data-act="openDealKp" data-deal="' + d.id + '">' + I('doc') + 'КП сделки · ' + kpN + '</button>' : '';
-      return docChainBlock(dealStageIdx(d), kpN > 0, kpBtn) + '<div style="height:14px"></div>' +
+      return docChainBlock(docIdx(d), kpN > 0, kpBtn) + '<div style="height:14px"></div>' +
         dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
     }
     if (tab === 'history') return dealHistoryTab(d);
@@ -2386,8 +2422,8 @@
   // ---- Deal header v2: the DEAL reads first — a plain-language sentence, the client (callable),
   // and a "now" summary. The object is demoted to a compact card in the overview (dealLotsBlock).
   function dealActionWord(d) {
-    return ({ sale_offplan: 'Покупка', sale_ready: 'Покупка', rent: 'Аренда',
-      fitout: 'Fit-out', rental_biz: 'Доходный актив', referral: 'Передача партнёру' })[d.funnel] || 'Сделка';
+    return ({ sale: 'Покупка', rent: 'Аренда', manage: 'Управление', exclusive: 'Эксклюзив',
+      cross: 'Партнёрская услуга', consult: 'Консалтинг' })[d.funnel] || 'Сделка';
   }
   // A deal may hold several lots under one contract (Part B). Falls back to the single object.
   function dealLots(d) {
@@ -2396,7 +2432,9 @@
   }
   function dealLotsLabel(d) {
     const lots = dealLots(d);
-    if (!lots.length) return 'объект не выбран';
+    // On an owner-side service the object is the client's own asset and never comes out of our
+    // inventory, so «объект не выбран» reported a gap that does not exist.
+    if (!lots.length) return (d.funnel === 'manage' || d.funnel === 'exclusive') ? 'объект клиента' : 'объект не выбран';
     if (lots.length === 1) return lots[0].name;
     return lots.length + ' лота · ' + lots[0].name.split(',')[0] + ' +' + (lots.length - 1);
   }
@@ -2518,7 +2556,12 @@
   function dealKeyCard(d) {
     const p = d.prov || {};
     const o0 = dealLots(d)[0];
-    const commPayer = ({ sale_offplan: 'застройщик', sale_ready: 'покупатель', rent: 'арендатор', rental_biz: 'покупатель' })[d.funnel] || 'по договору';
+    // Who pays us: on a primary sale the developer, on a resale the buyer, on a lease the tenant,
+    // on an owner-side service the owner, on a partner service the partner.
+    const commPayer = d.funnel === 'sale' ? (d.saleKind === 'первичка' ? 'застройщик' : 'покупатель')
+      : d.funnel === 'rent' ? 'арендатор'
+      : (d.funnel === 'manage' || d.funnel === 'exclusive') ? 'собственник'
+      : d.funnel === 'cross' ? 'партнёр' : 'по договору';
     const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) + ' · платит ' + commPayer : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
     const dep = depositLabel(d);
@@ -2571,7 +2614,7 @@
 
     // 4. Whose move. The agent's name goes after a dash rather than into a case-inflected phrase —
     // "Ход за Марина Волкова" is the kind of un-Russian line a template produces.
-    if (d.stage !== 'done') {
+    if (!dealClosed(d)) {
       const step = nbaActions(d).doIt[0] || 'Согласовать следующий шаг с клиентом';
       // `nextDue` holds either a date («сегодня 16:00») or an overdue marker («просрочено (касание)»);
       // only the former makes sense after the word «срок», and the latter is already in «Мешает».
@@ -2713,7 +2756,7 @@
     const sel = off.filter((o) => o.state === 'selected').length;
     const rej = off.filter((o) => o.state === 'rejected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length && deals.every((d) => d.stage === 'done')) return { label: 'Закрыта', tone: 'ok', icon: 'check' };
+    if (deals.length && deals.every(dealClosed)) return { label: deals.every(dealWon) ? 'Успех' : 'Закрыта', tone: deals.every(dealWon) ? 'ok' : '', icon: deals.every(dealWon) ? 'check' : 'x' };
     if (deals.length) return { label: 'В работе', tone: 'acc', icon: 'briefcase' };
     if (r.kp && r.kp.formed) return { label: 'КП собрано', tone: 'info', icon: 'doc' };
     if (sel) return { label: 'Клиент выбрал', tone: 'warn', icon: 'target' };
@@ -2741,7 +2784,8 @@
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length && deals.every((d) => d.stage === 'done')) return 'сделка закрыта — комиссия зафиксирована.';
+    if (deals.length && deals.every(dealWon)) return 'сделка закрыта успешно — комиссия начислена, ведём договор.';
+    if (deals.length && deals.every(dealClosed)) return 'сделка проиграна — заявка закрыта.';
     if (deals.length) return 'ведём сделку — согласуем условия и готовим документы.';
     if (r.kp && r.kp.formed) return 'КП собрано — ждём решение клиента.';
     if (sel) return 'клиент выбрал ' + sel + ' из ' + off.length + ' — собираем КП.';
@@ -2753,7 +2797,8 @@
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
     if (deals.length) {
-      if (deals.every((d) => d.stage === 'done')) return 'Запросить отзыв и рекомендации у клиента';
+      if (deals.every(dealWon)) return 'Запросить отзыв и рекомендации у клиента';
+      if (deals.every(dealClosed)) return 'Разобрать причину проигрыша и вернуть клиента в работу';
       const fd = deals.slice().sort((a, b) => dealStageIdx(b) - dealStageIdx(a))[0];
       return nbaActions(fd).doIt[0]; // mirror the deal's concrete operational step
     }
@@ -2800,7 +2845,7 @@
   function reqOfferStatus(r, off) {
     const dealObjIds = {};
     dealsOfRequest(r.id).forEach((d) => {
-      const done = d.stage === 'done';
+      const done = dealWon(d);
       (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
     });
     if (dealObjIds[off.id]) return dealObjIds[off.id] === 'done' ? { label: 'Сделка закрыта', tone: 'ok', icon: 'check' } : { label: 'В сделке', tone: 'acc', icon: 'briefcase' };
@@ -2906,7 +2951,7 @@
     if (tab === 'history') return requestHistoryTab(r);
     // docs — КП + документооборот КП→MOU→SPA→DLD (объекты, профиль, сделки — в основной части)
     const rDeals = dealsOfRequest(r.id);
-    const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(dealStageIdx)) : -1;
+    const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(docIdx)) : -1;
     return reqKpBlock(r) + '<div style="height:14px"></div>' + docChainBlock(sidx, !!(r.kp && r.kp.formed), '');
   }
   function requestSpec(id) {
@@ -3011,7 +3056,7 @@
       terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
     D().deals.push({ id: nid, clientId: r.clientId, companyId: null,
       title: (c.name || 'Клиент') + ' · ' + (objs[0] ? objs[0].name.split(',')[0] : 'сделка'),
-      funnel: 'sale_offplan', stage: 'new', stageDays: 0, amount: amount, hot: false,
+      funnel: 'sale', stage: 'work', stageDays: 0, amount: amount, hot: false,
       goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source, objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
       requestId: r.id, lots: sel, objectId: sel[0], consideredProjects: objs.map((o) => o.name), kpSnapshot: kpSnapshot, prov: {} });
     D().dealTimeline = D().dealTimeline || {};
@@ -3103,7 +3148,15 @@
       '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
   // Document pipeline of a deal: КП → MOU → SPA → DLD, statuses derived from the deal stage.
-  function dealStageIdx(d) { const m = { new: 0, work: 1, docs: 2, done: 3 }; return (d && m[d.stage] != null) ? m[d.stage] : 0; }
+  // Position along the deal's own funnel — used to order deals by how far along they are.
+  function dealStageIdx(d) { const i = funnelPath(d).indexOf(d && d.stage); return i < 0 ? 0 : i; }
+  // The КП→MOU→SPA→DLD strip has four steps and the funnels now have six to nine, so the position
+  // is projected onto those four rather than read as an index. Replaced wholesale by the gate layer.
+  function docIdx(d) {
+    const path = funnelPath(d);
+    if (!path.length) return 0;
+    return Math.min(3, Math.round((dealStageIdx(d) / Math.max(1, path.length - 1)) * 3));
+  }
   function docChainStatuses(sidx, hasKp) {
     const defs = [['КП', 'Коммерческое предложение', 'Собрано'], ['MOU', 'Договор о намерениях', 'Подписан'],
       ['SPA', 'Договор купли-продажи', 'Подписан'], ['DLD', 'Регистрация в Земельном департаменте', 'Зарегистрирован']];
@@ -3150,8 +3203,14 @@
     return ids.map((id) => '<option value="' + id + '"' + (id === current ? ' selected' : '') + '>' + agentName(id) + '</option>').join('');
   }
   const DEAL_ENUMS = {
-    dealType: ['Продажа · off-plan', 'Продажа · готовое', 'Аренда', 'Fit-out', 'Готовый арендный бизнес', 'Передано партнёру'],
-    objectType: ['off-plan', 'готовое', 'офис', 'ритейл', 'вилла', 'склад', 'земля'],
+    dealType: ['Продажа', 'Аренда', 'Управление арендой', 'Эксклюзив', 'Кросс-продажи', 'Консалтинг'],
+    // Readiness and the kind of transfer used to be smuggled into «тип объекта» («off-plan» sat in
+    // the same list as «офис»). They are separate questions, and it is their PAIR that decides which
+    // gates a deal has to pass — so they are separate fields.
+    objectType: ['апартаменты', 'вилла', 'офис', 'ритейл', 'склад', 'ГАБ', 'земля'],
+    readiness: ['оффплан', 'готовый'],
+    saleKind: ['', 'первичка', 'вторичка', 'переуступка', 'дарение', 'наследование'],
+    side: ['покупатель', 'арендатор', 'собственник'],
     paymentForm: ['100% оплата', 'Рассрочка от застройщика', 'Ипотека', 'Годовой чек', 'Поэтапно'],
     source: ['Property Finder', 'Bayut', 'Dubizzle', 'Instagram', 'Реферал', 'Клуб', 'Импорт'],
   };
@@ -3163,7 +3222,9 @@
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Прямое редактирование первоклассно. Сохранение помечает поля как «подтверждено человеком».</p>' +
       '<div class="match-grid">' +
       '<label class="fld"><span>Бюджет, AED</span><input id="df_amount" type="text" value="' + (d.amount || '') + '"></label>' +
-      sel('dealType', 'Тип сделки') + sel('objectType', 'Тип объекта') + sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
+      sel('dealType', 'Тип сделки') + sel('side', 'Сторона клиента') +
+      sel('objectType', 'Тип объекта') + sel('readiness', 'Готовность') + sel('saleKind', 'Вид сделки') +
+      sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
       '<label class="fld"><span>Цель</span><input id="df_goal" type="text" value="' + ((d.goal || '').replace(/"/g, '&quot;')) + '"></label>' +
       '<label class="fld"><span>Компания</span><select id="df_company"><option value="">—</option>' + companyOpts + '</select></label>' +
       '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
@@ -3177,14 +3238,14 @@
     const g = (k) => { const el = document.getElementById('df_' + k); return el ? el.value : d[k]; };
     const amt = parseInt((g('amount') || '').toString().replace(/\D/g, ''), 10);
     d.amount = amt || d.amount;
-    ['dealType', 'objectType', 'paymentForm', 'source', 'goal', 'company', 'agent'].forEach((k) => {
+    ['dealType', 'objectType', 'readiness', 'saleKind', 'side', 'paymentForm', 'source', 'goal', 'company', 'agent'].forEach((k) => {
       const val = g(k);
       if (k === 'company') d.companyId = val || null;
       else if (k === 'agent') d.agent = val;
       else d[k] = val;
     });
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
-    d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' });
+    d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed' });
     WS.storeApi.save();
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
@@ -4481,11 +4542,11 @@
       const c = data.clients.find((x) => x.id === i.clientId) || {};
       const newId = 'd_ex_' + id;
       if (!data.deals.find((d) => d.id === newId)) {
-        data.deals.push({ id: newId, clientId: i.clientId, objectId: i.ex === 'unknown_object' ? null : 'o_creekline', agent: 'u_marina', amount: c.budget || 1500000, hot: true, stage: 'new', title: (c.name || 'Новый лид'), sub: 'Квалифицировано из исключения', tags: ['из инбокса'], updated: 'сейчас', funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: c.goal || 'Инвестиция', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Импорт', partnerAgent: null, companyId: null, consideredProjects: [], stageDays: 0, prov: { budget: 'ai', source: 'ai', goal: 'ai', objectType: 'ai', paymentForm: 'ai' } });
+        data.deals.push({ id: newId, clientId: i.clientId, objectId: i.ex === 'unknown_object' ? null : 'o_creekline', agent: 'u_marina', amount: c.budget || 1500000, hot: true, stage: 'work', title: (c.name || 'Новый лид'), sub: 'Квалифицировано из исключения', tags: ['из инбокса'], updated: 'сейчас', funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: c.goal || 'Инвестиция', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Импорт', partnerAgent: null, companyId: null, consideredProjects: [], stageDays: 0, prov: { budget: 'ai', source: 'ai', goal: 'ai', objectType: 'ai', paymentForm: 'ai' } });
       }
       data.inbox = data.inbox.filter((x) => x.id !== id);
-      WS.storeApi.toast('Квалифицировано → создана сделка в канбане (стадия «Новая заявка»)', 'ok');
-      WS.store.clientsTab = 'deals'; WS.store.dealFunnel = 'sale_offplan';
+      WS.storeApi.toast('Квалифицировано → создана сделка в канбане (стадия «В работе»)', 'ok');
+      WS.store.clientsTab = 'deals'; WS.store.dealFunnel = 'sale';
       WS.router.go('clients');
       return;
     }
@@ -4701,7 +4762,11 @@
   function openDealForm(prefClient) {
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '"' + (c.id === prefClient ? ' selected' : '') + '>' + c.name + '</option>').join('');
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
-    const stageOpts = STAGES.map((s) => '<option value="' + s.k + '">' + s.label + '</option>').join('');
+    // Stage options follow the funnel the form is currently on. Offering every stage of every
+    // funnel would let an agent file a lease deal at «Бронь (EOI)», which that funnel does not have.
+    const curFunnel = (WS.FUNNELS || []).find((x) => x.k === (S().dealFunnel || 'sale')) || (WS.FUNNELS || [])[0] || { stages: [] };
+    const stageOpts = (curFunnel.stages || []).filter((k) => k !== 'lost')
+      .map((k) => '<option value="' + k + '">' + stageLabel(k) + '</option>').join('');
     const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
     const agentOpts = dealAgentOptions(null);
     const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '">' + dt + '</option>').join('');
@@ -4718,6 +4783,9 @@
       '</div><div class="section-label">Условия</div><div class="match-grid">' +
       '<label class="fld"><span>Тип сделки</span><select id="nd_dealType">' + dealTypeOpts + '</select></label>' +
       '<label class="fld"><span>Тип объекта</span><select id="nd_objectType">' + objectTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Готовность</span><select id="nd_readiness">' + DEAL_ENUMS.readiness.map((r) => '<option value="' + r + '">' + r + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Вид сделки</span><select id="nd_saleKind">' + DEAL_ENUMS.saleKind.map((r) => '<option value="' + r + '">' + (r || '—') + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Сторона клиента</span><select id="nd_side">' + DEAL_ENUMS.side.map((r) => '<option value="' + r + '">' + r + '</option>').join('') + '</select></label>' +
       '<label class="fld"><span>Форма оплаты</span><select id="nd_paymentForm">' + paymentFormOpts + '</select></label>' +
       '<label class="fld"><span>Источник</span><select id="nd_source">' + sourceOpts + '</select></label>' +
       '<label class="fld"><span>Цель</span><input id="nd_goal" type="text"></label>' +
@@ -4731,14 +4799,14 @@
   }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
-    const dealType = _g('nd_dealType') || 'Продажа · off-plan';
+    const dealType = _g('nd_dealType') || 'Продажа';
     const funnelMap = {
-      'Продажа · off-plan': 'sale_offplan',
-      'Продажа · готовое': 'sale_ready',
+      'Продажа': 'sale',
       'Аренда': 'rent',
-      'Fit-out': 'fitout',
-      'Готовый арендный бизнес': 'rental_biz',
-      'Передано партнёру': 'referral'
+      'Управление арендой': 'manage',
+      'Эксклюзив': 'exclusive',
+      'Кросс-продажи': 'cross',
+      'Консалтинг': 'consult'
     };
     // The essence is what the deal is called everywhere afterwards; fall back to the client's name
     // only when the agent left it blank, which is what the card used to do unconditionally.
@@ -4749,7 +4817,7 @@
       const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
       return now.d + ' ' + months[now.mo];
     })();
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'new', title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnelMap[dealType] || 'sale_offplan', dealType: dealType, objectType: _g('nd_objectType') || 'off-plan', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
+    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'work', title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnelMap[dealType] || 'sale', dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: _g('nd_readiness') || 'готовый', saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
     closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 
@@ -4784,7 +4852,7 @@
   function teamAgentStats(id) {
     const list = D().deals.filter((d) => d.agent === id);
     const val = list.reduce((s, d) => s + (d.amount || 0), 0);
-    const active = list.filter((d) => d.stage !== 'done').length;
+    const active = list.filter((d) => !dealClosed(d)).length;
     const meta = TEAM_META[id] || { focus: '—', load: 50, conv: 30, sla: 90 };
     return { list: list, val: val, active: active, deals: list.length, meta: meta };
   }
@@ -4793,14 +4861,14 @@
   // «План месяца · N / 12» hard-coded the plan. Both are gone.
   function mgrTiles() {
     const deals = D().deals || [];
-    const active = deals.filter((d) => d.stage !== 'done');
+    const active = deals.filter((d) => !dealClosed(d));
     const pipeline = Math.round(active.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
     // Closed business for the period lives in `attribution` — the same book the goals read, so the
     // Пульс cannot contradict «План отдела» two blocks below it.
     const attr = D().attribution || [];
     const earned = attr.reduce((s, x) => s + (x.commission || 0), 0) +
-      Math.round(deals.filter((d) => d.stage === 'done').reduce((s, d) => s + dealCommission(d), 0));
-    const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter((d) => d.stage === 'done').length;
+      Math.round(deals.filter(dealWon).reduce((s, d) => s + dealCommission(d), 0));
+    const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter(dealWon).length;
     const unassigned = (D().inbox || []).length;
     const atRisk = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
     const avgSla = Math.round(Object.keys(TEAM_META).reduce((s, k) => s + TEAM_META[k].sla, 0) / Object.keys(TEAM_META).length);
@@ -5428,7 +5496,7 @@
     }).join('');
     const stat = '<div class="fin-kpis" style="margin-bottom:14px">' +
       '<div class="kpi"><div class="kv">' + (D().objects || []).length + '</div><div class="kk">Объектов в работе</div></div>' +
-      '<div class="kpi"><div class="kv">' + (D().deals || []).filter((d) => d.stage === 'done').length + '</div><div class="kk">Закрыто · демо</div></div>' +
+      '<div class="kpi"><div class="kv">' + (D().deals || []).filter(dealWon).length + '</div><div class="kk">Закрыто · демо</div></div>' +
       '<div class="kpi"><div class="kv">2–3%</div><div class="kk">Типовая комиссия</div></div></div>';
     const portfolio = '<div class="card" style="margin:16px 0 12px"><div class="section-label" style="padding:12px 16px 4px">Портфолио · кейсы</div><div class="feed" style="padding:0 16px 8px">' +
       PORTFOLIO.map((c) => '<div class="feed-row"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + c[0] + '</div><div class="m">' + c[2] + '</div></div><span class="badge ok" style="white-space:nowrap">' + I('check') + c[1] + '</span></div>').join('') + '</div></div>';
@@ -5457,8 +5525,8 @@
     const isMgr = S().role === 'manager';
     const role = isMgr ? 'Руководитель отдела · Harbour Key Realty' : 'Брокер · коммерческая недвижимость';
     const deals = D().deals || [];
-    const active = deals.filter((d) => d.stage !== 'done').length;
-    const closed = deals.filter((d) => d.stage === 'done').length;
+    const active = deals.filter((d) => !dealClosed(d)).length;
+    const closed = deals.filter(dealWon).length;
     const badges = '<span class="badge ok">' + I('shield') + 'RERA · BRN 41857</span>' +
       '<span class="badge acc">' + I('star') + 'Клуб · co-broking</span>' +
       '<span class="badge">' + I('check') + 'KYC подтверждён</span>';

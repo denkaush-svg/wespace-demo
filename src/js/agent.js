@@ -19,7 +19,8 @@
   const lc = (s) => String(s == null ? '' : s).toLowerCase();
 
   // ---------- hands ----------
-  const ACTIVE = [{ field: 'stage', op: 'ne', value: 'done' }];
+  // `where` is a conjunction, so «not terminal» is two conditions rather than one negated value.
+  const ACTIVE = [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }];
 
   // Named readings, each paired with the query that produced it so the number
   // stays openable rather than merely asserted.
@@ -27,7 +28,7 @@
     deals_active: { label: 'сделок в работе', q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
     deals_active_sum: { label: 'на сумму', money: true, q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } } },
     deals_hot: { label: 'горячих сделок', q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
-    deals_closed: { label: 'закрытых сделок', q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'done' }], aggregate: { fn: 'count' } } },
+    deals_closed: { label: 'успешных сделок', q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'won' }], aggregate: { fn: 'count' } } },
     tasks_open: { label: 'открытых задач', q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
     tasks_overdue: { label: 'просроченных задач', q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
     clients_total: { label: 'контактов', q: { from: 'clients', aggregate: { fn: 'count' } } },
@@ -126,7 +127,12 @@
     [/сделк|работе|активн|пайплайн|сумм/, ['deals_active', 'deals_active_sum']],
   ];
 
-  const STAGES = [[/новы|заявк/, 'new'], [/работ/, 'work'], [/документ|догов/, 'docs'], [/закрыт|заверш/, 'done']];
+  // Spoken stage names → keys. Ordered longest-intent first: «подготовк» must win over «работ»,
+  // and «проигр» over «закрыт», or a lost deal gets filed as a win.
+  const STAGES = [[/подбор/, 'pick'], [/кп|предложен/i, 'kp'], [/показ/, 'show'], [/встреч|осмотр/, 'visit'],
+    [/переговор/, 'talks'], [/подготовк/, 'prep'], [/брон/, 'book'], [/подписан|оплат/, 'sign'],
+    [/регистрац/, 'reg'], [/выполнен/, 'exec'], [/проигр|отказ/, 'lost'], [/успех|закрыт|заверш|выигр/, 'won'],
+    [/работ/, 'work']];
   const WHEN = [[/послезавтра/, ['послезавтра', 'tomorrow']], [/завтра/, ['завтра', 'tomorrow']], [/сегодня/, ['сегодня', 'today']]];
 
   function suggestions() {

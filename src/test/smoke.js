@@ -629,11 +629,11 @@ setTimeout(async () => {
 
     // ---- a guarded change still needs the confirmation, through the agent too ----
     const dealStageWas = dealBy('d_anna').stage;
-    const p2 = AG.ask('переведи сделку Анны в стадию документы');
+    const p2 = AG.ask('переведи сделку Анны в стадию подготовка');
     check('agent · a stage change is proposed, not applied', !!p2 && p2.kind === 'proposal' && dealBy('d_anna').stage === dealStageWas);
     check('agent · the proposal is marked as needing confirmation', p2.tier === 'guarded', 'tier=' + (p2 && p2.tier));
     AG.confirm(p2.id);
-    check('agent · confirmed stage change lands', dealBy('d_anna').stage === 'docs', 'stage=' + dealBy('d_anna').stage);
+    check('agent · confirmed stage change lands', dealBy('d_anna').stage === 'prep', 'stage=' + dealBy('d_anna').stage);
 
     // ---- a task request creates a task, once confirmed ----
     const tasksWas2 = dd().tasks.length;

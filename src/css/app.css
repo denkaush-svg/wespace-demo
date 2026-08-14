@@ -376,8 +376,24 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    KANBAN (deals)
    ============================================================ */
+.kanban-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint);
+  margin: 0 0 8px 2px; }
+.kanban-hint svg { width: 13px; height: 13px; opacity: .7; }
 .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: 268px; gap: 14px; overflow-x: auto; padding-bottom: 12px; }
 .kcol { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; }
+/* Terminal columns read as outcomes, not as two more steps: a won column is the only green thing
+   on the board, a lost one recedes. Nine columns now scroll — .kanban already carries overflow-x. */
+.kcol-won { background: var(--ok-soft, var(--surface-2)); border-color: var(--ok-line, var(--line)); }
+.kcol-lost { opacity: .72; }
+.kcol-won .kh, .kcol-lost .kh { letter-spacing: .01em; }
+/* A deal that ended in a loss has no current step; the stepper greys out and states the exit once. */
+.dx-lost { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+  color: var(--stop); background: var(--stop-soft, transparent); border: 1px solid var(--stop);
+  border-radius: 999px; padding: 4px 12px; margin: -4px 0 12px; }
+/* Six-to-nine stages fit only if the labels give way; below eight steps nothing changes. */
+.dx-stepper.long .dx-step .l { font-size: 10.5px; max-width: 92px; margin-top: 6px; }
+.dx-stepper.long .dx-step .d { width: 26px; height: 26px; font-size: 11.5px; }
+.dx-stepper.long .dx-step::before { top: 12px; }
 .kcol .kh { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink); padding: 4px 6px 10px; }
 .kcol .kh .c { font-size: 11px; color: var(--mut); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 1px 8px; }
 .deal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px; margin-bottom: 9px; box-shadow: var(--shadow-sm); cursor: pointer; transition: .15s var(--ease); }

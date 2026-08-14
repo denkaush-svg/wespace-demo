@@ -4,7 +4,7 @@
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 15; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking).
+  const SCHEMA = 16; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -30,7 +30,7 @@
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
-    capture: {}, dealFunnel: 'sale_offplan', dealsFilter: {}, savedView: null,
+    capture: {}, dealFunnel: 'sale', dealsFilter: {}, savedView: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
     cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
@@ -153,7 +153,7 @@
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
-    store.capture = {}; store.dealFunnel = 'sale_offplan'; store.dealsFilter = {}; store.savedView = null;
+    store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
     store.incompatible = false;
     // UI-state added this cycle — return to defaults on reset so the stand starts clean.
@@ -266,7 +266,7 @@
   const WRITABLE = {
     deals: {
       safe: ['tags', 'sub', 'title', 'updated', 'note', 'nextStep', 'consideredProjects'],
-      guarded: ['stage', 'amount', 'hot', 'funnel', 'dealType', 'objectType', 'goal', 'paymentForm',
+      guarded: ['stage', 'amount', 'hot', 'funnel', 'dealType', 'objectType', 'readiness', 'saleKind', 'side', 'goal', 'paymentForm',
         'vat', 'source', 'agent', 'partnerAgent', 'companyId', 'stageDays', 'contacts'],
     },
     clients: {

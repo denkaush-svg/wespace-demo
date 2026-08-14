@@ -79,6 +79,10 @@
     { id: 'c_partner', name: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true,
       goal: 'Нужен внешний партнёр по объекту', budget: 2600000, areas: ['Downtown'], horizon: '1–2 месяца',
       note: 'Требуется подключение клубного партнёра (S6).', phone: '+971 50 •••• ••63 (DEMO)' },
+    { id: 'c_owner', name: 'Сергей Орлов', tag: 'own', lang: 'RU', channel: 'email', consent: true,
+      goal: 'Реализовать офисный блок в DIFC', budget: 12000000, areas: ['DIFC'], horizon: '3–6 месяцев',
+      note: 'Управляющий портфелем Altura Capital. Собственник со стороны продажи — отдаёт блок на эксклюзив.',
+      phone: '+971 4 401 9900 (DEMO)' },
   ];
 
   // `attrs` = качественные признаки для подбора и психо-мэтча (view/floor/finish/demand/prestige/metro)
@@ -142,9 +146,9 @@
   // structural fields + per-field provenance prov{field:'ai'|'confirmed'} (R3/A1),
   // stageDays (R12), companyId (R5), source for attribution (R9). Dubai taxonomy (§4).
   const deals = [
-    { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'new',
+    { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'show',
       title: 'Инвест-квартира до 2 млн AED', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня', createdAt: '14 мая',
-      funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция под аренду',
+      funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
       consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
       nextDue: 'сегодня 16:00', deposit: { kind: 'EOI', amount: 100000, paid: false, refundable: true },
@@ -155,21 +159,21 @@
       prov: { budget: 'confirmed', source: 'ai', paymentForm: 'ai', objectType: 'confirmed', goal: 'ai' } },
     { id: 'd_igor', clientId: 'c_overdue', objectId: 'o_bayline', agent: 'u_ahmed', amount: 2400000, hot: true, stage: 'work',
       title: 'Перепродажа Bayline Terraces', sub: 'Перепродажа · 2,4 млн AED', tags: ['касание просрочено'], updated: '2 дня назад', createdAt: '10 мая',
-      funnel: 'sale_ready', dealType: 'Продажа · готовое', objectType: 'готовое', goal: 'Перепродажа',
+      funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'готовый', saleKind: 'вторичка', side: 'покупатель', goal: 'Перепродажа',
       paymentForm: '100% оплата', vat: false, source: 'Реферал', partnerAgent: null, companyId: null,
       consideredProjects: ['Bayline Terraces'], stageDays: 6,
       nextDue: 'просрочено (касание)', deposit: { kind: 'EOI', amount: 50000, paid: true, at: '8 мая', refundable: true },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
-    { id: 'd_viktor', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_marina', amount: 1950000, hot: false, stage: 'docs',
+    { id: 'd_viktor', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_marina', amount: 1950000, hot: false, stage: 'book',
       title: 'Бронирование Bayline 1603', sub: 'Договор бронирования', tags: ['документ'], updated: 'вчера', createdAt: '10 мая',
-      funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция',
+      funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция',
       paymentForm: 'Ипотека', vat: false, source: 'Property Finder', partnerAgent: null, companyId: 'co_emaar',
       consideredProjects: ['Bayline Terraces'], stageDays: 3, requestId: 'r_viktor',
       nextDue: '12 мая', deposit: { kind: 'Бронирование (booking)', amount: 97500, paid: true, at: '6 мая', refundable: false },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
-    { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'work',
+    { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'req',
       title: 'Резиденция в Downtown через партнёра', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня', createdAt: '14 мая',
-      funnel: 'referral', dealType: 'Передано партнёру', objectType: 'готовое', goal: 'Покупка резиденции',
+      funnel: 'cross', dealType: 'Кросс-продажи', objectType: 'апартаменты', readiness: 'готовый', saleKind: '', side: 'покупатель', goal: 'Покупка резиденции',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: 'u_yusef', companyId: 'co_altura',
       consideredProjects: ['Downtown Views II'], stageDays: 1,
       contacts: [
@@ -178,23 +182,41 @@
         { name: 'Omar Khalil', role: 'Юрист сделки', rating: 'C', phone: '+971 50 771 2003' },
       ],
       prov: { budget: 'ai', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'ai' } },
-    { id: 'd_lease', clientId: 'c_night', objectId: 'o_palmcourt', agent: 'u_marina', amount: 95000, hot: false, stage: 'new',
+    { id: 'd_lease', clientId: 'c_night', objectId: 'o_palmcourt', agent: 'u_marina', amount: 95000, hot: false, stage: 'pick',
       title: 'Аренда 1BR в JVC', sub: 'Аренда 1BR · JVC', tags: ['ночной лид'], updated: 'сегодня', createdAt: '14 мая',
-      funnel: 'rent', dealType: 'Аренда', objectType: 'готовое', goal: 'Аренда под проживание',
+      funnel: 'rent', dealType: 'Аренда', objectType: 'апартаменты', readiness: 'готовый', saleKind: '', side: 'арендатор', goal: 'Аренда под проживание',
       paymentForm: 'Годовой чек', vat: false, source: 'Bayut', partnerAgent: null, companyId: null,
       consideredProjects: ['Palm Court Residence'], stageDays: 0,
       prov: { budget: 'ai', source: 'ai', objectType: 'ai', goal: 'ai' } },
-    { id: 'd_fitout', clientId: 'c_ambig', objectId: 'o_creekline', agent: 'u_lina', amount: 320000, hot: false, stage: 'work',
+    { id: 'd_fitout', clientId: 'c_ambig', objectId: 'o_creekline', agent: 'u_lina', amount: 320000, hot: false, stage: 'kp',
       title: 'Fit-out офиса в Business Bay', sub: 'Fit-out офиса · Business Bay', tags: ['fit-out'], updated: '3 дня назад', createdAt: '09 мая',
-      funnel: 'fitout', dealType: 'Fit-out', objectType: 'офис', goal: 'Отделка под аренду',
+      funnel: 'cross', dealType: 'Кросс-продажи', objectType: 'офис', readiness: 'готовый', saleKind: '', side: 'собственник', goal: 'Отделка под аренду',
       paymentForm: 'Поэтапно', vat: true, source: 'Реферал', partnerAgent: null, companyId: 'co_meydan',
       consideredProjects: [], stageDays: 4,
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
-    { id: 'd_rentbiz', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_omar', amount: 4200000, hot: false, stage: 'docs',
+    { id: 'd_rentbiz', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_omar', amount: 4200000, hot: false, stage: 'prep',
       title: 'Готовый арендный бизнес в DIFC', sub: 'Готовый арендный бизнес · DIFC', tags: ['портфель'], updated: 'вчера', createdAt: '11 мая',
-      funnel: 'rental_biz', dealType: 'Готовый арендный бизнес', objectType: 'офис', goal: 'Доходный актив',
+      funnel: 'sale', dealType: 'Продажа', objectType: 'ГАБ', readiness: 'готовый', saleKind: 'вторичка', side: 'покупатель', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
       consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_bayline', 'o_creekline'],
+      prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+    { id: 'd_manage', clientId: 'c_ambig', objectId: null, agent: 'u_lina', amount: 480000, hot: false, stage: 'visit',
+      title: 'Офис в Business Bay в управление', sub: 'Управление арендой · годовой чек', tags: ['управление'], updated: 'вчера', createdAt: '12 мая',
+      funnel: 'manage', dealType: 'Управление арендой', objectType: 'офис', readiness: 'готовый', saleKind: '', side: 'собственник', goal: 'Сдать после отделки',
+      paymentForm: 'Процент от аренды', vat: true, source: 'Реферал', partnerAgent: null, companyId: 'co_meydan',
+      consideredProjects: [], stageDays: 2,
+      prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+    { id: 'd_exclusive', clientId: 'c_owner', objectId: null, agent: 'u_omar', amount: 12000000, hot: false, stage: 'kp',
+      title: 'Эксклюзив на офисный блок в DIFC', sub: 'Мандат на реализацию · DIFC', tags: ['мандат'], updated: '2 дня назад', createdAt: '09 мая',
+      funnel: 'exclusive', dealType: 'Эксклюзив', objectType: 'офис', readiness: 'готовый', saleKind: '', side: 'собственник', goal: 'Реализовать блок',
+      paymentForm: 'Комиссия с реализации', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
+      consideredProjects: [], stageDays: 3,
+      prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+    { id: 'd_consult', clientId: 'c_docs', objectId: null, agent: 'u_marina', amount: 45000, hot: false, stage: 'talks',
+      title: 'Юридическая проверка портфеля DIFC', sub: 'Консалтинг · разовый гонорар', tags: ['консалтинг'], updated: 'вчера', createdAt: '12 мая',
+      funnel: 'consult', dealType: 'Консалтинг', objectType: 'офис', readiness: 'готовый', saleKind: '', side: 'покупатель', goal: 'Проверить документы перед покупкой',
+      paymentForm: '100% предоплата', vat: true, source: 'Реферал', partnerAgent: null, companyId: 'co_altura',
+      consideredProjects: [], stageDays: 1,
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
   ];
 
@@ -229,13 +251,44 @@
   ];
 
   // Funnels (R2) — each is the same 4-column board; columns = milestone projection of that funnel.
+  // Layer 1 of the agreed model (docs/2026-08-14-deal-funnels-preview.md): a funnel is the SERVICE
+  // we sell, never the product we sell it on. Object type, readiness and the kind of transfer are
+  // CARD FIELDS — they light the gates of layer 2 instead of multiplying boards, which is exactly
+  // what the previous six funnels did (off-plan / готовое / ГАБ were three boards for one service).
+  //
+  // Stage keys are one shared vocabulary; each funnel picks its own subset in its own order, so a
+  // deal that changes service keeps any stage the new funnel also has.
+  const STAGE_LABELS = {
+    work: 'В работе',
+    pick: 'Направлен подбор',
+    kp: 'Направлено КП',
+    req: 'Заявка партнёру',
+    show: 'Показ',
+    visit: 'Встреча / осмотр',
+    talks: 'Переговоры',
+    prep: 'Подготовка к сделке',
+    book: 'Бронь (EOI)',
+    sign: 'Подписание / оплата',
+    reg: 'Регистрация',
+    exec: 'Выполнение работ',
+    won: 'Успех',
+    lost: 'Проигрыш',
+  };
+  // `won` and `lost` are terminal in every funnel and always sit last, in that order — the board
+  // and the stage stepper both rely on it.
   const FUNNELS = [
-    { k: 'sale_offplan', label: 'Продажа · off-plan', cols: ['Квалификация · показ', 'Оффер', 'Документы · MOU', 'Оплата · передача'] },
-    { k: 'sale_ready', label: 'Продажа · готовое', cols: ['Квалификация · показ', 'Оффер', 'Документы · SPA', 'Передача · комиссия'] },
-    { k: 'rent', label: 'Аренда', cols: ['Заявка', 'Показ', 'Договор', 'Заселение'] },
-    { k: 'fitout', label: 'Fit-out', cols: ['Бриф', 'Смета', 'Договор', 'Сдача'] },
-    { k: 'rental_biz', label: 'Готовый арендный бизнес', cols: ['Отбор', 'Проверка', 'Сделка', 'Передача'] },
-    { k: 'referral', label: 'Передано партнёру', cols: ['Передано', 'У партнёра', 'Документы', 'Комиссия'] },
+    { k: 'sale', label: 'Продажа', side: 'покупатель', contract: 'sale',
+      stages: ['work', 'pick', 'show', 'talks', 'prep', 'book', 'sign', 'reg', 'won', 'lost'] },
+    { k: 'rent', label: 'Аренда', side: 'арендатор', contract: 'lease',
+      stages: ['work', 'pick', 'show', 'talks', 'prep', 'sign', 'reg', 'won', 'lost'] },
+    { k: 'manage', label: 'Управление арендой', side: 'собственник', contract: 'management',
+      stages: ['work', 'kp', 'visit', 'talks', 'prep', 'sign', 'won', 'lost'] },
+    { k: 'exclusive', label: 'Эксклюзив', side: 'собственник', contract: 'exclusive',
+      stages: ['work', 'kp', 'talks', 'prep', 'sign', 'won', 'lost'] },
+    { k: 'cross', label: 'Кросс-продажи', side: '', contract: 'service',
+      stages: ['work', 'req', 'kp', 'talks', 'prep', 'sign', 'won', 'lost'] },
+    { k: 'consult', label: 'Консалтинг', side: '', contract: 'service',
+      stages: ['work', 'kp', 'talks', 'prep', 'sign', 'exec', 'won', 'lost'] },
   ];
 
   // Companies (R5, A10) — entity above contacts/deals; carries KYC STATUS (not a rating).
@@ -309,6 +362,21 @@
       { at: '10 мая · 10:15', ord: 101015, ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлена смета fit-out по трём подрядчикам.' },
       { at: '11 мая · 17:40', ord: 111740, ch: 'note', kind: 'note', by: 'Лина Хассан', text: 'Просит поэтапную оплату — согласовать с Meydan.' },
     ],
+    d_manage: [
+      { at: '12 мая · 10:20', ord: 121020, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 5:30 — после отделки офис уходит в аренду, просят вести объект.', capture: true },
+      { at: '12 мая · 15:40', ord: 121540, ch: 'email', kind: 'raw', by: 'Лина Хассан', text: 'Отправлено КП на управление: ставка, отчётность, контроль оплат.' },
+      { at: '13 мая · 11:05', ord: 131105, ch: 'note', kind: 'note', by: 'Лина Хассан', text: 'Осмотр назначен — уточнить границы полномочий по доверенности.' },
+    ],
+    d_exclusive: [
+      { at: '09 мая · 14:15', ord: 91415, ch: 'meet', kind: 'raw', by: 'Омар Рахман', text: 'Встреча в DIFC — фонд готов отдать блок на эксклюзив.', capture: true },
+      { at: '10 мая · 09:50', ord: 100950, ch: 'email', kind: 'raw', by: 'Омар Рахман', text: 'Отправлены условия мандата: срок, маркетинг, партнёрская сеть.' },
+      { at: '12 мая · 16:30', ord: 121630, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Для рекламы блока понадобится Trakheesi — разрешение ещё не запрошено.' },
+    ],
+    d_consult: [
+      { at: '12 мая · 09:30', ord: 120930, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Звонок 3:40 — просят проверить договоры аренды по портфелю до сделки.', capture: true },
+      { at: '12 мая · 18:00', ord: 121800, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлено КП на юридическую проверку: объём, срок, гонорар.' },
+      { at: '13 мая · 12:45', ord: 131245, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Согласовать объём: только договоры аренды или ещё долги по service charge.' },
+    ],
     d_rentbiz: [
       { at: '11 мая · 09:50', ord: 110950, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Запрос по готовому арендному бизнесу в DIFC — интересует доходность.', capture: true },
       { at: '12 мая · 14:05', ord: 121405, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Собрана финмодель по DIFC Gate District: доходность и срок окупаемости.' },
@@ -381,6 +449,11 @@
       { at: '06 мая · 14:50', ord: 61450, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Звонок 7:20 — ипотека, нужно предодобрение банка.', capture: true },
       { at: '09 мая · 16:30', ord: 91630, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча — подписан лист бронирования по Bayline Terraces.' },
       { at: '11 мая · 15:00', ord: 111500, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Предпочитает email; звонки после 18:00. По-русски, документы — на английском.' },
+    ],
+    c_owner: [
+      { at: '08 мая · 16:40', ord: 81640, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт заведён из клубного канала: собственник со стороны продажи.' },
+      { at: '09 мая · 09:20', ord: 90920, ch: 'crm', kind: 'raw', by: 'Система', text: 'Согласие на переписку получено при первом контакте.' },
+      { at: '13 мая · 10:15', ord: 131015, ch: 'note', kind: 'note', by: 'Омар Рахман', text: 'Готов к эксклюзиву на 6 месяцев, но хочет право отзыва мандата — обсудить с юристом.' },
     ],
     c_partner: [
       { at: '12 мая · 10:30', ord: 121030, ch: 'crm', kind: 'raw', by: 'Система', text: 'Контакт пришёл из клубного канала.' },
@@ -478,6 +551,6 @@
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, refModel,
     deals, requests, tasks, events, inbox, analytics,
-    FUNNELS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, STAGE_LABELS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
