@@ -346,9 +346,9 @@ setTimeout(async () => {
   {
     const snap = WS.ui.metricsSnapshot();
     check('metricsSnapshot returns named metrics', !!(snap && snap.metrics && snap.metrics.deals_active));
-    const activeReal = data.deals.filter((d) => d.stage !== 'done').length;
+    const activeReal = data.deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
     check('deals_active matches the real data', snap.metrics.deals_active.v === activeReal, snap.metrics.deals_active.v + ' vs ' + activeReal);
-    const closedReal = data.deals.filter((d) => d.stage === 'done').length;
+    const closedReal = data.deals.filter((d) => d.stage === 'won').length;
     check('deals_closed matches the real data', snap.metrics.deals_closed.v === closedReal, snap.metrics.deals_closed.v + ' vs ' + closedReal);
     const noConsentReal = data.clients.filter((c) => !c.consent).length;
     check('clients_no_consent matches the real data', snap.metrics.clients_no_consent.v === noConsentReal);
@@ -450,13 +450,13 @@ setTimeout(async () => {
     check('query · returns all rows of a collection', !!qAll && qAll.ok === true && qAll.rows.length === dd().deals.length, JSON.stringify(qAll && qAll.rows && qAll.rows.length));
     check('query · result carries the revision it was computed at', qAll.revision === WS.store.dataRevision);
 
-    const expectActive = dd().deals.filter((d) => d.stage !== 'done').length;
-    const qActive = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } });
+    const expectActive = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
+    const qActive = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }], aggregate: { fn: 'count' } });
     check('query · count matches an independent computation', qActive.value === expectActive, qActive.value + ' vs ' + expectActive);
     check('query · the number comes with the records behind it', qActive.rows.length === expectActive, 'rows=' + qActive.rows.length);
 
-    const expectSum = dd().deals.filter((d) => d.stage !== 'done').reduce((s, d) => s + (d.amount || 0), 0);
-    const qSum = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'sum', field: 'amount' } });
+    const expectSum = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').reduce((s, d) => s + (d.amount || 0), 0);
+    const qSum = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }], aggregate: { fn: 'sum', field: 'amount' } });
     check('query · sum matches an independent computation', qSum.value === expectSum, qSum.value + ' vs ' + expectSum);
 
     const qGroup = QRY.run({ from: 'deals', groupBy: 'stage', aggregate: { fn: 'count' } });
@@ -604,8 +604,8 @@ setTimeout(async () => {
 
     // ---- an analytical question is answered from the store ----
     const a1 = AG.ask('сколько у меня активных сделок и на какую сумму');
-    const expectN = dd().deals.filter((d) => d.stage !== 'done').length;
-    const expectSum = dd().deals.filter((d) => d.stage !== 'done').reduce((s, d) => s + (d.amount || 0), 0);
+    const expectN = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
+    const expectSum = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').reduce((s, d) => s + (d.amount || 0), 0);
     check('agent · answers an analytics question', !!a1 && a1.kind === 'answer', JSON.stringify(a1 && a1.kind));
     check('agent · the number is the real one', (a1.text || '').indexOf(String(expectN)) >= 0, 'expected ' + expectN + ' in: ' + (a1.text || '').slice(0, 120));
     check('agent · the money figure is the real one', !!(a1.evidence || []).find((e) => e.value === expectSum), 'sum=' + expectSum);
@@ -691,31 +691,44 @@ setTimeout(async () => {
   //  The module tests above prove the reasoning; this proves the wiring.
   // ============================================================
   const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
+  // Wait for the CONDITION, not for a guessed duration. The Concierge answers after a chain of
+  // scripted delays plus a full re-render per message, so the cost grows with the fixtures — a
+  // fixed 1500 ms silently became too short the moment the stand gained a tenth deal.
+  const waitFor = async (fn, ms) => {
+    const limit = ms || 8000;
+    for (let spent = 0; spent < limit; spent += 50) { if (fn()) return true; await wait(50); }
+    return false;
+  };
   if (WS.agent && typeof WS.router.routePrompt === 'function') {
     WS.engine.openThread('probe:e2e', 'Сквозная', 'chat');
     WS.router.go('concierge');
 
     WS.router.routePrompt('сколько сделок в работе и на какую сумму');
-    await wait(1500);
+    await waitFor(() => { const el = doc.getElementById('chat'); return el && el.querySelector('[data-agev]'); });
     const chat1 = doc.getElementById('chat');
     const html1 = chat1 ? chat1.innerHTML : '';
-    const liveActive = dd().deals.filter((d) => d.stage !== 'done').length;
+    const liveActive = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
     check('e2e · a typed question produces an answer in the chat', html1.indexOf(String(liveActive)) >= 0, 'looking for ' + liveActive);
     check('e2e · the answer offers openable evidence', (chat1 && chat1.querySelectorAll('[data-agev]').length) > 0);
     check('e2e · no Wizard-of-Oz fallback left', html1.indexOf('Wizard-of-Oz') < 0 && html1.indexOf('подготовлены близкие результаты') < 0);
 
     // Clicking the evidence chip opens the records the number came from.
+    // Guarded: a missing chip is a FAILED CHECK, not a thrown TypeError. Crashing here killed the
+    // whole report, so every other result in the suite became invisible whenever this step lost its race.
     const chip = chat1.querySelector('[data-agev]');
-    chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    await wait(80);
-    const modalHtml = doc.getElementById('modal').innerHTML;
-    check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
-    WS.ui.closeModal();
+    check('e2e · the evidence chip is present to click', !!chip);
+    if (chip) {
+      chip.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await wait(80);
+      const modalHtml = doc.getElementById('modal').innerHTML;
+      check('e2e · evidence opens the underlying records', modalHtml.indexOf('Откуда это число') >= 0, modalHtml.slice(0, 90));
+      WS.ui.closeModal();
+    }
 
     // A write instruction reaches a proposal, and only a click applies it.
     const feedWas = (dd().contactTimeline['c_anna'] || []).length;
     WS.router.routePrompt('запиши по Анне: проверка сквозного пути');
-    await wait(1500);
+    await waitFor(() => { const el = doc.getElementById('chat'); return el && el.querySelector('[data-agok]'); });
     const chat2 = doc.getElementById('chat');
     const okBtn = chat2.querySelector('[data-agok]');
     check('e2e · a write instruction produces a confirm button', !!okBtn);

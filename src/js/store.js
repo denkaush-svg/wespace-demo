@@ -30,7 +30,7 @@
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
-    capture: {}, dealFunnel: 'sale', dealsFilter: {}, savedView: null,
+    capture: {}, dealFunnel: 'sale', contractId: null, dealsFilter: {}, savedView: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
     cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
@@ -60,6 +60,7 @@
       conflicts: clone(f.conflicts),
       attribution: clone(f.attribution),
       clientSignals: clone(f.clientSignals),
+      contracts: clone(f.contracts),
     };
   }
   // Funnel taxonomy is static config, not mutable state — expose it without cloning per reset.

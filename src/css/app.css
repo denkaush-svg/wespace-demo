@@ -376,6 +376,22 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    KANBAN (deals)
    ============================================================ */
+/* Contract milestones and commission tranches share one row shape: a state icon, a line of text
+   and when it happened. Done recedes, «сейчас» is the only accented row, waiting is faint — the
+   list has to answer «где мы» at a glance without reading every line. */
+.ms-list { display: flex; flex-direction: column; }
+.ms-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.ms-row:last-child { border-bottom: 0; }
+.ms-i { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface-2); color: var(--faint); margin-top: 1px; }
+.ms-i svg { width: 12px; height: 12px; }
+.ms-row.done .ms-i { background: var(--acc); color: #fff; }
+.ms-row.now .ms-i { background: var(--acc-soft); color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.ms-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ms-l { font-size: 13px; color: var(--ink); }
+.ms-row.now .ms-l { font-weight: 800; color: var(--acc-ink); }
+.ms-row.wait .ms-l { color: var(--mut); }
+.ms-a { font-size: 11.5px; color: var(--faint); }
 /* Gate layer — a manual checklist grouped by the stage each condition belongs to. Rows are wide
    targets because they are toggled, and the hint carries the meaning: «NOC» alone tells an agent
    who has not done a resale in Dubai nothing at all. */

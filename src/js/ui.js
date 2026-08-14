@@ -18,6 +18,9 @@
     // Заявки → Сделки: the funnel entry sits next to deals (CRM convention: Pipedrive / HubSpot / amoCRM).
     { id: 'requests', label: 'Заявки', icon: 'mail', count: () => ((D().requests || []).length + (D().inbox || []).length) },
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
+    // Contracts sit next to deals because that is the handover: the deal ends at signing and the
+    // contract is what runs for the months or years after it.
+    { id: 'contracts', label: 'Договоры', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'clients', tab: 'contacts', label: 'Клиенты', icon: 'users', count: () => (D().clients || []).length },
     { id: 'objects', label: 'Объекты', icon: 'building', count: () => D().objects.length },
@@ -41,6 +44,9 @@
     { id: 'concierge', label: 'Консьерж', icon: 'sparkle' },
     { id: 'team', label: 'Команда', icon: 'users' },
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
+    // Contracts sit next to deals because that is the handover: the deal ends at signing and the
+    // contract is what runs for the months or years after it.
+    { id: 'contracts', label: 'Договоры', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).length },
     { id: 'approvals', label: 'Согласования', icon: 'check', count: () => MGR_APPROVALS.length - (S().apprDone || []).length },
@@ -1868,7 +1874,11 @@
     if (tab === 'deals') {
       const ds = D().deals.filter((x) => x.clientId === c.id);
       const dealRows = ds.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>').join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">связанных сделок нет</div>';
+      // A client's contracts belong on the client too: after a purchase the relationship IS the
+      // contract, and it is what a repeat deal grows out of.
+      const kRows = contractsOfClient(c.id).map(contractRow).join('');
       return dxSec('briefcase', 'Сделки контакта · ' + ds.length, '', '<div class="feed">' + dealRows + '</div>') +
+        (kRows ? '<div style="margin-top:14px">' + dxSec('doc', 'Договоры контакта', '', '<div class="feed">' + kRows + '</div>') + '</div>' : '') +
         '<div style="margin-top:14px">' + dxSec('doc', 'Документы по сделкам', '', docsRows(docsFor((x) => x.client === c.id), 'по этому контакту документов пока нет')) + '</div>';
     }
     if (tab === 'history') {
@@ -2393,9 +2403,13 @@
     // params (default) — deal-specific structural fields (key terms are already up in «Ключевое»),
     // the parent заявка, plus data conflicts / partner handoff (was the near-empty «Обзор» tab).
     const req = dealRequestBlock(d);
+    const kk = contractsOfDeal(d.id);
+    const kblock = kk.length ? dxSec('doc', 'Договор по сделке', '', kk.map(contractRow).join('') +
+      '<div class="gate-foot">Сделка закрыта на подписании. Всё, что идёт дальше — платежи, регистрация, продления — ведётся договором.</div>') : '';
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
     return (req ? req + '<div style="height:14px"></div>' : '') +
+      (kblock ? kblock + '<div style="height:14px"></div>' : '') +
       dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealParamsExtra(d) + '</div>') +
       (cf ? '<div style="height:14px"></div>' + cf : '') +
       (ho ? '<div style="height:14px"></div>' + ho : '');
@@ -6027,6 +6041,145 @@
       '</div>';
   }
 
+
+  // ---- Contracts: the process that runs after a deal is won -----------------------------------
+  // Decision of 14 August: сопровождение is not a stage of the board but an object of its own. An
+  // off-plan contract lives three to five years on a payment schedule; a stage cannot hold that,
+  // and a deal left open for it reports work that is already done as pipeline.
+  //
+  // Every milestone carries two wordings. `label` is ours; `client` is what a client would read.
+  // They are authored together deliberately: the client register is meant to reach a client cabinet
+  // later, and writing it after the fact means re-deciding every milestone's disclosure at once.
+  function contractsAll() { return D().contracts || []; }
+  function contractById(id) { return contractsAll().find((k) => k.id === id) || null; }
+  function contractsOfDeal(id) { return contractsAll().filter((k) => k.dealId === id); }
+  function contractsOfClient(id) { return contractsAll().filter((k) => k.clientId === id); }
+  function contractKind(k) { return ((WS.fixtures && WS.fixtures.CONTRACT_KINDS) || {})[k && k.kind] || { label: 'Договор', icon: 'doc' }; }
+  function contractStep(k) {
+    const ms = (k && k.milestones) || [];
+    const cur = ms.filter((m) => m.state === 'now');
+    return { cur: cur, done: ms.filter((m) => m.state === 'done').length, total: ms.length };
+  }
+  // Money on a contract is a state, not a number: a developer pays in tranches, and the difference
+  // between «начислено» and «оплачено» is what tells an agent whether to chase anyone.
+  function commissionState(k) {
+    const c = (k && k.commission) || { entries: [] };
+    const paid = (c.entries || []).filter((e) => e.k === 'paid');
+    const got = paid.reduce((sum, e) => sum + (e.state === 'wait' ? 0 : (e.amount || 0)), 0);
+    const total = c.total || 0;
+    const label = !total ? '—' : (got >= total ? 'получена' : (got > 0 ? 'получена частично' : ((c.entries || []).some((e) => e.k === 'invoiced' && e.state !== 'wait') ? 'счёт выставлен' : 'начислена')));
+    return { total: total, got: got, label: label, tone: got >= total && total ? 'ok' : (got > 0 ? 'acc' : ''), payer: c.payer || 'по договору', vat: !!c.vat };
+  }
+  function contractRow(k) {
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const st = contractStep(k), money = commissionState(k);
+    const now = st.cur.length ? st.cur.map((m) => m.label).join(' · ') : 'все вехи пройдены';
+    return '<div class="feed-row" data-contract="' + k.id + '" style="cursor:pointer">' +
+      '<div class="fi i-acc">' + I(contractKind(k).icon) + '</div>' +
+      '<div class="ft"><div class="t">' + contractKind(k).label + ' · ' + (c.name || '—') + '</div>' +
+      '<div class="m">' + now + ' · веха ' + Math.min(st.done + 1, st.total) + ' из ' + st.total +
+      (k.nextDue ? ' · ' + k.nextDue : '') + '</div></div>' +
+      '<span class="badge ' + money.tone + '">' + I('money') + 'Комиссия · ' + money.label + '</span>' +
+      I('arrowRight') + '</div>';
+  }
+  function viewContracts() {
+    const list = contractsAll();
+    const active = list.filter((k) => k.status !== 'closed');
+    const due = active.filter((k) => k.nextDue).length;
+    const owed = active.reduce((sum, k) => { const m = commissionState(k); return sum + Math.max(0, m.total - m.got); }, 0);
+    const rows = list.map(contractRow).join('') ||
+      '<div style="font-size:12px;color:var(--faint);padding:10px 0">договоров пока нет — они открываются после успешной сделки</div>';
+    return heroBand('Договоры', 'Что идёт после успешной сделки: платежи по графику, регистрация права, продления. Сделка закрывается на подписании — дальше живёт договор.', 'o_bayline') +
+      '<div class="tiles" style="margin-top:20px">' +
+      tile('doc', 'Действующих договоров', active.length, '', '', 'Открыты после успешных сделок', '', 'accent', 'data-nav="contracts"') +
+      tile('money', 'Комиссия к получению', WS.AED(owed), '', '', owed ? 'Начислено, но ещё не поступило' : 'Всё получено', '', owed ? 'accent' : '', 'data-nav="contracts"') +
+      tile('clock', 'Со сроком на контроле', due, '', '', 'Платежи, продления, отчётность', '', '', 'data-nav="contracts"') +
+      '</div>' +
+      '<div class="card" style="margin-top:16px"><div class="section-label" style="padding:14px 16px 0">Договоры · ' + list.length + '</div>' +
+      '<div class="feed" style="padding:2px 16px 10px">' + rows + '</div></div>';
+  }
+  function contractMilestones(k, forClient) {
+    const rows = (k.milestones || []).map((m, i) => {
+      const cls = m.state === 'done' ? 'done' : (m.state === 'now' ? 'now' : 'wait');
+      const icon = m.state === 'done' ? 'check' : (m.state === 'now' ? 'clock' : 'dot');
+      const text = forClient ? (m.client || m.label) : m.label;
+      return '<div class="ms-row ' + cls + '"><span class="ms-i">' + I(icon) + '</span>' +
+        '<span class="ms-t"><span class="ms-l">' + text + '</span>' +
+        '<span class="ms-a">' + (m.at || '—') + '</span></span></div>';
+    }).join('');
+    return '<div class="ms-list">' + rows + '</div>';
+  }
+  function contractMoney(k) {
+    const m = commissionState(k);
+    const rows = ((k.commission || {}).entries || []).map((e) => {
+      const cls = e.state === 'done' ? 'done' : (e.state === 'now' ? 'now' : 'wait');
+      return '<div class="ms-row ' + cls + '"><span class="ms-i">' + I(e.state === 'done' ? 'check' : (e.state === 'now' ? 'clock' : 'dot')) + '</span>' +
+        '<span class="ms-t"><span class="ms-l">' + e.label + ' · ' + WS.AED(e.amount || 0) + '</span>' +
+        '<span class="ms-a">' + (e.at || '—') + '</span></span></div>';
+    }).join('');
+    return '<div class="dfields">' +
+      dfPair('Комиссия по договору', WS.AED(m.total)) +
+      dfPair('Получено', WS.AED(m.got) + (m.got && m.got < m.total ? ' · частично' : '')) +
+      dfPair('Плательщик', m.payer) +
+      dfPair('VAT', m.vat ? '5% применяется' : 'не применяется') +
+      ((k.commission || {}).split ? dfPair('Co-broking', k.commission.split) : '') +
+      '</div><div style="height:12px"></div><div class="ms-list">' + rows + '</div>' +
+      '<div class="gate-foot">Выплата отстаёт от передачи и часто приходит частями — поэтому комиссия ведётся статусом, а не одним числом в сделке.</div>';
+  }
+  function contractTabContent(k, tab) {
+    if (tab === 'money') return dxSec('money', 'Комиссия', '<span class="badge ' + commissionState(k).tone + '">' + commissionState(k).label + '</span>', contractMoney(k));
+    if (tab === 'client') {
+      return dxSec('users', 'Что видит клиент', '<span class="badge demo">' + I('lock') + 'предпросмотр</span>',
+        '<div class="gate-foot" style="margin-top:0;margin-bottom:12px">Так этот договор читается со стороны клиента. Личного кабинета ещё нет — здесь показано, что в него пойдёт: клиент видит, где находится его проект, не звоня агенту.</div>' +
+        contractMilestones(k, true));
+    }
+    if (tab === 'history') {
+      const rows = (k.timeline || []).map((e) => tlRow(e)).join('') ||
+        '<div style="font-size:12px;color:var(--faint);padding:6px 0">по договору пока нет событий</div>';
+      return dxSec('clock', 'История договора', '', '<div class="feed">' + rows + '</div>');
+    }
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const co = (D().companies || []).find((x) => x.id === k.companyId);
+    const o = (D().objects || []).find((x) => x.id === k.objectId);
+    const d = (D().deals || []).find((x) => x.id === k.dealId);
+    return dxSec('doc', 'Вехи договора', '<span class="badge acc">' + contractStep(k).done + ' из ' + contractStep(k).total + '</span>', contractMilestones(k, false)) +
+      '<div style="height:14px"></div>' +
+      dxSec('briefcase', 'Договор', '', '<div class="dfields">' +
+        dfPair('Номер', k.number) + dfPair('Подписан', k.signedAt) +
+        dfPair('Клиент', c.name || '—') + (co ? dfPair('Компания', co.name) : '') +
+        (o ? dfPair('Объект', o.name) : '') + dfPair('Сумма договора', WS.AED(k.amount || 0)) +
+        (k.nextDue ? dfPair('Ближайший срок', k.nextDue) : '') +
+        (d ? dfPair('Из сделки', '<a href="#" data-deal="' + d.id + '">' + d.title + '</a>') : dfPair('Из сделки', 'закрыта до демо-периода')) +
+        '</div>');
+  }
+  function contractSpec(id) {
+    const k = contractById(id); if (!k) return null;
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const money = commissionState(k);
+    return {
+      type: 'contract', id: id, title: contractKind(k).label + ' · ' + (c.name || ''),
+      status: statusChip([
+        { label: contractKind(k).label, icon: contractKind(k).icon, tone: 'acc' },
+        { label: k.number, icon: 'doc' },
+        { label: 'Комиссия · ' + money.label, icon: 'money', tone: money.tone },
+        { label: k.status === 'closed' ? 'закрыт' : 'действует', icon: k.status === 'closed' ? 'check' : 'clock' },
+      ]),
+      tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['client', 'Что видит клиент'], ['history', 'История']],
+      render: (tab) => contractTabContent(k, tab),
+      concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
+      pageActs: '<button class="btn sm" data-client="' + k.clientId + '">' + I('users') + 'Открыть клиента</button>',
+    };
+  }
+  function viewContractDetail(id) {
+    const spec = contractSpec(id);
+    if (!spec) return viewContracts();
+    return entityPage(spec, 'contracts', '', 'Назад к договорам');
+  }
+  function contractCard(id) {
+    const spec = contractSpec(id); if (!spec) return;
+    S().contractId = id; WS.router.go('contractDetail');
+  }
+
   // ---------------- MAIN RENDER ----------------
   function viewFor(id) {
     switch (id) {
@@ -6034,6 +6187,8 @@
       case 'concierge': return viewConcierge();
       case 'clients': return wrap(viewClients());
       case 'objects': return wrap(viewObjects());
+      case 'contracts': return wrap(viewContracts());
+      case 'contractDetail': return wrap(viewContractDetail(S().contractId));
       case 'objectDetail': return wrap(viewObjectDetail(S().objectId));
       case 'dealDetail': return wrap(viewDealDetail(S().dealId));
       case 'clientDetail': return wrap(viewClientDetail(S().clientId));
@@ -6103,7 +6258,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, toggleGate, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, toggleGate, contractCard, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };

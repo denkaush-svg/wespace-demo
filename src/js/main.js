@@ -106,6 +106,7 @@
     if (d.etab) { const p = d.etab.split('~'); return WS.ui.setEntityTab(p[0], p[1], p[2], t); }
     if (d.dealstage) return api.setDealStage(d.dealstage, d.stage);
     if (d.gate) return WS.ui.toggleGate(d.gate);
+    if (d.contract) return WS.ui.contractCard(d.contract);
     if (d.task) return WS.ui.taskCard(d.task);
     if (d.request) return WS.ui.requestCard(d.request);
     if (d.reqobj) { const p = d.reqobj.split('~'); return WS.ui.reqObjState(p[0], p[1], p[2]); }

@@ -205,6 +205,13 @@
       consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_bayline', 'o_creekline'],
       gates: { kyc: true, title: true, leases: true },
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+    { id: 'd_won', clientId: 'c_anna', objectId: 'o_palmcourt', agent: 'u_marina', amount: 1750000, hot: false, stage: 'won',
+      title: 'Покупка Palm Court 704', sub: 'Продажа · первичка · закрыта', tags: ['успех'], updated: '6 мая', createdAt: '18 апреля',
+      funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция под аренду',
+      paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: 'co_emaar',
+      consideredProjects: ['Palm Court Residence'], stageDays: 8,
+      gates: { kyc: true, escrow: true, spa: true, oqood: true, dld4: true },
+      prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_manage', clientId: 'c_ambig', objectId: null, agent: 'u_lina', amount: 480000, hot: false, stage: 'visit',
       title: 'Офис в Business Bay в управление', sub: 'Управление арендой · годовой чек', tags: ['управление'], updated: 'вчера', createdAt: '12 мая',
       funnel: 'manage', dealType: 'Управление арендой', objectType: 'офис', readiness: 'готовый', saleKind: '', side: 'собственник', goal: 'Сдать после отделки',
@@ -368,6 +375,11 @@
       { at: '10 мая · 10:15', ord: 101015, ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлена смета fit-out по трём подрядчикам.' },
       { at: '11 мая · 17:40', ord: 111740, ch: 'note', kind: 'note', by: 'Лина Хассан', text: 'Просит поэтапную оплату — согласовать с Meydan.' },
     ],
+    d_won: [
+      { at: '18 апреля · 11:00', ord: 181100, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча — выбрана студия Palm Court 704, рассрочка 60/40.', capture: true },
+      { at: '28 апреля · 16:20', ord: 281620, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'SPA подписан, первый платёж на escrow подтверждён застройщиком.' },
+      { at: '06 мая · 12:40', ord: 61240, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Регистрация Oqood прошла, пошлина DLD уплачена — сделка закрыта успехом, открыт договор.' },
+    ],
     d_manage: [
       { at: '12 мая · 10:20', ord: 121020, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 5:30 — после отделки офис уходит в аренду, просят вести объект.', capture: true },
       { at: '12 мая · 15:40', ord: 121540, ch: 'email', kind: 'raw', by: 'Лина Хассан', text: 'Отправлено КП на управление: ставка, отчётность, контроль оплат.' },
@@ -467,6 +479,90 @@
     ],
   };
 
+
+  // Contract kinds and their milestone spines. `client` is the wording a client may be shown; a
+  // milestone with `internalOnly` never leaves our side however the cabinet is built.
+  const CONTRACT_KINDS = {
+    offplan_spa: { label: 'Купля-продажа · оффплан (SPA)', icon: 'building' },
+    resale_title: { label: 'Купля-продажа · вторичка', icon: 'building' },
+    lease: { label: 'Аренда жилая (Ejari)', icon: 'doc' },
+    lease_comm: { label: 'Аренда коммерческая', icon: 'doc' },
+    management: { label: 'Управление объектом', icon: 'briefcase' },
+    exclusive: { label: 'Эксклюзивный мандат', icon: 'star' },
+    service: { label: 'Услуга партнёра', icon: 'handshake' },
+  };
+  const contracts = [
+    {
+      id: 'k_palm', dealId: 'd_won', clientId: 'c_anna', companyId: 'co_emaar', objectId: 'o_palmcourt',
+      kind: 'offplan_spa', number: 'SPA-2026-0418', signedAt: '28 апреля', status: 'active',
+      amount: 1750000, nextDue: 'платёж 25% — до 20 июня',
+      milestones: [
+        { k: 'active', label: 'Договор активен', client: 'Договор подписан и вступил в силу', at: '28 апреля', state: 'done' },
+        { k: 'pay10', label: 'Платёж 10% на escrow', client: 'Первый платёж принят застройщиком', at: '28 апреля', state: 'done' },
+        { k: 'oqood', label: 'Регистрация Oqood', client: 'Сделка зарегистрирована в реестре DLD', at: '06 мая', state: 'done' },
+        { k: 'pay25', label: 'Платёж 25% по графику', client: 'Ожидается платёж по графику — этап 2 из 4', at: 'до 20 июня', state: 'now' },
+        { k: 'built', label: 'Объект построен', client: 'Строительство завершено', at: 'IV квартал 2027', state: 'wait' },
+        { k: 'keys', label: 'Ключи переданы, snag list закрыт', client: 'Приёмка объекта и передача ключей', at: '—', state: 'wait' },
+        { k: 'title', label: 'Title Deed получен', client: 'Право собственности оформлено', at: '—', state: 'wait' },
+      ],
+      commission: { total: 70000, payer: 'застройщик', vat: false, split: null,
+        entries: [
+          { k: 'accrued', label: 'Начислено', amount: 70000, at: '06 мая', state: 'done' },
+          { k: 'invoiced', label: 'Выставлен счёт', amount: 70000, at: '07 мая', state: 'done' },
+          { k: 'paid', label: 'Оплачено', amount: 35000, at: '13 мая · первый транш', state: 'now' },
+        ] },
+      timeline: [
+        { at: '28 апреля · 16:20', ord: 281620, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'SPA подписан, escrow подтверждён.' },
+        { at: '06 мая · 12:40', ord: 61240, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Oqood зарегистрирован — договор переведён на график платежей.' },
+        { at: '13 мая · 10:05', ord: 131005, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Застройщик заплатил половину комиссии; остаток обещан после платежа 25%.' },
+      ],
+    },
+    {
+      id: 'k_jvc', dealId: null, clientId: 'c_night', companyId: null, objectId: 'o_creekline',
+      kind: 'lease', number: 'EJARI-2026-1180', signedAt: '02 марта', status: 'active',
+      amount: 95000, nextDue: 'уведомление о продлении — до 02 декабря',
+      milestones: [
+        { k: 'active', label: 'Договор активен', client: 'Договор аренды зарегистрирован в Ejari', at: '02 марта', state: 'done' },
+        { k: 'cheques', label: 'Оплата по чекам — 2 из 4', client: 'Оплата по графику: принято 2 платежа из 4', at: '02 июня — следующий', state: 'now' },
+        { k: 'renewal', label: 'Уведомление за 90 дней', client: 'Подготовка к продлению договора', at: 'до 02 декабря', state: 'wait' },
+        { k: 'closed', label: 'Продлён либо выезд и возврат депозита', client: 'Продление или завершение аренды', at: '—', state: 'wait' },
+      ],
+      commission: { total: 4750, payer: 'арендатор', vat: true, split: null,
+        entries: [
+          { k: 'accrued', label: 'Начислено', amount: 4750, at: '02 марта', state: 'done' },
+          { k: 'invoiced', label: 'Выставлен счёт', amount: 4750, at: '02 марта', state: 'done' },
+          { k: 'paid', label: 'Оплачено', amount: 4750, at: '05 марта', state: 'done' },
+        ] },
+      timeline: [
+        { at: '02 марта · 14:00', ord: 21400, ch: 'crm', kind: 'raw', by: 'Система', text: 'Договор аренды зарегистрирован в Ejari, депозит принят.' },
+        { at: '02 мая · 09:30', ord: 20930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Второй чек проведён; следующий — 02 июня, поставлено напоминание.' },
+      ],
+    },
+    {
+      id: 'k_meydan', dealId: null, clientId: 'c_ambig', companyId: 'co_meydan', objectId: null,
+      kind: 'management', number: 'MGMT-2026-0221', signedAt: '21 февраля', status: 'active',
+      amount: 520000, nextDue: 'отчёт собственнику — до 31 мая',
+      milestones: [
+        { k: 'active', label: 'Договор управления активен', client: 'Объект принят в управление', at: '21 февраля', state: 'done' },
+        { k: 'tenant', label: 'Арендатор найден', client: 'Найден арендатор, условия согласованы', at: '19 марта', state: 'done' },
+        { k: 'movein', label: 'Заселение', client: 'Арендатор заселён', at: '01 апреля', state: 'done' },
+        { k: 'payments', label: 'Контроль оплат от арендатора', client: 'Платежи поступают по графику', at: 'ежемесячно', state: 'now' },
+        { k: 'report', label: 'Отчётность собственнику', client: 'Отчёт по объекту за период', at: 'до 31 мая', state: 'now' },
+      ],
+      commission: { total: 26000, payer: 'собственник', vat: true, split: null,
+        entries: [
+          { k: 'accrued', label: 'Начислено за период', amount: 26000, at: '30 апреля', state: 'done' },
+          { k: 'invoiced', label: 'Выставлен счёт', amount: 26000, at: '05 мая', state: 'now' },
+          { k: 'paid', label: 'Оплачено', amount: 0, at: '—', state: 'wait' },
+        ] },
+      timeline: [
+        { at: '21 февраля · 11:20', ord: 211120, ch: 'crm', kind: 'raw', by: 'Система', text: 'Договор управления подписан, доверенность оформлена.' },
+        { at: '19 марта · 15:45', ord: 191545, ch: 'meet', kind: 'raw', by: 'Лина Хассан', text: 'Арендатор найден, условия согласованы с собственником.' },
+        { at: '12 мая · 09:10', ord: 120910, ch: 'note', kind: 'note', by: 'Лина Хассан', text: 'Счёт за апрель выставлен, оплата ещё не поступила — проследить.' },
+      ],
+    },
+  ];
+
   // A3 fact-conflict — visible, not a silent overwrite.
   const conflicts = {
     d_karim: { field: 'Бюджет', a: '≈ 2,0 млн (первое сообщение)', b: 'до 2,6 млн (уточнение)', av: 2000000, bv: 2600000, chosen: 'b', note: 'Взято последнее уточнение; исходное значение сохранено.' },
@@ -557,6 +653,6 @@
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, refModel,
     deals, requests, tasks, events, inbox, analytics,
-    FUNNELS, STAGE_LABELS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, STAGE_LABELS, contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
