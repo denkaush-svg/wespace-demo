@@ -32,6 +32,7 @@
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     capture: {}, dealFunnel: 'sale_offplan', dealsFilter: {}, savedView: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
+    cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
     eventsPlayed: [], feedback: [], signals: [], dayStep: 0,
   };
@@ -148,6 +149,7 @@
     store.docSearch = ''; store.docTab = 'all'; store.calType = 'all'; store.calDir = 'all'; store.calObj = 'all'; store.calClient = 'all'; store.calWeek = 0; store.calDay = -1;
     store.contactsSearch = ''; store.companiesSearch = ''; store.conciergeSearch = '';
     store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' };
+    store.cgGroupCollapse = {};
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';

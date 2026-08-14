@@ -751,21 +751,96 @@
       .sort((a, b) => (b.unread || 0) - (a.unread || 0))
       .filter((t) => matchConciergeThread(t, q));
   }
+  // Determine which group a thread belongs to based on its id namespace
+  function getThreadGroup(threadId) {
+    if (threadId.startsWith('deal:')) return 'byDeal';
+    if (threadId.startsWith('contact:') || threadId.startsWith('lead:')) return 'byContact';
+    if (threadId.startsWith('object:')) return 'byObject';
+    if (threadId.startsWith('company:')) return 'byCompany';
+    return 'general';
+  }
+  // Human-readable group names
+  const THREAD_GROUPS = {
+    byContact: { label: 'По клиентам', icon: 'users' },
+    byDeal: { label: 'По сделкам', icon: 'briefcase' },
+    byObject: { label: 'По объектам', icon: 'building' },
+    byCompany: { label: 'По компаниям', icon: 'building' },
+    general: { label: 'Общее', icon: 'sparkle' },
+  };
   function conciergeRail(activeTid) {
     const q = S().conciergeSearch || '';
     const threads = conciergeThreads();
+    const isSearch = q.length > 0;
 
     const searchBox_ = searchBox('conciergeSearch', 'Поиск по диалогам…', q, 'cg-rail-search');
 
-    const rows = threads.map((t) => {
-      const on = t.id === activeTid ? ' is-active' : '';
-      const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
-      const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
-      const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
-      return '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + t.label + '" data-ticon="' + t.icon + '">' +
-        '<span class="fi i-acc">' + I(t.icon) + '</span>' +
-        '<span class="ft"><span class="t">' + t.label + time + '</span><span class="m">' + preview + '</span></span>' + unread + '</button>';
-    }).join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>' + (q ? 'По запросу ничего не найдено' : 'Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.') + '</div></div>';
+    // Group threads and build structure
+    const groups = {};
+    ['byContact', 'byDeal', 'byObject', 'byCompany', 'general'].forEach((g) => {
+      groups[g] = { threads: [], unread: 0 };
+    });
+
+    threads.forEach((t) => {
+      const group = getThreadGroup(t.id);
+      groups[group].threads.push(t);
+      groups[group].unread += (t.unread || 0);
+    });
+
+    // Render groups
+    const collapse = S().cgGroupCollapse || {};
+    const renderedGroups = [];
+
+    Object.keys(groups).forEach((groupId) => {
+      const group = groups[groupId];
+      if (!group.threads.length) return;
+
+      const groupInfo = THREAD_GROUPS[groupId];
+      const isCollapsed = collapse[groupId] && !isSearch;
+      const activeInGroup = group.threads.some((t) => t.id === activeTid);
+      const shouldExpand = activeInGroup || isSearch;
+      const actuallyCollapsed = isCollapsed && !shouldExpand;
+
+      let html = '<div class="cg-rail-group">' +
+        '<button class="cg-group-head' + (actuallyCollapsed ? ' is-collapsed' : '') + '" data-group-toggle="' + groupId + '">' +
+        '<span class="cg-group-expand">' + I(actuallyCollapsed ? 'chevRight' : 'chevDown') + '</span>' +
+        '<span class="cg-group-label">' + groupInfo.label + '</span>' +
+        '<span class="cg-group-count">' + group.threads.length;
+      if (group.unread) html += ' · <span class="unread-badge">' + group.unread + '</span>';
+      html += '</span></button>';
+
+      if (!actuallyCollapsed) {
+        group.threads.forEach((t) => {
+          const on = t.id === activeTid ? ' is-active' : '';
+          const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
+          const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
+          const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
+
+          // A deal thread and a client thread are a different perimeter but the same person. The
+          // deal row therefore carries the deal's own essence — the thread label already opens with
+          // the client's name, so repeating it would say nothing — plus a marker when that client
+          // ALSO has a client-level dialogue, which is the jump the client asked to make easy.
+          let sub = '';
+          if (groupId === 'byDeal') {
+            const deal = D().deals.find((d) => d.id === t.id.slice(5));
+            if (deal) {
+              const essence = (deal.title && deal.title !== (D().clients.find((c) => c.id === deal.clientId) || {}).name) ? deal.title : (deal.sub || '');
+              const alsoClient = threads.some((x) => x.id === 'contact:' + deal.clientId);
+              sub = '<span class="cg-sub">' + (essence ? escAttr(essence) : '') +
+                (alsoClient ? '<span class="cg-link" title="У этого клиента есть и диалог по клиенту">' + I('users') + 'есть диалог по клиенту</span>' : '') + '</span>';
+            }
+          }
+
+          html += '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + escAttr(t.label) + '" data-ticon="' + t.icon + '">' +
+            '<span class="fi i-acc">' + I(t.icon) + '</span>' +
+            '<span class="ft"><span class="t">' + t.label + time + '</span>' + sub + '<span class="m">' + preview + '</span></span>' + unread + '</button>';
+        });
+      }
+
+      html += '</div>';
+      renderedGroups.push(html);
+    });
+
+    const rows = renderedGroups.join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>' + (q ? 'По запросу ничего не найдено' : 'Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.') + '</div></div>';
 
     return '<div class="cg-rail-head"><span class="section-label cg-rail-count" style="margin:0">Диалоги · ' + threads.length + '</span>' +
       '<div class="cg-rail-head-btns"><button class="btn sm" data-act="newThread">' + I('plus') + 'Новый</button>' +
@@ -5837,5 +5912,5 @@
     openDealEdit, saveDealEdit, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };
 })(window.WS = window.WS || {});
