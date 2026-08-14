@@ -1247,7 +1247,10 @@
   function dealsFunnel() {
     const ds = D().deals;
     const byStage = STAGES.map((s) => ({ s: s, list: ds.filter((d) => d.stage === s.k) }));
-    const totalVal = ds.reduce((a, d) => a + (d.amount || 0), 0);
+    // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
+    // forecast — the exact confusion the won/lost split exists to remove.
+    const live = ds.filter((d) => !dealClosed(d));
+    const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
     const cells = byStage.map(({ s, list }) => {
       const val = list.reduce((a, d) => a + (d.amount || 0), 0);
       return '<div class="fn-cell"><div class="fn-n">' + list.length + '</div><div class="fn-l">' + s.label + '</div><div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div></div>';
@@ -1261,7 +1264,7 @@
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
       '<div class="funnel">' + cells + '</div>' +
-      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + ds.length + ' сделок</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
+      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
   }
   // Stages live in fixtures next to the funnels that order them. STAGES is the canonical SPINE —
