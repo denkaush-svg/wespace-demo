@@ -2380,7 +2380,8 @@
     if (tab === 'docs') {
       const kpN = dealKpObjects(d).length;
       const kpBtn = kpN ? '<button class="btn xs" data-act="openDealKp" data-deal="' + d.id + '">' + I('doc') + 'КП сделки · ' + kpN + '</button>' : '';
-      return docChainBlock(docIdx(d), kpN > 0, kpBtn) + '<div style="height:14px"></div>' +
+      return gatesBlock(d) + '<div style="height:14px"></div>' +
+        (kpN ? dxSec('doc', 'Коммерческое предложение', kpBtn, '<div class="gate-foot" style="margin-top:0">Собрано по ' + kpN + ' ' + plural(kpN, 'объекту', 'объектам', 'объектам') + '.</div>') + '<div style="height:14px"></div>' : '') +
         dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
     }
     if (tab === 'history') return dealHistoryTab(d);
@@ -3147,7 +3148,106 @@
         'Снимок КП на момент создания сделки — неизменяемый. Живое КП правится в заявке.'),
       '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
-  // Document pipeline of a deal: КП → MOU → SPA → DLD, statuses derived from the deal stage.
+  // ---- Layer 2: gates ----------------------------------------------------------------
+  // A gate is a condition for moving on or getting paid. It lives in the card, never as a column:
+  // the whole point of the service axis is that Dubai's procedure does not multiply boards. Which
+  // gates a deal has is decided by its FIELDS — (готовность) × (вид сделки) × (тип оплаты) — so a
+  // resale grows Form F and trustee while an off-plan grows escrow and Oqood, on the same board.
+  //
+  // Depth is wave 1: a gate is a manual checklist item an agent ticks. Wave 2 attaches the document
+  // and the deadline, wave 3 pulls the status from DLD/Ejari. Pretending otherwise here would be
+  // demoing an integration we do not have.
+  const GATE_STEPS = [['prep', 'Подготовка к сделке'], ['sign', 'Подписание / оплата'], ['reg', 'Регистрация'], ['exec', 'Выполнение работ']];
+  const GATES = {
+    kyc: { label: 'KYC и источник средств', at: 'prep', hint: 'Личность и UBO, санкции и PEP, источник средств, доверенность. Обязательно в ОАЭ до сделки.' },
+    title: { label: 'Проверка титула и доверенности', at: 'prep', hint: 'Кто собственник, есть ли обременения, действует ли POA.' },
+    charges: { label: 'Долги по service charge', at: 'prep', hint: 'Справка об отсутствии задолженности по взносам на содержание.' },
+    leases: { label: 'Проверка договоров аренды', at: 'prep', hint: 'Действующие договоры и их условия — у ГАБ покупают денежный поток.' },
+    deposit10: { label: 'Депозит-чек 10%', at: 'prep', hint: 'Практика вторички; фактический процент — по договору.' },
+    formf: { label: 'Form F (MOU)', at: 'prep', hint: 'Договор о намерениях вторички на портале DLD: покупатель, продавец, агент.' },
+    assignment_noc: { label: 'NOC на переуступку', at: 'prep', hint: 'Согласие застройщика; порог оплаты задаёт SPA.' },
+    preapproval: { label: 'Предодобрение банка', at: 'prep', hint: 'Первый шаг ипотеки покупателя.' },
+    valuation: { label: 'Оценка объекта', at: 'prep', hint: 'Оценка банком или DLD — для ипотеки и для дарения.' },
+    fol: { label: 'Final Offer Letter', at: 'prep', hint: 'Финальное письмо-оффер банка покупателя.' },
+    escrow: { label: 'Платёж на escrow', at: 'sign', hint: 'Деньги переведены на защищённый счёт проекта.' },
+    spa: { label: 'SPA', at: 'sign', hint: 'Договор купли-продажи с застройщиком.' },
+    rentdep: { label: 'Депозит по аренде', at: 'sign', hint: '5% без мебели, 10% с мебелью — рыночная практика; по договору.' },
+    fitout_ok: { label: 'Согласование отделки', at: 'sign', hint: 'Одобрение проекта собственником, УК или муниципалитетом.' },
+    mgmt: { label: 'Договор управления', at: 'sign', hint: 'Право вести объект и контролировать оплаты; объём полномочий — по доверенности.' },
+    mandate: { label: 'Эксклюзивный мандат', at: 'sign', hint: 'Договор с собственником на реализацию объекта.' },
+    trakheesi: { label: 'Trakheesi', at: 'sign', hint: 'Разрешение на рекламу листинга.' },
+    partner_ok: { label: 'Подтверждение партнёра', at: 'sign', hint: 'Партнёр подтвердил оказание услуги — от этого зависит вознаграждение.' },
+    oqood: { label: 'Oqood', at: 'reg', hint: 'Регистрация в промежуточном реестре DLD, в короткий срок после SPA.' },
+    noc: { label: 'NOC застройщика', at: 'reg', hint: 'Согласие на перевод и отсутствие долгов по service charge.' },
+    mortgage_release: { label: 'Снятие залога продавца', at: 'reg', hint: 'Банк продавца снимает залог перед переводом права.' },
+    trustee: { label: 'Trustee-перевод', at: 'reg', hint: 'Переоформление права в офисе регистрационного trustee DLD.' },
+    dld4: { label: 'Пошлина DLD 4%', at: 'reg', hint: 'Госпошлина за перевод плюс сборы trustee. Плательщик — по договору.' },
+    titledeed: { label: 'Title Deed', at: 'reg', hint: 'Итоговый документ о праве собственности.' },
+    ejari: { label: 'Ejari', at: 'reg', hint: 'Регистрация аренды в реестре DLD.' },
+    service_ok: { label: 'Приёмка работ клиентом', at: 'exec', hint: 'Отчёт принят, документы подписаны.' },
+  };
+  const COMMERCIAL_TYPES = ['офис', 'ритейл', 'склад', 'ГАБ'];
+  function gatesFor(d) {
+    if (!d) return [];
+    const out = ['kyc']; // every deal, every funnel — the UAE requirement is not funnel-specific
+    const kind = d.saleKind || '', pay = d.paymentForm || '';
+    if (d.funnel === 'sale') {
+      if (kind === 'вторичка') out.push('title', 'deposit10', 'formf', 'noc', 'mortgage_release', 'trustee', 'titledeed');
+      else if (kind === 'переуступка') out.push('assignment_noc', 'oqood');
+      else out.push('escrow', 'spa', 'oqood'); // первичка and anything off-plan
+      if (d.objectType === 'ГАБ') out.push('leases', 'charges');
+      if (d.objectType === 'земля') out.push('charges');
+      out.push('dld4');
+      if (/ипотек/i.test(pay)) out.push('preapproval', 'valuation', 'fol');
+    } else if (d.funnel === 'rent') {
+      out.push('rentdep', 'ejari');
+      if (COMMERCIAL_TYPES.indexOf(d.objectType) >= 0) out.push('fitout_ok');
+    } else if (d.funnel === 'manage') out.push('mgmt', 'charges');
+    else if (d.funnel === 'exclusive') out.push('mandate', 'trakheesi');
+    else if (d.funnel === 'cross') out.push('partner_ok');
+    else if (d.funnel === 'consult') out.push('service_ok');
+    return out.filter((k, i) => GATES[k] && out.indexOf(k) === i);
+  }
+  function gateDone(d, k) { return !!(d.gates && d.gates[k]); }
+  function gateProgress(d) {
+    const list = gatesFor(d);
+    return { done: list.filter((k) => gateDone(d, k)).length, total: list.length };
+  }
+  function gatesBlock(d) {
+    const list = gatesFor(d);
+    if (!list.length) return '';
+    const pr = gateProgress(d);
+    // Grouped by the stage the gate belongs to, so the block reads as the road ahead rather than a
+    // flat list of Dubai acronyms. A group with nothing in it for this deal is not drawn.
+    const groups = GATE_STEPS.map(([at, label]) => {
+      const rows = list.filter((k) => GATES[k].at === at).map((k) => {
+        const g = GATES[k], on = gateDone(d, k);
+        return '<button class="gate-row' + (on ? ' on' : '') + '" data-gate="' + d.id + '~' + k + '" title="Отметить вручную">' +
+          '<span class="gate-box">' + (on ? I('check') : '') + '</span>' +
+          '<span class="gate-t"><span class="gate-l">' + g.label + '</span>' +
+          '<span class="gate-h">' + g.hint + '</span></span></button>';
+      }).join('');
+      return rows ? '<div class="gate-group"><div class="gate-gh">' + label + '</div>' + rows + '</div>' : '';
+    }).join('');
+    const meter = '<span class="badge' + (pr.done === pr.total ? ' ok' : ' acc') + '">' + pr.done + ' из ' + pr.total + '</span>';
+    return dxSec('check', 'Контрольные точки', meter,
+      '<div class="gates">' + groups + '</div>' +
+      '<div class="gate-foot">Набор собран по полям карточки: ' +
+      [d.dealType, d.readiness, d.saleKind, d.objectType].filter(Boolean).join(' · ') +
+      '. Отмечается вручную — подключение к реестрам DLD и Ejari идёт следующей волной.</div>');
+  }
+  function toggleGate(key) {
+    const parts = String(key || '').split('~');
+    const d = D().deals.find((x) => x.id === parts[0]);
+    if (!d || !GATES[parts[1]]) return;
+    d.gates = Object.assign({}, d.gates);
+    d.gates[parts[1]] = !d.gates[parts[1]];
+    WS.storeApi.save();
+    WS.storeApi.toast('«' + GATES[parts[1]].label + '» — ' + (d.gates[parts[1]] ? 'отмечено' : 'снята отметка'), 'ok');
+    setEntityTab('deal', d.id, 'docs');
+  }
+  // Document pipeline of a REQUEST: КП → MOU → SPA → DLD. Kept for the заявка card, where there is
+  // no deal yet to derive gates from; on a deal it is replaced by the gate block above.
   // Position along the deal's own funnel — used to order deals by how far along they are.
   function dealStageIdx(d) { const i = funnelPath(d).indexOf(d && d.stage); return i < 0 ? 0 : i; }
   // The КП→MOU→SPA→DLD strip has four steps and the funnels now have six to nine, so the position
@@ -6003,7 +6103,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, toggleGate, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };

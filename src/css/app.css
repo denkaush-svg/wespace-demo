@@ -376,6 +376,27 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    KANBAN (deals)
    ============================================================ */
+/* Gate layer — a manual checklist grouped by the stage each condition belongs to. Rows are wide
+   targets because they are toggled, and the hint carries the meaning: «NOC» alone tells an agent
+   who has not done a resale in Dubai nothing at all. */
+.gates { display: flex; flex-direction: column; gap: 14px; }
+.gate-group { display: flex; flex-direction: column; gap: 6px; }
+.gate-gh { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--faint); padding: 0 2px; }
+.gate-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s, 10px);
+  padding: 10px 12px; cursor: pointer; min-height: 44px; }
+.gate-row:hover { border-color: var(--acc-line); }
+.gate-row.on { background: var(--acc-soft); border-color: var(--acc-line); }
+.gate-box { flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 5px;
+  border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+.gate-row.on .gate-box { background: var(--acc); border-color: var(--acc); color: #fff; }
+.gate-box svg { width: 12px; height: 12px; }
+.gate-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gate-l { font-size: 13px; font-weight: 700; color: var(--ink); }
+.gate-row.on .gate-l { color: var(--acc-ink); }
+.gate-h { font-size: 11.5px; color: var(--mut); line-height: 1.35; }
+.gate-foot { font-size: 11.5px; color: var(--faint); line-height: 1.4; margin-top: 12px; }
 .kanban-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint);
   margin: 0 0 8px 2px; }
 .kanban-hint svg { width: 13px; height: 13px; opacity: .7; }
