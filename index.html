@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 00:15</title>
+  <title>WESPACE · сборка 16:34</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='00:15';
+    window.WS_BUILD='16:34';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -330,6 +330,21 @@ button { font-family: inherit; cursor: pointer; }
 .spark i.on { background: var(--acc); opacity: 1; }
 .meter { height: 7px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin-top: 12px; }
 .meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc), var(--acc-2)); border-radius: 999px; }
+
+/* goals (personal targets) */
+/* Goal progress — one row shared by the Pulse block and the profile editor. */
+.goal-card { padding: 6px 16px 14px; }
+.goal-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.goal-row:last-child { border-bottom: 0; }
+.goal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.goal-label { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.goal-num { font-size: 13.5px; font-weight: 700; color: var(--acc-deep); white-space: nowrap; }
+.goal-num i { font-style: normal; font-weight: 500; color: var(--mut); }
+.goal-meter.is-behind i { background: var(--warn, #c98a3a); }
+.goal-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
+.goal-pct { font-weight: 700; color: var(--ink); }
+.goal-pace.is-behind { color: var(--stop); }
+.goal-acts { display: flex; gap: 6px; margin-left: auto; }
 
 /* attention feed (single inbox) */
 .feed { margin-top: 12px; display: flex; flex-direction: column; }
@@ -840,6 +855,10 @@ button { font-family: inherit; cursor: pointer; }
 .obj-toolbar .mini-sel { flex: 0 0 auto; }
 /* matching panel (подбор) + psych form */
 .match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.match-grid .wide { grid-column: 1 / -1; }
+/* Grouped forms: the group heading needs air above it, or it collides with the field before. */
+.match-grid + .section-label, .form-grid + .section-label { margin-top: 16px; }
+.section-label + .match-grid, .section-label + .form-grid { margin-top: 6px; }
 .match-grid .fld { display: flex; flex-direction: column; gap: 5px; }
 .match-grid .fld > span { font-size: 12px; color: var(--mut); font-weight: 600; }
 .match-grid .fld input, .match-grid .fld select { height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
@@ -1270,18 +1289,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cb-num { font-size: 21px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); }
 .cb-badges { margin-top: 11px; }
 .cb-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.cd-list { display: flex; flex-direction: column; gap: 2px; }
-.cd-row { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 9px; }
+.cd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 2px 14px; }
+.cd-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; min-width: 0; }
 .cd-row.on { background: var(--acc-soft); }
 .cd-ic { display: inline-flex; width: 30px; height: 30px; border-radius: 8px; background: var(--bg); color: var(--mut); align-items: center; justify-content: center; flex: none; }
 .cd-row.on .cd-ic { background: #fff; color: var(--acc-deep); }
 .cd-ic svg { width: 15px; height: 15px; }
-.cd-label { font-size: 12.5px; color: var(--mut); width: 92px; flex: none; }
-.cd-val { font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; }
+.cd-label { font-size: 12.5px; color: var(--mut); width: 74px; flex: none; }
+.cd-val { font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cd-row.on .cd-val { color: var(--acc-deep); }
-.cd-primary { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: var(--acc-ink); background: #fff; border: 1px solid var(--acc-line); padding: 2px 8px; border-radius: 999px; flex: none; }
+.cd-primary { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--acc-ink); background: #fff; border: 1px solid var(--acc-line); padding: 2px 7px; border-radius: 999px; flex: none; white-space: nowrap; }
 .cd-primary svg { width: 11px; height: 11px; }
-.cd-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cd-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 
 /* ---- Manager IA (P7): team roster · lead distribution · approvals ---- */
 .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 4px; }
@@ -1439,17 +1458,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width: 820px) { .insights { grid-template-columns: 1fr; } }
 
 /* ===== Card heroes (client name / deal object / КП flagship) — object-hero family ===== */
-.chero { position: relative; border-radius: 14px; overflow: hidden; min-height: 236px; display: flex; margin-bottom: 16px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
+.chero { position: relative; border-radius: 14px; overflow: hidden; min-height: 126px; display: flex; margin-bottom: 16px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
 .chero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .chero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 55%, rgba(15,17,21,.14)); }
-.chero-content { position: relative; z-index: 2; display: flex; gap: 22px; align-items: center; padding: 24px 28px; flex: 1; }
-.chero-avatar { flex: 0 0 68px; width: 68px; height: 68px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 3px 10px rgba(0,0,0,.28); }
+.chero-content { position: relative; z-index: 2; display: flex; gap: 16px; align-items: center; padding: 16px 20px; flex: 1; }
+.chero-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .chero-info { flex: 1; min-width: 0; }
-.chero-name { font-family: var(--font-disp); font-size: 30px; font-weight: 800; line-height: 1.1; margin: 0 0 14px; color: #fff; letter-spacing: -.02em; }
-.chero-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; max-width: 520px; }
-.chero-fact { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,.86); line-height: 1.35; }
-.chero-fact-icon { display: inline-flex; width: 14px; height: 14px; flex: none; }
-.chero-fact-icon svg { width: 14px; height: 14px; opacity: .85; }
+.chero-name { font-family: var(--font-disp); font-size: 22px; font-weight: 800; line-height: 1.1; margin: 0 0 8px; color: #fff; letter-spacing: -.02em; }
+.chero-facts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; max-width: 100%; }
+.chero-fact { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,.86); line-height: 1.3; }
+.chero-fact-icon { display: inline-flex; width: 12px; height: 12px; flex: none; }
+.chero-fact-icon svg { width: 12px; height: 12px; opacity: .85; }
 
 .dhero-modal, .kp-hero-modal, .dhero-page { display: contents; }
 .dhero-page .osum { margin-bottom: 16px; }
@@ -1478,9 +1497,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .kp-hero-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 110px; margin-bottom: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; color: var(--mut); font-size: 13px; }
 .kp-hero-empty svg { width: 18px; height: 18px; opacity: .5; }
 @media (max-width: 720px) {
-  .chero-content { flex-direction: column; align-items: flex-start; gap: 14px; padding: 16px; }
-  .chero-name { font-size: 24px; }
-  .chero-facts { grid-template-columns: 1fr; }
+  .chero-content { flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 16px; }
+  .chero-name { font-size: 20px; }
+  .chero-facts { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
 .promo-msg { width: 100%; min-height: 96px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--surface); }
 .promo-creatives { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -1536,17 +1555,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .obj-map-foot .omf-t b { font-size: 13px; color: var(--ink); }
 .obj-map-foot .omf-t span { display: block; font-size: 11.5px; color: var(--mut); margin-top: 1px; }
 /* Object detail HERO pattern (photo on top, overlaid fields) */
-.ohero { position: relative; border-radius: 14px; overflow: hidden; min-height: 322px; display: flex; margin-bottom: 20px; }
+.ohero { position: relative; border-radius: 14px; overflow: hidden; min-height: 280px; display: flex; margin-bottom: 20px; }
 .ohero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .ohero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.86), rgba(15,17,21,.46) 54%, rgba(15,17,21,.10)); }
-.ohero-info { position: relative; z-index: 2; padding: 26px 28px; max-width: 540px; align-self: center; }
-.ohero-title { font-size: 26px; font-weight: 700; line-height: 1.14; margin: 0 0 9px; color: #fff; letter-spacing: -.01em; }
-.ohero-addr { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: rgba(255,255,255,.84); margin-bottom: 18px; }
-.ohero-addr svg { width: 14px; height: 14px; opacity: .8; }
+.ohero-info { position: relative; z-index: 2; padding: 22px 24px; max-width: 540px; align-self: center; }
+.ohero-title { font-size: 24px; font-weight: 700; line-height: 1.14; margin: 0 0 7px; color: #fff; letter-spacing: -.01em; }
+.ohero-addr { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255,255,255,.84); margin-bottom: 14px; }
+.ohero-addr svg { width: 13px; height: 13px; opacity: .8; }
 .ohero-meta { margin: 0; display: grid; gap: 0; }
-.ohero-meta > div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.2); }
-.ohero-meta dt { font-size: 13px; color: rgba(255,255,255,.78); margin: 0; }
-.ohero-meta dd { font-size: 13.5px; font-weight: 650; color: #fff; margin: 0; text-align: right; }
+.ohero-meta > div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.2); }
+.ohero-meta dt { font-size: 12px; color: rgba(255,255,255,.78); margin: 0; }
+.ohero-meta dd { font-size: 13px; font-weight: 650; color: #fff; margin: 0; text-align: right; }
 .ohero-src { position: absolute; top: 16px; left: 16px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: #fff; background: rgba(18,15,12,.52); padding: 4px 11px; border-radius: 999px; }
 .ohero-src svg { width: 13px; height: 13px; }
 .ohero-actions { position: absolute; top: 16px; right: 16px; z-index: 2; display: flex; flex-direction: column; gap: 8px; width: 196px; }
@@ -1614,14 +1633,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* ---- Deal card v2: the deal reads first; the object is demoted to a compact card ---- */
 /* Compact deal hero — same photo-backdrop family as .chero / .ohero, but short. */
-.dhero { position: relative; border-radius: var(--r); overflow: hidden; min-height: 116px; display: flex; margin-bottom: 12px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
+.dhero { position: relative; border-radius: var(--r); overflow: hidden; min-height: 104px; display: flex; margin-bottom: 12px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
 .dhero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .dhero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 58%, rgba(15,17,21,.16)); }
-.dhero-content { position: relative; z-index: 2; display: flex; gap: 14px; align-items: center; padding: 16px 20px; flex: 1; }
-.dhero-av { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.dhero-content { position: relative; z-index: 2; display: flex; gap: 12px; align-items: center; padding: 12px 16px; flex: 1; }
+.dhero-av { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .dhero-info { flex: 1; min-width: 0; }
-.dhero-name { font-family: var(--font-disp); font-size: 21px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
-.dhero-sub { margin-top: 5px; font-size: 13px; color: rgba(255,255,255,.86); }
+.dhero-name { font-family: var(--font-disp); font-size: 18px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
+.dhero-sub { margin-top: 3px; font-size: 12px; color: rgba(255,255,255,.86); }
+/* The deal's essence, edited in place. The label carries the affordance so the line below it can
+   stay plain text until touched; only the text node is focusable, so there is one tab stop. */
+.deal-title-edit { display: block; margin-bottom: 12px; }
+.deal-title-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
+.deal-title-lbl svg { width: 11px; height: 11px; }
+.deal-title-text { display: block; padding: 6px 10px; margin-left: -10px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ink); cursor: text; outline: none; transition: background .18s var(--ease), border-color .18s var(--ease); }
+.deal-title-text:hover { background: var(--surface-2); border-color: var(--line); }
+.deal-title-text:focus { background: var(--surface); border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.deal-title-edit:hover .deal-title-lbl { color: var(--acc-ink); }
+/* Handover brief — prose, so it reads as sentences rather than as another field grid. */
+.deal-brief { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink); max-width: 74ch; text-wrap: pretty; }
 /* Narrow stepper directly under the hero. */
 .deal-stepper-compact { margin-bottom: 12px; }
 .deal-stepper-compact .dx-stepper { margin: 8px 0 2px; }
@@ -1742,6 +1772,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .docchain-row.wait .docchain-k { color: var(--mut); }
 .docchain-s { font-size: 11.5px; color: var(--mut); margin-top: 1px; }
 .docchain-row .badge { margin-left: auto; flex: 0 0 auto; }
+
+/* List search + filter bar — one shape across contacts, companies and the Concierge rail. */
+.obj-search input[type="search"]::-webkit-search-cancel-button { display: none; }
+.list-filters { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--acc-line); border-radius: var(--r); background: var(--acc-soft); }
+.lf-fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lf-fld.inline { flex-direction: row; align-items: center; gap: 8px; }
+.lf-fld > span { font-size: 11.5px; font-weight: 600; color: var(--mut); }
+.lf-hint { flex: 1 1 100%; font-size: 11px; color: var(--faint); }
+.cg-rail-search { flex: none; margin: 8px; padding: 4px 4px 4px 12px; border-radius: var(--r); box-shadow: none; }  /* the rail is a flex COLUMN — .obj-search's flex:1 would stretch the field down the whole panel */
+.cg-rail-search input { font-size: 13px; padding: 8px 0; }
+.cg-rail-search .ico svg { width: 15px; height: 15px; }
 
 
 /* ============================================================
@@ -1870,14 +1911,27 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cg2{ display:grid; grid-template-columns:320px 1fr; height:100%; min-height:0; }
 .cg2-rail{ border-right:1px solid var(--line); background:var(--surface); display:flex; flex-direction:column; min-height:0; }
 .cg-rail-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:15px 16px; border-bottom:1px solid var(--line); }
-.cg-rail-list{ flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:3px; }
-.cg-rail-row{ display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left; cursor:pointer; padding:11px 12px; border-radius:var(--r-sm); border:1px solid transparent; background:transparent; transition:.14s var(--ease); }
-.cg-rail-row:hover{ background:var(--surface-2); }
-.cg-rail-row.is-active{ background:var(--acc-soft); border-color:var(--acc-line); }
+.cg-rail-list{ flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:0; }
+/* thread groups */
+.cg-rail-group{ display:flex; flex-direction:column; gap:0; margin-bottom:2px; }
+.cg-group-head{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; cursor:pointer; padding:10px 12px; border-radius:var(--r-sm); border:1px solid transparent; background:transparent; transition:.14s var(--ease); font-size:12px; font-weight:650; color:var(--ink-2); text-transform:uppercase; letter-spacing:.03em; margin-bottom:2px; }
+.cg-group-head:hover{ background:var(--surface-2); }
+.cg-group-expand{ width:16px; height:16px; display:grid; place-items:center; flex:none; color:var(--mut); transition:.14s var(--ease); }
+.cg-group-head .cg-group-label{ flex:1; }
+.cg-group-head .cg-group-count{ font-size:11px; font-weight:700; color:var(--faint); }
+.cg-group-head .unread-badge{ color:var(--acc); font-weight:700; }
+.cg-group-head.is-collapsed .cg-group-expand{ transform:rotate(-90deg); }
+/* threads in group */
+.cg-rail-group .cg-rail-row{ display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left; cursor:pointer; padding:11px 12px; border-radius:var(--r-sm); border:1px solid transparent; background:transparent; transition:.14s var(--ease); }
+.cg-rail-group .cg-rail-row:hover{ background:var(--surface-2); }
+.cg-rail-group .cg-rail-row.is-active{ background:var(--acc-soft); border-color:var(--acc-line); }
 .cg-rail-row .fi{ width:34px; height:34px; border-radius:var(--r-sm); display:grid; place-items:center; flex:none; background:var(--acc-soft); color:var(--acc); }
 .cg-rail-row .fi svg{ width:17px; height:17px; }
 .cg-rail-row .ft{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .cg-rail-row .ft .t{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-weight:650; color:var(--ink); font-size:13.5px; }
+.cg-sub{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--faint); margin-top:1px; }
+.cg-link{ display:inline-flex; align-items:center; gap:3px; color:var(--acc-ink); background:var(--acc-soft); border-radius:999px; padding:1px 6px; white-space:nowrap; }
+.cg-link svg{ width:10px; height:10px; }
 .cg-rail-row .ft .m{ font-size:12px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cg-rail-row.is-unread .ft .m{ color:var(--ink-2); font-weight:600; }
 .cg-rail-row .th-time{ font-size:10.5px; color:var(--faint); font-weight:500; flex:none; }
@@ -2143,8 +2197,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const tenant = { name: 'Harbour Key Realty LLC', city: 'Dubai', plan: 'Demo tenant' };
 
   const users = {
-    agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina' },
-    manager: { id: 'u_omar',   name: 'Омар Рахман',    role: 'Руководитель', init: 'ОР' },
+    agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina',
+      // Closed book for the demo period, per horizon. `attribution` is agency-wide and carries no
+      // agent split, so a personal goal must read the agent's own figures, not a slice of it.
+      closedPeriod: { month: { commission: 186000, deals: 2 }, quarter: { commission: 430000, deals: 5 } },
+      goals: [
+        { id: 'g_commission', metric: 'commission', target: 1200000, period: 'quarter', label: 'Заработать 1,2 млн комиссии за квартал', pinned: true },
+        { id: 'g_pipeline', metric: 'pipeline', target: 5000000, period: 'month', label: 'Держать 5 млн в активных сделках', pinned: true },
+        { id: 'g_deals', metric: 'deals', target: 14, period: 'quarter', label: 'Закрыть 14 сделок за квартал', pinned: false },
+      ]
+    },
+    manager: { id: 'u_omar',   name: 'Омар Рахман',    role: 'Руководитель', init: 'ОР',
+      goals: [
+        { id: 'g_team_commission', metric: 'commission', target: 3500000, period: 'quarter', label: 'План отдела по комиссии за квартал', pinned: true },
+        { id: 'g_team_deals', metric: 'deals', target: 18, period: 'quarter', label: 'Закрыть 18 сделок командой', pinned: true },
+        { id: 'g_team_pipeline', metric: 'pipeline', target: 15000000, period: 'month', label: 'Пайплайн отдела 15 млн', pinned: false },
+      ]
+    },
     partner: { id: 'u_yusef',  name: 'Юсеф Хаддад',     role: 'Клубный партнёр', init: 'ЮХ' },
   };
 
@@ -2261,7 +2330,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // stageDays (R12), companyId (R5), source for attribution (R9). Dubai taxonomy (§4).
   const deals = [
     { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'new',
-      title: 'Анна Петрова', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня',
+      title: 'Инвест-квартира до 2 млн AED', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня', createdAt: '14 мая',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
       consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
@@ -2272,21 +2341,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       ],
       prov: { budget: 'confirmed', source: 'ai', paymentForm: 'ai', objectType: 'confirmed', goal: 'ai' } },
     { id: 'd_igor', clientId: 'c_overdue', objectId: 'o_bayline', agent: 'u_ahmed', amount: 2400000, hot: true, stage: 'work',
-      title: 'Игорь Лебедев', sub: 'Перепродажа · 2,4 млн AED', tags: ['касание просрочено'], updated: '2 дня назад',
+      title: 'Перепродажа Bayline Terraces', sub: 'Перепродажа · 2,4 млн AED', tags: ['касание просрочено'], updated: '2 дня назад', createdAt: '10 мая',
       funnel: 'sale_ready', dealType: 'Продажа · готовое', objectType: 'готовое', goal: 'Перепродажа',
       paymentForm: '100% оплата', vat: false, source: 'Реферал', partnerAgent: null, companyId: null,
       consideredProjects: ['Bayline Terraces'], stageDays: 6,
       nextDue: 'просрочено (касание)', deposit: { kind: 'EOI', amount: 50000, paid: true, at: '8 мая', refundable: true },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_viktor', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_marina', amount: 1950000, hot: false, stage: 'docs',
-      title: 'Виктор Орлов', sub: 'Договор бронирования', tags: ['документ'], updated: 'вчера',
+      title: 'Бронирование Bayline 1603', sub: 'Договор бронирования', tags: ['документ'], updated: 'вчера', createdAt: '10 мая',
       funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: 'Инвестиция',
       paymentForm: 'Ипотека', vat: false, source: 'Property Finder', partnerAgent: null, companyId: 'co_emaar',
       consideredProjects: ['Bayline Terraces'], stageDays: 3, requestId: 'r_viktor',
       nextDue: '12 мая', deposit: { kind: 'Бронирование (booking)', amount: 97500, paid: true, at: '6 мая', refundable: false },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'work',
-      title: 'Karim Aziz', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня',
+      title: 'Резиденция в Downtown через партнёра', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня', createdAt: '14 мая',
       funnel: 'referral', dealType: 'Передано партнёру', objectType: 'готовое', goal: 'Покупка резиденции',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: 'u_yusef', companyId: 'co_altura',
       consideredProjects: ['Downtown Views II'], stageDays: 1,
@@ -2297,19 +2366,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       ],
       prov: { budget: 'ai', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'ai' } },
     { id: 'd_lease', clientId: 'c_night', objectId: 'o_palmcourt', agent: 'u_marina', amount: 95000, hot: false, stage: 'new',
-      title: 'Sarah Mansour', sub: 'Аренда 1BR · JVC', tags: ['ночной лид'], updated: 'сегодня',
+      title: 'Аренда 1BR в JVC', sub: 'Аренда 1BR · JVC', tags: ['ночной лид'], updated: 'сегодня', createdAt: '14 мая',
       funnel: 'rent', dealType: 'Аренда', objectType: 'готовое', goal: 'Аренда под проживание',
       paymentForm: 'Годовой чек', vat: false, source: 'Bayut', partnerAgent: null, companyId: null,
       consideredProjects: ['Palm Court Residence'], stageDays: 0,
       prov: { budget: 'ai', source: 'ai', objectType: 'ai', goal: 'ai' } },
     { id: 'd_fitout', clientId: 'c_ambig', objectId: 'o_creekline', agent: 'u_lina', amount: 320000, hot: false, stage: 'work',
-      title: 'Елена Крылова', sub: 'Fit-out офиса · Business Bay', tags: ['fit-out'], updated: '3 дня назад',
+      title: 'Fit-out офиса в Business Bay', sub: 'Fit-out офиса · Business Bay', tags: ['fit-out'], updated: '3 дня назад', createdAt: '09 мая',
       funnel: 'fitout', dealType: 'Fit-out', objectType: 'офис', goal: 'Отделка под аренду',
       paymentForm: 'Поэтапно', vat: true, source: 'Реферал', partnerAgent: null, companyId: 'co_meydan',
       consideredProjects: [], stageDays: 4,
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_rentbiz', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_omar', amount: 4200000, hot: false, stage: 'docs',
-      title: 'Портфель · готовый арендный', sub: 'Готовый арендный бизнес · DIFC', tags: ['портфель'], updated: 'вчера',
+      title: 'Готовый арендный бизнес в DIFC', sub: 'Готовый арендный бизнес · DIFC', tags: ['портфель'], updated: 'вчера', createdAt: '11 мая',
       funnel: 'rental_biz', dealType: 'Готовый арендный бизнес', objectType: 'офис', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
       consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_bayline', 'o_creekline'],
@@ -2359,13 +2428,34 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Companies (R5, A10) — entity above contacts/deals; carries KYC STATUS (not a rating).
   const companies = [
     { id: 'co_emaar', name: 'Emaar Properties', kind: 'Застройщик', kyc: 'verified', note: 'Крупный застройщик, эскроу-счета DLD.',
-      trn: '100 4567 8901 0003', license: 'DLD · застройщик', address: 'Downtown Dubai, Emaar Square, Building 3', contactPerson: 'Fatima Al Nuaimi', contactRole: 'Broker Relations Director', phone: '+971 4 367 3333', email: 'brokers@emaar.ae', commission: '2–4% off-plan · выплата от застройщика · эскроу DLD', escrow: true },
+      trn: '100 4567 8901 0003', license: 'DLD · застройщик', address: 'Downtown Dubai, Emaar Square, Building 3', contactPerson: 'Fatima Al Nuaimi', contactRole: 'Broker Relations Director', phone: '+971 4 367 3333', email: 'brokers@emaar.ae', commission: '2–4% off-plan · выплата от застройщика · эскроу DLD', escrow: true,
+      people: [
+        { name: 'Fatima Al Nuaimi', role: 'Директор по работе с брокерами', decision: 'ЛПР', phone: '+971 4 367 3333', email: 'fatima@emaar.ae', channel: 'email', primary: true, note: 'Согласование аллокации и условия co-broking' },
+        { name: 'Mohammed Al Mazrouei', role: 'Менеджер проектов', decision: 'влияет', phone: '+971 50 123 4456', email: 'mohamm@emaar.ae', channel: 'whatsapp', note: 'Сроки поставки, изменения в плане' },
+        { name: 'Layla Al Mansouri', role: 'Юрист проекта', decision: 'исполнитель', phone: '+971 4 367 3400', email: 'layla.mansouri@emaar.ae', channel: 'email', note: 'Документооборот, контракты' },
+        { name: 'Rashid Al Ketbi', role: 'Финансовый контроллер', decision: 'влияет', phone: '+971 50 234 5678', email: 'rashid.ketbi@emaar.ae', channel: 'email', note: 'Условия оплаты и комиссии' },
+      ] },
     { id: 'co_altura', name: 'Altura Capital', kind: 'Фонд', kyc: 'verified', note: 'Инвестфонд, портфельные сделки.',
-      trn: '100 7789 2210 0007', license: 'DIFC · инвестиционный фонд', address: 'DIFC, Gate Village 4', contactPerson: 'Сергей Орлов', contactRole: 'Portfolio Manager', phone: '+971 4 401 9900', email: 's.orlov@altura.capital', commission: 'по договору · портфельные закрытия', escrow: false },
+      trn: '100 7789 2210 0007', license: 'DIFC · инвестиционный фонд', address: 'DIFC, Gate Village 4', contactPerson: 'Сергей Орлов', contactRole: 'Portfolio Manager', phone: '+971 4 401 9900', email: 's.orlov@altura.capital', commission: 'по договору · портфельные закрытия', escrow: false,
+      people: [
+        { name: 'Сергей Орлов', role: 'Менеджер портфеля', decision: 'ЛПР', phone: '+971 4 401 9900', email: 's.orlov@altura.capital', channel: 'email', primary: true, note: 'Утверждение сделок, условия инвестиций' },
+        { name: 'Natasha Volkova', role: 'Аналитик инвестиций', decision: 'влияет', phone: '+971 50 345 6789', email: 'n.volkova@altura.capital', channel: 'whatsapp', note: 'Оценка доходности, финмодели' },
+        { name: 'Dr. Omar Al Shami', role: 'Генеральный партнёр', decision: 'ЛПР', phone: '+971 4 401 9901', email: 'o.alshami@altura.capital', channel: 'email', note: 'Стратегические решения, мегасделки' },
+      ] },
     { id: 'co_meydan', name: 'Meydan Group', kind: 'Корпоративный клиент', kyc: 'pending', note: 'Корпоративный арендатор, проверка KYC идёт.',
-      trn: '—', license: 'DED · трейд-лицензия', address: 'Meydan, Nad Al Sheba', contactPerson: 'Ahmed Rashid', contactRole: 'Procurement Lead', phone: '+971 4 381 3700', email: 'procurement@meydan.ae', commission: 'аренда · годовой чек', escrow: false },
+      trn: '—', license: 'DED · трейд-лицензия', address: 'Meydan, Nad Al Sheba', contactPerson: 'Ahmed Rashid', contactRole: 'Procurement Lead', phone: '+971 4 381 3700', email: 'procurement@meydan.ae', commission: 'аренда · годовой чек', escrow: false,
+      people: [
+        { name: 'Ahmed Rashid', role: 'Начальник закупок', decision: 'ЛПР', phone: '+971 4 381 3700', email: 'ahmed.rashid@meydan.ae', channel: 'whatsapp', primary: true, note: 'Согласование аренды, переговоры' },
+        { name: 'Khalil Al Shami', role: 'Операционный директор', decision: 'ЛПР', phone: '+971 50 456 7890', email: 'khalil@meydan.ae', channel: 'email', note: 'Утверждение бюджетов, сроков' },
+        { name: 'Fatima Al Dhaheri', role: 'Администратор объектов', decision: 'исполнитель', phone: '+971 4 381 3800', email: 'fatima.dhaheri@meydan.ae', channel: 'whatsapp', note: 'Обслуживание, коммунальные платежи' },
+      ] },
     { id: 'co_harbour', name: 'Harbour Key Realty', kind: 'Агентство', kyc: 'verified', note: 'Наше агентство.',
-      trn: '100 2231 4456 0001', license: 'RERA ORN 28114', address: 'Business Bay, Bay Square, Building 10', contactPerson: 'Марина Волкова', contactRole: 'Managing Broker', phone: '+971 50 118 2244', email: 'marina@harbourkey.ae', commission: 'co-broking 50 / 50', escrow: false },
+      trn: '100 2231 4456 0001', license: 'RERA ORN 28114', address: 'Business Bay, Bay Square, Building 10', contactPerson: 'Марина Волкова', contactRole: 'Managing Broker', phone: '+971 50 118 2244', email: 'marina@harbourkey.ae', commission: 'co-broking 50 / 50', escrow: false,
+      people: [
+        { name: 'Марина Волкова', role: 'Управляющий брокер', decision: 'ЛПР', phone: '+971 50 118 2244', email: 'marina@harbourkey.ae', channel: 'whatsapp', primary: true, note: 'Основной контакт, координация сделок' },
+        { name: 'Омар Рахман', role: 'Старший агент', decision: 'влияет', phone: '+971 50 447 2210', email: 'omar@harbourkey.ae', channel: 'whatsapp', note: 'Крупные сделки, переговоры' },
+        { name: 'Лина Хассан', role: 'Операционный менеджер', decision: 'исполнитель', phone: '+971 50 556 7890', email: 'lina@harbourkey.ae', channel: 'email', note: 'Документооборот, отчётность' },
+      ] },
   ];
 
   // Per-deal timeline (R4) — channel history. kind:'raw' immutable source event; 'note' editable;
@@ -2418,13 +2508,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const companyTimeline = {
     co_emaar: [
       { at: '02 мая · 11:00', ord: 21100, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: застройщик, эскроу-счета DLD.' },
-      { at: '05 мая · 15:20', ord: 51520, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча с Fatima Al Nuaimi — аллокация в Bayline Terraces.' },
+      { at: '05 мая · 15:20', ord: 51520, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча с Fatima Al Nuaimi — аллокация в Bayline Terraces.', person: 0 },
       { at: '07 мая · 10:40', ord: 71040, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Получен прайс-лист и график платежей по проекту.' },
-      { at: '11 мая · 09:30', ord: 110930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Комиссия 4% подтверждена на квартал — фиксируем в сделках.' },
+      { at: '11 мая · 09:30', ord: 110930, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Комиссия 4% подтверждена на квартал — фиксируем в сделках.', person: 3 },
     ],
     co_altura: [
       { at: '04 мая · 13:15', ord: 41315, ch: 'crm', kind: 'raw', by: 'Система', text: 'Компания заведена: инвестфонд DIFC, портфельные сделки.' },
-      { at: '09 мая · 16:00', ord: 91600, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 12:30 — мандат фонда на доходные активы в DIFC.', capture: true },
+      { at: '09 мая · 16:00', ord: 91600, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Звонок 12:30 — мандат фонда на доходные активы в DIFC.', capture: true, person: 0 },
       { at: '12 мая · 11:45', ord: 121145, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Два запроса фонда сведены в один портфель — предложено вести как пакет.' },
     ],
     co_meydan: [
@@ -2998,7 +3088,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 12; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded.
+  const SCHEMA = 15; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking).
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -3019,10 +3109,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     objFilter: 'all', objSearch: '', objSort: 'default', objArea: 'all', objBr: 'all', objPrice: 'all',
     shortlist: [], podborClient: 'c_anna', match: null, matchClient: null,
     docSearch: '', docTab: 'all', calType: 'all', calDir: 'all', calObj: 'all', calClient: 'all', calWeek: 0, calDay: -1,
+    contactsSearch: '', companiesSearch: '', conciergeSearch: '',
+    contactsFilters: { priority: 'all', psych: 'all', object: 'all' },
+    companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     capture: {}, dealFunnel: 'sale_offplan', dealsFilter: {}, savedView: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
+    cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
     eventsPlayed: [], feedback: [], signals: [], dayStep: 0,
   };
@@ -3137,6 +3231,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     store.objSearch = ''; store.objSort = 'default'; store.objArea = 'all'; store.objBr = 'all'; store.objPrice = 'all';
     store.shortlist = []; store.podborClient = 'c_anna'; store.match = null; store.matchClient = null;
     store.docSearch = ''; store.docTab = 'all'; store.calType = 'all'; store.calDir = 'all'; store.calObj = 'all'; store.calClient = 'all'; store.calWeek = 0; store.calDay = -1;
+    store.contactsSearch = ''; store.companiesSearch = ''; store.conciergeSearch = '';
+    store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' };
+    store.cgGroupCollapse = {};
+    store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.capture = {}; store.dealFunnel = 'sale_offplan'; store.dealsFilter = {}; store.savedView = null;
@@ -4837,6 +4935,130 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const closed = deals.filter((d) => d.stage === 'done');
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
   }
+
+  // ---- Goal progress computation — per metric from demo data ----
+  // ---- Personal / team goals ----------------------------------------------------------------
+  // Progress is DERIVED from the demo's own records, never stored: a counter nothing updates would
+  // drift away from the board the moment a scenario moves a deal.
+  //
+  // Scope: an agent's goal counts that agent's own book; the manager's goals count the department,
+  // so the same component serves «моя цель» and «план отдела».
+  const GOAL_METRICS = {
+    commission: { label: 'Комиссия', unit: 'money', hint: 'закрытые сделки периода' },
+    deals: { label: 'Закрытые сделки', unit: 'count', word: ['сделка', 'сделки', 'сделок'], hint: 'стадия «закрыта»' },
+    pipeline: { label: 'Пайплайн в работе', unit: 'money', hint: 'сумма активных сделок' },
+    shows: { label: 'Показы', unit: 'count', word: ['показ', 'показа', 'показов'], hint: 'встречи на объектах' },
+    leads: { label: 'Клиенты в работе', unit: 'count', word: ['клиент', 'клиента', 'клиентов'], hint: 'закреплены за вами' },
+  };
+  // May in the demo week; a quarter is Apr–Jun, so a quarterly goal is 44 days in on 14 May.
+  const DAYS_IN_MONTH = 31;
+  const QUARTER_ELAPSED_BEFORE_MAY = 30;  // Q2 runs Apr–Jun, so on 14 May only April has elapsed
+  const DAYS_IN_QUARTER = 91;
+  function goalOwnerId(scope) {
+    const u = D().users[scope === 'team' ? 'manager' : S().role];
+    return u ? u.id : null;
+  }
+  function goalDeals(scope) {
+    const all = D().deals || [];
+    if (scope === 'team') return all;
+    const me = goalOwnerId(scope);
+    return all.filter((d) => d.agent === me);   // d.agent holds a user id (u_marina), not a role name
+  }
+  // The closed book for the period. For the whole department it is `attribution` (the agency's
+  // book by source); for one agent it is that agent's own `closedPeriod` — `attribution` carries no
+  // agent split, so slicing it per person would have reported the agency's history as Marina's.
+  // Either way, a deal that closes DURING the demo is added on top, so the figure moves on screen.
+  function closedBook(scope, period) {
+    const deals = goalDeals(scope);
+    const live = deals.filter((d) => d.stage === 'done');
+    if (scope === 'team') {
+      const attr = D().attribution || [];
+      return {
+        commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + live.length,
+      };
+    }
+    const own = ((D().users[S().role] || {}).closedPeriod || {})[period === 'quarter' ? 'quarter' : 'month'] || { commission: 0, deals: 0 };
+    return {
+      commission: Math.round(own.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+      deals: own.deals + live.length,
+    };
+  }
+  function goalFact(goal, scope) {
+    const deals = goalDeals(scope);
+    if (goal.metric === 'commission') return closedBook(scope, goal.period).commission;
+    if (goal.metric === 'deals') return closedBook(scope, goal.period).deals;
+    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => d.stage !== 'done').reduce((s2, d) => s2 + (d.amount || 0), 0));
+    if (goal.metric === 'shows') {
+      // Events carry no owner, so a show counts as mine when its client is on one of my deals — and
+      // only once it has actually happened: a viewing booked for 16:00 is not a показ at 9:12.
+      const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
+      return (D().events || []).filter((e) => e.kind === 'show' && e.status !== 'canceled' &&
+        ordFromWhen(e.when, UNDATED_ORD) <= NOW_ORD && (scope === 'team' || mine[e.clientId])).length;
+    }
+    if (goal.metric === 'leads') {
+      if (scope === 'team') return (D().clients || []).length;
+      const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
+      return (D().clients || []).filter((c) => mine[c.id]).length;
+    }
+    return 0;
+  }
+  function goalValue(metric, n) {
+    const m = GOAL_METRICS[metric] || {};
+    if (m.unit === 'money') return WS.AED(n);
+    return n + (m.word ? ' ' + plural(n, m.word[0], m.word[1], m.word[2]) : '');
+  }
+  function computeGoalProgress(goal, scope) {
+    const fact = goalFact(goal, scope);
+    const target = goal.target || 0;
+    const pct = target ? Math.round((fact / target) * 100) : 0;
+    const now = WS.fixtures.DEMO_NOW;
+    const elapsed = goal.period === 'quarter' ? (QUARTER_ELAPSED_BEFORE_MAY + now.d) : now.d;
+    const span = goal.period === 'quarter' ? DAYS_IN_QUARTER : DAYS_IN_MONTH;
+    const projected = elapsed > 0 ? Math.round(fact / elapsed * span) : 0;
+    const share = target ? Math.round(projected / target * 100) : 0;
+    // Days by which the current rate beats (or misses) the finish line.
+    const daysAhead = (fact && target) ? Math.round(span - (target / (fact / elapsed))) : 0;
+    let pace;
+    // Pace only means something for a metric that ACCUMULATES over the period. Pipeline is a stock —
+    // how much sits in work right now — so projecting it forward by a daily rate is nonsense.
+    const cumulative = goal.metric !== 'pipeline' && goal.metric !== 'leads';
+    if (!cumulative) pace = fact >= target ? 'план по загрузке держится' : 'до нормы не хватает ' + goalValue(goal.metric, target - fact);
+    else if (!target) pace = 'цель не задана';
+    else if (fact >= target) pace = 'цель закрыта';
+    else if (share >= 100) pace = 'идёте с опережением — на ' + Math.max(1, daysAhead) + ' ' + plural(Math.max(1, daysAhead), 'день', 'дня', 'дней') + ' раньше срока';
+    else pace = 'при текущем темпе — ' + share + '% к концу ' + (goal.period === 'quarter' ? 'квартала' : 'месяца');
+    return { fact: fact, target: target, pct: pct, remaining: Math.max(0, target - fact), pace: pace, behind: share < 100 && fact < target };
+  }
+  // One row, used by the agent's «Мои цели» and by the manager's «План отдела».
+  function goalRow(goal, scope) {
+    const p = computeGoalProgress(goal, scope);
+    const bar = Math.max(2, Math.min(100, p.pct));
+    return '<div class="goal-row">' +
+      '<div class="goal-head"><span class="goal-label">' + escAttr(goal.label) + '</span>' +
+      '<span class="goal-num">' + goalValue(goal.metric, p.fact) + ' <i>из ' + goalValue(goal.metric, p.target) + '</i></span></div>' +
+      '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
+      '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
+      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span>' +
+      '<span class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + p.pace + '</span></div></div>';
+  }
+  function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
+  function pulseMyGoals() {
+    const goals = goalsOf(S().role);
+    const pinned = goals.filter((g) => g.pinned);
+    const head = '<div class="wq-head" style="margin-top:24px"><div class="section-label" style="margin:0">' +
+      (S().role === 'manager' ? 'План отдела' : 'Мои цели') + '</div>' +
+      '<button class="btn sm" data-nav="profile">' + I('target') + 'Настроить цели</button></div>';
+    if (!pinned.length) {
+      const why = goals.length
+        ? 'Ни одна цель не закреплена на Пульсе. Откройте профиль и отметьте те, за которыми хотите следить каждый день.'
+        : 'Цели ещё не заданы. Поставьте одну — комиссия за месяц, число сделок, показы — и Пульс будет считать прогресс сам, по вашим сделкам.';
+      return head + '<div class="card" style="padding:16px"><div style="font-size:12.5px;color:var(--mut);max-width:62ch">' + why + '</div>' +
+        '<button class="btn sm primary" data-act="addGoal" style="margin-top:10px">' + I('plus') + 'Поставить цель</button></div>';
+    }
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    return head + '<div class="card goal-card">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
+  }
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
   // never computes its own. Each entry: a value plus a human label, addressable by a stable key.
@@ -5018,6 +5240,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         heroViz('pulse', 'Пульс команды', greet + ', ' + firstName + '. Обзор отдела на смене — план, SLA, распределение и согласования.', { descBig: true }) +
         cgComposer('startPrompt', 'Спросите Консьержа по команде — «кто перегружен», «что нарушает SLA», «сводка за неделю»…', 'startSend', 'prompt-lead') +
         '<div class="qa-row" style="margin-top:16px">' + mgrQa + '</div>' +
+        pulseMyGoals() +
         mgrTiles() +
         canonMetrics() +
         '<div class="section-label" style="margin-top:28px">Команда и исключения</div>' + workQueueManager() +
@@ -5085,6 +5308,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
+      pulseMyGoals() +
       '<div class="tiles dash" style="margin-top:20px">' + tiles + '</div>' +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
@@ -5257,21 +5481,121 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '</section>' +
     '</div>';
   }
+  function conciergeThreads() {
+    const q = (S().conciergeSearch || '').toLowerCase().trim();
+    return (WS.engine.threadList() || []).slice()
+      .sort((a, b) => (b.unread || 0) - (a.unread || 0))
+      .filter((t) => matchConciergeThread(t, q));
+  }
+  // Determine which group a thread belongs to based on its id namespace
+  function getThreadGroup(threadId) {
+    if (threadId.startsWith('deal:')) return 'byDeal';
+    if (threadId.startsWith('request:')) return 'byRequest';
+    if (threadId.startsWith('contact:') || threadId.startsWith('lead:')) return 'byContact';
+    if (threadId.startsWith('object:')) return 'byObject';
+    if (threadId.startsWith('company:')) return 'byCompany';
+    return 'general';
+  }
+  // Human-readable group names
+  const THREAD_GROUPS = {
+    byContact: { label: 'По клиентам', icon: 'users' },
+    byDeal: { label: 'По сделкам', icon: 'briefcase' },
+    byRequest: { label: 'По заявкам', icon: 'mail' },
+    byObject: { label: 'По объектам', icon: 'building' },
+    byCompany: { label: 'По компаниям', icon: 'building' },
+    general: { label: 'Общее', icon: 'sparkle' },
+  };
   function conciergeRail(activeTid) {
-    const threads = WS.engine.threadList().slice().sort((a, b) => (b.unread || 0) - (a.unread || 0));
-    const rows = threads.map((t) => {
-      const on = t.id === activeTid ? ' is-active' : '';
-      const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
-      const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
-      const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
-      return '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + t.label + '" data-ticon="' + t.icon + '">' +
-        '<span class="fi i-acc">' + I(t.icon) + '</span>' +
-        '<span class="ft"><span class="t">' + t.label + time + '</span><span class="m">' + preview + '</span></span>' + unread + '</button>';
-    }).join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.</div></div>';
-    return '<div class="cg-rail-head"><span class="section-label" style="margin:0">Диалоги · ' + threads.length + '</span>' +
+    const q = S().conciergeSearch || '';
+    const threads = conciergeThreads();
+    const isSearch = q.length > 0;
+
+    const searchBox_ = searchBox('conciergeSearch', 'Поиск по диалогам…', q, 'cg-rail-search');
+
+    // Group threads and build structure
+    const groups = {};
+    ['byContact', 'byRequest', 'byDeal', 'byObject', 'byCompany', 'general'].forEach((g) => {
+      groups[g] = { threads: [], unread: 0 };
+    });
+
+    threads.forEach((t) => {
+      const group = getThreadGroup(t.id);
+      groups[group].threads.push(t);
+      groups[group].unread += (t.unread || 0);
+    });
+
+    // Render groups
+    const collapse = S().cgGroupCollapse || {};
+    const renderedGroups = [];
+
+    Object.keys(groups).forEach((groupId) => {
+      const group = groups[groupId];
+      if (!group.threads.length) return;
+
+      const groupInfo = THREAD_GROUPS[groupId];
+      const isCollapsed = collapse[groupId] && !isSearch;
+      const activeInGroup = group.threads.some((t) => t.id === activeTid);
+      const shouldExpand = activeInGroup || isSearch;
+      const actuallyCollapsed = isCollapsed && !shouldExpand;
+
+      let html = '<div class="cg-rail-group">' +
+        '<button class="cg-group-head' + (actuallyCollapsed ? ' is-collapsed' : '') + '" data-group-toggle="' + groupId + '">' +
+        '<span class="cg-group-expand">' + I(actuallyCollapsed ? 'chevRight' : 'chevDown') + '</span>' +
+        '<span class="cg-group-label">' + groupInfo.label + '</span>' +
+        '<span class="cg-group-count">' + group.threads.length;
+      if (group.unread) html += ' · <span class="unread-badge">' + group.unread + '</span>';
+      html += '</span></button>';
+
+      if (!actuallyCollapsed) {
+        group.threads.forEach((t) => {
+          const on = t.id === activeTid ? ' is-active' : '';
+          const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
+          const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
+          const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
+
+          // A deal thread and a client thread are a different perimeter but the same person. The
+          // deal row therefore carries the deal's own essence — the thread label already opens with
+          // the client's name, so repeating it would say nothing — plus a marker when that client
+          // ALSO has a client-level dialogue, which is the jump the client asked to make easy.
+          let sub = '';
+          if (groupId === 'byDeal') {
+            const deal = D().deals.find((d) => d.id === t.id.slice(5));
+            if (deal) {
+              const essence = (deal.title && deal.title !== (D().clients.find((c) => c.id === deal.clientId) || {}).name) ? deal.title : (deal.sub || '');
+              const alsoClient = threads.some((x) => x.id === 'contact:' + deal.clientId);
+              sub = '<span class="cg-sub">' + (essence ? escAttr(essence) : '') +
+                (alsoClient ? '<span class="cg-link" title="У этого клиента есть и диалог по клиенту">' + I('users') + 'есть диалог по клиенту</span>' : '') + '</span>';
+            }
+          }
+
+          html += '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + escAttr(t.label) + '" data-ticon="' + t.icon + '">' +
+            '<span class="fi i-acc">' + I(t.icon) + '</span>' +
+            '<span class="ft"><span class="t">' + t.label + time + '</span>' + sub + '<span class="m">' + preview + '</span></span>' + unread + '</button>';
+        });
+      }
+
+      html += '</div>';
+      renderedGroups.push(html);
+    });
+
+    const rows = renderedGroups.join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>' + (q ? 'По запросу ничего не найдено' : 'Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.') + '</div></div>';
+
+    return '<div class="cg-rail-head"><span class="section-label cg-rail-count" style="margin:0">Диалоги · ' + threads.length + '</span>' +
       '<div class="cg-rail-head-btns"><button class="btn sm" data-act="newThread">' + I('plus') + 'Новый</button>' +
       '<button class="cg-rail-collapse" data-act="cgRailToggle" title="Свернуть диалоги">' + I('chevLeft') + '</button></div></div>' +
-      '<div class="cg-rail-list">' + rows + '</div>';
+      searchBox_ + '<div class="cg-rail-list">' + rows + '</div>';
+  }
+  // A keystroke in the rail search repaints the rail list only. A full store emit would remount the
+  // chat (see render() -> mountConcierge) and jump the transcript on every character.
+  function refreshCgRail() {
+    const list = document.querySelector('.cg-rail-list'); if (!list) return;
+    const active = WS.engine.activeThreadId();
+    const html = conciergeRail(active);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    list.innerHTML = (tmp.querySelector('.cg-rail-list') || { innerHTML: '' }).innerHTML;
+    const cnt = document.querySelector('.cg-rail-count');
+    if (cnt) cnt.textContent = 'Диалоги · ' + conciergeThreads().length;
   }
   function conciergeHomeMain(st) {
     return '<div class="cg-main-inner">' +
@@ -5303,7 +5627,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   // "Новый диалог" — pick the entity the conversation is about.
   function openNewThread() {
-    const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + (c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
+    const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
@@ -5415,37 +5739,169 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     return head(title, desc, actions) + body;
   }
+  // ---- Search and filter helpers ----
+  // One search field for every list — same affordance, same shape, wherever a broker looks for
+  // something. `extraCls` lets a host (the Concierge rail) tighten the spacing without a second
+  // component.
+  function searchBox(inputId, placeholder, value, extraCls) {
+    const v = value || '';
+    return '<div class="prompt obj-search ' + (extraCls || '') + '"><span class="ico">' + I('search') + '</span>' +
+      '<input id="' + inputId + '" type="search" placeholder="' + escAttr(placeholder) + '" value="' + escAttr(v) + '" autocomplete="off">' +
+      (v ? '<button class="voice" data-act="' + inputId + 'Clear" title="Очистить">' + I('x') + '</button>' : '') + '</div>';
+  }
+  // Filter helpers
+  function matchContactsFilters(c) {
+    const st = S().contactsFilters || {};
+    // Priority filter
+    if (st.priority && st.priority !== 'all') {
+      const sig = (D().clientSignals || {})[c.id];
+      if (st.priority === 'none' ? sig && sig.priority : !sig || sig.priority !== st.priority) return false;
+    }
+    // Portrait filters
+    if (st.psych && st.psych !== 'all') {
+      if (st.psych === 'empty') { if (c.psych && c.psych.filled) return false; }
+      else {
+        const val = st.psych.split(':')[0];
+        const sub = st.psych.split(':')[1];
+        const p = c.psych || {};
+        if (val === 'decision' && p.decision !== sub) return false;
+        if (val === 'risk' && p.risk !== sub) return false;
+        if (val === 'values') { if (!p.values || p.values.indexOf(sub) < 0) return false; }
+      }
+    }
+    // Object filter
+    if (st.object && st.object !== 'all') {
+      const hasObj = (D().deals || []).some((d) => d.clientId === c.id &&
+                       (d.objectId === st.object || (d.lots || []).indexOf(st.object) >= 0)) ||
+                     (D().requests || []).some((r) => r.clientId === c.id &&
+                       (r.offered || []).some((o) => (o && o.id ? o.id : o) === st.object));
+      if (!hasObj) return false;
+    }
+    return true;
+  }
+
+  function matchCompaniesFilters(co) {
+    const st = S().companiesFilters || {};
+    if (st.client && st.client !== 'all') {
+      const hasCo = (D().deals || []).some((d) => d.companyId === co.id && d.clientId === st.client);
+      if (!hasCo) return false;
+    }
+    return true;
+  }
+
+  // Match threads by label + preview text for Concierge
+  function matchConciergeThread(t, query) {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const label = (t.label || '').toLowerCase();
+    const preview = (t.preview || '').toLowerCase();
+    return label.indexOf(q) >= 0 || preview.indexOf(q) >= 0;
+  }
+
   // Контакты = a people registry with TYPES. "Клиент" is one type; a contact may be a
   // partner, an intermediary, or a company contact. Resolves the deals/clients/contacts dilemma.
   const CONTACT_TYPES = [
     { k: 'all', t: 'Все' }, { k: 'client', t: 'Клиенты' }, { k: 'partner', t: 'Партнёры' },
     { k: 'intermediary', t: 'Посредники' }, { k: 'transferred', t: 'Замещение' },
   ];
+  // Text a broker would actually type into a contact search: the person, how to reach them, what
+  // they want, where, and the company they sit behind.
+  function contactHaystack(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const cos = deals.map((d) => (D().companies || []).find((x) => x.id === d.companyId)).filter(Boolean);
+    return [c.name, c.phone, c.goal, c.horizon, c.lang, (c.areas || []).join(' '),
+      clientContactVals(c).email, deals.map((d) => d.title).join(' '), cos.map((x) => x.name).join(' ')]
+      .filter(Boolean).join(' ').toLowerCase();
+  }
+  function contactsSearchList() {
+    const cur = S().contactType || 'all';
+    const q = (S().contactsSearch || '').trim().toLowerCase();
+    const cl = D().clients || [];
+    let list = cl.map((c, i) => ({ id: c.id, name: c.name, role: c.goal, budget: c.budget, c: c, transferred: i >= cl.length - 2 }));
+    if (cur === 'transferred') list = list.filter((p) => p.transferred);
+    if (q) list = list.filter((p) => contactHaystack(p.c).indexOf(q) >= 0);
+    return list.filter((p) => matchContactsFilters(p.c));
+  }
+  function contactRow(p) {
+    const k = kycOf(p.c);
+    const deal = (D().deals || []).find((d) => d.clientId === p.id);
+    const dealBtn = deal ? '<button class="btn sm ghost" data-deal="' + deal.id + '">' + I('briefcase') + 'Сделка</button>' : '';
+    const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
+      '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
+      (p.c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>') + dealBtn;
+    return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
+      '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
+      '<div class="m">' + (p.role || '') + (p.budget ? ' · ' + WS.AED(p.budget) : '') + '</div></div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
+  }
+  function contactsFilterCount() {
+    const f = S().contactsFilters || {};
+    return ['priority', 'psych', 'object'].filter((k) => f[k] && f[k] !== 'all').length;
+  }
+  // "Nothing found" must say what was searched and offer the way back out.
+  function listEmptyState(q, hasFilters, clearAct) {
+    const what = q ? 'по запросу «' + escAttr(q) + '»' : 'под выбранные фильтры';
+    return '<div class="empty" style="padding:24px 16px">' + I('search') +
+      '<div style="font-weight:700;color:var(--ink)">Ничего не нашлось ' + what + '</div>' +
+      '<div style="margin-top:4px">Попробуйте короче или другими словами' + (hasFilters ? ', либо снимите фильтры' : '') + '.</div>' +
+      '<div class="qa-row" style="justify-content:center;margin-top:12px"><button class="chip" data-act="' + clearAct + '">' + I('x') + 'Сбросить</button></div></div>';
+  }
+  function contactsListInner() {
+    const list = contactsSearchList();
+    if (!list.length) return listEmptyState((S().contactsSearch || '').trim(), contactsFilterCount() > 0, 'clearContactsFilters');
+    return '<div class="feed" style="padding:0 16px 8px">' + list.map(contactRow).join('') + '</div>';
+  }
+  function contactsCountLabel() {
+    return ((S().contactType === 'transferred') ? 'Замещение' : 'Клиенты') + ' · ' + contactsSearchList().length;
+  }
   function contactsPeople() {
     const cur = S().contactType || 'all';
-    const cl = D().clients || [];
-    let clients = cl.map((c, i) => ({ id: c.id, name: c.name, role: c.goal, budget: c.budget, c: c, transferred: i >= cl.length - 2 }));
-    if (cur === 'transferred') clients = clients.filter((p) => p.transferred);
+    const q = S().contactsSearch || '';
+    const f = S().contactsFilters || {};
+    const open = !!S().contactsFiltersOpen;
+    const n = contactsFilterCount();
+
     const FILTERS = [{ k: 'all', t: 'Все клиенты' }, { k: 'transferred', t: 'Замещение' }];
-    const rows = clients.map((p) => {
-      const k = kycOf(p.c);
-      const deal = (D().deals || []).find((d) => d.clientId === p.id);
-      const dealBtn = deal ? '<button class="btn sm ghost" data-deal="' + deal.id + '">' + I('briefcase') + 'Сделка</button>' : '';
-      const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
-        '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
-        (p.c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>') + dealBtn;
-      return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
-        '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
-        '<div class="m">' + (p.role || '') + (p.budget ? ' · ' + WS.AED(p.budget) : '') + '</div></div>' +
-        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
-    }).join('');
-    const filter = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
-      (cur === ct.k ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + ct.t + '</button>').join('');
+    const on = ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"';
+    const typeChips = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
+      (cur === ct.k ? on : '') + '>' + ct.t + '</button>').join('');
+    const prio = ['all', 'A', 'B', 'C'].map((k) => '<button class="chip' + ((f.priority || 'all') === k ? '' : ' mut') +
+      '" data-contactfilter="priority:' + k + '"' + ((f.priority || 'all') === k ? on : '') + '>' +
+      (k === 'all' ? 'Любой приоритет' : 'Приоритет ' + k) + '</button>').join('');
+
+    // Portrait and object filters sit behind a disclosure so the default view stays calm; the toggle
+    // carries the count, so an applied filter is never invisible.
+    const toggle = '<button class="chip' + (n ? '' : ' mut') + '" data-act="contactsFiltersToggle"' + (n ? on : '') + '>' +
+      I('menu') + 'Фильтры' + (n ? ' · ' + n : '') + I(open ? 'chevUp' : 'chevDown') + '</button>';
+    const clear = (n || q) ? '<button class="view-clear" data-act="clearContactsFilters">' + I('x') + 'сбросить</button>' : '';
+
+    let panel = '';
+    if (open) {
+      const psychOpts = [['all', 'Любой портрет'], ['empty', 'портрет не заполнен']]
+        .concat(PSYCH_OPTS.decision.map((d) => ['decision:' + d, d]))
+        .concat(PSYCH_OPTS.risk.map((r) => ['risk:' + r, r]))
+        .concat(PSYCH_OPTS.values.map((v) => ['values:' + v, 'важно: ' + v]));
+      const objOpts = [['all', 'Любой объект']].concat((D().objects || []).map((o) => [o.id, o.name.split(',')[0]]));
+      panel = '<div class="list-filters">' +
+        '<label class="lf-fld"><span>Портрет клиента</span>' + miniSel('cfPsych', f.psych || 'all', psychOpts) + '</label>' +
+        '<label class="lf-fld"><span>Смотрел объект</span>' + miniSel('cfObject', f.object || 'all', objOpts) + '</label>' +
+        '<div class="lf-hint">Фильтры складываются с поиском. Поиск по клиенту идёт строкой — имя, телефон, компания.</div></div>';
+    }
+
     const note = cur === 'transferred'
       ? '<div class="ws-flag" style="margin:0 0 12px">' + I('users') + ' Клиенты, переданные вам от коллеги на время его отсутствия. Режим замещения включается в Настройках.</div>' : '';
-    return '<div class="qa-row" style="margin-bottom:14px">' + filter + '</div>' + note +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">' + (cur === 'transferred' ? 'Замещение' : 'Клиенты') + ' · ' + clients.length + '</div>' +
-      '<div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+
+    return '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
+      searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
+      '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + '</div>' + panel +
+      '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
+      '<div class="contacts-list">' + contactsListInner() + '</div></div>';
+  }
+  function refreshContacts() {
+    const box = document.querySelector('.contacts-list'); if (!box) return;
+    box.innerHTML = contactsListInner();
+    const cnt = document.querySelector('.contacts-count');
+    if (cnt) cnt.textContent = contactsCountLabel();
   }
   // R7: saved deterministic views — same query → same list. Applied on top of the funnel filter.
   const SAVED_VIEWS = [
@@ -5614,19 +6070,142 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Контакты · ' + D().clients.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' + companiesBlock();
   }
   // R5: Company entity (agency/developer/corp/fund) with KYC STATUS (not a rating).
+  function companyHaystack(co) {
+    const people = (co.people || []).map((x) => x.name + ' ' + x.role).join(' ');
+    return [co.name, co.kind, co.license, co.trn, co.address, co.commission, people].filter(Boolean).join(' ').toLowerCase();
+  }
+  function companiesSearchList() {
+    const q = (S().companiesSearch || '').trim().toLowerCase();
+    let cos = D().companies || [];
+    if (q) cos = cos.filter((co) => companyHaystack(co).indexOf(q) >= 0);
+    return cos.filter((co) => matchCompaniesFilters(co));
+  }
+  function companyRow(co) {
+    const linked = (D().deals || []).filter((d) => d.companyId === co.id).length;
+    const people = (co.people || []).length;
+    const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
+    const meta = co.kind + ' · сделок: ' + linked + (people ? ' · ' + people + ' ' + plural(people, 'контакт', 'контакта', 'контактов') : '');
+    return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div>' +
+      '<div class="ft"><div class="t">' + co.name + '</div><div class="m">' + meta + '</div></div>' + kyc + I('arrowRight') + '</div>';
+  }
+  function companiesListInner() {
+    const cos = companiesSearchList();
+    if (!cos.length) return listEmptyState((S().companiesSearch || '').trim(), (S().companiesFilters || {}).client !== 'all', 'clearCompaniesFilters');
+    return '<div class="feed" style="padding:0 16px 8px">' + cos.map(companyRow).join('') + '</div>';
+  }
   function companiesBlock() {
-    const cos = D().companies || [];
-    const rows = cos.map((co) => {
-      const linked = (D().deals || []).filter((d) => d.companyId === co.id).length;
-      const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
-      return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div>' +
-        '<div class="ft"><div class="t">' + co.name + '</div><div class="m">' + co.kind + ' · сделок: ' + linked + '</div></div>' + kyc + I('arrowRight') + '</div>';
-    }).join('');
-    return '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Компании · ' + cos.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+    const q = S().companiesSearch || '';
+    const f = S().companiesFilters || {};
+    // Only clients that actually reach a company through a deal — an option that filters to nothing
+    // is a dead control.
+    const linkedClients = (D().clients || []).filter((c) => (D().deals || []).some((d) => d.clientId === c.id && d.companyId));
+    const clientOpts = [['all', 'Любой клиент']].concat(linkedClients.map((c) => [c.id, c.name]));
+    const clear = (q || (f.client && f.client !== 'all')) ? '<button class="view-clear" data-act="clearCompaniesFilters">' + I('x') + 'сбросить</button>' : '';
+    const bar = '<div class="qa-row" style="margin:10px 0 0;align-items:center">' +
+      '<label class="lf-fld inline"><span>Связана с клиентом</span>' + miniSel('cofClient', f.client || 'all', clientOpts) + '</label>' + clear + '</div>';
+    return searchBox('companiesSearch', 'Поиск: название, тип, лицензия, контактное лицо…', q) + bar +
+      '<div class="card" style="margin-top:12px"><div class="section-label companies-count" style="padding:12px 16px 4px">Компании · ' + companiesSearchList().length + '</div>' +
+      '<div class="companies-list">' + companiesListInner() + '</div></div>';
+  }
+  function refreshCompanies() {
+    const box = document.querySelector('.companies-list'); if (!box) return;
+    box.innerHTML = companiesListInner();
+    const cnt = document.querySelector('.companies-count');
+    if (cnt) cnt.textContent = 'Компании · ' + companiesSearchList().length;
   }
   // ---- Company card v2: same universal shell (static type → status chip, dx-sec tabs) ----
+  // Handover brief on the company card — the counterpart of clientBriefSentences: who this legal
+  // entity is · how much of our book runs through it · whom we actually talk to · on what terms ·
+  // what to watch. Clauses drop out when their data is absent, and no name lands in a slot that
+  // would require Russian declension.
+  function companyBriefSentences(co) {
+    const out = [];
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const people = co.people || [];
+
+    // 1. Who this is.
+    let who = co.name + ' — ' + lowerFirst(co.kind || 'контрагент');
+    if (co.license) who += ', ' + co.license;
+    out.push(who + '.' + (co.note ? ' ' + co.note : ''));
+
+    // 2. How much of our book runs through it.
+    if (deals.length) {
+      const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
+      const open = deals.filter((d) => d.stage !== 'done');
+      let vol = 'Через компанию идёт ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
+        ' на ' + WS.AED(total);
+      if (open.length) {
+        const stages = joinRu(Array.from(new Set(open.map((d) => '«' + funnelSteps(d).cols[funnelSteps(d).idx] + '»'))));
+        vol += '; в работе ' + open.length + ' — ' + plural(open.length, 'стадия', 'стадии', 'стадии') + ' ' + stages;
+      }
+      out.push(vol + '.');
+    } else {
+      out.push('Сделок через компанию пока не было — контрагент заведён, история пустая.');
+    }
+
+    // 3. Whom we actually talk to.
+    if (people.length) {
+      const primary = people.find((p) => p.primary) || people[0];
+      const lpr = people.filter((p) => p.decision === 'ЛПР' && p !== primary);
+      let line = 'Основной контакт — ' + primary.name + ', ' + lowerFirst(primary.role);
+      if (lpr.length) line += '; решение принимает ' + joinRu(lpr.map((p) => p.name + ' (' + lowerFirst(p.role) + ')'));
+      const rest = people.length - 1 - lpr.length;
+      if (rest > 0) line += '; ещё ' + rest + ' ' + plural(rest, 'человек', 'человека', 'человек') + ' в контуре';
+      out.push(line + '.');
+    }
+
+    // 4. On what terms.
+    const terms = [];
+    if (co.commission) terms.push('комиссия — ' + lowerFirst(co.commission));
+    if (co.escrow) terms.push('расчёты через эскроу-счета DLD');
+    if (terms.length) out.push(capFirst(joinRu(terms)) + '.');
+
+    // 5. What to watch.
+    const watch = [];
+    if (co.kyc !== 'verified') watch.push('KYC ещё на проверке — до его завершения договор не подписываем');
+    if (!co.escrow && /застройщик/i.test(co.kind || '')) watch.push('эскроу-счёт не подтверждён');
+    if (!co.trn || co.trn === '—') watch.push('нет TRN — счёт с VAT не выставить');
+    if (watch.length) out.push('Внимание: ' + joinRu(watch) + '.');
+
+    return out;
+  }
+  function companyOps(co) {
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const activeDeal = deals.find((d) => d.stage !== 'done');
+    const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
+    const primary = (co.people || []).find((p) => p.primary) || (co.people || [])[0];
+    return opsStrip([
+      ['building', 'Тип', co.kind],
+      deals.length ? ['briefcase', 'Сделок в работе', String(deals.length)] : null,
+      total ? ['money', 'Суммарный объём', WS.AED(total)] : null,
+      primary ? ['users', 'Основной контакт', primary.name] : null,
+    ], null);
+  }
   function companyTabContent(co, tab) {
     const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    if (tab === 'people') {
+      const people = co.people || [];
+      if (!people.length) {
+        return dxSec('users', 'Люди компании', '',
+          '<div style="font-size:12.5px;color:var(--mut);padding:6px 0">Контактные лица не заведены. Добавьте их, чтобы вести переписку с тем, кто отвечает за свою часть сделки.</div>');
+      }
+      const rows = people.map((p, i) => {
+        const dec = ({ 'ЛПР': ['ok', 'target'], 'влияет': ['warn', 'star'] })[p.decision] || ['', 'check'];
+        const decision = '<span class="badge ' + dec[0] + '">' + I(dec[1]) + (p.decision || 'исполнитель') + '</span>';
+        const ch = chanMeta(p.channel || 'email');
+        const val = personChannelValue(p);
+        const star = p.primary ? '<span class="c-star" title="Основной контакт">' + I('star') + '</span>' : '';
+        const sub = [p.role, val].filter(Boolean).join(' · ');
+        const main = '<div class="dc-main"><div class="fi i-acc">' + I(ch[0]) + '</div>' +
+          '<div class="ft"><div class="t">' + p.name + star + '</div><div class="m">' + sub + '</div>' +
+          (p.note ? '<div class="m" style="color:var(--faint)">' + p.note + '</div>' : '') + '</div></div>';
+        const acts = '<div class="dc-acts">' + decision +
+          '<button class="btn sm" data-thread="company:' + co.id + ':' + i + '" data-tlabel="' + escAttr(p.name + ' · ' + co.name) + '" data-ticon="building">' + I('chat') + 'Написать</button></div>';
+        return '<div class="dc-row">' + main + acts + '</div>';
+      }).join('');
+      const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">ЛПР принимает решение, «влияет» — согласует свою часть, «исполнитель» — ведёт операционные шаги. Переписка ведётся с каждым отдельно и попадает в историю компании.</div>';
+      return dxSec('users', 'Люди компании · ' + people.length, '', '<div class="dc-list">' + rows + '</div>' + hint);
+    }
     if (tab === 'details') {
       const escrow = co.escrow ? '<span class="badge ok">' + I('shield') + 'Эскроу DLD</span>' : '';
       const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
@@ -5641,36 +6220,58 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     if (tab === 'history') return companyFeedBlock(co);
     // overview
-    const key = dxSec('building', 'Реквизиты и статус', '', '<div class="dfields">' +
+    return companyOps(co) + '<div style="margin-top:14px">' + dxSec('sparkle', 'Справка Консьержа', '', '<p class="deal-brief">' + companyBriefSentences(co).join(' ') + '</p>') + '</div>' +
+      '<div style="margin-top:14px">' + dxSec('building', 'Реквизиты', '', '<div class="dfields">' +
       dfPair('Тип', co.kind) +
       dfPair('Лицензия / ORN', co.license || '—') +
       dfPair('TRN', co.trn || '—') +
       dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
       dfPair('Условия комиссии', co.commission) +
       dfPair('Сделок', String(deals.length)) + '</div>' +
-      (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''));
-    const contact = dxSec('users', 'Контактное лицо', '', '<div class="dfields">' +
-      dfPair(co.contactPerson || 'Контакт', co.contactRole || '—') + dfPair('Телефон', co.phone) +
-      dfPair('Email', co.email) + dfPair('Адрес', co.address) + '</div>');
-    return '<div class="dx-grid2">' + key + contact + '</div>' +
+      (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : '')) + '</div>' +
       '<div style="margin-top:14px">' + companyFeedBlock(co, 5) + '</div>';
   }
-  function companyCard(id) {
-    const co = (D().companies || []).find((x) => x.id === id); if (!co) return;
+  // Same band as the client hero — the markup contract is `.chero > img + scrim + content(avatar,
+  // info(name, facts))`; anything else lands unstyled on a dark gradient and reads as broken.
+  // A person's reachable value depends on the channel they prefer: messengers ride the phone number,
+  // mail rides the address. `p[p.channel]` silently produced an email under a WhatsApp icon.
+  function personChannelValue(p) {
+    const ch = p.channel || 'email';
+    if (ch === 'email') return p.email || p.phone || '';
+    return p.phone || p.email || '';
+  }
+  function companyHero(co) {
+    const bg = (WS.photos && (WS.photos.o_marina || WS.photos.o_interior)) || '';
+    const init = (co.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const people = (co.people || []).length;
+    const verified = co.kyc === 'verified';
+    const facts = [
+      ['building', co.kind || 'Компания'],
+      ['shield', co.license || 'лицензия не указана'],
+      [verified ? 'check' : 'clock', verified ? 'KYC пройден' : 'KYC на проверке'],
+      ['users', people ? people + ' ' + plural(people, 'контактное лицо', 'контактных лица', 'контактных лиц') : 'контактов нет'],
+    ];
+    const factsHtml = '<div class="chero-facts">' + facts.map((f) => '<div class="chero-fact"><span class="chero-fact-icon">' + I(f[0]) + '</span><span>' + f[1] + '</span></div>').join('') + '</div>';
+    return '<div class="chero">' + (bg ? '<img class="chero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="chero-scrim"></div>' +
+      '<div class="chero-content"><div class="chero-avatar">' + init + '</div>' +
+      '<div class="chero-info"><h1 class="chero-name">' + co.name + '</h1>' + factsHtml + '</div></div></div>';
+  }
+  function companySpec(id) {
+    const co = (D().companies || []).find((x) => x.id === id); if (!co) return null;
     const kyc = co.kyc === 'verified' ? { icon: 'check', label: 'KYC пройден', tone: 'ok' } : { icon: 'clock', label: 'KYC на проверке', tone: 'warn' };
-    const chips = [{ icon: 'building', label: co.kind, tone: 'acc' }, kyc];
-    if (co.escrow) chips.push({ icon: 'shield', label: 'Эскроу DLD', tone: 'ok' });
-    chips.push({ icon: 'lock', label: 'статус, не рейтинг', tone: 'demo' });
     const dealsCount = (D().deals || []).filter((d) => d.companyId === id).length;
-    entityCard({
-      type: 'company', id: id, title: co.name, status: statusChip(chips),
-      tabs: [['overview', 'Обзор'], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+    const peopleCount = (co.people || []).length;
+    const status = statusChip([kyc]);
+    return {
+      type: 'company', id: id, title: co.name, status: companyHero(co) + status,
+      tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
-      footer: '<button class="btn" data-act="closeModal">Закрыть</button>' +
-        '<button class="btn primary" data-thread="company:' + co.id + '" data-tlabel="' + co.name + ' · компания" data-ticon="building">' + I('chat') + 'Чат по компании</button>',
-    });
+      pageActs: '<button class="btn sm primary" data-thread="company:' + co.id + '" data-tlabel="' + escAttr(co.name) + ' · компания" data-ticon="building">' + I('chat') + 'Чат по компании</button>',
+    };
   }
+  function companyCard(id) { S().companyId = id; WS.router.go('companyDetail'); }
 
   // ---------------- PSYCH PROFILE (персонализация коммуникации) ----------------
   const PSYCH_OPTS = {
@@ -5696,7 +6297,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function psychBlock(c) {
     const p = c.psych;
     if (!p || !p.filled) {
-      return '<div class="section-label" style="margin-top:16px">Персонализация коммуникации</div>' +
+      return '<div class="section-label" style="margin-top:16px">Портрет клиента</div>' +
         '<div class="psych-empty">' + I('sparkle') +
         '<div><div style="font-weight:700;color:var(--ink)">Профиль не заполнен</div>' +
         '<div style="font-size:12px;color:var(--mut);margin-top:2px">Параметры стиля общения помогут вести персонализированную коммуникацию в мессенджерах и соцсетях (за согласием клиента).</div></div>' +
@@ -5705,7 +6306,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const chip = (ic, t) => t ? '<span class="badge">' + I(ic) + t + '</span>' : '';
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
     const tips = commTips(p).map((t) => '<div class="chg-row">' + I('check') + '<span>' + t + '</span></div>').join('');
-    return '<div class="section-label" style="margin-top:16px">Психологический профиль · персонализация</div>' +
+    return '<div class="section-label" style="margin-top:16px">Портрет клиента</div>' +
       '<div class="prov" style="margin-bottom:8px">' + chip('users', p.decision) + chip('flame', p.pace) + chip('shield', p.risk) + '</div>' +
       '<div class="prov" style="margin-bottom:8px">' + vals + '</div>' +
       row('Канал и тон', (p.channel || '') + (p.tone ? ' · ' + p.tone : '')) +
@@ -5806,30 +6407,39 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     agent: { phone: '+971 50 123 4417', whatsapp: '+971 50 123 4417', telegram: '@marina_dxb', instagram: '@marina.dubai.realty', email: 'marina@harbourkey.ae' },
     manager: { phone: '+971 50 447 2210', whatsapp: '+971 50 447 2210', telegram: '@omar_hk', instagram: '@omar.harbourkey', email: 'omar@harbourkey.ae' },
   };
-  // Contact info surfaced explicitly at the top of the client overview — proper vCard, all channels.
+  // Contact info surfaced explicitly at the top of the client overview — compact row of preferred + filled channels.
   function contactBlock(c) {
     const dealForC = D().deals.find((x) => x.clientId === c.id);
     const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const pref = prefChannel(c);
     const prefLabel = chanMeta(pref)[1];
-    const consent = c.consent
-      ? '<span class="badge ok">' + I('check') + 'согласие (PDPL)</span>'
-      : '<span class="badge stop">' + I('lock') + 'нет согласия</span>';
-    const inner = contactVCard(clientContactVals(c), pref) +
-      '<div class="cd-foot"><div class="prov"><span class="badge">' + I('flame') + c.lang + '</span>' + consent + '</div>' +
-      '<button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + c.name + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
+    const vals = clientContactVals(c);
+    // Preferred channel first, then the ones that actually hold a value — an empty channel used to
+    // take a full row saying «—», which is how five contacts filled the whole fold.
+    const shown = [pref].concat(CONTACT_ORDER.filter((ch) => ch !== pref && vals[ch] && vals[ch] !== '—'));
+    const channels = shown.map((ch) => {
+      const m = chanMeta(ch);
+      const isPref = ch === pref;
+      return '<div class="cd-row' + (isPref ? ' on' : '') + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
+        '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
+        (isPref ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
+    }).join('');
+    // Language and consent are stated once, up in the hero and the status chip — the foot keeps only
+    // the action.
+    const inner = '<div class="cd-list">' + channels + '</div>' +
+      '<div class="cd-foot"><button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
     return dxSec('phone', 'Контактные данные', '', inner);
   }
-  // Психологический профиль — сводка на основной вкладке (полная версия — во вкладке «Персонализация»).
+  // Client portrait — the summary shown on the overview tab; the full version lives on its own tab.
   function psychSummary(c) {
     const p = c.psych;
     if (!p || !p.filled) {
-      return dxSec('sparkle', 'Психологический профиль', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
+      return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
         '<div style="font-size:12.5px;color:var(--mut)">Профиль стиля общения не заполнен — поможет вести персонализированную коммуникацию в мессенджерах и соцсетях.</div>');
     }
     const chips = [p.decision, p.pace, p.risk].filter(Boolean).map((x) => '<span class="badge">' + x + '</span>').join('');
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
-    return dxSec('sparkle', 'Психологический профиль', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
+    return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
       '<div class="prov">' + chips + vals + '</div>' +
       '<div style="font-size:12.5px;color:var(--mut);margin-top:8px">Канал и тон: ' + ((p.channel || '—') + (p.tone ? ' · ' + p.tone : '')) + '</div>');
   }
@@ -5839,6 +6449,78 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
     if (!all.length) return '';
     return reqPrefProfile({ offered: all });
+  }
+  // Справка Консьержа — human handover brief for the next agent picking up this client.
+  // Handover brief on the client card — what one agent tells another before picking this client up.
+  // Every clause is built from the client's own records and disappears when the data is absent, so a
+  // bare new contact yields two honest sentences instead of a skeleton of dashes. Phrases are shaped
+  // to avoid Russian case agreement: a name never lands in a slot that would require declension.
+  function clientBriefSentences(c) {
+    const out = [];
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const active = deals.filter((d) => d.stage !== 'done');
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+
+    // 1. Who and what the request is.
+    const want = [];
+    if (c.goal) want.push(lowerFirst(c.goal) + (c.budget ? ' до ' + WS.AED(c.budget) : ''));
+    else if (c.budget) want.push('бюджет до ' + WS.AED(c.budget));
+    if ((c.areas || []).length) want.push('районы ' + joinRu(c.areas));
+    if (c.horizon) want.push('срок ' + c.horizon);
+    out.push(c.name + (c.lang ? ', ' + c.lang : '') + '. ' + (want.length ? 'Запрос — ' + want.join('; ') + '.' : 'Запрос ещё не зафиксирован.'));
+
+    // 2. Where the client stands right now.
+    if (active.length) {
+      const d0 = active[0];
+      const stageL = funnelSteps(d0).cols[funnelSteps(d0).idx];
+      let line = 'В работе ' + active.length + ' ' + plural(active.length, 'сделка', 'сделки', 'сделок') +
+        ': «' + d0.title + '», стадия «' + stageL + '»';
+      if (d0.amount) line += ', ' + WS.AED(d0.amount);
+      out.push(line + '; ведёт ' + agentName(d0.agent) + '.');
+    } else if (reqs.length) {
+      const offered = reqs.reduce((n, r) => n + ((r.offered || []).length), 0);
+      out.push('Активных сделок нет: ' + reqs.length + ' ' + plural(reqs.length, 'заявка', 'заявки', 'заявок') +
+        (offered ? ', предложено ' + offered + ' ' + plural(offered, 'объект', 'объекта', 'объектов') : '') + '.');
+    } else {
+      out.push('Активных сделок и заявок пока нет — контакт в базе, работа не начата.');
+    }
+
+    // 3. The last thing that actually happened. The feed also carries planned shows and open tasks
+    // («что было и что предстоит» share one ribbon) — a 16:00 показ is not a «последнее касание» at
+    // 9:12, so anything dated in the future is skipped here.
+    const feed = contactFeedEntries(c).filter((e) => !(e.ord > NOW_ORD));
+    if (feed.length) {
+      const last = feed[0];
+      const what = (last.text || last.t || '').replace(/\s+/g, ' ').trim();
+      if (what) out.push('Последнее касание — ' + (last.at || 'недавно') + ': ' + lowerFirst(what.length > 90 ? what.slice(0, 90).replace(/\s+\S*$/, '') + '…' : what.replace(/[.!?]*$/, '')) + '.');
+    }
+
+    // 4. What to watch out for.
+    const watch = [];
+    const k = kycOf(c);
+    if (k.st !== 'ok') watch.push(lowerFirst(k.label));
+    if (c.consent === false) watch.push('нет согласия на связь (PDPL)');
+    const overdue = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue').length;
+    if (overdue) watch.push(overdue + ' ' + plural(overdue, 'просроченная задача', 'просроченные задачи', 'просроченных задач'));
+    const sig = (D().clientSignals || {})[c.id];
+    if (sig) (sig.signals || []).filter((x) => !x.ok).forEach((x) => watch.push(lowerFirst(x.t)));
+    if (watch.length) out.push('Внимание: ' + joinRu(watch) + '.');
+
+    // 5. How to talk to them — only when the портрет is filled in.
+    const p = c.psych;
+    if (p && p.filled) {
+      const how = [lowerFirst(commTips(p)[0])];
+      if (p.channel) how.push('канал — ' + p.channel);            // «WhatsApp» is a name, not a word to lowercase
+      if (p.bestTime) how.push('лучшее время — ' + lowerFirst(p.bestTime));
+      out.push('Как говорить: ' + how.join(', ') + '.');
+    }
+    return out;
+  }
+  function conciergeClientHandover(c) {
+    const p = c.psych;
+    const tag = (p && p.filled) ? 'портрет + история' : 'по данным карточки';
+    return dxSec('sparkle', 'Справка Консьержа', '<span class="badge ai-b">' + I('sparkle') + tag + '</span>',
+      '<p class="deal-brief">' + clientBriefSentences(c).join(' ') + '</p>');
   }
   // Client-level lead ops (derived): owner from the active deal, lifecycle stage, next contact from tasks.
   function clientOps(c) {
@@ -5858,7 +6540,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
-      return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
+      return dxSec('sparkle', 'Портрет клиента', '', psychInner(c));
     }
     if (tab === 'kyc') {
       const k = kycOf(c);
@@ -5892,8 +6574,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const s = (D().clientSignals || {})[c.id];
     const prio = s ? '<span class="prio prio-' + s.priority + '">' + s.priority + '</span>' : '';
     const key = dxSec('users', 'Ключевое', '', '<div class="dfields">' +
-      dfPair('Цель', c.goal) + dfPair('Бюджет', c.budget ? WS.AED(c.budget) : '—') +
-      dfPair('Районы', (c.areas || []).join(', ')) + dfPair('Срок покупки', c.horizon) +
+      dfPair('Цель', c.goal) + dfPair('Районы', (c.areas || []).join(', ')) +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
       (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : ''));
     const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
@@ -5907,7 +6588,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
       '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
     const pref = clientPrefProfile(c);
-    return clientOps(c) + contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
+    return clientOps(c) + '<div style="margin-top:14px">' + conciergeClientHandover(c) + '</div>' +
+      '<div style="margin-top:14px">' + contactBlock(c) + '</div>' +
+      '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
       (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
       '<div style="margin-top:14px">' + actions + '</div>' +
@@ -5919,16 +6602,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const k = kycOf(c);
     const dealsCount = D().deals.filter((x) => x.clientId === id).length;
-    const cm = chanMeta(prefChannel(c));
+    // KYC, the preferred channel and the language now live in the compact hero — repeating them as
+    // chips right underneath was the same fact stated twice. Only the consent flag, which the hero
+    // does not carry and which gates every outbound touch, stays.
     const status = statusChip([
-      { icon: 'shield', label: k.label, tone: k.st },
-      { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие есть' : 'Нет согласия', tone: c.consent ? 'ok' : 'stop' },
-      { icon: cm[0], label: cm[1] },
-      { icon: 'flame', label: c.lang },
+      { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие на связь есть' : 'Нет согласия на связь', tone: c.consent ? 'ok' : 'stop' },
     ]);
     return {
       type: 'contact', id: id, title: c.name, status: clientHero(c) + status,
-      tabs: [['overview', 'Обзор'], ['profile', 'Персонализация'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+      tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
       pageActs: '<button class="btn sm primary" data-act="newDeal" data-cid="' + id + '">' + I('briefcase') + 'Создать сделку</button>' +
@@ -5958,7 +6640,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
       dealField('Источник (из заявки)', d.source, p.source, d.id + ':source') +
-      dealField('Компания', co ? co.name + ' · ' + co.kind : '—', 'confirmed') +
+      dealField('Компания', co ? '<span data-company="' + co.id + '" style="cursor:pointer;border-bottom:1px solid var(--acc-line)">' + co.name + '</span> · ' + co.kind : '—', 'confirmed') +
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
   }
@@ -6021,7 +6703,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const edit = del ? '<button class="tl-ic-btn" ' + del + ' title="Удалить заметку">' + I('x') + '</button>' : '';
     // The lock sits with the timestamp; the tag row carries only real labels, so it never
     // renders as a lone stray icon under the text.
-    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') +
+    // On a company feed the counterpart matters as much as the channel: «с кем именно говорили»
+    // is the difference between a conversation with the ЛПР and one with an operations manager.
+    const who = e._person ? '<span class="tl-src">' + I('users') + escAttr(e._person) + '</span>' : '';
+    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') + who +
       (e.src ? '<span class="tl-src">' + I('briefcase') + escAttr(e.src) + '</span>' : '');
     return '<div class="evc ' + e.kind + '">' +
       '<div class="evc-top"><span class="evc-ic ' + s.cls + '">' + I(chIcon(e.ch)) + '</span>' +
@@ -6040,7 +6725,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const tl = (D().dealTimeline || {})[d.id] || [];
     const cap = S().capture || {};
     const on = (d.id in cap) ? cap[d.id] : true;
-    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i })))
+    const born = dealCreationEntry(d);
+    const pairs = tl.map((e, i) => ({ e: e, i: i }));
+    if (born) pairs.push({ e: born, i: -1 });   // i = -1: synthetic, never a deletable note
+    const rows = feedSortDesc(pairs)
       .map((p) => tlRow(p.e, p.e.kind === 'note' ? 'data-notedel="' + d.id + ':' + p.i + '"' : ''))
       .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">пока нет истории по каналам</div>';
     const privacy = '<div class="cap-toggle"><span>' + I('lock') + 'Запись разговоров по сделке (A7)</span>' +
@@ -6087,7 +6775,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const out = [];
     const isContact = kind === 'contact';
     const own = isContact ? (data.contactTimeline || {}) : (data.companyTimeline || {});
-    (own[ent.id] || []).forEach((e, i) => out.push(Object.assign({}, e, { _ci: i })));
+    const roster = (!isContact && ent.people) || [];
+    (own[ent.id] || []).forEach((e, i) => {
+      const per = (e.person != null && roster[e.person]) ? roster[e.person] : null;
+      out.push(Object.assign({}, e, { _ci: i }, per ? { _person: per.name + ' · ' + lowerFirst(per.role) } : {}));
+    });
     const deals = (data.deals || []).filter((d) => isContact ? d.clientId === ent.id : d.companyId === ent.id);
     deals.forEach((d) => {
       const lbl = isContact ? dealFeedLabel(d, ent) : (d.title || d.sub || 'сделка');
@@ -6151,9 +6843,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div style="font-size:12px;color:var(--faint);padding:8px 0">по выбранному фильтру событий нет</div>';
     return '<div class="timeline">' + rows + '</div>';
   }
+  // The deal's birth is a real event, but it lives on the deal record rather than in the timeline
+  // fixtures — so it is synthesised at render time and sorts to the bottom (oldest) of the ribbon.
+  function dealCreationEntry(d) {
+    if (!d.createdAt) return null;
+    const day = (d.createdAt.match(/^(\d+)/) || [])[1];
+    return {
+      at: d.createdAt, ord: day ? ORD(parseInt(day, 10), 0, 1) : 1,
+      ch: 'crm', kind: 'ai', by: 'Консьерж', t: 'Сделка заведена',
+      text: 'Сделка заведена в системе' + (d.requestId ? ' из заявки' : '') + '.',
+    };
+  }
   function dealLineageEntries(d) {
     const data = D();
     const out = [];
+    const born = dealCreationEntry(d);
+    if (born) out.push(Object.assign({}, born, { src: 'Сделка', _origin: { type: 'deal', id: d.id } }));
     ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка', _origin: { type: 'deal', id: d.id } })));
     if (d.requestId) {
       const r = requestById(d.requestId);
@@ -6290,7 +6995,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
-      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + d.title + '" data-ticon="briefcase">' +
+      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
       '<div class="w">W</div><div class="ph">Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
       '<div class="send">' + I('arrowRight') + '</div></div>';
   }
@@ -6432,6 +7137,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Без клиента') + '</div>' +
       '<div class="dhero-sub">' + sub + '</div></div></div></div>';
   }
+  // The deal's essence, editable in place: one tab stop, a real textbox role, and a label that
+  // says what the line is — a bare bold sentence under the hero reads as decoration, not a field.
+  function dealTitleEdit(d) {
+    return '<div class="deal-title-edit" data-deal="' + d.id + '">' +
+      '<span class="deal-title-lbl">' + I('pencil') + 'Суть сделки</span>' +
+      '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Суть сделки — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';
+  }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
   function dealClientCard(d) {
     const c = D().clients.find((x) => x.id === d.clientId);
@@ -6474,13 +7187,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   function dealChipRow(d) {
-    const s = funnelSteps(d);
     const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const now = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14 };
+    const createdDaysAgo = (function() {
+      if (!d.createdAt) return null;
+      const dayMatch = d.createdAt.match(/^(\d+)/);
+      if (!dayMatch) return null;
+      const createdDay = parseInt(dayMatch[1], 10);
+      const daysAgo = now.d - createdDay;
+      if (daysAgo === 0) return 'сегодня';
+      if (daysAgo === 1) return '1 дн. назад';
+      return daysAgo + ' дн. назад';
+    })();
     return '<div class="dnb-chips">' +
-      '<span class="chip on">' + I('trend') + s.cols[s.idx] + '</span>' +
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
-      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
+      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') +
+      (d.createdAt && createdDaysAgo ? '<span class="chip">' + I('calendar') + 'создана ' + d.createdAt + ' · ' + createdDaysAgo + '</span>' : '') + '</div>';
   }
   function dealNextStepCard(d) {
     const a = nbaActions(d);
@@ -6527,27 +7250,92 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
       (dep ? dealField('Задаток / EOI', dep, 'confirmed') : '') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal') +
-      dealField('Тип сделки', d.dealType, p.dealType) +
       dealField('Комиссия', comm, 'confirmed') +
       dealField('Co-broking', cobro, 'confirmed') + '</div>');
   }
-  // Essence status phrase — one short line high on the card, so "what's happening now" is
-  // visible without scrolling. Doc-oriented, keyed off the deal stage.
-  function dealStatusPhrase(d) {
-    return ({
-      new: 'квалифицируем клиента и готовим показ объектов.',
-      work: 'отправили предложение — ждём решение клиента.',
-      docs: 'готовим документы на подписание, ожидаем подписание клиентом.',
-      done: 'сделка закрыта, комиссия зафиксирована.',
-    })[d.stage] || ('стадия «' + funnelSteps(d).cols[funnelSteps(d).idx] + '».');
+  // Handover brief — what one agent tells another when passing a deal over. Four movements, each
+  // a sentence assembled from the deal's own records: where we stand · what is already settled ·
+  // what is holding it up · whose move it is. Every clause is dropped when its data is absent, so a
+  // brand-new deal yields two honest sentences instead of a skeleton full of dashes.
+  function dealBriefSentences(d) {
+    const s = funnelSteps(d);
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const out = [];
+
+    // 1. Where we stand.
+    const days = d.stageDays || 0;
+    let stand = 'Сделка на стадии «' + s.cols[s.idx] + '»';
+    if (days > 0) stand += ', ' + days + '-й день';
+    if (d.createdAt) stand += '; заведена ' + d.createdAt;
+    out.push(stand + '.');
+
+    // 2. What is already settled — money, paper, inventory.
+    const settled = [];
+    const dep = d.deposit;
+    if (dep && dep.paid) settled.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' внесён' + (dep.at ? ' ' + dep.at : ''));
+    const kpN = dealKpObjects(d).length;
+    if (kpN) settled.push('КП на ' + kpN + ' ' + plural(kpN, 'объект', 'объекта', 'объектов') + ' отправлено');
+    const lots = dealLots(d);
+    if (lots.length === 1) settled.push('выбран ' + lots[0].name.split(',')[0]);
+    else if (lots.length > 1) settled.push('в пакете ' + lots.length + ' ' + plural(lots.length, 'лот', 'лота', 'лотов'));
+    if (d.partnerAgent) settled.push('в сделке участвует партнёр ' + agentName(d.partnerAgent));
+    if (settled.length) out.push(capFirst(joinRu(settled)) + '.');
+
+    // 3. What is holding it up.
+    const risks = [];
+    if (/просроч/i.test(d.nextDue || '')) risks.push('касание просрочено');
+    const cf = (D().conflicts || {})[d.id];
+    if (cf) risks.push('по полю «' + cf.field + '» расходятся два источника');
+    if (c.consent === false) risks.push('от клиента нет согласия на связь');
+    if (dep && !dep.paid) risks.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' ещё не внесён');
+    const openTasks = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done').length;
+    if (openTasks) risks.push('по клиенту ' + plural(openTasks, 'висит', 'висят', 'висят') + ' ' + openTasks + ' ' + plural(openTasks, 'задача', 'задачи', 'задач'));
+    if (risks.length) out.push('Мешает: ' + joinRu(risks) + '.');
+
+    // 4. Whose move. The agent's name goes after a dash rather than into a case-inflected phrase —
+    // "Ход за Марина Волкова" is the kind of un-Russian line a template produces.
+    if (d.stage !== 'done') {
+      const step = nbaActions(d).doIt[0] || 'Согласовать следующий шаг с клиентом';
+      // `nextDue` holds either a date («сегодня 16:00») or an overdue marker («просрочено (касание)»);
+      // only the former makes sense after the word «срок», and the latter is already in «Мешает».
+      const due = /просроч/i.test(d.nextDue || '') ? '' : (d.nextDue ? ', срок ' + d.nextDue : '');
+      out.push('Следующий шаг — ' + lowerFirst(step) + due + '; ведёт ' + agentName(d.agent) + '.');
+    } else {
+      out.push('Сделка закрыта, комиссия зафиксирована — остаётся запросить отзыв у клиента.');
+    }
+    return out;
   }
-  // Header order (client feedback v2): compact hero → narrow stepper → one-line essence status →
+  // Deposit kind reads as a label ("EOI", "Бронирование (booking)") — lowercasing it mangles the
+  // acronym, so only the first letter of a word-form is dropped.
+  function depKind(dep) {
+    const k = dep.kind || 'задаток';
+    return /^[A-ZА-Я]{2,}$/.test(k.split(' ')[0]) ? k : lowerFirst(k);
+  }
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+  function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function lowerFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+  // Russian enumeration: «a, b и c» — a bare " · " list would read as a table, not as a sentence.
+  function joinRu(list) {
+    if (list.length <= 1) return list[0] || '';
+    return list.slice(0, -1).join(', ') + ' и ' + list[list.length - 1];
+  }
+  function dealStatusBrief(d) {
+    return dxSec('sparkle', 'Справка по сделке', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<p class="deal-brief">' + dealBriefSentences(d).join(' ') + '</p>');
+  }
+  // Header order (client feedback v2): compact hero → inline-editable title → narrow stepper → one-line essence status →
   // facing cards (LEFT key params · RIGHT client contacts + objects) → "что сейчас" detail.
   function dealHeader(d) {
     return dealHero(d) +
+      dealTitleEdit(d) +
       '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       dealChipRow(d) +
-      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
+      dealStatusBrief(d) +
       '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
       '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
       dealLotsBlock(d);
@@ -6573,9 +7361,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       status: dealHeader(d),
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
-      concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),
+      concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
       pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
-        '<button class="btn sm primary" data-thread="deal:' + d.id + '" data-tlabel="' + d.title + '" data-ticon="briefcase">' + I('chat') + 'Чат по сделке</button>',
+        '<button class="btn sm primary" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' + I('chat') + 'Чат по сделке</button>',
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
@@ -7032,7 +7820,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const at = (d.kpSnapshot && d.kpSnapshot.at) || (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.at : 'при создании сделки');
     // Terms frozen in the snapshot; pre-baked demo deals (no snapshot) fall back to their live fields.
     const terms = (d.kpSnapshot && d.kpSnapshot.terms) || d;
-    openModal('КП сделки · ' + d.title,
+    openModal('КП сделки · ' + escAttr(d.title),
       kpDocBody(c.name || 'Клиент', 'КП сделки · зафиксировано ' + at, objs, terms,
         'Снимок КП на момент создания сделки — неизменяемый. Живое КП правится в заявке.'),
       '<button class="btn" data-act="closeModal">Закрыть</button>');
@@ -7076,6 +7864,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="page-crumb"><button class="btn sm ghost" data-request="' + r.id + '">' + I('chevLeft') + 'К заявке · ' + (c.name || r.title) + '</button></div>';
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
+  // Every id a deal's owner can hold — TEAM plus whoever already owns one (u_omar runs the DIFC
+  // portfolio but is not on the agent roster). Without him the edit form reassigned his deal.
+  function dealAgentOptions(current) {
+    const ids = TEAM.map((a) => a.id);
+    (D().deals || []).forEach((d) => { if (d.agent && ids.indexOf(d.agent) < 0) ids.push(d.agent); });
+    if (current && ids.indexOf(current) < 0) ids.push(current);
+    return ids.map((id) => '<option value="' + id + '"' + (id === current ? ' selected' : '') + '>' + agentName(id) + '</option>').join('');
+  }
   const DEAL_ENUMS = {
     dealType: ['Продажа · off-plan', 'Продажа · готовое', 'Аренда', 'Fit-out', 'Готовый арендный бизнес', 'Передано партнёру'],
     objectType: ['off-plan', 'готовое', 'офис', 'ритейл', 'вилла', 'склад', 'земля'],
@@ -7085,14 +7881,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function openDealEdit(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
     const sel = (k, label) => '<label class="fld"><span>' + label + '</span><select id="df_' + k + '">' + DEAL_ENUMS[k].map((o) => '<option' + (o === d[k] ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
+    const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '"' + (co.id === d.companyId ? ' selected' : '') + '>' + co.name + '</option>').join('');
+    const agentOpts = dealAgentOptions(d.agent);
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Прямое редактирование первоклассно. Сохранение помечает поля как «подтверждено человеком».</p>' +
       '<div class="match-grid">' +
       '<label class="fld"><span>Бюджет, AED</span><input id="df_amount" type="text" value="' + (d.amount || '') + '"></label>' +
       sel('dealType', 'Тип сделки') + sel('objectType', 'Тип объекта') + sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
       '<label class="fld"><span>Цель</span><input id="df_goal" type="text" value="' + ((d.goal || '').replace(/"/g, '&quot;')) + '"></label>' +
+      '<label class="fld"><span>Компания</span><select id="df_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="df_vat"' + (d.vat ? ' checked' : '') + '> Применяется VAT 5%</label>';
-    openModal('Параметры сделки · ' + d.title, body,
+    openModal('Параметры сделки · ' + escAttr(d.title), body,
       '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>');
   }
   function saveDealEdit(id) {
@@ -7100,11 +7900,117 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const g = (k) => { const el = document.getElementById('df_' + k); return el ? el.value : d[k]; };
     const amt = parseInt((g('amount') || '').toString().replace(/\D/g, ''), 10);
     d.amount = amt || d.amount;
-    ['dealType', 'objectType', 'paymentForm', 'source', 'goal'].forEach((k) => { d[k] = g(k); });
+    ['dealType', 'objectType', 'paymentForm', 'source', 'goal', 'company', 'agent'].forEach((k) => {
+      const val = g(k);
+      if (k === 'company') d.companyId = val || null;
+      else if (k === 'agent') d.agent = val;
+      else d[k] = val;
+    });
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
     d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' });
+    WS.storeApi.save();
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
+  }
+
+  // ---- Goals edit (profile) ----
+  function openGoalEdit(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    const metricOpts = ['commission', 'deals', 'pipeline', 'shows', 'leads']
+      .map((m) => '<option value="' + m + '"' + (m === g.metric ? ' selected' : '') + '>' + ({ commission: 'Заработанная комиссия', deals: 'Закрытые сделки', pipeline: 'Сумма пайплайна', shows: 'Проведённые показы', leads: 'Новые клиенты' })[m] + '</option>').join('');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Цель на период. Прогресс считается автоматически из данных демо. Выводить на Пульс — показывает только закреплённые цели.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Цель</span><input id="gf_label" type="text" value="' + ((g.label || '').replace(/"/g, '&quot;')) + '"></label>' +
+      '<label class="fld"><span>Метрика</span><select id="gf_metric">' + metricOpts + '</select></label>' +
+      '<label class="fld"><span>Целевое значение</span><input id="gf_target" type="number" value="' + (g.target || '') + '"></label>' +
+      '<label class="fld"><span>Период</span><select id="gf_period"><option value="month"' + (g.period === 'month' ? ' selected' : '') + '>Месяц</option><option value="quarter"' + (g.period === 'quarter' ? ' selected' : '') + '>Квартал</option></select></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned"' + (g.pinned ? ' checked' : '') + '> Показывать в Пульсе</label>';
+    openModal('Редактировать цель · ' + escAttr(g.label), body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveGoal" data-goal="' + goalId + '">' + I('check') + 'Сохранить</button>');
+  }
+  function saveGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    const gv = (k) => { const el = document.getElementById('gf_' + k); return el ? el.value : g[k]; };
+    const target = parseInt(gv('target'), 10);
+    if (!gv('label').trim() || !target) { WS.storeApi.toast('Укажите цель и значение', 'warn'); return; }
+    g.label = gv('label');
+    g.metric = gv('metric');
+    g.target = target;
+    g.period = gv('period');
+    g.pinned = !!(document.getElementById('gf_pinned') || {}).checked;
+    closeModal();
+    WS.storeApi.toast('Цель сохранена', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  function deleteGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const ix = goals.findIndex((x) => x.id === goalId);
+    if (ix >= 0) {
+      const g = goals[ix];
+      openModal('Удалить цель', '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Удалить цель «' + escAttr(g.label) + '»? Действие необратимо.</p>',
+        '<button class="btn" data-act="closeModal">Отмена</button><button class="btn danger" data-act="confirmDeleteGoal" data-goal="' + goalId + '">' + I('x') + 'Удалить</button>');
+    }
+  }
+  function confirmDeleteGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const ix = goals.findIndex((x) => x.id === goalId);
+    if (ix >= 0) {
+      goals.splice(ix, 1);
+      closeModal();
+      WS.storeApi.toast('Цель удалена', 'ok');
+      WS.storeApi.save(); WS.storeApi.emit();
+    }
+  }
+  function addGoal() {
+    const u = D().users[S().role];
+    if (!u.goals) u.goals = [];
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Добавить новую цель на период. Прогресс считается автоматически.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Цель</span><input id="gf_label" type="text" placeholder="Например: Заработать 300 тыс. комиссии в мае"></label>' +
+      '<label class="fld"><span>Метрика</span><select id="gf_metric"><option value="commission">Заработанная комиссия</option><option value="deals">Закрытые сделки</option><option value="pipeline">Сумма пайплайна</option><option value="shows">Проведённые показы</option><option value="leads">Новые клиенты</option></select></label>' +
+      '<label class="fld"><span>Целевое значение</span><input id="gf_target" type="number" placeholder="Например: 300000"></label>' +
+      '<label class="fld"><span>Период</span><select id="gf_period"><option value="month">Месяц</option><option value="quarter">Квартал</option></select></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned" checked> Показывать в Пульсе</label>';
+    openModal('Добавить цель', body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createGoal">' + I('plus') + 'Создать</button>');
+  }
+  function createGoal() {
+    const u = D().users[S().role];
+    if (!u.goals) u.goals = [];
+    const gv = (k) => { const el = document.getElementById('gf_' + k); return el ? el.value : ''; };
+    const label = gv('label').trim();
+    const target = parseInt(gv('target'), 10);
+    if (!label || !target) { WS.storeApi.toast('Укажите цель и значение', 'warn'); return; }
+    u.goals.push({
+      id: 'g_' + Math.round(performance.now()),
+      metric: gv('metric'),
+      target: target,
+      period: gv('period'),
+      label: label,
+      pinned: !!(document.getElementById('gf_pinned') || {}).checked,
+    });
+    closeModal();
+    WS.storeApi.toast('Цель добавлена', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  // Pin / unpin decides what the Pulse carries — the client asked to configure exactly that.
+  function toggleGoalPin(goalId) {
+    const u = D().users[S().role];
+    const g = ((u && u.goals) || []).find((x) => x.id === goalId);
+    if (!g) return;
+    g.pinned = !g.pinned;
+    WS.storeApi.toast(g.pinned ? 'Цель выведена на Пульс' : 'Цель убрана с Пульса', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
   }
   // Event types an agent can log by hand (IA §6.2 «Примечания / События»).
   // ch = channel icon bucket; kind 'note' stays editable, logged facts are immutable like channel raw.
@@ -7291,6 +8197,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<span class="df-sep"></span>' + srcChips + '</div>' +
       '<div class="obj-count section-label" style="margin-bottom:8px">Найдено: ' + objs.length + ' из ' + D().objects.length + '</div>' +
       '<div class="obj-list">' + cards + '</div>';
+  }
+  // List search + filter controls repaint their own subtree, the way bindObjects/refreshObjects do.
+  function bindListSearch() {
+    const wire = (id, key, refresh) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', (e) => { S()[key] = e.target.value; refresh(); });
+    };
+    wire('contactsSearch', 'contactsSearch', refreshContacts);
+    wire('companiesSearch', 'companiesSearch', refreshCompanies);
+    wire('conciergeSearch', 'conciergeSearch', refreshCgRail);
+    const sel = (id, apply) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', (e) => apply(e.target.value));
+    };
+    sel('cfPsych', (v) => { S().contactsFilters = Object.assign({}, S().contactsFilters, { psych: v }); WS.storeApi.emit(); });
+    sel('cfObject', (v) => { S().contactsFilters = Object.assign({}, S().contactsFilters, { object: v }); WS.storeApi.emit(); });
+    sel('cofClient', (v) => { S().companiesFilters = Object.assign({}, S().companiesFilters, { client: v }); WS.storeApi.emit(); });
   }
   function bindObjects() {
     const s = document.getElementById('objSearch');
@@ -7649,6 +8572,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!spec) return viewClients();
     return entityPage(spec, 'clients', 'contacts', 'Назад к клиентам');
   }
+  function viewCompanyDetail(id) {
+    const spec = companySpec(id);
+    if (!spec) return viewCompanies();
+    return entityPage(spec, 'companies', '', 'Назад к компаниям');
+  }
 
   // ---------------- ПОДБОР ПОД СДЕЛКУ (matching workspace) ----------------
   const TARGET_YIELD = 0.05; // implied investor target (net)
@@ -7656,7 +8584,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const m = Object.assign(WS.storeApi.clone(D().refModel), { objectId: o.id, price: o.price });
     return WS.finance.compute(m).netYield;
   }
-  // ---------------- MATCHING (качественный + психологический подбор) ----------------
+  // ---------------- MATCHING (quality criteria + client-portrait fit) ----------------
   const QUAL = [
     { k: 'water', label: 'Вид на воду', test: (o) => o.attrs && o.attrs.view === 'water' },
     { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floor === 'high' },
@@ -7718,9 +8646,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="arow" style="margin-top:10px"><div class="alabel"><label>Целевая доходность</label></div>' +
         '<div class="actl"><input type="range" id="m_yield" min="0.03" max="0.08" step="0.005" value="' + m.yield + '"><span class="av" id="av_m_yield">' + (Math.round(m.yield * 1000) / 10) + '%</span></div></div>' +
       '<div class="section-label" style="margin:12px 0 6px">Качественные критерии</div><div class="qa-row">' + qualChips + '</div>' +
-      '<div class="section-label" style="margin:12px 0 6px">Психологический мэтч</div><div class="qa-row">' + psychToggle +
-        (psychAvail ? '' : '<span class="badge">' + I('lock') + 'заполните профиль в карточке контакта</span>') + '</div>' +
-      (psychAvail ? '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + I('sparkle') + ' Профиль: <b>' + c.psych.decision + '</b> · важно: ' + (c.psych.values || []).join(', ') + '</div>' : '') +
+      '<div class="section-label" style="margin:12px 0 6px">Мэтч по портрету клиента</div><div class="qa-row">' + psychToggle +
+        (psychAvail ? '' : '<span class="badge">' + I('lock') + 'заполните портрет в карточке контакта</span>') + '</div>' +
+      (psychAvail ? '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + I('sparkle') + ' Портрет: <b>' + c.psych.decision + '</b> · важно: ' + (c.psych.values || []).join(', ') + '</div>' : '') +
       '</div>';
     const sl = S().shortlist || [];
     let base = sl.length ? D().objects.filter((o) => sl.indexOf(o.id) >= 0) : D().objects.slice();
@@ -8129,7 +9057,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { h: 'Сравнение объектов' }, { k: 'Creekline 1208', v: 'ROI 39,40% · net 5,28%' }, { k: 'Palm Court 704', v: 'ниже бюджета · net 5,67% (предпочитает)' },
       { h: 'Аргументы (с источниками)' }, { k: 'Доходность', v: 'финмодель по объекту · допущения видны' }, { k: 'Клуб', v: 'Palm Court — эксклюзив клуба' },
       { h: 'Факты ↔ гипотезы' }, { k: 'Факт', v: 'бюджет до 2 млн, срок 1–3 мес' }, { k: 'Гипотеза', v: 'чувствителен к первому платежу (не подтверждено)' },
-      { h: 'Психологический профиль (сигналы стиля)' },
+      { h: 'Портрет клиента (сигналы стиля)' },
       { k: 'Тип решения', v: 'Аналитик — цифры и факты' }, { k: 'Что важно', v: 'доходность, безопасность сделки' },
       { k: 'Тон', v: 'по делу, с расчётами, без давления' }, { k: 'Триггеры', v: 'график первого платежа, подтверждённая доходность' },
       { k: 'Как вести', v: 'дать цифры и источники; для мессенджеров — короткие сообщения с конкретикой' },
@@ -8315,6 +9243,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Мой день · сегодня ' + today.length + od + '</div>' +
       '<button class="btn sm" data-nav="tasks">' + I('arrowRight') + 'Все задачи</button></div>' + top;
   }
+
   // ---- Экран «Задачи» ----
   function tasksInsights() {
     return '<div class="section-label" style="margin:4px 0 8px;display:flex;align-items:center;gap:8px">Инсайты · группы задач <span class="badge ai-b">' + I('sparkle') + 'AI-сгенерировано</span></div>' + insightCards();
@@ -8496,20 +9425,54 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '"' + (c.id === prefClient ? ' selected' : '') + '>' + c.name + '</option>').join('');
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
     const stageOpts = STAGES.map((s) => '<option value="' + s.k + '">' + s.label + '</option>').join('');
+    const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
+    const agentOpts = dealAgentOptions(null);
+    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '">' + dt + '</option>').join('');
+    const objectTypeOpts = DEAL_ENUMS.objectType.map((ot) => '<option value="' + ot + '">' + ot + '</option>').join('');
+    const paymentFormOpts = DEAL_ENUMS.paymentForm.map((pf) => '<option value="' + pf + '">' + pf + '</option>').join('');
+    const sourceOpts = DEAL_ENUMS.source.map((s) => '<option value="' + s + '">' + s + '</option>').join('');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Создать сделку вручную — из формы, приложенной заявки или PDF (в демо — форма). Это структурированный экран, а не диалог с Консьержем.</p>' +
-      '<div class="form-grid">' +
+      '<div class="section-label">Кто и что</div><div class="match-grid">' +
+      '<label class="fld wide"><span>Суть сделки</span><input id="nd_title" type="text" placeholder="Напр.: Инвест-квартира в Business Bay"></label>' +
       '<label class="fld"><span>Клиент</span><select id="nd_client">' + clientOpts + '</select></label>' +
       '<label class="fld"><span>Объект</span><select id="nd_object">' + objOpts + '</select></label>' +
       '<label class="fld"><span>Сумма, AED</span><input id="nd_amount" type="number" step="50000"></label>' +
       '<label class="fld"><span>Стадия</span><select id="nd_stage">' + stageOpts + '</select></label>' +
+      '</div><div class="section-label">Условия</div><div class="match-grid">' +
+      '<label class="fld"><span>Тип сделки</span><select id="nd_dealType">' + dealTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Тип объекта</span><select id="nd_objectType">' + objectTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Форма оплаты</span><select id="nd_paymentForm">' + paymentFormOpts + '</select></label>' +
+      '<label class="fld"><span>Источник</span><select id="nd_source">' + sourceOpts + '</select></label>' +
+      '<label class="fld"><span>Цель</span><input id="nd_goal" type="text"></label>' +
+      '<label class="pcheck wide"><input type="checkbox" id="nd_vat"> Применяется VAT 5%</label>' +
+      '</div><div class="section-label">Ответственность</div><div class="match-grid">' +
+      '<label class="fld"><span>Компания</span><select id="nd_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      '<label class="fld"><span>Ответственный агент</span><select id="nd_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<div class="prov" style="margin-top:10px"><span class="badge">' + I('upload') + 'Приложить заявку (PDF) — демо</span><span class="badge demo">' + I('lock') + 'ручное создание</span></div>';
     openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>');
   }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
+    const dealType = _g('nd_dealType') || 'Продажа · off-plan';
+    const funnelMap = {
+      'Продажа · off-plan': 'sale_offplan',
+      'Продажа · готовое': 'sale_ready',
+      'Аренда': 'rent',
+      'Fit-out': 'fitout',
+      'Готовый арендный бизнес': 'rental_biz',
+      'Передано партнёру': 'referral'
+    };
+    // The essence is what the deal is called everywhere afterwards; fall back to the client's name
+    // only when the agent left it blank, which is what the card used to do unconditionally.
+    const title = (_g('nd_title') || '').trim() || c.name || 'Сделка';
     const id = 'dm_' + Math.round(performance.now());
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'new', title: c.name || 'Сделка', sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас' } }]);
+    const createdAt = (function() {
+      const now = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, mo: 5 };
+      const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+      return now.d + ' ' + months[now.mo];
+    })();
+    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'new', title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnelMap[dealType] || 'sale_offplan', dealType: dealType, objectType: _g('nd_objectType') || 'off-plan', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
     closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 
@@ -8548,19 +9511,33 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const meta = TEAM_META[id] || { focus: '—', load: 50, conv: 30, sla: 90 };
     return { list: list, val: val, active: active, deals: list.length, meta: meta };
   }
+  // A head of brokerage opens the morning on money against plan, who will miss it, what is stuck and
+  // who is drowning. «Агентов на смене · вся команда активна» was a constant that decided nothing;
+  // «План месяца · N / 12» hard-coded the plan. Both are gone.
   function mgrTiles() {
-    const active = D().deals.filter((d) => d.stage !== 'done');
+    const deals = D().deals || [];
+    const active = deals.filter((d) => d.stage !== 'done');
     const pipeline = Math.round(active.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
-    const closed = D().deals.filter((d) => d.stage === 'done').length;
+    // Closed business for the period lives in `attribution` — the same book the goals read, so the
+    // Пульс cannot contradict «План отдела» two blocks below it.
+    const attr = D().attribution || [];
+    const earned = attr.reduce((s, x) => s + (x.commission || 0), 0) +
+      Math.round(deals.filter((d) => d.stage === 'done').reduce((s, d) => s + dealCommission(d), 0));
+    const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter((d) => d.stage === 'done').length;
     const unassigned = (D().inbox || []).length;
-    const slaBreaches = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
+    const atRisk = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
+    const avgSla = Math.round(Object.keys(TEAM_META).reduce((s, k) => s + TEAM_META[k].sla, 0) / Object.keys(TEAM_META).length);
+    const stuckPred = (SAVED_VIEWS.find((v) => v.k === 'stuck') || {}).pred || (() => false);
+    const stuck = deals.filter(stuckPred);
+    const stuckSum = Math.round(stuck.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
     return '<div class="tiles" style="margin-top:20px">' +
-      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активные сделки всех агентов', 'up', 'accent', 'data-nav="clients"') +
-      tile('target', 'План месяца', closed + ' / 12', 'сделок', '', 'Закрыто из цели отдела', '', '', 'data-nav="analytics"') +
-      tile('warn', 'Нарушения SLA', slaBreaches, '', '', 'Агенты вне норматива', '', '', 'data-nav="team"') +
-      tile('mail', 'Нераспределённые', unassigned, '', '', 'Заявки ждут агента', '', '', 'data-nav="leads"') +
+      tile('money', 'Комиссия отдела за квартал', WS.AED(earned), '', '', closedN + ' ' + plural(closedN, 'закрытая сделка', 'закрытые сделки', 'закрытых сделок'), 'up', 'accent', 'data-nav="analytics"') +
+      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активных сделок — ' + active.length, 'up', '', 'data-nav="clients"') +
+      tile('clock', 'Застряли в стадии', stuck.length, '', '', stuckSum ? stuckSum.toLocaleString('ru-RU') + ' млн AED без движения 5+ дней' : 'всё движется', '', stuck.length ? 'accent' : '', 'data-savedview="stuck" data-nav="clients"') +
+      tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
+      tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
+      tile('mail', 'Нераспределённые заявки', unassigned, '', '', unassigned ? 'Ждут агента — назначить' : 'Все заявки распределены', '', unassigned > 0 ? 'accent' : '', 'data-nav="leads"') +
       tile('check', 'На согласовании', MGR_APPROVALS.length - (S().apprDone || []).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
-      tile('users', 'Агентов на смене', Object.keys(TEAM_META).length, '', '', 'Вся команда активна', '', '', 'data-nav="team"') +
       '</div>';
   }
   function viewTeam() {
@@ -8767,7 +9744,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const body = wsDocHead('Переговорный бриф', 'К звонку · ' + c.name, 'Цель: согласовать объект и снять возражение по первому платежу') +
       '<div class="section-label">Сравнение объектов · чистая доходность</div>' +
       barChart([{ label: 'Creekline 1208', value: nyC, fmt: WS.finance.pct(nyC), hot: nyC >= 0.05 }, { label: 'Palm Court 704', value: nyP, fmt: WS.finance.pct(nyP), hot: nyP >= 0.05 }]) +
-      '<div class="section-label">Психологический профиль</div>' +
+      '<div class="section-label">Портрет клиента</div>' +
       '<div class="prov">' + (p.decision ? '<span class="badge">' + I('users') + p.decision + '</span>' : '') + (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('') + '</div>' +
       '<div class="ws-flag" style="margin-top:8px">' + I('sparkle') + ' <b>Как вести разговор:</b> ' + (p.tone || 'по делу, с расчётами') + '. Триггеры: ' + ((p.triggers || []).join(', ') || '—') + '.</div>' +
       '<div class="section-label">Аргументы (с источниками)</div>' +
@@ -8992,8 +9969,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
+  // Компании — legal entities (developers, funds, corporates, agencies). The list, its search and
+  // its filter live in companiesBlock() so the same block serves this screen and the contacts one.
   function viewCompanies() {
-    return head('Компании', 'Юрлица: застройщики, фонды, корпоративные клиенты, агентства. KYC-статус (не рейтинг) и связанные сделки. Клик по строке — карточка компании.',
+    return head('Компании', 'Юрлица: застройщики, фонды, корпоративные клиенты, агентства. KYC-статус (не рейтинг), контактные лица с ролями и связанные сделки. Клик по строке — карточка компании.',
       '<button class="btn sm primary" data-act="newContact">' + I('plus') + 'Добавить компанию</button>') + companiesBlock();
   }
   // Аналитика — team funnel + canonical metrics (reuses manager blocks).
@@ -9230,7 +10209,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // Private metrics — visible only to the broker (not on the public витрина).
     const priv = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 10px;display:flex;align-items:center;gap:8px">Личная статистика <span class="badge demo">' + I('lock') + 'только вам</span></div>' +
       '<div class="fin-kpis">' +
-      '<div class="kpi"><div class="kv">214 000</div><div class="kk">Комиссия · квартал, AED</div></div>' +
+      '<div class="kpi"><div class="kv">' + WS.AED(goalFact({ metric: 'commission' }, S().role === 'manager' ? 'team' : 'me')) + '</div><div class="kk">Комиссия · квартал</div></div>' +
       '<div class="kpi"><div class="kv">34%</div><div class="kk">Конверсия лид → сделка</div></div>' +
       '<div class="kpi"><div class="kv">1,7</div><div class="kk">Средний чек, млн AED</div></div>' +
       '<div class="kpi"><div class="kv">28%</div><div class="kk">Повторные клиенты</div></div></div></div>';
@@ -9249,7 +10228,32 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '</div>';
     const profileContact = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 10px">Контактные данные</div>' +
       contactVCard(USER_CONTACTS[S().role] || USER_CONTACTS.agent, 'whatsapp') + '</div>';
-    return header + profileContact + kpis + priv + about + objectsCard + svcAcc + links;
+    // Goals are configured here and surfaced on the Pulse; the row renderer is shared with
+    // pulseMyGoals so the two screens can never drift apart.
+    const goals = (u && u.goals) || [];
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    const goalsRows = goals.map((g) => {
+      const p = computeGoalProgress(g, scope);
+      const m = GOAL_METRICS[g.metric] || { label: g.metric };
+      const bar = Math.max(2, Math.min(100, p.pct));
+      const pin = '<button class="btn xs' + (g.pinned ? ' primary' : '') + '" data-act="toggleGoalPin" data-goal="' + g.id + '" title="' +
+        (g.pinned ? 'Убрать с Пульса' : 'Показывать на Пульсе') + '">' + I(g.pinned ? 'check' : 'plus') + 'На Пульсе</button>';
+      return '<div class="goal-row">' +
+        '<div class="goal-head"><span class="goal-label">' + escAttr(g.label) + '</span>' +
+        '<span class="goal-num">' + goalValue(g.metric, p.fact) + ' <i>из ' + goalValue(g.metric, p.target) + '</i></span></div>' +
+        '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
+        '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
+        '<span>' + m.label + ' · ' + (g.period === 'quarter' ? 'квартал' : 'месяц') + '</span>' +
+        '<span class="goal-acts">' + pin +
+        '<button class="btn xs" data-act="editGoal" data-goal="' + g.id + '">' + I('pencil') + 'Изменить</button>' +
+        '<button class="btn xs" data-act="deleteGoal" data-goal="' + g.id + '" title="Удалить цель">' + I('x') + '</button></span></div></div>';
+    }).join('');
+    const goalsEmpty = '<div style="font-size:12.5px;color:var(--mut);max-width:64ch">Целей пока нет. Поставьте первую — комиссия за месяц, число закрытых сделок, показы или новые клиенты. Прогресс Пульс посчитает сам, по вашим сделкам, и покажет темп против календаря.</div>';
+    const goalsCard = '<div class="card pad" style="margin-bottom:14px">' +
+      '<div class="wq-head" style="margin:0 0 12px"><div class="section-label" style="margin:0">' + (scope === 'team' ? 'Цели отдела' : 'Мои цели') + '</div>' +
+      '<button class="btn sm primary" data-act="addGoal">' + I('plus') + 'Добавить цель</button></div>' +
+      (goals.length ? goalsRows : goalsEmpty) + '</div>';
+    return header + profileContact + kpis + priv + about + goalsCard + objectsCard + svcAcc + links;
   }
 
   // ---------------- КЛУБНЫЕ (портал закрытого клуба брокеров и инвесторов) ----------------
@@ -9588,6 +10592,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'objectDetail': return wrap(viewObjectDetail(S().objectId));
       case 'dealDetail': return wrap(viewDealDetail(S().dealId));
       case 'clientDetail': return wrap(viewClientDetail(S().clientId));
+      case 'companyDetail': return wrap(viewCompanyDetail(S().companyId));
       case 'tasks': return wrap(viewTasks());
       case 'team': return S().role === 'manager' ? wrap(viewTeam()) : viewStart();
       case 'leads': return S().role === 'manager' ? wrap(viewLeadsDistribution()) : wrap(viewRequests());
@@ -9629,6 +10634,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
     if (st.view === 'concierge') mountConcierge();
     if (st.view === 'objects') bindObjects();
+    bindListSearch();
     if (st.view === 'finance') renderFinance();
     // Hide the floating Concierge launcher (W) on the Concierge screen itself — it's redundant there.
     const _fab = document.querySelector('.fab-w'); if (_fab) _fab.style.display = (st.view === 'concierge') ? 'none' : '';
@@ -9652,10 +10658,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab };
+    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };
 })(window.WS = window.WS || {});
 
 </script>
@@ -10016,9 +11022,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-act]');
     if (!t) return;
     const d = t.dataset;
+
+    if (d.groupToggle) {
+      const groupId = d.groupToggle;
+      if (!store.cgGroupCollapse) store.cgGroupCollapse = {};
+      store.cgGroupCollapse[groupId] = !store.cgGroupCollapse[groupId];
+      WS.ui.refreshCgRail();
+      return;
+    }
 
     if (d.nav) { if (d.tab) store.clientsTab = d.tab; return WS.router.go(d.nav); }
     if (d.thread) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.openThread(d.thread, d.tlabel, d.ticon); }
@@ -10105,8 +11119,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.funnel) { store.dealFunnel = d.funnel; return api.emit(); }
     if (d.analytics) return WS.ui.openAnalyticsDrill(d.analytics);
     if (d.company) return WS.ui.companyCard(d.company);
-    if (d.savedview) { store.savedView = store.savedView === d.savedview ? null : d.savedview; return api.emit(); }
+    // A saved view only renders on the deals board, so a trigger that also carries data-nav must
+    // land there — otherwise the manager's tile sets a filter on a screen that never shows it.
+    if (d.savedview) { store.savedView = store.savedView === d.savedview ? null : d.savedview;
+      if (d.nav) { store.clientsTab = 'deals'; return WS.router.go(d.nav); }
+      return api.emit(); }
     if (d.exresolve) { return WS.ui.resolveException(d.exresolve); }
+    if (d.contactfilter) { const p = d.contactfilter.split(':'); store.contactsFilters = store.contactsFilters || {}; store.contactsFilters[p[0]] = p[1]; return api.emit(); }
     if (d.eng) return WS.engine.handle(d.eng, d);
 
     if (d.act) return handleAct(d.act, t);
@@ -10156,6 +11175,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'auditLog': WS.ui.openAuditLog(); break;
       case 'editDeal': WS.ui.openDealEdit(t.dataset.deal); break;
       case 'saveDeal': WS.ui.saveDealEdit(t.dataset.deal); break;
+      case 'editGoal': WS.ui.openGoalEdit(t.dataset.goal); break;
+      case 'toggleGoalPin': WS.ui.toggleGoalPin(t.dataset.goal); break;
+      case 'saveGoal': WS.ui.saveGoal(t.dataset.goal); break;
+      case 'deleteGoal': WS.ui.deleteGoal(t.dataset.goal); break;
+      case 'confirmDeleteGoal': WS.ui.confirmDeleteGoal(t.dataset.goal); break;
+      case 'addGoal': WS.ui.addGoal(); break;
+      case 'createGoal': WS.ui.createGoal(); break;
       case 'addEvent': { const sc = t.dataset.scope || 'deal'; WS.ui.openEventForm(sc, sc === 'contact' ? t.dataset.cid : sc === 'company' ? t.dataset.coid : t.dataset.deal); break; }
       case 'saveEventEntry': WS.ui.saveEventEntry(t.dataset.scope || 'deal', t.dataset.eid); break;
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
@@ -10201,6 +11227,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'calDayClear': store.calDay = -1; api.emit(); break;
       case 'doctab': store.docTab = t.dataset.tab; api.emit(); break;
       case 'docClear': store.docSearch = ''; api.emit(); break;
+      case 'contactsSearchClear': store.contactsSearch = ''; api.emit(); break;
+      case 'companiesSearchClear': store.companiesSearch = ''; api.emit(); break;
+      case 'conciergeSearchClear': store.conciergeSearch = ''; api.emit(); break;
+      case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
+      case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
+      case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' }; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
       case 'endTour': store.tour = { active: false, scenarioId: null, stepIndex: 0 }; api.emit(); break;
@@ -10239,7 +11271,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
-    if (e.key === 'Escape') { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
+    // Deal title inline edit: save on Enter, restore on Escape
+    if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('deal-title-text')) {
+      e.preventDefault(); const box = e.target.parentElement;
+      if (box && box.dataset.deal) { const newTitle = (e.target.textContent || '').trim(); if (newTitle) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); } } }
+    }
+    if (e.key === 'Escape') {
+      if (e.target.classList && e.target.classList.contains('deal-title-text')) {
+        e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.deal) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
+      } else { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
+    }
     // focus trap: keep Tab within the open modal or navigator drawer (a11y §17)
     if (e.key === 'Tab') {
       const modal = document.querySelector('.modal-wrap.show .modal');
@@ -10270,6 +11311,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (el && (el.id === 'm_min' || el.id === 'm_max') && store.match) { store.match[el.id === 'm_min' ? 'min' : 'max'] = parseInt(el.value, 10) || 0; api.emit(); }
     if (el && el.id === 'm_yield' && store.match) { store.match.yield = parseFloat(el.value); const lab = document.getElementById('av_m_yield'); if (lab) lab.textContent = (Math.round(store.match.yield * 1000) / 10) + '%'; }
   });
+
+  // ---- Deal title inline edit: save on blur ----
+  document.addEventListener('blur', (e) => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('deal-title-text')) {
+      const box = el.closest('.deal-title-edit');
+      if (box && box.dataset.deal) {
+        const newTitle = (el.textContent || '').trim();
+        if (newTitle) {
+          const d = store.data.deals.find((x) => x.id === box.dataset.deal);
+          if (d && d.title !== newTitle) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); }
+        }
+      }
+    }
+  }, true);
 
   // matching selects + yield commit (re-rank on change)
   document.addEventListener('change', (e) => {

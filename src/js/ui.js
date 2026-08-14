@@ -225,11 +225,11 @@
     deals: { label: 'Закрытые сделки', unit: 'count', word: ['сделка', 'сделки', 'сделок'], hint: 'стадия «закрыта»' },
     pipeline: { label: 'Пайплайн в работе', unit: 'money', hint: 'сумма активных сделок' },
     shows: { label: 'Показы', unit: 'count', word: ['показ', 'показа', 'показов'], hint: 'встречи на объектах' },
-    leads: { label: 'Новые клиенты', unit: 'count', word: ['клиент', 'клиента', 'клиентов'], hint: 'заведены в книгу' },
+    leads: { label: 'Клиенты в работе', unit: 'count', word: ['клиент', 'клиента', 'клиентов'], hint: 'закреплены за вами' },
   };
   // May in the demo week; a quarter is Apr–Jun, so a quarterly goal is 44 days in on 14 May.
   const DAYS_IN_MONTH = 31;
-  const QUARTER_ELAPSED_BEFORE_MAY = 30 + 31; // April has 30, March 31 — the quarter starts 1 April
+  const QUARTER_ELAPSED_BEFORE_MAY = 30;  // Q2 runs Apr–Jun, so on 14 May only April has elapsed
   const DAYS_IN_QUARTER = 91;
   function goalOwnerId(scope) {
     const u = D().users[scope === 'team' ? 'manager' : S().role];
@@ -241,24 +241,37 @@
     const me = goalOwnerId(scope);
     return all.filter((d) => d.agent === me);   // d.agent holds a user id (u_marina), not a role name
   }
+  // The closed book for the period. For the whole department it is `attribution` (the agency's
+  // book by source); for one agent it is that agent's own `closedPeriod` — `attribution` carries no
+  // agent split, so slicing it per person would have reported the agency's history as Marina's.
+  // Either way, a deal that closes DURING the demo is added on top, so the figure moves on screen.
+  function closedBook(scope, period) {
+    const deals = goalDeals(scope);
+    const live = deals.filter((d) => d.stage === 'done');
+    if (scope === 'team') {
+      const attr = D().attribution || [];
+      return {
+        commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + live.length,
+      };
+    }
+    const own = ((D().users[S().role] || {}).closedPeriod || {})[period === 'quarter' ? 'quarter' : 'month'] || { commission: 0, deals: 0 };
+    return {
+      commission: Math.round(own.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+      deals: own.deals + live.length,
+    };
+  }
   function goalFact(goal, scope) {
     const deals = goalDeals(scope);
-    // Closed business lives in `attribution` — the period's book by source, which is also what the
-    // Пульс reports as «комиссия на лид». Deals still on the board contribute the moment they close,
-    // so the number moves during a demo instead of sitting on the seeded total.
-    const attr = D().attribution || [];
-    if (goal.metric === 'commission') {
-      const closedNow = deals.filter((d) => d.stage === 'done').reduce((s2, d) => s2 + dealCommission(d), 0);
-      return Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + closedNow);
-    }
-    if (goal.metric === 'deals') {
-      return attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + deals.filter((d) => d.stage === 'done').length;
-    }
+    if (goal.metric === 'commission') return closedBook(scope, goal.period).commission;
+    if (goal.metric === 'deals') return closedBook(scope, goal.period).deals;
     if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => d.stage !== 'done').reduce((s2, d) => s2 + (d.amount || 0), 0));
     if (goal.metric === 'shows') {
-      // Events carry no owner, so a show counts as mine when its client is on one of my deals.
+      // Events carry no owner, so a show counts as mine when its client is on one of my deals — and
+      // only once it has actually happened: a viewing booked for 16:00 is not a показ at 9:12.
       const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
-      return (D().events || []).filter((e) => e.kind === 'show' && (scope === 'team' || mine[e.clientId])).length;
+      return (D().events || []).filter((e) => e.kind === 'show' && e.status !== 'canceled' &&
+        ordFromWhen(e.when, UNDATED_ORD) <= NOW_ORD && (scope === 'team' || mine[e.clientId])).length;
     }
     if (goal.metric === 'leads') {
       if (scope === 'team') return (D().clients || []).length;
@@ -286,7 +299,7 @@
     let pace;
     // Pace only means something for a metric that ACCUMULATES over the period. Pipeline is a stock —
     // how much sits in work right now — so projecting it forward by a daily rate is nonsense.
-    const cumulative = goal.metric !== 'pipeline';
+    const cumulative = goal.metric !== 'pipeline' && goal.metric !== 'leads';
     if (!cumulative) pace = fact >= target ? 'план по загрузке держится' : 'до нормы не хватает ' + goalValue(goal.metric, target - fact);
     else if (!target) pace = 'цель не задана';
     else if (fact >= target) pace = 'цель закрыта';
@@ -754,6 +767,7 @@
   // Determine which group a thread belongs to based on its id namespace
   function getThreadGroup(threadId) {
     if (threadId.startsWith('deal:')) return 'byDeal';
+    if (threadId.startsWith('request:')) return 'byRequest';
     if (threadId.startsWith('contact:') || threadId.startsWith('lead:')) return 'byContact';
     if (threadId.startsWith('object:')) return 'byObject';
     if (threadId.startsWith('company:')) return 'byCompany';
@@ -763,6 +777,7 @@
   const THREAD_GROUPS = {
     byContact: { label: 'По клиентам', icon: 'users' },
     byDeal: { label: 'По сделкам', icon: 'briefcase' },
+    byRequest: { label: 'По заявкам', icon: 'mail' },
     byObject: { label: 'По объектам', icon: 'building' },
     byCompany: { label: 'По компаниям', icon: 'building' },
     general: { label: 'Общее', icon: 'sparkle' },
@@ -776,7 +791,7 @@
 
     // Group threads and build structure
     const groups = {};
-    ['byContact', 'byDeal', 'byObject', 'byCompany', 'general'].forEach((g) => {
+    ['byContact', 'byRequest', 'byDeal', 'byObject', 'byCompany', 'general'].forEach((g) => {
       groups[g] = { threads: [], unread: 0 };
     });
 
@@ -1033,8 +1048,10 @@
     }
     // Object filter
     if (st.object && st.object !== 'all') {
-      const hasObj = (D().deals || []).some((d) => d.clientId === c.id && d.objectId === st.object) ||
-                     (D().requests || []).some((r) => r.clientId === c.id && (r.offered || []).indexOf(st.object) >= 0);
+      const hasObj = (D().deals || []).some((d) => d.clientId === c.id &&
+                       (d.objectId === st.object || (d.lots || []).indexOf(st.object) >= 0)) ||
+                     (D().requests || []).some((r) => r.clientId === c.id &&
+                       (r.offered || []).some((o) => (o && o.id ? o.id : o) === st.object));
       if (!hasObj) return false;
     }
     return true;
@@ -3080,7 +3097,7 @@
     const at = (d.kpSnapshot && d.kpSnapshot.at) || (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.at : 'при создании сделки');
     // Terms frozen in the snapshot; pre-baked demo deals (no snapshot) fall back to their live fields.
     const terms = (d.kpSnapshot && d.kpSnapshot.terms) || d;
-    openModal('КП сделки · ' + d.title,
+    openModal('КП сделки · ' + escAttr(d.title),
       kpDocBody(c.name || 'Клиент', 'КП сделки · зафиксировано ' + at, objs, terms,
         'Снимок КП на момент создания сделки — неизменяемый. Живое КП правится в заявке.'),
       '<button class="btn" data-act="closeModal">Закрыть</button>');
@@ -3124,6 +3141,14 @@
     return '<div class="page-crumb"><button class="btn sm ghost" data-request="' + r.id + '">' + I('chevLeft') + 'К заявке · ' + (c.name || r.title) + '</button></div>';
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
+  // Every id a deal's owner can hold — TEAM plus whoever already owns one (u_omar runs the DIFC
+  // portfolio but is not on the agent roster). Without him the edit form reassigned his deal.
+  function dealAgentOptions(current) {
+    const ids = TEAM.map((a) => a.id);
+    (D().deals || []).forEach((d) => { if (d.agent && ids.indexOf(d.agent) < 0) ids.push(d.agent); });
+    if (current && ids.indexOf(current) < 0) ids.push(current);
+    return ids.map((id) => '<option value="' + id + '"' + (id === current ? ' selected' : '') + '>' + agentName(id) + '</option>').join('');
+  }
   const DEAL_ENUMS = {
     dealType: ['Продажа · off-plan', 'Продажа · готовое', 'Аренда', 'Fit-out', 'Готовый арендный бизнес', 'Передано партнёру'],
     objectType: ['off-plan', 'готовое', 'офис', 'ритейл', 'вилла', 'склад', 'земля'],
@@ -3134,7 +3159,7 @@
     const d = D().deals.find((x) => x.id === id); if (!d) return;
     const sel = (k, label) => '<label class="fld"><span>' + label + '</span><select id="df_' + k + '">' + DEAL_ENUMS[k].map((o) => '<option' + (o === d[k] ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
     const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '"' + (co.id === d.companyId ? ' selected' : '') + '>' + co.name + '</option>').join('');
-    const agentOpts = TEAM.map((a) => '<option value="' + a.id + '"' + (a.id === d.agent ? ' selected' : '') + '>' + a.name + '</option>').join('');
+    const agentOpts = dealAgentOptions(d.agent);
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Прямое редактирование первоклассно. Сохранение помечает поля как «подтверждено человеком».</p>' +
       '<div class="match-grid">' +
       '<label class="fld"><span>Бюджет, AED</span><input id="df_amount" type="text" value="' + (d.amount || '') + '"></label>' +
@@ -3144,7 +3169,7 @@
       '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="df_vat"' + (d.vat ? ' checked' : '') + '> Применяется VAT 5%</label>';
-    openModal('Параметры сделки · ' + d.title, body,
+    openModal('Параметры сделки · ' + escAttr(d.title), body,
       '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>');
   }
   function saveDealEdit(id) {
@@ -3160,6 +3185,7 @@
     });
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
     d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' });
+    WS.storeApi.save();
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
   }
@@ -3180,7 +3206,7 @@
       '<label class="fld"><span>Период</span><select id="gf_period"><option value="month"' + (g.period === 'month' ? ' selected' : '') + '>Месяц</option><option value="quarter"' + (g.period === 'quarter' ? ' selected' : '') + '>Квартал</option></select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned"' + (g.pinned ? ' checked' : '') + '> Показывать в Пульсе</label>';
-    openModal('Редактировать цель · ' + g.label, body,
+    openModal('Редактировать цель · ' + escAttr(g.label), body,
       '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveGoal" data-goal="' + goalId + '">' + I('check') + 'Сохранить</button>');
   }
   function saveGoal(goalId) {
@@ -4677,7 +4703,7 @@
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
     const stageOpts = STAGES.map((s) => '<option value="' + s.k + '">' + s.label + '</option>').join('');
     const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
-    const agentOpts = TEAM.map((a) => '<option value="' + a.id + '">' + a.name + '</option>').join('');
+    const agentOpts = dealAgentOptions(null);
     const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '">' + dt + '</option>').join('');
     const objectTypeOpts = DEAL_ENUMS.objectType.map((ot) => '<option value="' + ot + '">' + ot + '</option>').join('');
     const paymentFormOpts = DEAL_ENUMS.paymentForm.map((pf) => '<option value="' + pf + '">' + pf + '</option>').join('');
@@ -4784,7 +4810,7 @@
     return '<div class="tiles" style="margin-top:20px">' +
       tile('money', 'Комиссия отдела за квартал', WS.AED(earned), '', '', closedN + ' ' + plural(closedN, 'закрытая сделка', 'закрытые сделки', 'закрытых сделок'), 'up', 'accent', 'data-nav="analytics"') +
       tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активных сделок — ' + active.length, 'up', '', 'data-nav="clients"') +
-      tile('clock', 'Застряли в стадии', stuck.length, '', '', stuckSum ? stuckSum.toLocaleString('ru-RU') + ' млн AED без движения 5+ дней' : 'всё движется', '', stuck.length ? 'accent' : '', 'data-savedview="stuck"') +
+      tile('clock', 'Застряли в стадии', stuck.length, '', '', stuckSum ? stuckSum.toLocaleString('ru-RU') + ' млн AED без движения 5+ дней' : 'всё движется', '', stuck.length ? 'accent' : '', 'data-savedview="stuck" data-nav="clients"') +
       tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
       tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
       tile('mail', 'Нераспределённые заявки', unassigned, '', '', unassigned ? 'Ждут агента — назначить' : 'Все заявки распределены', '', unassigned > 0 ? 'accent' : '', 'data-nav="leads"') +

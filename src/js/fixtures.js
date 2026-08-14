@@ -11,6 +11,9 @@
 
   const users = {
     agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina',
+      // Closed book for the demo period, per horizon. `attribution` is agency-wide and carries no
+      // agent split, so a personal goal must read the agent's own figures, not a slice of it.
+      closedPeriod: { month: { commission: 186000, deals: 2 }, quarter: { commission: 430000, deals: 5 } },
       goals: [
         { id: 'g_commission', metric: 'commission', target: 1200000, period: 'quarter', label: 'Заработать 1,2 млн комиссии за квартал', pinned: true },
         { id: 'g_pipeline', metric: 'pipeline', target: 5000000, period: 'month', label: 'Держать 5 млн в активных сделках', pinned: true },

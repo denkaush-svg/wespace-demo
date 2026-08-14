@@ -144,7 +144,11 @@
     if (d.funnel) { store.dealFunnel = d.funnel; return api.emit(); }
     if (d.analytics) return WS.ui.openAnalyticsDrill(d.analytics);
     if (d.company) return WS.ui.companyCard(d.company);
-    if (d.savedview) { store.savedView = store.savedView === d.savedview ? null : d.savedview; return api.emit(); }
+    // A saved view only renders on the deals board, so a trigger that also carries data-nav must
+    // land there — otherwise the manager's tile sets a filter on a screen that never shows it.
+    if (d.savedview) { store.savedView = store.savedView === d.savedview ? null : d.savedview;
+      if (d.nav) { store.clientsTab = 'deals'; return WS.router.go(d.nav); }
+      return api.emit(); }
     if (d.exresolve) { return WS.ui.resolveException(d.exresolve); }
     if (d.contactfilter) { const p = d.contactfilter.split(':'); store.contactsFilters = store.contactsFilters || {}; store.contactsFilters[p[0]] = p[1]; return api.emit(); }
     if (d.eng) return WS.engine.handle(d.eng, d);
