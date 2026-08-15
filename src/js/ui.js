@@ -2167,13 +2167,36 @@
       '<div style="font-size:12px;color:var(--faint);padding:8px 0">по выбранному фильтру событий нет</div>';
     return '<div class="timeline">' + rows + '</div>';
   }
+  const RU_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function demoNow() { return (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, mo: 5 }; }
+  function dayOfYear(day, mo) { let n = day; for (let i = 0; i < (mo || 1) - 1; i++) n += MONTH_DAYS[i]; return n; }
+  // «18 апреля» → { day: 18, mo: 4 }. A date with no month named is read as the demo month.
+  function createdOn(d) {
+    if (!d || !d.createdAt) return null;
+    const m = /^(\d+)\s*([а-яё]*)/i.exec(d.createdAt);
+    if (!m) return null;
+    const mi = RU_MONTHS.indexOf((m[2] || '').toLowerCase());
+    return { day: parseInt(m[1], 10), mo: mi >= 0 ? mi + 1 : demoNow().mo };
+  }
+  function createdAgoLabel(d) {
+    const c = createdOn(d); if (!c) return null;
+    const now = demoNow();
+    const diff = dayOfYear(now.d, now.mo) - dayOfYear(c.day, c.mo);
+    if (diff <= 0) return 'сегодня';
+    if (diff === 1) return '1 дн. назад';
+    return diff + ' дн. назад';
+  }
   // The deal's birth is a real event, but it lives on the deal record rather than in the timeline
   // fixtures — so it is synthesised at render time and sorts to the bottom (oldest) of the ribbon.
   function dealCreationEntry(d) {
     if (!d.createdAt) return null;
-    const day = (d.createdAt.match(/^(\d+)/) || [])[1];
+    const c = createdOn(d);
+    // Sort key is relative to the demo month, so an earlier month goes negative and stays oldest
+    // instead of being read as a day of the current one.
+    const rel = c ? (dayOfYear(c.day, c.mo) - dayOfYear(1, demoNow().mo) + 1) : 1;
     return {
-      at: d.createdAt, ord: day ? ORD(parseInt(day, 10), 0, 1) : 1,
+      at: d.createdAt, ord: c ? ORD(rel, 0, 1) : 1,
       ch: 'crm', kind: 'ai', by: 'Консьерж', t: 'Сделка заведена',
       text: 'Сделка заведена в системе' + (d.requestId ? ' из заявки' : '') + '.',
     };
@@ -2521,17 +2544,7 @@
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   function dealChipRow(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    const now = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14 };
-    const createdDaysAgo = (function() {
-      if (!d.createdAt) return null;
-      const dayMatch = d.createdAt.match(/^(\d+)/);
-      if (!dayMatch) return null;
-      const createdDay = parseInt(dayMatch[1], 10);
-      const daysAgo = now.d - createdDay;
-      if (daysAgo === 0) return 'сегодня';
-      if (daysAgo === 1) return '1 дн. назад';
-      return daysAgo + ' дн. назад';
-    })();
+    const createdDaysAgo = createdAgoLabel(d);
     return '<div class="dnb-chips">' +
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +

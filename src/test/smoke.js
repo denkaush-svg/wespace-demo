@@ -751,6 +751,56 @@ setTimeout(async () => {
     }
   }
 
+  // ---- a deal created in an earlier month reads as older, not as the future ----
+  // «18 апреля» against a 14 мая clock gave «-4 дн. назад», and its creation entry sorted above
+  // everything that happened since — both from reading the day and ignoring the month.
+  {
+    const old = dd().deals.find((d) => /апрел/.test(d.createdAt || ''));
+    if (old) {
+      WS.ui.dealCard(old.id);
+      const h = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+      check('deal age · no negative age on the card', h.indexOf('-') < 0 || !/-\d+ дн\. назад/.test(h), (h.match(/-?\d+ дн\. назад/) || [])[0]);
+      check('deal age · an April deal reads as weeks old', /2[0-9] дн\. назад/.test(h), (h.match(/-?\d+ дн\. назад/) || [])[0]);
+    }
+  }
+
+  // ---- sort keys must agree with the dates they claim ----
+  //  is a DDHHMM key built for a demo week in May. Entries dated in an earlier month were
+  // given day-only keys, so «28 апреля» outranked «06 мая» and a merged feed showed the past on
+  // top. The invariant is cheap to state and catches the whole class, not the one instance.
+  {
+    const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const LEN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const when = (at) => {
+      const m = /^(\d+)\s+([а-яё]+)(?:[^0-9]+(\d+):(\d+))?/i.exec(at || '');
+      if (!m) return null;
+      const mo = MONTHS.indexOf(m[2].toLowerCase()) + 1;
+      if (!mo) return null;
+      let doy = parseInt(m[1], 10);
+      for (let i2 = 0; i2 < mo - 1; i2++) doy += LEN[i2];
+      return doy * 1440 + (parseInt(m[3] || '0', 10) * 60) + parseInt(m[4] || '0', 10);
+    };
+    const collections = [];
+    ['dealTimeline', 'contactTimeline', 'companyTimeline', 'requestTimeline'].forEach((k) => {
+      const box = dd()[k] || {};
+      Object.keys(box).forEach((id) => collections.push([k + '.' + id, box[id]]));
+    });
+    (dd().contracts || []).forEach((c) => { if (c.timeline) collections.push(['contract.' + c.id, c.timeline]); });
+    let bad = [];
+    collections.forEach(([name, list]) => {
+      const rows = (list || []).filter((e) => e && e.at && e.ord != null && when(e.at) != null);
+      for (let a = 0; a < rows.length; a++) {
+        for (let b = a + 1; b < rows.length; b++) {
+          const dt = when(rows[a].at) - when(rows[b].at);
+          const dd2 = rows[a].ord - rows[b].ord;
+          if (dt !== 0 && (dt > 0) !== (dd2 > 0)) bad.push(name + ': «' + rows[a].at + '» vs «' + rows[b].at + '»');
+        }
+      }
+    });
+    check('feed · every ord agrees with the date it claims', bad.length === 0, bad.slice(0, 3).join(' | '));
+  }
+
+
   // ---- a hand edit moves the revision, or a stale proposal stays confirmable ----
   {
     const revWas = WS.store.dataRevision;
