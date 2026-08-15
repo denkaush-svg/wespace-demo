@@ -775,6 +775,20 @@ setTimeout(async () => {
     });
   }
 
+  // ---- object maps: real imagery for every object, with the attribution the licence requires ----
+  {
+    const objs = dd().objects || [];
+    objs.forEach((o) => {
+      check('map · ' + o.id + ' — картинка карты есть', !!(WS.maps || {})[o.id]);
+    });
+    WS.ui.objectCard(objs[0].id);
+    const map = doc.querySelector('#app .obj-map-canvas');
+    check('map · карта отрисована картинкой', !!map && !!map.querySelector('img'));
+    check('map · точка объекта на карте', !!map && !!map.querySelector('.obj-map-marker'));
+    check('map · указан источник данных (ODbL)',
+      !!map && /OpenStreetMap/.test(map.textContent), map ? map.textContent.slice(0, 40) : '');
+  }
+
   // ---- the stylesheet parses: an unbalanced brace silently kills every rule after it ----
   {
     ['tokens.css', 'app.css', 'theme.css'].forEach((f) => {

@@ -1554,6 +1554,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     linear-gradient(135deg, #eef2f4, #e4ebef); }
 .obj-map-pin { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; background: var(--acc); transform: rotate(-45deg); display: grid; place-items: center; box-shadow: 0 5px 12px rgba(241,126,61,.42); }
 .obj-map-pin svg { transform: rotate(45deg); width: 17px; height: 17px; color: #fff; }
+/* Real map imagery: the tile crop is centred on the object, so the marker is centred too.
+   A halo ring makes the point readable over both the pale desert and the dense street grid. */
+.obj-map-canvas.has-img { display: block; padding: 0; background: #e9e4dc; }
+.obj-map-canvas.has-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.obj-map-marker { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; background: var(--acc); border: 3px solid #fff;
+  box-shadow: 0 0 0 1px rgba(20,30,40,.18), 0 4px 12px rgba(20,30,40,.35); }
+.obj-map-marker::after { content: ''; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
+  margin: -23px 0 0 -23px; border-radius: 50%; border: 1px solid var(--acc);
+  background: rgba(241,126,61,.13); }
+.obj-map-credit { position: absolute; right: 6px; bottom: 5px; font-size: 9.5px; color: #3d4550;
+  background: rgba(255,255,255,.78); padding: 1px 6px; border-radius: 4px; letter-spacing: .01em; }
 .obj-map-area { position: absolute; left: 12px; top: 12px; font-size: 11.5px; font-weight: 600; color: var(--ink); background: rgba(255,255,255,.82); padding: 3px 9px; border-radius: 999px; }
 .obj-map-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--surface); }
 .obj-map-foot .omf-t b { font-size: 13px; color: var(--ink); }

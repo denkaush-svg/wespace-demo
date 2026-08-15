@@ -4148,12 +4148,21 @@
       '</div>';
   }
   // Offline DEMO map — shows where the object sits (old CRM «Показать на карте»). No network/API on file://.
+  // Real OpenStreetMap imagery around the object's coordinates; the marker is dead centre of the
+  // frame by construction (see maps.js), so it needs no per-object offset. Falls back to the flat
+  // panel if an object has no map baked in.
   function objMap(o) {
-    return '<div class="obj-map">' +
-      '<div class="obj-map-canvas"><span class="obj-map-pin">' + I('building') + '</span>' +
-      '<span class="obj-map-area">' + o.area + '</span></div>' +
+    const img = (WS.maps || {})[o.id];
+    const canvas = img
+      ? '<div class="obj-map-canvas has-img"><img src="' + img + '" alt="Карта: ' + escAttr(o.area) + '" loading="lazy">' +
+        '<span class="obj-map-marker"></span>' +
+        '<span class="obj-map-area">' + o.area + '</span>' +
+        '<span class="obj-map-credit">© OpenStreetMap</span></div>'
+      : '<div class="obj-map-canvas"><span class="obj-map-pin">' + I('building') + '</span>' +
+        '<span class="obj-map-area">' + o.area + '</span></div>';
+    return '<div class="obj-map">' + canvas +
       '<div class="obj-map-foot"><div class="omf-t"><b>' + o.area + '</b><span>' + (o.address || '—') + '</span></div>' +
-      '<span class="badge demo">' + I('lock') + 'DEMO карта</span></div>' +
+      '<span class="badge demo">' + I('lock') + 'точка — район, DEMO</span></div>' +
       '</div>';
   }
   // Downloadable materials — distinct from the Документы tab (matches old CRM «КП · Сторис · Финмодель»).
