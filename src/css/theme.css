@@ -234,7 +234,7 @@
 .wl .n svg{ width:12px; height:12px; vertical-align:-1px; color:var(--stop); }
 
 /* ---- floating round Concierge button — black W on orange circle ---- */
-.fab-w{ position:fixed; right:24px; bottom:24px; width:52px; height:52px; border-radius:50%;
+.fab-w{ position:fixed; right:10px; bottom:18px; width:52px; height:52px; border-radius:50%;
   background:radial-gradient(130% 130% at 32% 24%, #FF9E5F 0%, var(--acc) 52%, var(--acc-2) 100%);
   color:#141414; border:0; font-family:'Bebas Neue',sans-serif; font-size:27px; line-height:1;
   display:grid; place-items:center; cursor:pointer; z-index:95; transition:.16s cubic-bezier(.2,.7,.2,1);

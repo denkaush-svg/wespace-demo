@@ -1621,7 +1621,7 @@
       tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
-      pageActs: '<button class="btn sm primary" data-thread="company:' + co.id + '" data-tlabel="' + escAttr(co.name) + ' · компания" data-ticon="building">' + I('chat') + 'Чат по компании</button>',
+      pageActs: '',
     };
   }
   function companyCard(id) { S().companyId = id; WS.router.go('companyDetail'); }
@@ -2783,6 +2783,26 @@
     const over = /просроч/i.test(d.nextDue || '');
     return nextStepCard(agentName(d.agent), d.nextDue || '', over, a.doIt[0], a.why || '');
   }
+  // Entries the client authored, across the deal, its заявка and the contact — the client's own
+  // moves, separated from ours. `by` is the author of a timeline entry; inbound raw channel capture
+  // counts too, since a voice message in WhatsApp is the client doing something.
+  function clientMoves(d) {
+    return dealLineageEntries(d).filter((e) => {
+      if (/просроч/i.test(e.text || '')) return false;
+      return /клиент/i.test(e.by || '') || (e.kind === 'raw' && /клиент/i.test(e.by || ''));
+    });
+  }
+  function dealClientMovesCard(d) {
+    const list = clientMoves(d).filter((e) => !(e.ord > NOW_ORD)).slice(0, 4);
+    const inner = list.length
+      ? '<div class="cm-list">' + list.map((e) => '<div class="cm-row">' +
+          '<span class="cm-ic">' + I(chanMeta(e.ch === 'note' ? 'phone' : (e.ch || 'phone'))[0]) + '</span>' +
+          '<div class="cm-b"><div class="cm-t">' + (e.text || '') + '</div>' +
+          '<div class="cm-m">' + (e.at || '') + (e.src ? ' · ' + e.src : '') + '</div></div></div>').join('') + '</div>'
+      : '<div class="cm-empty">' + I('clock') + 'Клиент пока ничего не делал сам — вся активность на нашей стороне. Это тоже сигнал: он либо не вовлечён, либо ждёт от нас ответа.</div>';
+    return dxSec('users', 'Что делал клиент', list.length ? '<span class="badge">' + list.length + ' из ' + clientMoves(d).length + '</span>' : '',
+      inner);
+  }
   function dealRecentCard(d) {
     return recentEventsCard((D().dealTimeline || {})[d.id] || [], 'deal~' + d.id + '~history');
   }
@@ -2840,12 +2860,11 @@
     const c = D().clients.find((x) => x.id === d.clientId) || {};
     const out = [];
 
-    // 1. Where we stand, how long, and who is carrying it.
+    // 1. How long and whose — the stage itself is named by the step line directly above.
     const days = d.stageDays || 0;
-    let stand = 'Стадия «' + s.cols[s.idx] + '»';
-    if (days > 0) stand += ', ' + days + '-й день';
-    stand += '; ведёт ' + agentName(d.agent);
+    let stand = 'Ведёт ' + agentName(d.agent);
     if (d.createdAt) stand += ', сделка заведена ' + d.createdAt;
+    if (days > 0) stand += '; на текущем шаге ' + days + '-й день';
     out.push(stand + '.');
 
     // 2. What is already settled — money, paper, inventory, control points.
@@ -2919,7 +2938,7 @@
       dealChipRow(d) +
       cxStack([
         [cxCol([dealStatusBrief(d), dealKeyCard(d), dealNextStepCard(d)]),
-         cxCol([dealClientCard(d), dealRecentCard(d)])],
+         cxCol([dealClientCard(d), dealClientMovesCard(d), dealRecentCard(d)])],
         dealLotsBlock(d),
       ]);
   }
@@ -2947,8 +2966,7 @@
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
-      pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
-        '<button class="btn sm primary" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' + I('chat') + 'Чат по сделке</button>',
+      pageActs: '',
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
@@ -3206,6 +3224,7 @@
       sel ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
       c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', ''] : null,
       ['pencil', 'Изменить заявку', 'data-act="editRequest" data-req="' + r.id + '"', ''],
+      c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
   }
   function requestState(r) {
@@ -3248,8 +3267,7 @@
       tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
-      pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
-        '<button class="btn sm primary" data-thread="' + tid + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail">' + I('chat') + 'Чат по заявке</button>',
+      pageActs: '',
     };
   }
   // Net yield for the КП preview — reuses the finance model; guarded so a compute miss never breaks render.
@@ -4290,16 +4308,14 @@
       ['Вид', objAttr(o, 'view')], ['Отделка', objAttr(o, 'finish')], ['Спрос на рынке', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'], ['Источник', o.sourceLabel],
     ].map((p) => '<div><div class="omk">' + p[0] + '</div><div class="omv">' + p[1] + '</div></div>').join('') + '</div>';
-
+    const grid = '<div class="odetail-grid">' +
+      dxSec('grid', 'Параметры объекта', '', paramsInner) +
+      dxSec('compass', 'Расположение на карте', '', objMap(o)) + '</div>';
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) + cxStack([
-      [ctx, dxSec('grid', 'Параметры объекта', '', paramsInner)],
-      dxSec('compass', 'Расположение на карте', '', objMap(o)),
-      statuses,
-      docs,
-    ]);
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) +
+      (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
@@ -6563,6 +6579,8 @@
       k.kind === 'lease' || k.kind === 'lease_comm' ? ['replay', 'Продлить', 'data-act="contractRenew" data-kref="' + k.id + '"', ''] : null,
       ['x', 'Расторжение', 'data-act="contractTerminate" data-kref="' + k.id + '"', 'danger'],
       ['chat', 'Чат по договору', 'data-thread="contract:' + k.id + '" data-tlabel="' + escAttr(contractKind(k).label) + '" data-ticon="doc"', ''],
+      k.clientId ? ['users', 'Открыть клиента', 'data-client="' + k.clientId + '"', ''] : null,
+      k.dealId ? ['briefcase', 'Исходная сделка', 'data-deal="' + k.dealId + '"', ''] : null,
     ].filter(Boolean);
     return acts;
   }
@@ -6630,8 +6648,7 @@
       tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
       render: (tab) => contractTabContent(k, tab),
       concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
-      pageActs: '<button class="btn sm" data-client="' + k.clientId + '">' + I('users') + 'Открыть клиента</button>' +
-        (k.dealId ? '<button class="btn sm" data-deal="' + k.dealId + '">' + I('briefcase') + 'Исходная сделка</button>' : ''),
+      pageActs: '',
     };
   }
   function viewContractDetail(id) {

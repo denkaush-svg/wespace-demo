@@ -218,7 +218,12 @@ setTimeout(async () => {
     const sorted = own.slice().sort((a, b) => a.ord - b.ord);
     const oldest = sorted[0], newest = sorted[sorted.length - 1];
     openFn();
-    const h = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+    // Scoped to the feed itself: other blocks now quote timeline entries too («Что делал клиент»),
+    // and their order is their own business.
+    const scope = doc.querySelector('#app .dx-tabbody') || doc.getElementById('app');
+    const feed = [].slice.call(scope.querySelectorAll('.feed, .timeline'))
+      .map((el) => el.innerHTML).join('') || scope.innerHTML;
+    const h = feed + doc.getElementById('modal').innerHTML;
     const iOld = h.indexOf(oldest.text), iNew = h.indexOf(newest.text);
     check(label + ' · newest above oldest', iOld > 0 && iNew > 0 && iNew < iOld,
       'iNewest=' + iNew + ' iOldest=' + iOld);
