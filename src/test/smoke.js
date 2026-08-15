@@ -792,6 +792,48 @@ setTimeout(async () => {
     }
   }
 
+  // ---- every rendered action must have a handler, and every handler must not throw ----
+  // Third time this class has shipped: a control that renders, looks live and does nothing (or
+  // throws) when clicked. The selector test covers delegation; this covers the switch behind it.
+  {
+    const uiSrc = read('js/ui.js'), mainSrc = read('js/main.js');
+    const acts = Array.from(new Set((uiSrc.match(/data-act="[a-zA-Z][a-zA-Z0-9_]*"/g) || [])
+      .map((x) => x.replace(/data-act="|"/g, ''))));
+    const cases = new Set((mainSrc.match(/case '[a-zA-Z][a-zA-Z0-9_]*'/g) || []).map((x) => x.slice(6, -1)));
+    const orphans = acts.filter((a2) => !cases.has(a2));
+    check('actions · every rendered data-act has a handler', orphans.length === 0, orphans.join(', '));
+  }
+
+  // ---- an explicit action outranks navigation, wherever both are on one element ----
+  // A verb needs the id of the thing it acts on, so buttons legitimately carry both. The handler
+  // must therefore test data-act FIRST; when it did not, the contract verbs silently reopened the
+  // card. Asserted on the live handler's own source, not on a restatement of the rule.
+  {
+    const src = read('js/main.js');
+    const iAct = src.indexOf('if (d.act) return handleAct');
+    const navChecks = ['if (d.deal)', 'if (d.client)', 'if (d.contract)', 'if (d.obj)', 'if (d.task)'];
+    const late = navChecks.filter((n) => { const i2 = src.indexOf(n); return i2 >= 0 && i2 < iAct; });
+    check('actions · data-act is resolved before any navigation attribute', iAct > 0 && late.length === 0, late.join(', '));
+  }
+
+  // ---- the contract verbs actually run when clicked ----
+  {
+    const k0 = (dd().contracts || [])[0];
+    if (k0) {
+      WS.ui.contractCard(k0.id);
+      const btn = doc.getElementById('app').querySelector('[data-act="contractAmend"]');
+      check('contract · the amend action is rendered', !!btn);
+      if (btn) {
+        const errsWas = errors.length;
+        btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        const modalHtml = doc.getElementById('modal').innerHTML;
+        check('contract · clicking amend opens something and throws nothing',
+          errors.length === errsWas && modalHtml.indexOf('соглашение') >= 0, modalHtml.slice(0, 80));
+        WS.ui.closeModal();
+      }
+    }
+  }
+
   // ---- no dated fact on a deal may predate the deal itself ----
   // Two deals booked a deposit days before they were created. Nothing crashes; the card simply
   // states an impossible order of events, which is worse than a crash because it looks fine.

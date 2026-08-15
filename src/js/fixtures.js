@@ -577,8 +577,8 @@
       ],
       schedule: [
         { label: 'Отчёт и комиссия · март', pct: 0, amount: 13000, due: '31 марта', state: 'paid' },
-        { label: 'Отчёт и комиссия · апрель', pct: 0, amount: 13000, due: '30 апреля', state: 'due' },
-        { label: 'Отчёт и комиссия · май', pct: 0, amount: 13000, due: '31 мая', state: 'wait' },
+        { label: 'Отчёт и комиссия · апрель', pct: 0, amount: 13000, due: '30 апреля', state: 'overdue' },
+        { label: 'Отчёт и комиссия · май', pct: 0, amount: 13000, due: '31 мая', state: 'due' },
       ],
       documents: [
         { name: 'Договор управления', at: '21 февраля', state: 'ok' },

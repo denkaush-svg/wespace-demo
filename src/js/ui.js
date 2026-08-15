@@ -1949,7 +1949,9 @@
       ['chat', 'Написать', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users"', ''],
       ['clock', 'Запланировать касание', 'data-act="newTask"', ''],
       ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
-      ['sparkle', 'Бриф к звонку', 'data-scn="S8"', ''],
+      // Was data-scn="S8" — a scripted demo run hard-wired to Анна's deal, which ran unchanged
+      // whichever client's card you opened. A bar that claims to act on THIS card must.
+      ['sparkle', 'Бриф к звонку', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + ' · бриф" data-ticon="sparkle"', ''],
       !(c.psych && c.psych.filled) ? ['users', 'Заполнить портрет', 'data-act="psychForm" data-cid="' + c.id + '"', ''] : null,
     ];
   }
@@ -2652,7 +2654,7 @@
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';
   }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
-  function dealClientCard(d) {
+  function dealClientCard(d, threadId) {
     const c = D().clients.find((x) => x.id === d.clientId);
     if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан к сделке</div>');
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -2665,7 +2667,7 @@
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
+      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
@@ -2700,7 +2702,7 @@
       ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
       ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
       ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', ''],
-      ['calendar', 'Назначить показ', 'data-scn="S3"', ''],
+      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
       ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
@@ -6379,9 +6381,9 @@
   // milestone («платежи по графику») hid the four dates the money actually moves on.
   function contractSchedule(k) {
     const rows = (k.schedule || []).map((x) => {
-      const cls = x.state === 'paid' ? 'done' : (x.state === 'due' ? 'now' : 'wait');
-      const tone = x.state === 'paid' ? 'ok' : (x.state === 'due' ? 'acc' : '');
-      const word = x.state === 'paid' ? 'оплачен' : (x.state === 'due' ? 'ближайший' : 'ожидается');
+      const cls = x.state === 'paid' ? 'done' : (x.state === 'wait' ? 'wait' : 'now');
+      const tone = x.state === 'paid' ? 'ok' : (x.state === 'overdue' ? 'stop' : (x.state === 'due' ? 'acc' : ''));
+      const word = x.state === 'paid' ? 'оплачен' : (x.state === 'overdue' ? 'просрочен' : (x.state === 'due' ? 'ближайший' : 'ожидается'));
       return '<div class="ms-row ' + cls + '"><span class="ms-i">' + I(x.state === 'paid' ? 'check' : (x.state === 'due' ? 'clock' : 'dot')) + '</span>' +
         '<span class="ms-t"><span class="ms-l">' + x.label + ' · ' + WS.AED(x.amount || 0) + '</span>' +
         '<span class="ms-a">' + (x.due || '—') + '</span></span>' +
@@ -6399,7 +6401,8 @@
       const on = x.state === 'ok';
       return '<div class="ms-row ' + (on ? 'done' : 'wait') + '"><span class="ms-i">' + I(on ? 'doc' : 'dot') + '</span>' +
         '<span class="ms-t"><span class="ms-l">' + x.name + '</span><span class="ms-a">' + (x.at || '—') + '</span></span>' +
-        (on ? '<button class="btn xs" data-act="openDoc">' + I('download') + 'Открыть</button>' : '<span class="badge">ожидается</span>') + '</div>';
+        (on ? '<button class="btn xs" data-act="contractDoc" data-kref="' + k.id + '" data-docname="' + escAttr(x.name) + '">' + I('download') + 'Открыть</button>'
+            : '<span class="badge">ожидается</span>') + '</div>';
     }).join('');
     return dxSec('doc', 'Документы договора', '', rows || '<div style="font-size:12px;color:var(--faint);padding:6px 0">документов по договору пока нет</div>');
   }
@@ -6425,8 +6428,10 @@
     out.push(now.length
       ? 'Сейчас: ' + now.join('; ') + '. Пройдено ' + st.done + ' из ' + st.total + ' вех.'
       : 'Все вехи пройдены — договор можно закрывать.');
+    const late = (k.schedule || []).find((x) => x.state === 'overdue');
     const due = (k.schedule || []).find((x) => x.state === 'due');
-    if (due) out.push('Ближайший платёж — ' + lowerFirst(due.label) + ' на ' + WS.AED(due.amount) + ', срок ' + due.due + '.');
+    if (late) out.push('Просрочен платёж: ' + lowerFirst(late.label) + ' на ' + WS.AED(late.amount) + ', срок был ' + late.due + '.');
+    else if (due) out.push('Ближайший платёж — ' + lowerFirst(due.label) + ' на ' + WS.AED(due.amount) + ', срок ' + due.due + '.');
     if (money.total) {
       out.push(money.got >= money.total
         ? 'Комиссия ' + WS.AED(money.total) + ' получена полностью, платил ' + money.payer + '.'
@@ -6443,7 +6448,9 @@
   function contractClientCard(k) {
     const c = D().clients.find((x) => x.id === k.clientId);
     if (!c) return '';
-    return dealClientCard({ clientId: c.id, id: k.id });
+    // Explicit thread: passing the contract through as a deal produced «deal:k_palm», a thread id
+    // for a deal that does not exist.
+    return dealClientCard({ clientId: c.id, id: k.id }, 'contract:' + k.id);
   }
   function contractHeader(k) {
     return contractHero(k) +
@@ -6457,19 +6464,30 @@
   }
   // Things you do TO a contract, as opposed to reading it: amend it, invoice against it, renew or
   // terminate it. They live in the same bar as every other card's actions.
+  // The id travels as data-kref, NOT data-contract: the latter is the navigation attribute a
+  // contract ROW carries, and the delegated handler reaches it first — the button would silently
+  // reopen the card instead of running the verb.
   function contractActions(k) {
     const money = commissionState(k);
     const acts = [
-      ['pencil', 'Доп. соглашение', 'data-act="contractAmend" data-contract="' + k.id + '"', ''],
-      money.got < money.total ? ['money', 'Выставить счёт', 'data-act="contractInvoice" data-contract="' + k.id + '"', 'primary'] : null,
-      k.kind === 'lease' || k.kind === 'lease_comm' ? ['replay', 'Продлить', 'data-act="contractRenew" data-contract="' + k.id + '"', ''] : null,
-      ['x', 'Расторжение', 'data-act="contractTerminate" data-contract="' + k.id + '"', 'danger'],
+      ['pencil', 'Доп. соглашение', 'data-act="contractAmend" data-kref="' + k.id + '"', ''],
+      money.got < money.total ? ['money', 'Выставить счёт', 'data-act="contractInvoice" data-kref="' + k.id + '"', 'primary'] : null,
+      k.kind === 'lease' || k.kind === 'lease_comm' ? ['replay', 'Продлить', 'data-act="contractRenew" data-kref="' + k.id + '"', ''] : null,
+      ['x', 'Расторжение', 'data-act="contractTerminate" data-kref="' + k.id + '"', 'danger'],
       ['chat', 'Чат по договору', 'data-thread="contract:' + k.id + '" data-tlabel="' + escAttr(contractKind(k).label) + '" data-ticon="doc"', ''],
     ].filter(Boolean);
     return acts;
   }
   // A demo has to be honest about what it does not do: these open a described intent, not a stub
   // that silently succeeds.
+  function contractDocOpen(id, name) {
+    const k = contractById(id); if (!k) return;
+    openModal('Документ · ' + escAttr(name),
+      '<p style="font-size:13px;line-height:1.5;margin-top:0">Документ по договору ' + escAttr(k.number) +
+      '. В рабочей системе здесь открывается файл из хранилища тенанта; в демо файлов нет.</p>' +
+      '<div class="prov" style="margin-top:12px"><span class="badge demo">' + I('lock') + 'демо — файла нет</span></div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
   function contractAct(kind, id) {
     const k = contractById(id); if (!k) return;
     const M = {
@@ -6613,7 +6631,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };

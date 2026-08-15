@@ -54,6 +54,13 @@
     if (e.target.closest && e.target.closest('[contenteditable="true"], input, textarea, select')) return;
     const d = t.dataset;
 
+    // An explicit action wins over navigation, always. Elements legitimately carry both — a verb
+    // needs the id of the thing it acts on — and every navigation branch below would otherwise have
+    // to remember to exempt data-act. Two shipped without it: the contract verbs reopened the card
+    // and did nothing else.
+    if (d.act) return handleAct(d.act, t);
+
+
     if (d.groupToggle) {
       const groupId = d.groupToggle;
       if (!store.cgGroupCollapse) store.cgGroupCollapse = {};
@@ -114,7 +121,7 @@
     if (d.request) return WS.ui.requestCard(d.request);
     if (d.reqobj) { const p = d.reqobj.split('~'); return WS.ui.reqObjState(p[0], p[1], p[2]); }
     if (d.reqaddobj) { const p = d.reqaddobj.split('~'); return WS.ui.reqAddObjectDo(p[0], p[1]); }
-    if (d.deal && !d.act) return WS.ui.dealCard(d.deal);
+    if (d.deal) return WS.ui.dealCard(d.deal);
     if (d.evplay) { WS.ui.closeModal(); return WS.eventEngine.play(d.evplay); }
     if (d.fb) return WS.eventEngine.recordFb(d.fb, d.fbval);
     if (d.mqual) { const m = store.match || (store.match = {}); m.qual = m.qual || []; const i = m.qual.indexOf(d.mqual); if (i >= 0) m.qual.splice(i, 1); else m.qual.push(d.mqual); return api.emit(); }
@@ -158,7 +165,7 @@
     if (d.contactfilter) { const p = d.contactfilter.split(':'); store.contactsFilters = store.contactsFilters || {}; store.contactsFilters[p[0]] = p[1]; return api.emit(); }
     if (d.eng) return WS.engine.handle(d.eng, d);
 
-    if (d.act) return handleAct(d.act, t);
+
   });
 
   function handleAct(act, t) {
@@ -166,8 +173,9 @@
       case 'theme': api.setTheme(store.theme === 'dark' ? 'light' : 'dark'); break;
       case 'notif': api.toast('Уведомления: ' + (store.unsaved || 0) + ' несохранённых подтверждений'); break;
       case 'wallet': WS.ui.openWallet(); break;
+      case 'contractDoc': WS.ui.contractDocOpen(t.dataset.kref, t.dataset.docname); break;
       case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
-        WS.ui.contractAct(d.act, t.dataset.contract); break;
+        WS.ui.contractAct(act, t.dataset.kref); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
@@ -356,10 +364,12 @@
           if (hit) shown++;
         });
         const firstVisible = Array.prototype.filter.call(sel.options, (o) => !o.hidden)[0];
-        // Keep a valid selection at all times: after filtering, the chosen row may be hidden, or
-        // nothing may be chosen yet. Either way the first visible row becomes the answer.
+        // Keep the selection HONEST: the first visible row when there is one, and nothing at all
+        // when there is not. Leaving a hidden option selected under «ничего не найдено» is how a
+        // record gets silently attached to whoever happened to be highlighted before the search.
         const cur = sel.selectedOptions[0];
-        if (firstVisible && (!cur || cur.hidden)) firstVisible.selected = true;
+        if (firstVisible) { if (!cur || cur.hidden) firstVisible.selected = true; }
+        else sel.selectedIndex = -1;
         const n = document.getElementById(el.dataset.pick + '_n');
         if (n) n.textContent = q ? (shown ? 'найдено ' + shown : 'ничего не найдено') : shown + ' записей';
       }
