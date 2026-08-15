@@ -791,6 +791,55 @@ setTimeout(async () => {
       String((body.match(/Срок сдачи/g) || []).length));
   }
 
+  // ---- the object card is a sales tool: claims carry numbers, objections carry answers ----
+  {
+    const src = read('js/ui.js');
+    // Словарь прилагательных не знает числа 12 — любой оставшийся вызов печатает голую цифру.
+    check('object · этаж нигде не идёт через словарь прилагательных', src.indexOf("objAttr(o, 'floor')") < 0);
+    check('object · «высокий этаж» в подборе читает floorBand', /floorBand === 'high'/.test(src));
+
+    (dd().objects || []).forEach((o) => {
+      check('market · срез рынка есть для района ' + o.area, !!(WS.AREAS || {})[o.area]);
+      check('object ' + o.id + ' · есть довод сверх полей', !!o.usp);
+    });
+
+    WS.ui.objectCard('o_creekline');
+    let body = doc.querySelector('#app .view').textContent;
+    check('object · есть блок «Чем продавать»', body.indexOf('Чем продавать') >= 0);
+    check('object · есть блок «Что спросят»', body.indexOf('Что спросят') >= 0);
+    check('object · район назван и помечен как срез DEMO',
+      body.indexOf('Район · Business Bay') >= 0 && /срез рынка — DEMO/.test(body));
+    check('object · уникальное качество юнита на карточке', body.indexOf('Корпус B') >= 0);
+    // Довод без цифры — лозунг. Каждый тезис подпирается числом из карточки или из среза района.
+    const pts = [].slice.call(doc.querySelectorAll('#app .sp-row .sp-d'));
+    check('object · доводов не меньше трёх', pts.length >= 3, String(pts.length));
+    const thin = pts.filter((p) => p.textContent.trim().length < 30);
+    check('object · у каждого довода есть подпись с доказательством', thin.length === 0,
+      thin.length ? thin[0].textContent.slice(0, 50) : '');
+    check('object · доводов с цифрами не меньше двух',
+      pts.filter((p) => /\d/.test(p.textContent)).length >= 2);
+    // Возражение без ответа бесполезно: блок существует ровно ради второй строки.
+    const qa = [].slice.call(doc.querySelectorAll('#app .oq-row'));
+    check('object · у каждого возражения есть ответ',
+      qa.length >= 2 && qa.every((r) => r.querySelector('.oq-a') && r.querySelector('.oq-a').textContent.trim().length > 20),
+      String(qa.length));
+    // Цена выше средней по району прозвучит как возражение, а не как довод.
+    check('object · «дороже района» стоит в вопросах, а не в доводах', /Почему дороже/.test(body));
+
+    WS.ui.objectCard('o_bayline');
+    body = doc.querySelector('#app .view').textContent;
+    // Истёкшая проверка — первое, что агент должен знать, а не то, что вытеснено лимитом списка.
+    check('object · устаревшая проверка вынесена в вопросы', /ещё продаётся/.test(body));
+    check('object · истёкшая проверка не выдаётся за довод', !/Доступность проверена/.test(body));
+
+    WS.ui.objectCard('o_palmcourt');
+    body = doc.querySelector('#app .view').textContent;
+    // toLocaleString ставит неразрывный пробел — сравнивать надо по нормализованному тексту.
+    const flat = body.replace(/\s+/g, ' ');
+    check('object · «дешевле района» называет обе цены',
+      /дешевле района/.test(flat) && /18 600 AED/.test(flat));
+  }
+
   // ---- object maps: real imagery for every object, with the attribution the licence requires ----
   {
     const objs = dd().objects || [];

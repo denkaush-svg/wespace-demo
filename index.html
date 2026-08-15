@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 02:18</title>
+  <title>WESPACE · сборка 02:57</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='02:18';
+    window.WS_BUILD='02:57';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -586,6 +586,32 @@ button { font-family: inherit; cursor: pointer; }
 /* Observed choices sit under the declared parameters inside one preference block, divided rather
    than repeated as a second section with the same heading. */
 .pref-observed { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+/* Чем продавать: тезис + цифра под ним. */
+.sp-list { display: flex; flex-direction: column; gap: 12px; }
+.sp-row { display: flex; gap: 10px; align-items: flex-start; }
+.sp-ic { display: inline-flex; width: 27px; height: 27px; border-radius: 9px; background: var(--acc-soft);
+  color: var(--acc); align-items: center; justify-content: center; flex: none; }
+.sp-ic svg { width: 15px; height: 15px; }
+.sp-t { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.sp-d { font-size: 12px; color: var(--mut); line-height: 1.5; margin-top: 3px; text-wrap: pretty; }
+/* Что спросят: реплика клиента и готовый ответ. */
+.oq-list { display: flex; flex-direction: column; gap: 11px; }
+.oq-row { border-left: 2px solid var(--acc-line); padding-left: 11px; }
+.oq-q { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.oq-q svg { width: 14px; height: 14px; flex: none; color: var(--acc); margin-top: 2px; }
+.oq-a { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; text-wrap: pretty; }
+/* Район: срез рынка под картой. */
+.mkt-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+.mkt-c { background: var(--surface); padding: 9px 10px; min-width: 0; }
+.mkt-v { font-size: 14px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; white-space: nowrap; }
+.mkt-l { font-size: 10.5px; color: var(--mut); margin-top: 2px; }
+.mkt-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.mkt-r { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; line-height: 1.5; color: var(--mut); }
+.mkt-r svg { width: 15px; height: 15px; flex: none; color: var(--acc); margin-top: 1px; }
+.mkt-r.off svg { color: #c99a2e; }
+.mkt-r b { display: block; font-size: 12px; color: var(--ink); font-weight: 700; margin-bottom: 1px; }
+@media (max-width: 900px) { .mkt-chips { grid-template-columns: 1fr 1fr; } }
 .obj-fit { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
 .obj-fit b { color: var(--ink); font-weight: 700; }
 /* What the client did — same row grammar as the event feed, but only their own moves. */
@@ -1751,6 +1777,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Summary band under the hero: lead description + key metrics on an accent-tinted card (price emphasized) */
 .osum { border: 1px solid var(--acc-line); background: var(--acc-soft); border-radius: 14px; padding: 17px 20px 0; margin-bottom: 16px; }
 .osum-bare { padding-top: 4px; }
+.osum-bare .osum-metrics { border-top: 0; margin-top: 0; }
 .osum-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--acc-ink); margin-bottom: 7px; }
 .osum-lead { font-size: 15.5px; line-height: 1.6; color: var(--ink); max-width: 820px; margin: 0 0 2px; }
 .osum-metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 15px; border-top: 1px solid var(--acc-line); }
@@ -2465,7 +2492,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       match: 'Business Bay, в бюджете, проверенная доступность, инвестиционный профиль.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Creekline Residences · Tower B',
       handover: 'Q4 2026', paymentPlan: '10% бронь · 40% в стройку · 50% на сдаче',
-      serviceCharge: '16 AED/фт²·год', escrow: 'Escrow DLD · ADCB', occupancy: null },
+      serviceCharge: '16 AED/фт²·год', escrow: 'Escrow DLD · ADCB', occupancy: null,
+      usp: 'Корпус B — единственный в проекте, где 1BR выходят на канал, а не во внутренний двор. С 12-го этажа вид не перекрывается соседней башней: ниже девятого он уже закрыт.' },
     { id: 'o_palmcourt', name: 'Palm Court Residence, Unit 704', source: 'club',
       sourceLabel: 'Клубный эксклюзив', area: 'JVC', price: 1690000, size: 95, br: '1BR+',
       address: 'JVC, Palm Court Residence, District 12, Unit 704', commissionPct: 3,
@@ -2474,7 +2502,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       attrs: { view: 'garden', floor: 7, floors: 18, floorBand: 'mid', finish: 'new', demand: 'mid', prestige: 'mid', metro: false },
       match: 'JVC, ниже бюджета, клубный эксклюзив, высокая доходность аренды.',
       segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Palm Court Residence · District 12',
-      handover: null, paymentPlan: null, serviceCharge: '14 AED/фт²·год', escrow: null, occupancy: 'Свободна (vacant)' },
+      handover: null, paymentPlan: null, serviceCharge: '14 AED/фт²·год', escrow: null, occupancy: 'Свободна (vacant)',
+      usp: 'Клубный эксклюзив: юнита нет на порталах. Клиенту не с чем сравнить построчно и некуда уйти торговаться — торг идёт с нами, а не между двадцатью агентами по одному объявлению.' },
     { id: 'o_bayline', name: 'Bayline Terraces, Unit 1603', source: 'import',
       sourceLabel: 'Импорт застройщика', area: 'Dubai Creek Harbour', price: 1950000, size: 88, br: '1BR',
       address: 'Dubai Creek Harbour, Bayline Terraces, Unit 1603', commissionPct: 2.5,
@@ -2484,11 +2513,36 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       match: 'Dubai Creek Harbour, у верхней границы бюджета. Проверка доступности устарела.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Bayline Terraces · Dubai Creek Harbour',
       handover: 'Q2 2027', paymentPlan: '20% бронь · 40% в стройку · 40% post-handover (2 года)',
-      serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null },
+      serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null,
+      usp: 'Post-handover 40% на два года после ключей: покупатель заходит в Creek Harbour, оплатив до сдачи 60%, и гасит остаток уже с арендного потока.' },
   ];
 
   // Reference financial model (spec §12.2) — single source of truth for
   // screen, PDF and Excel. finance.js recomputes from these assumptions.
+  // Срез рынка по району: в живой системе — витрина сделок DLD и данные портала, на стенде
+  // зафиксированный снимок. `perM2` — средняя цена сделок за 12 месяцев; `yieldTypical` — чистая
+  // доходность на вложенное по той же модели, что считает карточка, иначе сравнение врёт.
+  const AREAS = {
+    'Business Bay': {
+      perM2: 21400, priceYoY: 9, rentYoY: 6, yieldTypical: 5.1, dom: 41,
+      tenant: 'Сотрудники DIFC и Downtown. Снимают на год, чаще без семьи, съезжают при смене работы.',
+      driver: 'Набережная канала и пешеходные связки с Downtown. Район дозастраивается вглубь, свободной земли почти нет.',
+      risk: 'Одинаковых 1BR много. Юнит без вида и без этажа конкурирует только ценой.',
+    },
+    'JVC': {
+      perM2: 18600, priceYoY: 12, rentYoY: 9, yieldTypical: 5.4, dom: 33,
+      tenant: 'Семьи и молодые пары. Живут по два-три года, съезжают редко — арендный поток ровный.',
+      driver: 'Школы, клиники и районный ретейл догнали жильё: район перестал быть окраиной с одними домами.',
+      risk: 'Метро нет и в планах не стоит. Клиент без машины район не рассматривает.',
+    },
+    'Dubai Creek Harbour': {
+      perM2: 23200, priceYoY: 7, rentYoY: 4, yieldTypical: 4.7, dom: 52,
+      tenant: 'Рынок аренды только формируется: жилых очередей сдано мало, ставка держится на новизне.',
+      driver: 'Мастер-план Emaar на десять лет. Парк, набережная и марина выходят очередями, каждая следующая дороже входа.',
+      risk: 'Инфраструктура догоняет стройку. Вторичка продаётся дольше, чем в Business Bay.',
+    },
+  };
+
   const refModel = {
     objectId: 'o_creekline',
     price: 1820000,
@@ -3057,7 +3111,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, roster, clients, objects, refModel,
+    DEMO_NOW, tenant, users, roster, clients, objects, AREAS, refModel,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
@@ -3482,7 +3536,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 16; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost.
+  const SCHEMA = 17; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -3546,6 +3600,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   // Funnel taxonomy is static config, not mutable state — expose it without cloning per reset.
   WS.FUNNELS = WS.fixtures.FUNNELS;
+  // Срез рынка по районам — такая же статическая конфигурация, как воронки: он не редактируется
+  // из интерфейса и не должен клонироваться на каждый сброс сцены.
+  WS.AREAS = WS.fixtures.AREAS;
 
   function initStatuses() {
     const st = {};
@@ -9226,7 +9283,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // ---- Object card v3: rich presentation (photo gallery hero, price anchor, full meta) — parity with old grey CRM ----
   const OBJ_ATTR = {
     view: { city: 'Город', water: 'Вид на воду', garden: 'Сад', park: 'Парк' },
-    floor: { high: 'Высокий', mid: 'Средний', low: 'Низкий' },
     finish: { new: 'Свежая отделка', standard: 'Стандартная', 'shell&core': 'Shell & Core', shell: 'Shell & Core' },
     demand: { high: 'Высокий спрос', mid: 'Средний спрос', low: 'Низкий спрос' },
     prestige: { high: 'Премиум', mid: 'Средний', low: 'Эконом' },
@@ -9237,8 +9293,26 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const VIEW_PHRASE = { city: 'на город', water: 'на воду', garden: 'в сад', park: 'на парк' };
   function objFloor(o) {
     const a = o.attrs || {};
-    if (typeof a.floor !== 'number') return objAttr(o, 'floor');
+    if (typeof a.floor !== 'number') return '—';
     return a.floor + (a.floors ? ' из ' + a.floors : '') + ' эт.';
+  }
+  const SQFT = 10.7639;              // м² → фт², чтобы читать service charge в тех же единицах, в каких он продаётся
+  function ru(n) { return String(n).replace('.', ','); }
+  function objIsOff(o) { return /off-plan|оффплан/i.test(o.segment || ''); }
+  function objPerM2(o) { return o.size ? Math.round(o.price / o.size) : null; }
+  function objMarket(o) { return (WS.AREAS || {})[o.area] || null; }
+  // Отклонение цены объекта от средней по району, в процентах. Знак несёт смысл: минус — аргумент,
+  // плюс — возражение, которое всё равно прозвучит, поэтому ответ на него готовится заранее.
+  function objPriceGap(o) {
+    const m = objMarket(o), pm = objPerM2(o);
+    if (!m || !pm || !m.perM2) return null;
+    return Math.round((pm / m.perM2 - 1) * 100);
+  }
+  // Service charge продаётся за фт² в год — клиент спрашивает, сколько это в год деньгами.
+  function objServiceYear(o) {
+    const m = /([\d.,]+)\s*AED\/\s*фт/.exec(o.serviceCharge || '');
+    if (!m || !o.size) return null;
+    return Math.round(parseFloat(m[1].replace(',', '.')) * o.size * SQFT);
   }
   // Net yield, guarded: the finance model can miss, and a card must not fall over because of it.
   function objYieldPct(o) {
@@ -9253,8 +9327,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function objBriefParts(o) {
     const a = o.attrs || {};
     const out = [];
-    const perM2 = o.size ? Math.round(o.price / o.size) : null;
-    const off = /off-plan|оффплан/i.test(o.segment || '');
+    const off = objIsOff(o);
 
     // 1. What it is, in one line: type, size, where, which floor, what you see out of the window.
     let one = (o.br || 'объект') + ' ' + (o.size ? o.size + ' м² ' : '') + 'в районе ' + o.area;
@@ -9277,13 +9350,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // object lists them, while an off-plan's terms genuinely read as one enumeration.
     if (terms.length) out.push(capFirst(off ? joinRu(terms) : terms.join('; ')) + '.');
 
-    // 3. The money, with the one comparison that matters.
-    const money = [];
-    money.push(WS.AED(o.price) + (perM2 ? ' — ' + WS.AED(perM2) + ' за м²' : ''));
+    // 3. Комиссия — единственная цифра из денег, которой нет в полосе метрик над справкой.
     const y = objYieldPct(o);
-    if (y) money.push('расчётная доходность ' + String(y).replace('.', ',') + '% годовых');
-    if (o.commissionPct) money.push('комиссия агенту ' + String(o.commissionPct).replace('.', ',') + '%');
-    out.push(capFirst(money.join('; ')) + '.');
+    if (o.commissionPct) out.push('Комиссия агенту ' + ru(o.commissionPct) + '% — ' + WS.AED(Math.round(o.price * o.commissionPct / 100)) + '.');
 
     // 4. Whom it suits — read off demand, prestige, yield and the payment terms.
     const fit = [];
@@ -9314,6 +9383,101 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '</div>' : '';
     return dxSec('sparkle', 'Справка по объекту', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
       '<p class="deal-brief">' + b.text.join(' ') + '</p>' + verdict);
+  }
+  // ============================================================================================
+  // Чем продавать. Не список свойств — список утверждений, каждое с цифрой под ним: тезис агент
+  // произносит вслух, подпись — то, чем он его подтверждает, если клиент переспросит. Порядок —
+  // от того, что уникально для этого юнита, к общему по району.
+  // ============================================================================================
+  function objSellPoints(o) {
+    const a = o.attrs || {}, mk = objMarket(o), off = objIsOff(o);
+    const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
+    const out = [];
+    if (o.usp) out.push(['star', 'Чего нет у соседних юнитов', o.usp]);
+    if (gap != null && gap <= -2) out.push(['money', 'На ' + Math.abs(gap) + '% дешевле района',
+      WS.AED(pm) + ' за м² против ' + WS.AED(mk.perM2) + ' — средней цены сделок по ' + o.area + ' за 12 месяцев.']);
+    if (mk && y != null && y >= mk.yieldTypical) out.push(['wallet', 'Доходность выше типичной по району',
+      ru(y) + '% против ' + ru(mk.yieldTypical) + '% по ' + o.area + '. Считано по одной модели, цифры сравнимы.']);
+    if (mk && mk.priceYoY >= 8) out.push(['trend', 'Район прибавил ' + mk.priceYoY + '% за год',
+      'Аренда за тот же период +' + mk.rentYoY + '%. ' + mk.driver]);
+    if (off && o.paymentPlan) out.push(['calc', 'Вход рассрочкой, а не всей суммой',
+      o.paymentPlan.replace(/\s*·\s*/g, ' · ') + (o.handover ? '. Ключи ' + o.handover + '.' : '.')]);
+    if (o.escrow) out.push(['shield', 'Деньги идут на эскроу, не застройщику',
+      o.escrow + '. Это первый ответ на «а если стройка встанет».']);
+    if (!off && /vacant|свободн/i.test(o.occupancy || '')) out.push(['clock', 'Доход с первого месяца',
+      'Юнит свободен — заезд арендатора не ждёт окончания чужого договора.']);
+    if (a.metro) out.push(['compass', 'Метро в пешей доступности',
+      'Для арендатора без машины район остаётся в выборке — это шире спрос при пересдаче.']);
+    if (mk && mk.dom <= 40) out.push(['handshake', 'Из района выходят быстро',
+      'Средний срок экспозиции ' + mk.dom + ' дней. Аргумент для того, кто боится «застрять в бетоне».']);
+    return out.slice(0, 5);
+  }
+  // ============================================================================================
+  // Что спросят. Возражение — это не риск объекта, а реплика, которая прозвучит в разговоре;
+  // ценность блока в том, что ответ уже посчитан и его не надо придумывать на трубке.
+  // ============================================================================================
+  function objObjections(o) {
+    const a = o.attrs || {}, mk = objMarket(o), off = objIsOff(o);
+    const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
+    const out = [];
+    if (o.verified !== 'verified' || o.trakheesi !== 'ok') out.push(['Он вообще ещё продаётся?',
+      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до него объект нельзя публиковать как листинг' : '') +
+      '. Сверьте с застройщиком до показа, это одна задача.']);
+    if (off) out.push(['Плачу сейчас — получаю когда?',
+      (o.handover ? 'Ключи ' + o.handover + '. ' : '') + 'До сдачи платежи идут частями по графику' +
+      (o.escrow ? ', и не застройщику, а на эскроу-счёт: ' + o.escrow.replace(/^Escrow\s*/i, '') + '. Со счёта деньги уходят по мере готовности стройки' : '') + '.']);
+    if (gap != null && gap >= 2) out.push(['Почему дороже, чем в среднем по району?',
+      WS.AED(pm) + ' против ' + WS.AED(mk.perM2) + ' за м², это +' + gap + '%. Разница — ' +
+      (typeof a.floor === 'number' ? a.floor + '-й этаж' : 'этаж') + (VIEW_PHRASE[a.view] ? ' и вид ' + VIEW_PHRASE[a.view] : '') +
+      '. Сравнивать надо с юнитами того же уровня, а не со всем районом — средняя считает и первые этажи во двор.']);
+    if (gap != null && gap <= -2) out.push(['Дешевле рынка — что с ним не так?',
+      'Ничего: ' + (o.source === 'club' ? 'это клубный эксклюзив, цена не поднималась в торге между агентами' :
+        off ? 'это цена входа на этапе строительства, не готового жилья' : 'объект свободен, и собственник считает простой') +
+      (o.verified === 'verified' ? '. Доступность проверена ' + o.checkedAt : '') + '.']);
+    if (a.metro === false) out.push(['Как сюда добираться без метро?',
+      'Метро рядом нет — район автомобильный, и арендатор здесь такой же. ' + (mk ? mk.tenant : '') +
+      ' Для сдачи это скорее плюс: текучка ниже.']);
+    const sc = objServiceYear(o);
+    if (sc) out.push(['Сколько стоит содержание?',
+      o.serviceCharge + ' — при ' + o.size + ' м² это около ' + WS.AED(sc) + ' в год. В расчёте доходности заложен опекс ' +
+      WS.AED((D().refModel || {}).opexY1 || 0) + ', service charge внутри него.']);
+    if (mk && mk.dom >= 50) out.push(['А если передумаю — быстро выйду?',
+      'Средний срок экспозиции по ' + o.area + ' — ' + mk.dom + ' дней, дольше, чем в Business Bay. ' + mk.risk]);
+    return out.slice(0, 5);
+  }
+  // Район отдельным блоком под картой: карта отвечает «где», этот блок — «что с этим местом
+  // происходит», то есть на чём держится цена через три года.
+  function objAreaBlock(o) {
+    const mk = objMarket(o);
+    if (!mk) return '';
+    const chips = [
+      [WS.AED(mk.perM2), 'средняя за м²'],
+      ['+' + mk.priceYoY + '%', 'цена за год'],
+      ['+' + mk.rentYoY + '%', 'аренда за год'],
+      [mk.dom + ' дн.', 'срок экспозиции'],
+    ].map((c) => '<div class="mkt-c"><div class="mkt-v">' + c[0] + '</div><div class="mkt-l">' + c[1] + '</div></div>').join('');
+    const rows = [
+      ['users', 'Кто здесь снимает', mk.tenant],
+      ['trend', 'Что двигает район', mk.driver],
+      ['warn', 'На что смотреть', mk.risk],
+    ].map((r) => '<div class="mkt-r' + (r[0] === 'warn' ? ' off' : '') + '">' + I(r[0]) +
+      '<div><b>' + r[1] + '</b><span>' + r[2] + '</span></div></div>').join('');
+    return dxSec('trend', 'Район · ' + o.area, '<span class="badge demo">' + I('lock') + 'срез рынка — DEMO</span>',
+      '<div class="mkt-chips">' + chips + '</div><div class="mkt-rows">' + rows + '</div>');
+  }
+  function objSellBlock(o) {
+    const pts = objSellPoints(o);
+    if (!pts.length) return '';
+    return dxSec('target', 'Чем продавать', '<span class="badge">' + pts.length + '</span>',
+      '<div class="sp-list">' + pts.map((p) => '<div class="sp-row"><span class="sp-ic">' + I(p[0]) + '</span>' +
+        '<div><div class="sp-t">' + p[1] + '</div><div class="sp-d">' + p[2] + '</div></div></div>').join('') + '</div>');
+  }
+  function objObjectionBlock(o) {
+    const qs = objObjections(o);
+    if (!qs.length) return '';
+    return dxSec('help', 'Что спросят и что ответить', '<span class="badge">' + qs.length + '</span>',
+      '<div class="oq-list">' + qs.map((q) => '<div class="oq-row"><div class="oq-q">' + I('chat') + q[0] + '</div>' +
+        '<div class="oq-a">' + q[1] + '</div></div>').join('') + '</div>');
   }
   function objCommission(o) {
     if (!o.commissionPct) return '';
@@ -9354,7 +9518,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function objMeta(o) {
     const pairs = [
       ['Район', o.area], ['Адрес', o.address], ['Вид', objAttr(o, 'view')],
-      ['Этаж', objAttr(o, 'floor')], ['Отделка', objAttr(o, 'finish')], ['Спрос', objAttr(o, 'demand')],
+      ['Этаж', objFloor(o)], ['Отделка', objAttr(o, 'finish')], ['Спрос', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'],
       ['Готовность', o.availability === 'available' ? 'Доступен для показа' : 'Требует проверки'], ['Источник', o.sourceLabel],
     ];
@@ -9400,7 +9564,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (tab === 'specs') {
       return dxSec('building', 'Характеристики', '', '<div class="dfields">' +
         dfPair('Район', o.area) + dfPair('Адрес', o.address) + dfPair('Класс', o.br) + dfPair('Площадь', o.size + ' м²') +
-        dfPair('Цена за м²', perM2) + dfPair('Этаж', objAttr(o, 'floor')) + dfPair('Отделка', objAttr(o, 'finish')) +
+        dfPair('Цена за м²', perM2) + dfPair('Этаж', objFloor(o)) + dfPair('Отделка', objAttr(o, 'finish')) +
         dfPair('Вид', objAttr(o, 'view')) + dfPair('Спрос на рынке', objAttr(o, 'demand')) + dfPair('Престиж', objAttr(o, 'prestige')) +
         dfPair('Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—') + dfPair('Источник', o.sourceLabel) +
         dfPair('Доступность', o.availability === 'available' ? 'Доступен' : 'Требует проверки') + '</div>');
@@ -9541,8 +9705,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
     return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o, { lead: false }) + cxStack([
-      [objBriefBlock(o), dxSec('compass', 'Расположение на карте', '', objMap(o))],
-      [ctx, cxCol([dxSec('grid', 'Параметры объекта', '', paramsInner), statuses])],
+      // Слева — чем это продают, справа — где это и что с этим местом. Пары подобраны так, чтобы
+      // ответ стоял рядом со строкой, к которой он относится: «сколько стоит содержание» — против
+      // service charge в условиях сделки.
+      [cxCol([objBriefBlock(o), objSellBlock(o)]),
+       cxCol([dxSec('compass', 'Расположение на карте', '', objMap(o)), objAreaBlock(o)])],
+      [objObjectionBlock(o), ctx],
+      [dxSec('grid', 'Параметры объекта', '', paramsInner), statuses],
       docs,
     ]);
   }
@@ -9575,7 +9744,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // ---------------- MATCHING (quality criteria + client-portrait fit) ----------------
   const QUAL = [
     { k: 'water', label: 'Вид на воду', test: (o) => o.attrs && o.attrs.view === 'water' },
-    { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floor === 'high' },
+    { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floorBand === 'high' },
     { k: 'newfinish', label: 'Свежая отделка', test: (o) => o.attrs && o.attrs.finish === 'new' },
     { k: 'demand', label: 'Высокий спрос', test: (o) => o.attrs && o.attrs.demand === 'high' },
     { k: 'metro', label: 'Рядом метро', test: (o) => o.attrs && o.attrs.metro },

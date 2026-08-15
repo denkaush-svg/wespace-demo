@@ -96,7 +96,8 @@
       match: 'Business Bay, в бюджете, проверенная доступность, инвестиционный профиль.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Creekline Residences · Tower B',
       handover: 'Q4 2026', paymentPlan: '10% бронь · 40% в стройку · 50% на сдаче',
-      serviceCharge: '16 AED/фт²·год', escrow: 'Escrow DLD · ADCB', occupancy: null },
+      serviceCharge: '16 AED/фт²·год', escrow: 'Escrow DLD · ADCB', occupancy: null,
+      usp: 'Корпус B — единственный в проекте, где 1BR выходят на канал, а не во внутренний двор. С 12-го этажа вид не перекрывается соседней башней: ниже девятого он уже закрыт.' },
     { id: 'o_palmcourt', name: 'Palm Court Residence, Unit 704', source: 'club',
       sourceLabel: 'Клубный эксклюзив', area: 'JVC', price: 1690000, size: 95, br: '1BR+',
       address: 'JVC, Palm Court Residence, District 12, Unit 704', commissionPct: 3,
@@ -105,7 +106,8 @@
       attrs: { view: 'garden', floor: 7, floors: 18, floorBand: 'mid', finish: 'new', demand: 'mid', prestige: 'mid', metro: false },
       match: 'JVC, ниже бюджета, клубный эксклюзив, высокая доходность аренды.',
       segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Palm Court Residence · District 12',
-      handover: null, paymentPlan: null, serviceCharge: '14 AED/фт²·год', escrow: null, occupancy: 'Свободна (vacant)' },
+      handover: null, paymentPlan: null, serviceCharge: '14 AED/фт²·год', escrow: null, occupancy: 'Свободна (vacant)',
+      usp: 'Клубный эксклюзив: юнита нет на порталах. Клиенту не с чем сравнить построчно и некуда уйти торговаться — торг идёт с нами, а не между двадцатью агентами по одному объявлению.' },
     { id: 'o_bayline', name: 'Bayline Terraces, Unit 1603', source: 'import',
       sourceLabel: 'Импорт застройщика', area: 'Dubai Creek Harbour', price: 1950000, size: 88, br: '1BR',
       address: 'Dubai Creek Harbour, Bayline Terraces, Unit 1603', commissionPct: 2.5,
@@ -115,11 +117,36 @@
       match: 'Dubai Creek Harbour, у верхней границы бюджета. Проверка доступности устарела.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Bayline Terraces · Dubai Creek Harbour',
       handover: 'Q2 2027', paymentPlan: '20% бронь · 40% в стройку · 40% post-handover (2 года)',
-      serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null },
+      serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null,
+      usp: 'Post-handover 40% на два года после ключей: покупатель заходит в Creek Harbour, оплатив до сдачи 60%, и гасит остаток уже с арендного потока.' },
   ];
 
   // Reference financial model (spec §12.2) — single source of truth for
   // screen, PDF and Excel. finance.js recomputes from these assumptions.
+  // Срез рынка по району: в живой системе — витрина сделок DLD и данные портала, на стенде
+  // зафиксированный снимок. `perM2` — средняя цена сделок за 12 месяцев; `yieldTypical` — чистая
+  // доходность на вложенное по той же модели, что считает карточка, иначе сравнение врёт.
+  const AREAS = {
+    'Business Bay': {
+      perM2: 21400, priceYoY: 9, rentYoY: 6, yieldTypical: 5.1, dom: 41,
+      tenant: 'Сотрудники DIFC и Downtown. Снимают на год, чаще без семьи, съезжают при смене работы.',
+      driver: 'Набережная канала и пешеходные связки с Downtown. Район дозастраивается вглубь, свободной земли почти нет.',
+      risk: 'Одинаковых 1BR много. Юнит без вида и без этажа конкурирует только ценой.',
+    },
+    'JVC': {
+      perM2: 18600, priceYoY: 12, rentYoY: 9, yieldTypical: 5.4, dom: 33,
+      tenant: 'Семьи и молодые пары. Живут по два-три года, съезжают редко — арендный поток ровный.',
+      driver: 'Школы, клиники и районный ретейл догнали жильё: район перестал быть окраиной с одними домами.',
+      risk: 'Метро нет и в планах не стоит. Клиент без машины район не рассматривает.',
+    },
+    'Dubai Creek Harbour': {
+      perM2: 23200, priceYoY: 7, rentYoY: 4, yieldTypical: 4.7, dom: 52,
+      tenant: 'Рынок аренды только формируется: жилых очередей сдано мало, ставка держится на новизне.',
+      driver: 'Мастер-план Emaar на десять лет. Парк, набережная и марина выходят очередями, каждая следующая дороже входа.',
+      risk: 'Инфраструктура догоняет стройку. Вторичка продаётся дольше, чем в Business Bay.',
+    },
+  };
+
   const refModel = {
     objectId: 'o_creekline',
     price: 1820000,
@@ -688,7 +715,7 @@
 
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, roster, clients, objects, refModel,
+    DEMO_NOW, tenant, users, roster, clients, objects, AREAS, refModel,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };

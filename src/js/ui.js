@@ -4088,7 +4088,6 @@
   // ---- Object card v3: rich presentation (photo gallery hero, price anchor, full meta) — parity with old grey CRM ----
   const OBJ_ATTR = {
     view: { city: 'Город', water: 'Вид на воду', garden: 'Сад', park: 'Парк' },
-    floor: { high: 'Высокий', mid: 'Средний', low: 'Низкий' },
     finish: { new: 'Свежая отделка', standard: 'Стандартная', 'shell&core': 'Shell & Core', shell: 'Shell & Core' },
     demand: { high: 'Высокий спрос', mid: 'Средний спрос', low: 'Низкий спрос' },
     prestige: { high: 'Премиум', mid: 'Средний', low: 'Эконом' },
@@ -4099,8 +4098,26 @@
   const VIEW_PHRASE = { city: 'на город', water: 'на воду', garden: 'в сад', park: 'на парк' };
   function objFloor(o) {
     const a = o.attrs || {};
-    if (typeof a.floor !== 'number') return objAttr(o, 'floor');
+    if (typeof a.floor !== 'number') return '—';
     return a.floor + (a.floors ? ' из ' + a.floors : '') + ' эт.';
+  }
+  const SQFT = 10.7639;              // м² → фт², чтобы читать service charge в тех же единицах, в каких он продаётся
+  function ru(n) { return String(n).replace('.', ','); }
+  function objIsOff(o) { return /off-plan|оффплан/i.test(o.segment || ''); }
+  function objPerM2(o) { return o.size ? Math.round(o.price / o.size) : null; }
+  function objMarket(o) { return (WS.AREAS || {})[o.area] || null; }
+  // Отклонение цены объекта от средней по району, в процентах. Знак несёт смысл: минус — аргумент,
+  // плюс — возражение, которое всё равно прозвучит, поэтому ответ на него готовится заранее.
+  function objPriceGap(o) {
+    const m = objMarket(o), pm = objPerM2(o);
+    if (!m || !pm || !m.perM2) return null;
+    return Math.round((pm / m.perM2 - 1) * 100);
+  }
+  // Service charge продаётся за фт² в год — клиент спрашивает, сколько это в год деньгами.
+  function objServiceYear(o) {
+    const m = /([\d.,]+)\s*AED\/\s*фт/.exec(o.serviceCharge || '');
+    if (!m || !o.size) return null;
+    return Math.round(parseFloat(m[1].replace(',', '.')) * o.size * SQFT);
   }
   // Net yield, guarded: the finance model can miss, and a card must not fall over because of it.
   function objYieldPct(o) {
@@ -4115,8 +4132,7 @@
   function objBriefParts(o) {
     const a = o.attrs || {};
     const out = [];
-    const perM2 = o.size ? Math.round(o.price / o.size) : null;
-    const off = /off-plan|оффплан/i.test(o.segment || '');
+    const off = objIsOff(o);
 
     // 1. What it is, in one line: type, size, where, which floor, what you see out of the window.
     let one = (o.br || 'объект') + ' ' + (o.size ? o.size + ' м² ' : '') + 'в районе ' + o.area;
@@ -4139,13 +4155,9 @@
     // object lists them, while an off-plan's terms genuinely read as one enumeration.
     if (terms.length) out.push(capFirst(off ? joinRu(terms) : terms.join('; ')) + '.');
 
-    // 3. The money, with the one comparison that matters.
-    const money = [];
-    money.push(WS.AED(o.price) + (perM2 ? ' — ' + WS.AED(perM2) + ' за м²' : ''));
+    // 3. Комиссия — единственная цифра из денег, которой нет в полосе метрик над справкой.
     const y = objYieldPct(o);
-    if (y) money.push('расчётная доходность ' + String(y).replace('.', ',') + '% годовых');
-    if (o.commissionPct) money.push('комиссия агенту ' + String(o.commissionPct).replace('.', ',') + '%');
-    out.push(capFirst(money.join('; ')) + '.');
+    if (o.commissionPct) out.push('Комиссия агенту ' + ru(o.commissionPct) + '% — ' + WS.AED(Math.round(o.price * o.commissionPct / 100)) + '.');
 
     // 4. Whom it suits — read off demand, prestige, yield and the payment terms.
     const fit = [];
@@ -4176,6 +4188,101 @@
         '</div>' : '';
     return dxSec('sparkle', 'Справка по объекту', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
       '<p class="deal-brief">' + b.text.join(' ') + '</p>' + verdict);
+  }
+  // ============================================================================================
+  // Чем продавать. Не список свойств — список утверждений, каждое с цифрой под ним: тезис агент
+  // произносит вслух, подпись — то, чем он его подтверждает, если клиент переспросит. Порядок —
+  // от того, что уникально для этого юнита, к общему по району.
+  // ============================================================================================
+  function objSellPoints(o) {
+    const a = o.attrs || {}, mk = objMarket(o), off = objIsOff(o);
+    const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
+    const out = [];
+    if (o.usp) out.push(['star', 'Чего нет у соседних юнитов', o.usp]);
+    if (gap != null && gap <= -2) out.push(['money', 'На ' + Math.abs(gap) + '% дешевле района',
+      WS.AED(pm) + ' за м² против ' + WS.AED(mk.perM2) + ' — средней цены сделок по ' + o.area + ' за 12 месяцев.']);
+    if (mk && y != null && y >= mk.yieldTypical) out.push(['wallet', 'Доходность выше типичной по району',
+      ru(y) + '% против ' + ru(mk.yieldTypical) + '% по ' + o.area + '. Считано по одной модели, цифры сравнимы.']);
+    if (mk && mk.priceYoY >= 8) out.push(['trend', 'Район прибавил ' + mk.priceYoY + '% за год',
+      'Аренда за тот же период +' + mk.rentYoY + '%. ' + mk.driver]);
+    if (off && o.paymentPlan) out.push(['calc', 'Вход рассрочкой, а не всей суммой',
+      o.paymentPlan.replace(/\s*·\s*/g, ' · ') + (o.handover ? '. Ключи ' + o.handover + '.' : '.')]);
+    if (o.escrow) out.push(['shield', 'Деньги идут на эскроу, не застройщику',
+      o.escrow + '. Это первый ответ на «а если стройка встанет».']);
+    if (!off && /vacant|свободн/i.test(o.occupancy || '')) out.push(['clock', 'Доход с первого месяца',
+      'Юнит свободен — заезд арендатора не ждёт окончания чужого договора.']);
+    if (a.metro) out.push(['compass', 'Метро в пешей доступности',
+      'Для арендатора без машины район остаётся в выборке — это шире спрос при пересдаче.']);
+    if (mk && mk.dom <= 40) out.push(['handshake', 'Из района выходят быстро',
+      'Средний срок экспозиции ' + mk.dom + ' дней. Аргумент для того, кто боится «застрять в бетоне».']);
+    return out.slice(0, 5);
+  }
+  // ============================================================================================
+  // Что спросят. Возражение — это не риск объекта, а реплика, которая прозвучит в разговоре;
+  // ценность блока в том, что ответ уже посчитан и его не надо придумывать на трубке.
+  // ============================================================================================
+  function objObjections(o) {
+    const a = o.attrs || {}, mk = objMarket(o), off = objIsOff(o);
+    const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
+    const out = [];
+    if (o.verified !== 'verified' || o.trakheesi !== 'ok') out.push(['Он вообще ещё продаётся?',
+      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до него объект нельзя публиковать как листинг' : '') +
+      '. Сверьте с застройщиком до показа, это одна задача.']);
+    if (off) out.push(['Плачу сейчас — получаю когда?',
+      (o.handover ? 'Ключи ' + o.handover + '. ' : '') + 'До сдачи платежи идут частями по графику' +
+      (o.escrow ? ', и не застройщику, а на эскроу-счёт: ' + o.escrow.replace(/^Escrow\s*/i, '') + '. Со счёта деньги уходят по мере готовности стройки' : '') + '.']);
+    if (gap != null && gap >= 2) out.push(['Почему дороже, чем в среднем по району?',
+      WS.AED(pm) + ' против ' + WS.AED(mk.perM2) + ' за м², это +' + gap + '%. Разница — ' +
+      (typeof a.floor === 'number' ? a.floor + '-й этаж' : 'этаж') + (VIEW_PHRASE[a.view] ? ' и вид ' + VIEW_PHRASE[a.view] : '') +
+      '. Сравнивать надо с юнитами того же уровня, а не со всем районом — средняя считает и первые этажи во двор.']);
+    if (gap != null && gap <= -2) out.push(['Дешевле рынка — что с ним не так?',
+      'Ничего: ' + (o.source === 'club' ? 'это клубный эксклюзив, цена не поднималась в торге между агентами' :
+        off ? 'это цена входа на этапе строительства, не готового жилья' : 'объект свободен, и собственник считает простой') +
+      (o.verified === 'verified' ? '. Доступность проверена ' + o.checkedAt : '') + '.']);
+    if (a.metro === false) out.push(['Как сюда добираться без метро?',
+      'Метро рядом нет — район автомобильный, и арендатор здесь такой же. ' + (mk ? mk.tenant : '') +
+      ' Для сдачи это скорее плюс: текучка ниже.']);
+    const sc = objServiceYear(o);
+    if (sc) out.push(['Сколько стоит содержание?',
+      o.serviceCharge + ' — при ' + o.size + ' м² это около ' + WS.AED(sc) + ' в год. В расчёте доходности заложен опекс ' +
+      WS.AED((D().refModel || {}).opexY1 || 0) + ', service charge внутри него.']);
+    if (mk && mk.dom >= 50) out.push(['А если передумаю — быстро выйду?',
+      'Средний срок экспозиции по ' + o.area + ' — ' + mk.dom + ' дней, дольше, чем в Business Bay. ' + mk.risk]);
+    return out.slice(0, 5);
+  }
+  // Район отдельным блоком под картой: карта отвечает «где», этот блок — «что с этим местом
+  // происходит», то есть на чём держится цена через три года.
+  function objAreaBlock(o) {
+    const mk = objMarket(o);
+    if (!mk) return '';
+    const chips = [
+      [WS.AED(mk.perM2), 'средняя за м²'],
+      ['+' + mk.priceYoY + '%', 'цена за год'],
+      ['+' + mk.rentYoY + '%', 'аренда за год'],
+      [mk.dom + ' дн.', 'срок экспозиции'],
+    ].map((c) => '<div class="mkt-c"><div class="mkt-v">' + c[0] + '</div><div class="mkt-l">' + c[1] + '</div></div>').join('');
+    const rows = [
+      ['users', 'Кто здесь снимает', mk.tenant],
+      ['trend', 'Что двигает район', mk.driver],
+      ['warn', 'На что смотреть', mk.risk],
+    ].map((r) => '<div class="mkt-r' + (r[0] === 'warn' ? ' off' : '') + '">' + I(r[0]) +
+      '<div><b>' + r[1] + '</b><span>' + r[2] + '</span></div></div>').join('');
+    return dxSec('trend', 'Район · ' + o.area, '<span class="badge demo">' + I('lock') + 'срез рынка — DEMO</span>',
+      '<div class="mkt-chips">' + chips + '</div><div class="mkt-rows">' + rows + '</div>');
+  }
+  function objSellBlock(o) {
+    const pts = objSellPoints(o);
+    if (!pts.length) return '';
+    return dxSec('target', 'Чем продавать', '<span class="badge">' + pts.length + '</span>',
+      '<div class="sp-list">' + pts.map((p) => '<div class="sp-row"><span class="sp-ic">' + I(p[0]) + '</span>' +
+        '<div><div class="sp-t">' + p[1] + '</div><div class="sp-d">' + p[2] + '</div></div></div>').join('') + '</div>');
+  }
+  function objObjectionBlock(o) {
+    const qs = objObjections(o);
+    if (!qs.length) return '';
+    return dxSec('help', 'Что спросят и что ответить', '<span class="badge">' + qs.length + '</span>',
+      '<div class="oq-list">' + qs.map((q) => '<div class="oq-row"><div class="oq-q">' + I('chat') + q[0] + '</div>' +
+        '<div class="oq-a">' + q[1] + '</div></div>').join('') + '</div>');
   }
   function objCommission(o) {
     if (!o.commissionPct) return '';
@@ -4216,7 +4323,7 @@
   function objMeta(o) {
     const pairs = [
       ['Район', o.area], ['Адрес', o.address], ['Вид', objAttr(o, 'view')],
-      ['Этаж', objAttr(o, 'floor')], ['Отделка', objAttr(o, 'finish')], ['Спрос', objAttr(o, 'demand')],
+      ['Этаж', objFloor(o)], ['Отделка', objAttr(o, 'finish')], ['Спрос', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'],
       ['Готовность', o.availability === 'available' ? 'Доступен для показа' : 'Требует проверки'], ['Источник', o.sourceLabel],
     ];
@@ -4262,7 +4369,7 @@
     if (tab === 'specs') {
       return dxSec('building', 'Характеристики', '', '<div class="dfields">' +
         dfPair('Район', o.area) + dfPair('Адрес', o.address) + dfPair('Класс', o.br) + dfPair('Площадь', o.size + ' м²') +
-        dfPair('Цена за м²', perM2) + dfPair('Этаж', objAttr(o, 'floor')) + dfPair('Отделка', objAttr(o, 'finish')) +
+        dfPair('Цена за м²', perM2) + dfPair('Этаж', objFloor(o)) + dfPair('Отделка', objAttr(o, 'finish')) +
         dfPair('Вид', objAttr(o, 'view')) + dfPair('Спрос на рынке', objAttr(o, 'demand')) + dfPair('Престиж', objAttr(o, 'prestige')) +
         dfPair('Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—') + dfPair('Источник', o.sourceLabel) +
         dfPair('Доступность', o.availability === 'available' ? 'Доступен' : 'Требует проверки') + '</div>');
@@ -4403,8 +4510,13 @@
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
     return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o, { lead: false }) + cxStack([
-      [objBriefBlock(o), dxSec('compass', 'Расположение на карте', '', objMap(o))],
-      [ctx, cxCol([dxSec('grid', 'Параметры объекта', '', paramsInner), statuses])],
+      // Слева — чем это продают, справа — где это и что с этим местом. Пары подобраны так, чтобы
+      // ответ стоял рядом со строкой, к которой он относится: «сколько стоит содержание» — против
+      // service charge в условиях сделки.
+      [cxCol([objBriefBlock(o), objSellBlock(o)]),
+       cxCol([dxSec('compass', 'Расположение на карте', '', objMap(o)), objAreaBlock(o)])],
+      [objObjectionBlock(o), ctx],
+      [dxSec('grid', 'Параметры объекта', '', paramsInner), statuses],
       docs,
     ]);
   }
@@ -4437,7 +4549,7 @@
   // ---------------- MATCHING (quality criteria + client-portrait fit) ----------------
   const QUAL = [
     { k: 'water', label: 'Вид на воду', test: (o) => o.attrs && o.attrs.view === 'water' },
-    { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floor === 'high' },
+    { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floorBand === 'high' },
     { k: 'newfinish', label: 'Свежая отделка', test: (o) => o.attrs && o.attrs.finish === 'new' },
     { k: 'demand', label: 'Высокий спрос', test: (o) => o.attrs && o.attrs.demand === 'high' },
     { k: 'metro', label: 'Рядом метро', test: (o) => o.attrs && o.attrs.metro },
