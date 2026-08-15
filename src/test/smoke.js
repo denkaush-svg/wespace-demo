@@ -775,6 +775,22 @@ setTimeout(async () => {
     });
   }
 
+  // ---- the object card states facts, not adjectives, and says whom the object is for ----
+  {
+    (dd().objects || []).forEach((o) => {
+      const a = o.attrs || {};
+      check('object ' + o.id + ' · этаж — число', typeof a.floor === 'number', String(a.floor));
+    });
+    WS.ui.objectCard(dd().objects[0].id);
+    const body = doc.querySelector('#app .view').textContent;
+    check('object · есть справка по объекту', body.indexOf('Справка по объекту') >= 0);
+    check('object · справка говорит, кому подходит', body.indexOf('Подходит') >= 0);
+    check('object · этаж больше не «Высокий»', !/Этаж\s*Высокий/.test(body), body.slice(0, 40));
+    // Каждый факт живёт в одном месте: срок сдачи стоит в обложке, повторять его в условиях незачем.
+    check('object · срок сдачи не повторяется', (body.match(/Срок сдачи/g) || []).length === 1,
+      String((body.match(/Срок сдачи/g) || []).length));
+  }
+
   // ---- object maps: real imagery for every object, with the attribution the licence requires ----
   {
     const objs = dd().objects || [];

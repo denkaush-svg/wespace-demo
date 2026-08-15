@@ -441,6 +441,8 @@ button { font-family: inherit; cursor: pointer; }
 /* Observed choices sit under the declared parameters inside one preference block, divided rather
    than repeated as a second section with the same heading. */
 .pref-observed { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.obj-fit { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+.obj-fit b { color: var(--ink); font-weight: 700; }
 /* What the client did — same row grammar as the event feed, but only their own moves. */
 .cm-list { display: flex; flex-direction: column; gap: 9px; }
 .cm-row { display: flex; gap: 10px; align-items: flex-start; }
@@ -680,6 +682,11 @@ button { font-family: inherit; cursor: pointer; }
 /* A spec sheet spreads its rows to fill the shared height, so extra height reads as comfortable
    spacing rather than emptiness; a parameter grid must not — it would leave a band of nothing. */
 .cx-pair .dfields, .cx-col .dfields { flex: 1 1 auto; align-content: space-between; }
+/* A map can fill whatever height its neighbour sets — a paragraph cannot. So the map stretches
+   and the row is sized by the text, instead of leaving a band of nothing under the brief. */
+.cx-pair .obj-map { flex: 1 1 auto; display: flex; flex-direction: column; margin-top: 0; }
+.cx-pair .obj-map-canvas { flex: 1 1 auto; height: auto; min-height: 172px; max-height: 214px; overflow: hidden; }
+.cx-pair .obj-meta { align-content: start; row-gap: 16px; column-gap: 26px; }
 @media (max-width: 760px) { .cx-pair { grid-template-columns: 1fr; } }
 .dx-cbar-lbl { font-size: 11px; color: var(--mut); margin: 0 0 6px 2px; display: flex; align-items: center; gap: 6px; }
 .dx-cbar-lbl svg { width: 13px; height: 13px; color: var(--acc); }
@@ -1598,6 +1605,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .ohero-cap svg { width: 12px; height: 12px; }
 /* Summary band under the hero: lead description + key metrics on an accent-tinted card (price emphasized) */
 .osum { border: 1px solid var(--acc-line); background: var(--acc-soft); border-radius: 14px; padding: 17px 20px 0; margin-bottom: 16px; }
+.osum-bare { padding-top: 4px; }
 .osum-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--acc-ink); margin-bottom: 7px; }
 .osum-lead { font-size: 15.5px; line-height: 1.6; color: var(--ink); max-width: 820px; margin: 0 0 2px; }
 .osum-metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 15px; border-top: 1px solid var(--acc-line); }

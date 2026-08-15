@@ -4094,6 +4094,89 @@
     prestige: { high: 'Премиум', mid: 'Средний', low: 'Эконом' },
   };
   function objAttr(o, k) { const v = o.attrs && o.attrs[k]; if (v == null || v === '') return '—'; const m = OBJ_ATTR[k]; return (m && m[v]) || v; }
+  // «Этаж: высокий» is an adjective in the place of a fact. The storey is a number; the band it
+  // falls into is kept separately, for filtering, and stated as a hint rather than as the value.
+  const VIEW_PHRASE = { city: 'на город', water: 'на воду', garden: 'в сад', park: 'на парк' };
+  function objFloor(o) {
+    const a = o.attrs || {};
+    if (typeof a.floor !== 'number') return objAttr(o, 'floor');
+    return a.floor + (a.floors ? ' из ' + a.floors : '') + ' эт.';
+  }
+  // Net yield, guarded: the finance model can miss, and a card must not fall over because of it.
+  function objYieldPct(o) {
+    try { const y = objNetYield(o); return (typeof y === 'number' && isFinite(y)) ? Math.round(y * 1000) / 10 : null; }
+    catch (e) { return null; }
+  }
+  // ============================================================================================
+  // Справка по объекту — the one block that says what the rows cannot: what this thing IS as an
+  // offer, whom it suits and for what, and where it is weak. Same voice as the client brief:
+  // connected sentences built from the object's own fields, nothing invented.
+  // ============================================================================================
+  function objBriefParts(o) {
+    const a = o.attrs || {};
+    const out = [];
+    const perM2 = o.size ? Math.round(o.price / o.size) : null;
+    const off = /off-plan|оффплан/i.test(o.segment || '');
+
+    // 1. What it is, in one line: type, size, where, which floor, what you see out of the window.
+    let one = (o.br || 'объект') + ' ' + (o.size ? o.size + ' м² ' : '') + 'в районе ' + o.area;
+    if (typeof a.floor === 'number') one += ', ' + a.floor + '-й этаж';
+    const view = VIEW_PHRASE[(o.attrs || {}).view];
+    if (view) one += ', вид ' + view;
+    out.push(one + '.');
+
+    // 2. How it is sold — the thing that decides whether a buyer can even consider it.
+    const terms = [];
+    if (off) {
+      terms.push('оффплан' + (o.developer ? ' от ' + o.developer : ''));
+      if (o.handover) terms.push('сдача ' + o.handover);
+      if (o.paymentPlan) terms.push('рассрочка ' + o.paymentPlan.replace(/\s*·\s*/g, ' / '));
+    } else {
+      terms.push('готовый' + (o.occupancy ? ', ' + lowerFirst(o.occupancy) : ''));
+      if (o.serviceCharge) terms.push('service charge ' + o.serviceCharge);
+    }
+    // «и» binds two things of a kind; a status and a service charge are not that, so a ready
+    // object lists them, while an off-plan's terms genuinely read as one enumeration.
+    if (terms.length) out.push(capFirst(off ? joinRu(terms) : terms.join('; ')) + '.');
+
+    // 3. The money, with the one comparison that matters.
+    const money = [];
+    money.push(WS.AED(o.price) + (perM2 ? ' — ' + WS.AED(perM2) + ' за м²' : ''));
+    const y = objYieldPct(o);
+    if (y) money.push('расчётная доходность ' + String(y).replace('.', ',') + '% годовых');
+    if (o.commissionPct) money.push('комиссия агенту ' + String(o.commissionPct).replace('.', ',') + '%');
+    out.push(capFirst(money.join('; ')) + '.');
+
+    // 4. Whom it suits — read off demand, prestige, yield and the payment terms.
+    const fit = [];
+    if (off) fit.push('инвестору, который готов ждать сдачи ради цены входа');
+    if (y && y >= 5) fit.push('покупателю под аренду');
+    if (a.prestige === 'high') fit.push('клиенту, которому важен адрес');
+    if (!off && a.finish === 'new') fit.push('тому, кто въезжает сразу');
+    
+
+    // 5. And where it does not fit. A brief that only sells is not a brief.
+    const against = [];
+    if (off) against.push('тем, кому нужен доход сейчас');
+    if (a.metro === false) against.push('тем, кто ездит на метро');
+    if (a.demand === 'mid' || a.demand === 'low') against.push('тем, кто рассчитывает на быструю перепродажу');
+    return { text: out, fit: fit, against: against };
+  }
+  function objBriefSentences(o) {
+    const b = objBriefParts(o);
+    return b.text.concat(b.fit.length ? ['Подходит ' + joinRu(b.fit) + '.'] : [],
+                         b.against.length ? ['Не подойдёт ' + joinRu(b.against) + '.'] : []);
+  }
+  function objBriefBlock(o) {
+    const b = objBriefParts(o);
+    const verdict = (b.fit.length || b.against.length)
+      ? '<div class="chg-list obj-fit">' +
+        (b.fit.length ? '<div class="chg-row">' + I('check') + '<span><b>Подходит</b> ' + joinRu(b.fit) + '</span></div>' : '') +
+        (b.against.length ? '<div class="chg-row off">' + I('warn') + '<span><b>Не подойдёт</b> ' + joinRu(b.against) + '</span></div>' : '') +
+        '</div>' : '';
+    return dxSec('sparkle', 'Справка по объекту', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<p class="deal-brief">' + b.text.join(' ') + '</p>' + verdict);
+  }
   function objCommission(o) {
     if (!o.commissionPct) return '';
     return '<span class="obj-comm">' + I('money') + 'Комиссия ' + o.commissionPct + '% · ' + WS.AED(Math.round(o.price * o.commissionPct / 100)) + '</span>';
@@ -4238,7 +4321,6 @@
     if (o.developer) rows.push(['Застройщик', o.developer]);
     if (o.project) rows.push(['Проект · корпус', o.project]);
     if (isOff) {
-      if (o.handover) rows.push(['Срок сдачи (handover)', o.handover]);
       if (o.paymentPlan) rows.push(['План оплаты', o.paymentPlan]);
       if (o.escrow) rows.push(['Escrow (DLD)', o.escrow]);
     } else if (o.occupancy) {
@@ -4278,17 +4360,18 @@
   }
   // Summary band under the hero: lead description + key metrics on an accent-tinted card,
   // with the price emphasized — gives the block presence instead of bare numbers on the page bg.
-  function objSummary(o) {
+  function objSummary(o, opts) {
     const perM2 = o.size ? WS.AED(Math.round(o.price / o.size)) : '—';
+    const y = objYieldPct(o);
     const m = [
       [WS.AED(o.price), 'общая цена', true],
       [perM2, 'цена за м²', false],
       [o.size + ' м²', 'площадь', false],
-      [objAttr(o, 'floor'), 'этаж', false],
+      [y ? String(y).replace('.', ',') + '%' : objFloor(o), y ? 'доходность (расчёт)' : 'этаж', false],
     ];
-    return '<div class="osum">' +
-      '<div class="osum-eyebrow">Описание</div>' +
-      '<p class="osum-lead">' + (o.match || '—') + '</p>' +
+    const lead = (opts && opts.lead === false) ? '' :
+      '<div class="osum-eyebrow">Описание</div><p class="osum-lead">' + (o.match || '—') + '</p>';
+    return '<div class="osum' + (lead ? '' : ' osum-bare') + '">' + lead +
       '<div class="osum-metrics">' + m.map((c) =>
         '<div class="osum-m' + (c[2] ? ' osum-m--hero' : '') + '"><div class="osum-v">' + c[0] + '</div><div class="osum-l">' + c[1] + '</div></div>').join('') +
       '</div></div>';
@@ -4310,18 +4393,20 @@
       [inSl ? 'check' : 'star', inSl ? 'В подборке' : 'В подборку', 'data-shortlist="' + o.id + '"', inSl ? 'on' : ''],
       ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="object" data-obj="' + o.id + '"', ''],
     ]);
+    // Источник и сегмент уже сказаны в обложке; здесь только то, чего там нет.
     const paramsInner = '<div class="obj-meta">' + [
-      ['Вид', objAttr(o, 'view')], ['Отделка', objAttr(o, 'finish')], ['Спрос на рынке', objAttr(o, 'demand')],
-      ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'], ['Источник', o.sourceLabel],
+      ['Этаж', objFloor(o)], ['Вид из окон', objAttr(o, 'view')],
+      ['Отделка', objAttr(o, 'finish')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : 'нет рядом'],
+      ['Спрос на рынке', objAttr(o, 'demand')], ['Престиж адреса', objAttr(o, 'prestige')],
     ].map((p) => '<div><div class="omk">' + p[0] + '</div><div class="omv">' + p[1] + '</div></div>').join('') + '</div>';
-    const grid = '<div class="odetail-grid">' +
-      dxSec('grid', 'Параметры объекта', '', paramsInner) +
-      dxSec('compass', 'Расположение на карте', '', objMap(o)) + '</div>';
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o) +
-      (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o, { lead: false }) + cxStack([
+      [objBriefBlock(o), dxSec('compass', 'Расположение на карте', '', objMap(o))],
+      [ctx, cxCol([dxSec('grid', 'Параметры объекта', '', paramsInner), statuses])],
+      docs,
+    ]);
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
