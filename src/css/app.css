@@ -974,6 +974,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* "что изменилось" list */
 .chg-list { display: flex; flex-direction: column; gap: 6px; }
+.pt-list { display: flex; flex-direction: column; }
+/* Beside a taller neighbour the trait rows spread to fill, the way the spec sheets do — extra
+   height reads as spacing rather than as a block that ran out of content. */
+.cx-pair .pt-list { flex: 1 1 auto; justify-content: space-between; }
+.pt-row { display: flex; align-items: baseline; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.pt-row:last-child { border-bottom: 0; }
+.pt-ic { display: inline-flex; width: 22px; height: 22px; border-radius: 7px; background: var(--acc-soft); color: var(--acc); align-items: center; justify-content: center; flex: none; align-self: center; }
+.pt-ic svg { width: 13px; height: 13px; }
+.pt-k { color: var(--mut); width: 56px; flex: none; }
+.pt-v { color: var(--ink); font-weight: 600; flex: 1; min-width: 0; }
+.pt-vals { margin-top: 10px; }
+.pt-tips { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .chg-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
 .chg-row svg { width: 15px; height: 15px; color: var(--ok); flex: none; margin-top: 1px; }
 
@@ -1085,6 +1097,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* A full-width parameter list reads as a long thin column of pairs; two columns give it the same
    height as the blocks it sits between. */
 .dfields.cols2 { grid-template-columns: 1fr 1fr; column-gap: 26px; }
+/* Two columns are for a full-width block. In half a row they leave 90px for a value like
+   «Business Bay, Dubai Creek Harbour, JVC», which then wraps into a ladder. */
+.cx-pair .dfields.cols2, .cx-col .dfields.cols2 { grid-template-columns: 1fr; }
 .dfields.cols2 .dfield:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
 @media (max-width: 760px) { .dfields.cols2 { grid-template-columns: 1fr; } }
 .dfield .dk { color: var(--mut); flex: 0 0 auto; }
@@ -1241,6 +1256,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prio-B { background: var(--acc); }
 .prio-C { background: var(--mut); }
 .chg-row.off svg { color: #c99a2e; }
+/* Across the full width the signal list is five short lines with a lot of nothing to their right;
+   in two columns it fills the row it is given. */
+.sig-wide .chg-list { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 22px; }
+@media (max-width: 760px) { .sig-wide .chg-list { grid-template-columns: 1fr; } }
 
 /* Продвижение проектов — раздел главного меню */
 .promo-page { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(258px, 1fr); gap: 16px; align-items: start; }
@@ -1263,14 +1282,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cb-num { font-size: 21px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); }
 .cb-badges { margin-top: 11px; }
 .cb-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.cd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 2px 14px; }
-.cd-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; min-width: 0; }
+.cd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 2px 10px; }
+.cd-row { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border-radius: 9px; min-width: 0; }
 .cd-row.on { background: var(--acc-soft); }
-.cd-ic { display: inline-flex; width: 30px; height: 30px; border-radius: 8px; background: var(--bg); color: var(--mut); align-items: center; justify-content: center; flex: none; }
+.cd-row.on { grid-column: 1 / -1; }
+.cd-ic { display: inline-flex; width: 26px; height: 26px; border-radius: 8px; background: var(--bg); color: var(--mut); align-items: center; justify-content: center; flex: none; }
 .cd-row.on .cd-ic { background: #fff; color: var(--acc-deep); }
 .cd-ic svg { width: 15px; height: 15px; }
 .cd-label { font-size: 12.5px; color: var(--mut); width: 74px; flex: none; }
-.cd-val { font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cd-val { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cd-row.on .cd-val { color: var(--acc-deep); }
 .cd-primary { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--acc-ink); background: #fff; border: 1px solid var(--acc-line); padding: 2px 7px; border-radius: 999px; flex: none; white-space: nowrap; }
 .cd-primary svg { width: 11px; height: 11px; }

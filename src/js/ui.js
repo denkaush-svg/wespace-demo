@@ -1770,8 +1770,8 @@
     const channels = shown.map((ch) => {
       const m = chanMeta(ch);
       const isPref = ch === pref;
-      return '<div class="cd-row' + (isPref ? ' on' : '') + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
-        '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
+      return '<div class="cd-row' + (isPref ? ' on' : '') + '" title="' + escAttr(m[1]) + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
+        '<span class="cd-val">' + (vals[ch] || '—') + '</span>' +
         (isPref ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
     }).join('');
     // Language, consent and «Написать» are all stated elsewhere on this screen — in the hero, in the
@@ -1785,11 +1785,21 @@
       return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
         '<div style="font-size:12.5px;color:var(--mut)">Профиль стиля общения не заполнен — поможет вести персонализированную коммуникацию в мессенджерах и соцсетях.</div>');
     }
-    const chips = [p.decision, p.pace, p.risk].filter(Boolean).map((x) => '<span class="badge">' + x + '</span>').join('');
+    const flat = (t) => String(t || '').replace(/;\s*/g, ', ').trim();
+    const line = (ic, k, v) => v ? '<div class="pt-row"><span class="pt-ic">' + I(ic) + '</span>' +
+      '<span class="pt-k">' + k + '</span><span class="pt-v">' + v + '</span></div>' : '';
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
+    const tips = commTips(p).slice(0, 2).map((t) => '<div class="chg-row">' + I('check') + '<span>' + t + '</span></div>').join('');
     return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
-      '<div class="prov">' + chips + vals + '</div>' +
-      '<div style="font-size:12.5px;color:var(--mut);margin-top:8px">Канал и тон: ' + ((p.channel || '—') + (p.tone ? ' · ' + p.tone : '')) + '</div>');
+      '<div class="pt-list">' +
+        line('target', 'Решение', p.decision) +
+        line('clock', 'Темп', p.pace) +
+        line('shield', 'Риск', p.risk) +
+        line('chat', 'Канал', flat(p.channel)) +
+        line('pencil', 'Тон', flat(p.tone)) +
+      '</div>' +
+      (vals ? '<div class="prov pt-vals">' + vals + '</div>' : '') +
+      (tips ? '<div class="chg-list pt-tips">' + tips + '</div>' : ''));
   }
   // Client-level preference profile: aggregate this client's requests' offered ↔ selected/rejected.
   function clientPrefProfile(c) {
@@ -1946,6 +1956,7 @@
   function clientActions(c) {
     return [
       ['briefcase', 'Создать сделку', 'data-act="newDeal" data-cid="' + c.id + '"', 'primary'],
+      ['building', 'Подобрать объекты', 'data-scn="G2"', ''],
       ['chat', 'Написать', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users"', ''],
       ['clock', 'Запланировать касание', 'data-act="newTask"', ''],
       ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
@@ -2030,12 +2041,12 @@
       (dir.ready.length ? dfPair('Готовность', joinRu(dir.ready)) : '') +
       (dir.services.length ? dfPair('Интересуют услуги', joinRu(dir.services)) : '') +
       dfPair('Районы интереса', (c.areas || []).join(', ')) +
-      dfPair('Язык и канал', [c.lang, chanMeta(prefChannel(c))[1]].filter(Boolean).join(' · ')) +
+      (c.lang ? dfPair('Язык', c.lang) : '') +
       (rejectedNames.length ? dfPair('Отклонял', joinRu(rejectedNames)) : '') +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
       (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : '') +
       (clientPrefProfile(c) ? '<div class="pref-observed">' + clientPrefProfile(c) + '</div>' : ''));
-    const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
+    const sig = dxSec('target', 'Сигналы и приоритет', prio, '<div class="sig-wide">' + signalsInner(c) + '</div>');
     // Deal-level actions («подобрать объекты», «расчёт и КП», «назначить показ») belong to a deal
     // and already live on the deal card and in the page header; on the client they invited an agent
     // to act on a transaction from a screen that does not know which transaction.
@@ -2045,8 +2056,8 @@
     // the client's history and drags whatever sits beside it to the same height.
     return cxStack([
       [conciergeClientHandover(c), contactBlock(c)],
-      key,
-      [psychSummary(c), sig],
+      [key, psychSummary(c)],
+      sig,
       contactFeedBlock(c, 5),
     ]);
   }
@@ -2070,8 +2081,7 @@
       tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
-      pageActs: '<button class="btn sm primary" data-act="newDeal" data-cid="' + id + '">' + I('briefcase') + 'Создать сделку</button>' +
-        '<button class="btn sm" data-scn="G2">' + I('building') + 'Подобрать объекты</button>',
+      pageActs: '',
     };
   }
   function clientCard(id) { S().clientId = id; WS.router.go('clientDetail'); }
@@ -2648,12 +2658,14 @@
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const kycIcon = k.st === 'ok' ? 'check' : (k.st === 'stop' ? 'lock' : 'clock');
     const cm = chanMeta(prefChannel(c));
+    const since = clientSince(c);
+    const nDeals = (D().deals || []).filter((x) => x.clientId === c.id).length;
     const facts = [
-      ['clock', c.horizon ? 'Срок: ' + c.horizon : 'Срок не задан'],
-      ['money', c.budget ? WS.AED(c.budget) : '—'],
+      since ? ['calendar', 'в работе с ' + since.at] : null,
+      nDeals ? ['briefcase', nDeals + ' ' + plural(nDeals, 'сделка', 'сделки', 'сделок')] : null,
       [kycIcon, k.label],
       [cm[0], cm[1]],
-    ];
+    ].filter(Boolean);
     const factsHtml = '<div class="chero-facts">' + facts.map((f) => '<div class="chero-fact"><span class="chero-fact-icon">' + I(f[0]) + '</span><span>' + f[1] + '</span></div>').join('') + '</div>';
     return '<div class="chero">' + (bg ? '<img class="chero-img" src="' + bg + '" alt="">' : '') +
       '<div class="chero-scrim"></div>' +
