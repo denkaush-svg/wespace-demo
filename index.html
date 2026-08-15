@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:01</title>
+  <title>WESPACE · сборка 13:50</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:01';
+    window.WS_BUILD='13:50';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3761,7 +3761,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // A hand edit is a data change like any other. Writing through save() alone left dataRevision
   // untouched, so a Concierge proposal built before the edit still matched `expectedRevision` and
   // stayed confirmable — the stale-proposal guard silently stopped guarding.
-  function touch() { store.dataRevision++; save(); emit(); }
+  //  saves without redrawing — for a write made while a person is typing in the
+  // surface, where a re-render would replace the node under their cursor.
+  function touch(opts) { store.dataRevision++; save(); if (!opts || opts.render !== false) emit(); }
 
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
@@ -7463,7 +7465,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // The deal's essence, editable in place: one tab stop, a real textbox role, and a label that
   // says what the line is — a bare bold sentence under the hero reads as decoration, not a field.
   function dealTitleEdit(d) {
-    return '<div class="deal-title-edit" data-deal="' + d.id + '">' +
+    // NOT data-deal: the delegated click handler navigates on that attribute, so clicking into the
+    // field re-opened the card, re-rendered it and took the focus away mid-keystroke.
+    return '<div class="deal-title-edit" data-titledeal="' + d.id + '">' +
       '<span class="deal-title-lbl">' + I('pencil') + 'Суть сделки</span>' +
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Суть сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';
@@ -11639,6 +11643,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-act]');
     if (!t) return;
+    // Typing is not navigating. A click that starts inside an editable field belongs to the field,
+    // however many navigable ancestors it happens to sit under.
+    if (e.target.closest && e.target.closest('[contenteditable="true"], input, textarea, select')) return;
     const d = t.dataset;
 
     if (d.groupToggle) {
@@ -11890,12 +11897,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
     // Deal title inline edit: save on Enter, restore on Escape
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('deal-title-text')) {
-      e.preventDefault(); const box = e.target.parentElement;
-      if (box && box.dataset.deal) { const newTitle = (e.target.textContent || '').trim(); if (newTitle) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); } } }
+      e.preventDefault();
+      const box = e.target.closest('.deal-title-edit');
+      if (box && box.dataset.titledeal) {
+        const newTitle = (e.target.textContent || '').trim();
+        const d = store.data.deals.find((x) => x.id === box.dataset.titledeal);
+        // Enter is a deliberate commit, so the card is redrawn — the title also appears in the hero
+        // and in the tab labels, and they would otherwise disagree with the line just edited.
+        if (d && newTitle) { d.title = newTitle; api.touch(); WS.ui.dealCard(d.id); }
+        else if (d) { e.target.textContent = d.title || 'Сделка'; }
+      }
     }
     if (e.key === 'Escape') {
       if (e.target.classList && e.target.classList.contains('deal-title-text')) {
-        e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.deal) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
+        e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.titledeal) { const d = store.data.deals.find((x) => x.id === box.dataset.titledeal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
       } else { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
     }
     // focus trap: keep Tab within the open modal or navigator drawer (a11y §17)
@@ -11934,12 +11949,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const el = e.target;
     if (el && el.classList && el.classList.contains('deal-title-text')) {
       const box = el.closest('.deal-title-edit');
-      if (box && box.dataset.deal) {
+      if (box && box.dataset.titledeal) {
         const newTitle = (el.textContent || '').trim();
-        if (newTitle) {
-          const d = store.data.deals.find((x) => x.id === box.dataset.deal);
-          if (d && d.title !== newTitle) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); }
-        }
+        const d = store.data.deals.find((x) => x.id === box.dataset.titledeal);
+        // Blur saves silently: the text on screen IS the confirmation. A toast would redraw too
+        // — every emit replaces the node — which is the flash read as the app glitching.
+        if (d && newTitle && d.title !== newTitle) { d.title = newTitle; api.touch({ render: false }); }
+        else if (d && !newTitle) { el.textContent = d.title || 'Сделка'; }
       }
     }
   }, true);

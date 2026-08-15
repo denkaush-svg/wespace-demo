@@ -49,6 +49,9 @@
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-act]');
     if (!t) return;
+    // Typing is not navigating. A click that starts inside an editable field belongs to the field,
+    // however many navigable ancestors it happens to sit under.
+    if (e.target.closest && e.target.closest('[contenteditable="true"], input, textarea, select')) return;
     const d = t.dataset;
 
     if (d.groupToggle) {
@@ -300,12 +303,20 @@
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
     // Deal title inline edit: save on Enter, restore on Escape
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('deal-title-text')) {
-      e.preventDefault(); const box = e.target.parentElement;
-      if (box && box.dataset.deal) { const newTitle = (e.target.textContent || '').trim(); if (newTitle) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); } } }
+      e.preventDefault();
+      const box = e.target.closest('.deal-title-edit');
+      if (box && box.dataset.titledeal) {
+        const newTitle = (e.target.textContent || '').trim();
+        const d = store.data.deals.find((x) => x.id === box.dataset.titledeal);
+        // Enter is a deliberate commit, so the card is redrawn — the title also appears in the hero
+        // and in the tab labels, and they would otherwise disagree with the line just edited.
+        if (d && newTitle) { d.title = newTitle; api.touch(); WS.ui.dealCard(d.id); }
+        else if (d) { e.target.textContent = d.title || 'Сделка'; }
+      }
     }
     if (e.key === 'Escape') {
       if (e.target.classList && e.target.classList.contains('deal-title-text')) {
-        e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.deal) { const d = store.data.deals.find((x) => x.id === box.dataset.deal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
+        e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.titledeal) { const d = store.data.deals.find((x) => x.id === box.dataset.titledeal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
       } else { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
     }
     // focus trap: keep Tab within the open modal or navigator drawer (a11y §17)
@@ -344,12 +355,13 @@
     const el = e.target;
     if (el && el.classList && el.classList.contains('deal-title-text')) {
       const box = el.closest('.deal-title-edit');
-      if (box && box.dataset.deal) {
+      if (box && box.dataset.titledeal) {
         const newTitle = (el.textContent || '').trim();
-        if (newTitle) {
-          const d = store.data.deals.find((x) => x.id === box.dataset.deal);
-          if (d && d.title !== newTitle) { d.title = newTitle; api.save(); WS.ui.dealCard(d.id); }
-        }
+        const d = store.data.deals.find((x) => x.id === box.dataset.titledeal);
+        // Blur saves silently: the text on screen IS the confirmation. A toast would redraw too
+        // — every emit replaces the node — which is the flash read as the app glitching.
+        if (d && newTitle && d.title !== newTitle) { d.title = newTitle; api.touch({ render: false }); }
+        else if (d && !newTitle) { el.textContent = d.title || 'Сделка'; }
       }
     }
   }, true);

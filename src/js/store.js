@@ -448,7 +448,9 @@
   // A hand edit is a data change like any other. Writing through save() alone left dataRevision
   // untouched, so a Concierge proposal built before the edit still matched `expectedRevision` and
   // stayed confirmable — the stale-proposal guard silently stopped guarding.
-  function touch() { store.dataRevision++; save(); emit(); }
+  //  saves without redrawing — for a write made while a person is typing in the
+  // surface, where a re-render would replace the node under their cursor.
+  function touch(opts) { store.dataRevision++; save(); if (!opts || opts.render !== false) emit(); }
 
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);

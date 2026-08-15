@@ -2496,7 +2496,9 @@
   // The deal's essence, editable in place: one tab stop, a real textbox role, and a label that
   // says what the line is — a bare bold sentence under the hero reads as decoration, not a field.
   function dealTitleEdit(d) {
-    return '<div class="deal-title-edit" data-deal="' + d.id + '">' +
+    // NOT data-deal: the delegated click handler navigates on that attribute, so clicking into the
+    // field re-opened the card, re-rendered it and took the focus away mid-keystroke.
+    return '<div class="deal-title-edit" data-titledeal="' + d.id + '">' +
       '<span class="deal-title-lbl">' + I('pencil') + 'Суть сделки</span>' +
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Суть сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';

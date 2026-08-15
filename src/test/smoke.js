@@ -764,6 +764,31 @@ setTimeout(async () => {
     }
   }
 
+  // ---- an inline editor must survive being clicked ----
+  // The editable «Суть сделки» sat inside a wrapper carrying data-deal, the same attribute the
+  // delegated click handler navigates on. Clicking into the field reopened the card, replaced the
+  // node mid-keystroke and read as a flickering screen you could not type into. The regression is
+  // only visible through a real click: calling the render function proves nothing.
+  {
+    const td = dd().deals[0];
+    WS.ui.dealCard(td.id);
+    const field = doc.querySelector('.deal-title-text');
+    check('title · the editable field is rendered', !!field);
+    if (field) {
+      const viewWas = WS.store.view;
+      field.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('title · clicking into the field does not navigate', WS.store.view === viewWas, 'view=' + WS.store.view);
+      check('title · clicking into the field does not replace it', doc.contains(field));
+      // typing then leaving commits the new essence, without a redraw under the pointer
+      field.textContent = 'Новая суть сделки';
+      field.dispatchEvent(new win.FocusEvent('blur', { bubbles: false }));
+      check('title · leaving the field saves the new essence',
+        (dd().deals.find((x) => x.id === td.id) || {}).title === 'Новая суть сделки',
+        (dd().deals.find((x) => x.id === td.id) || {}).title);
+      check('title · the field is still the same node after saving', doc.contains(field));
+    }
+  }
+
   // ---- sort keys must agree with the dates they claim ----
   //  is a DDHHMM key built for a demo week in May. Entries dated in an earlier month were
   // given day-only keys, so «28 апреля» outranked «06 мая» and a merged feed showed the past on
