@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:14</title>
+  <title>WESPACE · сборка 18:09</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:14';
+    window.WS_BUILD='18:09';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -579,6 +579,13 @@ button { font-family: inherit; cursor: pointer; }
 .an-src.ok svg { color: var(--ok); }
 /* Drawn at a revision the data has since left behind. */
 .an-src .moved { color: var(--warn); font-weight: 600; }
+/* Which setting produced the answer — shown only when it was moved off default. */
+.an-mode { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px;
+  color: var(--faint); font-weight: 600; }
+.an-mode svg { width: 11px; height: 11px; color: var(--acc); }
+/* A mode that may not touch the workspace says so before it is chosen. */
+.cg-ro { margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .02em;
+  color: var(--faint); text-transform: uppercase; }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4560,14 +4567,30 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       I('voice2') + '<span class="lb">Прослушать</span></button></div>';
   }
 
+  /* Which setting produced this answer, as the server resolved it. Shown only
+     when the person moved something off the default — otherwise it is noise on
+     every reply. It reads back what actually ran: the mode pill is a real
+     instruction now, and an answer scrolled back to a day later should not
+     leave you guessing which one it was given. */
+  function modeNote(r) {
+    if (!r || !WS.ui || !WS.ui.cgModeLabel) return '';
+    const m = r.mode && r.mode !== 'auto' ? WS.ui.cgModeLabel(r.mode) : '';
+    const d = r.depth && r.depth !== 'think' ? WS.ui.cgDepthLabel(r.depth) : '';
+    const parts = [m, d].filter(Boolean);
+    return parts.length ? '<div class="an-mode">' + I('sparkle') + parts.join(' · ') + '</div>' : '';
+  }
+
   function answerCard(r, mid) {
     chipMid = mid || null;
     if (mid) replies[mid] = r;
+    // The note is appended after, never folded into `body`: `body` decides
+    // whether the prose is a lead paragraph or the whole answer, and a mode
+    // note would have quietly made every plain reply a lead.
     const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
     return msg('ai', I('sparkle') + ' Консьерж',
-      head + body + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
+      head + body + modeNote(r) + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>
@@ -5587,11 +5610,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     { ic: 'trend', t: 'Что изменилось', d: 'Новые запуски и движения цен с прошлого раза' },
     { ic: 'bell', t: 'Watch · стоящий агент', d: 'Пинг, когда появится подходящий объект' },
   ];
+  /* Depth is a ceiling, not a promise: it cannot buy the model more thinking
+     from a printing CLI, so what it honestly changes is how much is asked for
+     and how long the answer may take. The hints used to promise reasoning
+     steps and multi-source research, neither of which happened. */
   const CG_DEPTH = [
-    { k: 'fast', t: 'Быстро', hint: 'Мгновенный ответ без рассуждений' },
-    { k: 'think', t: 'Размышление', hint: 'Взвешенный разбор в несколько шагов' },
-    { k: 'deep', t: 'Глубоко', hint: 'Многоисточниковое исследование' },
+    { k: 'fast', t: 'Быстро', hint: 'Коротко: две-три фразы, до трёх блоков' },
+    { k: 'think', t: 'Размышление', hint: 'Разбор по существу, до восьми блоков' },
+    { k: 'deep', t: 'Глубоко', hint: 'Полный разбор с оговорками; отвечает дольше' },
   ];
+  // Which modes may propose a change to the workspace. The rule is enforced in
+  // the proxy and again where the write happens; here it is only shown, so the
+  // control says what it does before it is pressed.
+  const CG_READ_ONLY = { roi: true, dd: true, cma: true };
+  const cgModeLabel = (k) => (CG_MODES.find((m) => m.k === k) || {}).t || '';
+  const cgDepthLabel = (k) => (CG_DEPTH.find((d) => d.k === k) || {}).t || '';
+  const cgWrites = (k) => !CG_READ_ONLY[k];
   // Agent workshop — square tiles on the Concierge home. Turn the concierge into YOUR
   // customized agent: build sub-agents, recurring loops, schedules, triggers, sources.
   const CG_WORKSHOP = [
@@ -5658,7 +5692,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // description so it reads as an intelligent posture, not a filter.
   function cgModeMenu() {
     const cur = S().cgMode || 'auto';
-    const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span>' + (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
+    const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) +
+      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">только чтение</span>' : '') + '</b><i>' + m.d + '</i></span>' +
+      (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
     const soon = (m) => '<div class="cg-item mode-row soon">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span><span class="cg-soon">скоро</span></div>';
     return '<div class="cg-pop-inner">' +
       '<div class="cg-sec">Режим Консьержа</div>' + CG_MODES.map(row).join('') +
@@ -10099,7 +10135,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn" data-act="closeModal">Оставить как есть</button><button class="btn primary" data-act="reset">Безопасный сброс</button>');
   }
 
-  WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+  WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
+    openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
@@ -11038,11 +11075,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return null;
   }
 
-  function normBlocks(list) {
+  function normBlocks(list, cap) {
     if (!Array.isArray(list)) return null;
+    const limit = cap > 0 ? cap : blockCap();
     const out = [];
     list.forEach((b) => {
-      if (out.length >= 10) return;
+      if (out.length >= limit) return;
       if (!b || typeof b !== 'object') return;
       const t = String(b.t);
       if (!BLOCK_ARRAYS[t]) return;
@@ -11068,7 +11106,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      into a false claim. Numbers in a document come from a query or not at all. */
   function normReport(r) {
     if (!r || typeof r !== 'object') return null;
-    const all = normBlocks(r.blocks);
+    // A document is asked for outright, so the depth ceiling — which shapes the
+    // reply in the chat — does not shorten it.
+    const all = normBlocks(r.blocks, 10);
     if (!all) return null;
     const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data');
     if (!blocks.length) return null;
@@ -11097,6 +11137,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const chip = openChip(plan.open);
     if (chip) next = [chip].concat(next || []).slice(0, 3);
 
+    /* A read-only mode may not write, and the refusal is visible: silently
+       dropping the proposal would read as the model ignoring the request.
+
+       `refusedAct` is the server saying it already cut one out. Both are
+       needed: switch the pill while an answer is in flight and the mode here
+       is no longer the mode it was asked in — without the flag that reply
+       would quietly lose its action. */
+    if (plan.refusedAct || (plan.act && READ_ONLY[String((WS.store || {}).cgMode || '')])) {
+      return {
+        kind: 'answer',
+        text: text + ' Менять что-либо в этом режиме нельзя — переключите режим на «Авто», и я предложу изменение.',
+        evidence: evidence, next: next,
+      };
+    }
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
       const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next });
@@ -11117,13 +11171,38 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     };
   }
 
+  /* What the person set in the composer. The mode pill, the depth segment and
+     the context chips were stored, drawn and dropped — the model never saw any
+     of them. Only the ids and the pinned labels go over: the framing behind an
+     id belongs to the server, because the endpoint is public and framing a
+     caller sends is framing a caller wrote. */
+  function composer() {
+    const s = WS.store || {};
+    const focus = (Array.isArray(s.cgCtx) ? s.cgCtx : []).slice(0, 8)
+      .map((c) => ({ label: String(c && c.label || '').slice(0, 80), att: !!(c && c.att) }))
+      .filter((c) => c.label);
+    return { mode: String(s.cgMode || 'auto'), depth: String(s.cgDepth || 'think'), focus: focus };
+  }
+
+  // How many blocks the chosen depth allows. The server asks for it in words;
+  // the ceiling is kept here, where the blocks are actually built.
+  const DEPTH_BLOCKS = { fast: 3, think: 8, deep: 10 };
+  function blockCap() {
+    return DEPTH_BLOCKS[String((WS.store || {}).cgDepth || 'think')] || 8;
+  }
+
+  // Modes that may not touch the workspace. The server strips `act` on its
+  // side; this is the same rule where the write would actually happen.
+  const READ_ONLY = { roi: true, dd: true, cma: true };
+
   // ---------- transport ----------
 
   async function stream(text, onText) {
     const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: text, digest: digest(), history: history(), scope: scope() }),
+      body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope() },
+        composer())),
     });
     if (!res.ok || !res.body) throw new Error('http ' + res.status);
 
@@ -11171,6 +11250,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const done = await stream(text, opts && opts.onText);
     const reply = toReply(done.say, done.plan || {});
     if (!reply) throw new Error('empty reply');
+    // What actually answered, as the server resolved it — not what the page
+    // hoped it had asked for. An id it does not know falls back over there.
+    reply.mode = done.mode || null;
+    reply.depth = done.depth || null;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;
@@ -11233,7 +11316,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable, composer,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

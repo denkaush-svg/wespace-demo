@@ -1144,6 +1144,103 @@ setTimeout(async () => {
           line);
       }
 
+      /* The composer had a mode pill, a depth segment and context chips, and
+         none of the three reached the model: stored, drawn, dropped. A control
+         that changes nothing teaches the person that the handles on this thing
+         are decoration. These checks are about the handles being real. */
+      {
+        const st = WS.store;
+        const modeWas = st.cgMode, depthWas = st.cgDepth, ctxWas = st.cgCtx;
+
+        st.cgMode = 'roi'; st.cgDepth = 'deep';
+        st.cgCtx = [{ label: 'Объект: Creekline' }, { label: 'Переписка с клиентом', att: true }];
+        const sent = L.composer();
+        check('режим · what the composer holds is what gets sent',
+          sent.mode === 'roi' && sent.depth === 'deep' && sent.focus.length === 2 && sent.focus[1].att === true,
+          JSON.stringify(sent));
+
+        // The framing behind an id lives on the server: the endpoint is public,
+        // and framing a caller sends is framing a caller wrote.
+        check('режим · and only the id travels, never the wording',
+          Object.keys(sent).join(',') === 'mode,depth,focus' &&
+          JSON.stringify(sent).indexOf('Инвест') < 0, JSON.stringify(sent).slice(0, 80));
+
+        // A read-only mode is enforced where the write would happen, not only
+        // in the prompt — and the refusal is visible, because a proposal that
+        // silently vanishes reads as the model ignoring the request.
+        const refused = L.toReply('Перевожу дальше.', { act: { op: 'dealStage', id: dd().deals[0].id, stage: 'work' } });
+        check('режим · a read-only mode does not propose a change',
+          !!refused && refused.kind === 'answer' && refused.text.indexOf('нельзя') > 0, JSON.stringify(refused && refused.kind));
+        check('режим · and it says how to get one', !!refused && refused.text.indexOf('«Авто»') > 0, refused && refused.text);
+
+        st.cgMode = 'auto';
+        const allowed = L.toReply('Перевожу дальше.', { act: { op: 'dealStage', id: dd().deals[0].id, stage: 'work' } });
+        check('режим · in a writing mode the same reply becomes a proposal',
+          !!allowed && allowed.kind === 'proposal', JSON.stringify(allowed && allowed.kind));
+
+        // Switch the pill while an answer is in flight and the mode here is no
+        // longer the mode it was asked in. The server says it already cut the
+        // action out; without honouring that, the reply loses it in silence.
+        const late = L.toReply('Перевожу дальше.', { refusedAct: 'roi' });
+        check('режим · a refusal the server made is not lost when the pill has moved on',
+          !!late && late.kind === 'answer' && late.text.indexOf('нельзя') > 0, JSON.stringify(late && late.kind));
+
+        // Depth is a ceiling, and the ceiling is kept where the blocks are built.
+        const many = () => Array.from({ length: 30 }, () => ({ t: 'p', text: 'x' }));
+        st.cgDepth = 'fast';
+        check('глубина · «Быстро» keeps the answer short', L.normBlocks(many()).length === 3);
+        st.cgDepth = 'deep';
+        check('глубина · «Глубоко» allows the full set', L.normBlocks(many()).length === 10);
+        /* The server states the ceiling to the model; the page enforces it.
+           Two numbers, and nothing has been making them agree — the prompt
+           could ask for eight while the page cut at three, and the answer
+           would arrive visibly truncated with nobody at fault. Read out of the
+           shipped rules, not restated here. */
+        {
+          const rules = fs.readFileSync(path.join(D, '..', 'server', 'proxy.js'), 'utf8');
+          const said = {};
+          ['fast', 'think', 'deep'].forEach((k) => {
+            const m = new RegExp(k + ':\\s*\\{\\s*blocks:\\s*(\\d+)').exec(rules);
+            said[k] = m ? Number(m[1]) : null;
+          });
+          const enforced = {};
+          ['fast', 'think', 'deep'].forEach((k) => {
+            st.cgDepth = k;
+            enforced[k] = L.normBlocks(many()).length;
+          });
+          check('глубина · the page cuts at exactly the number the rules ask for',
+            said.fast === enforced.fast && said.think === enforced.think && said.deep === enforced.deep,
+            JSON.stringify({ said: said, enforced: enforced }));
+        }
+
+        // A document is asked for outright; the chat's ceiling does not shorten it.
+        st.cgDepth = 'fast';
+        const rp = L.normReport({ title: 'Разбор', blocks: many() });
+        check('глубина · but a document is not cut to the chat’s ceiling',
+          !!rp && rp.blocks.length === 10, rp && rp.blocks.length);
+
+        // What actually answered, as the server resolved it.
+        const card = doc.createElement('div');
+        card.innerHTML = WS.engine.agentCard(
+          { kind: 'answer', text: 'ответ', evidence: [], next: [], mode: 'roi', depth: 'deep' }, 'mMode');
+        check('режим · the answer says which setting produced it',
+          (card.textContent || '').indexOf('Инвест-анализ · ROI') >= 0 &&
+          (card.textContent || '').indexOf('Глубоко') >= 0, (card.textContent || '').slice(0, 120));
+        const plain = doc.createElement('div');
+        plain.innerHTML = WS.engine.agentCard(
+          { kind: 'answer', text: 'ответ', evidence: [], next: [], mode: 'auto', depth: 'think' }, 'mMode2');
+        check('режим · and stays quiet when nothing was moved off default',
+          (plain.textContent || '').indexOf('Размышление') < 0, (plain.textContent || '').slice(0, 90));
+
+        // The control says what it does before it is pressed.
+        check('режим · the picker knows which modes may not write',
+          WS.ui.cgWrites('auto') === true && WS.ui.cgWrites('roi') === false &&
+          WS.ui.cgWrites('cma') === false && WS.ui.cgWrites('qual') === true,
+          [WS.ui.cgWrites('auto'), WS.ui.cgWrites('roi')].join(','));
+
+        st.cgMode = modeWas; st.cgDepth = depthWas; st.cgCtx = ctxWas;
+      }
+
       // Evidence carries the revision it was read at.
       const ev = L.evidenceFor(['deals_active']);
       check('основания · a chip remembers the revision it was read at',
@@ -1279,8 +1376,8 @@ setTimeout(async () => {
     {
       check('live · an unknown block shape is dropped',
         L.normBlocks([{ t: 'script', text: 'x' }, { t: 'p', text: 'ок' }]).length === 1);
-      check('live · block lists are capped',
-        L.normBlocks(Array.from({ length: 30 }, () => ({ t: 'p', text: 'x' }))).length === 10);
+      check('live · block lists are capped by the chosen depth',
+        L.normBlocks(Array.from({ length: 30 }, () => ({ t: 'p', text: 'x' }))).length === 8);
       check('live · a reply that is only blocks still stands',
         (L.toReply('', { blocks: [{ t: 'p', text: 'только разбор' }] }) || {}).kind === 'answer');
 

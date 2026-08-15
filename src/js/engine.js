@@ -760,14 +760,30 @@
       I('voice2') + '<span class="lb">Прослушать</span></button></div>';
   }
 
+  /* Which setting produced this answer, as the server resolved it. Shown only
+     when the person moved something off the default — otherwise it is noise on
+     every reply. It reads back what actually ran: the mode pill is a real
+     instruction now, and an answer scrolled back to a day later should not
+     leave you guessing which one it was given. */
+  function modeNote(r) {
+    if (!r || !WS.ui || !WS.ui.cgModeLabel) return '';
+    const m = r.mode && r.mode !== 'auto' ? WS.ui.cgModeLabel(r.mode) : '';
+    const d = r.depth && r.depth !== 'think' ? WS.ui.cgDepthLabel(r.depth) : '';
+    const parts = [m, d].filter(Boolean);
+    return parts.length ? '<div class="an-mode">' + I('sparkle') + parts.join(' · ') + '</div>' : '';
+  }
+
   function answerCard(r, mid) {
     chipMid = mid || null;
     if (mid) replies[mid] = r;
+    // The note is appended after, never folded into `body`: `body` decides
+    // whether the prose is a lead paragraph or the whole answer, and a mode
+    // note would have quietly made every plain reply a lead.
     const body = blocksHtml(r.blocks) + reportCard(r.report);
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
     return msg('ai', I('sparkle') + ' Консьерж',
-      head + body + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
+      head + body + modeNote(r) + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>

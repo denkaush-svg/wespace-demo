@@ -73,6 +73,14 @@ function run() {
     result(t);
     return process.exit(0);
   }
+  // A reply that wants to change the workspace — what a read-only mode has to
+  // be able to refuse.
+  if (MODE === 'act') {
+    const t = 'Перевожу сделку дальше.\n```json\n{"act":{"op":"dealStage","id":"d_anna","stage":"work"}}\n```';
+    delta(t);
+    result(t);
+    return process.exit(0);
+  }
   if (MODE === 'plain') {
     const t = 'Без плана, только текст.';
     delta(t);

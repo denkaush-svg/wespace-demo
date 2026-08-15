@@ -302,6 +302,81 @@ async function modelChecks() {
     sent.indexOf('=== ДАННЫЕ') >= 0 &&
     sent.indexOf('=== ДАННЫЕ') < sent.indexOf('ТОЛЬКО_В_ДАННЫХ') &&
     sent.indexOf('ТОЛЬКО_В_ДАННЫХ') < sent.indexOf('=== КОНЕЦ ДАННЫХ ==='));
+
+  await modeChecks();
+}
+
+/* ---------- the composer's handles ----------
+
+   The mode pill, the depth segment and the context chips were stored, drawn
+   and dropped: the model never saw one of them. These checks are about the
+   difference between a control and a picture of a control. */
+async function modeChecks() {
+  const P = require('../proxy.js');
+
+  // The framing behind an id belongs here. A caller that sends its own is
+  // sending framing a caller wrote — to an endpoint anyone can reach.
+  let sp = P.resolveCall({ mode: 'roi', depth: 'deep' });
+  ok('a known mode and depth are taken', sp.mode === 'roi' && sp.depth === 'deep', JSON.stringify(sp));
+  sp = P.resolveCall({ mode: 'нет-такого', depth: 'бесконечно' });
+  ok('an unknown one falls back rather than passing through',
+    sp.mode === 'auto' && sp.depth === 'think', JSON.stringify(sp));
+  sp = P.resolveCall({ mode: { toString: () => 'roi' } });
+  ok('and a mode that is not a string is refused', sp.mode === 'auto', JSON.stringify(sp));
+
+  const roi = P.buildPrompt({ text: 'вопрос', mode: 'roi', depth: 'deep' });
+  ok('the chosen mode reaches the model as its own section',
+    roi.indexOf('=== РЕЖИМ ===') >= 0 && roi.indexOf('Инвест-анализ') >= 0, roi.slice(0, 0) + '');
+  ok('a read-only mode is told so', roi.indexOf('только для чтения') >= 0);
+  ok('and the depth asks for what it says on the control', roi.indexOf('Глубина «Глубоко»') >= 0);
+  const auto = P.buildPrompt({ text: 'вопрос' });
+  ok('a writing mode is told the other thing', auto.indexOf('только для чтения') < 0 &&
+    auto.indexOf('через act и с подтверждением') >= 0);
+  ok('every mode says the outside is not connected',
+    auto.indexOf('Внешние источники не подключены') >= 0);
+
+  // Pinned chips are the person's own narrowing — values, not instructions.
+  const pinned = P.buildPrompt({ text: 'x', focus: [{ label: 'Объект: Creekline' }, { label: 'Клиент: Анна' }] });
+  ok('what the broker pinned reaches the model as narrowing',
+    pinned.indexOf('Брокер сузил разговор до: Объект: Creekline; Клиент: Анна.') >= 0);
+  // The attachments on this stand are props. Handed over without that said,
+  // the model reads a filename and invents the file.
+  const att = P.buildPrompt({ text: 'x', focus: [{ label: 'Переписка с клиентом', att: true }] });
+  ok('an attachment is handed over as the empty prop it is',
+    att.indexOf('Содержимого у этих вложений нет') >= 0 && att.indexOf('Не пересказывай их') >= 0);
+  const flood = P.buildPrompt({ text: 'x', focus: Array.from({ length: 40 }, (_, i) => ({ label: 'чип' + i })) });
+  ok('and the list of them is bounded', flood.indexOf('чип8') < 0, 'чип8 present');
+
+  // Depth buys time from the server's own table, never from the caller.
+  ok('a deeper answer is allowed longer', P.depthTimeout('deep') > P.depthTimeout('fast'),
+    P.depthTimeout('deep') + ' vs ' + P.depthTimeout('fast'));
+  const capWas = P.CFG.maxTimeoutMs;
+  P.CFG.maxTimeoutMs = 1000;
+  ok('but never past the ceiling', P.depthTimeout('deep') === 1000, String(P.depthTimeout('deep')));
+  P.CFG.maxTimeoutMs = capWas;
+
+  /* A read-only mode is enforced, not requested. The rule is in the prompt
+     too, and a rule that lives only in the prompt is one the model may
+     decline — quietly, on the turn that matters. */
+  refill();
+  let res = await ask({ text: 'смени стадию', mode: 'roi' }, 'act');
+  let done = events(res.body).find((e) => e.event === 'done');
+  ok('a change proposed in a read-only mode is cut out',
+    !!done && !done.data.plan.act && done.data.plan.refusedAct === 'roi',
+    JSON.stringify(done && done.data.plan));
+  refill();
+  res = await ask({ text: 'смени стадию', mode: 'auto' }, 'act');
+  done = events(res.body).find((e) => e.event === 'done');
+  ok('while in a writing mode it survives', !!done && !!done.data.plan.act,
+    JSON.stringify(done && done.data.plan));
+  ok('and the answer says which mode actually ran',
+    !!done && done.data.mode === 'auto' && done.data.depth === 'think',
+    JSON.stringify(done && { m: done.data.mode, d: done.data.depth }));
+  refill();
+  res = await ask({ text: 'вопрос', mode: 'нет-такого' }, 'ok');
+  done = events(res.body).find((e) => e.event === 'done');
+  ok('an unknown mode is reported as the one that replaced it',
+    !!done && done.data.mode === 'auto', JSON.stringify(done && done.data.mode));
 }
 
 // ---------- guards ----------

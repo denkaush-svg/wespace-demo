@@ -355,11 +355,12 @@
     return null;
   }
 
-  function normBlocks(list) {
+  function normBlocks(list, cap) {
     if (!Array.isArray(list)) return null;
+    const limit = cap > 0 ? cap : blockCap();
     const out = [];
     list.forEach((b) => {
-      if (out.length >= 10) return;
+      if (out.length >= limit) return;
       if (!b || typeof b !== 'object') return;
       const t = String(b.t);
       if (!BLOCK_ARRAYS[t]) return;
@@ -385,7 +386,9 @@
      into a false claim. Numbers in a document come from a query or not at all. */
   function normReport(r) {
     if (!r || typeof r !== 'object') return null;
-    const all = normBlocks(r.blocks);
+    // A document is asked for outright, so the depth ceiling — which shapes the
+    // reply in the chat — does not shorten it.
+    const all = normBlocks(r.blocks, 10);
     if (!all) return null;
     const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data');
     if (!blocks.length) return null;
@@ -414,6 +417,20 @@
     const chip = openChip(plan.open);
     if (chip) next = [chip].concat(next || []).slice(0, 3);
 
+    /* A read-only mode may not write, and the refusal is visible: silently
+       dropping the proposal would read as the model ignoring the request.
+
+       `refusedAct` is the server saying it already cut one out. Both are
+       needed: switch the pill while an answer is in flight and the mode here
+       is no longer the mode it was asked in — without the flag that reply
+       would quietly lose its action. */
+    if (plan.refusedAct || (plan.act && READ_ONLY[String((WS.store || {}).cgMode || '')])) {
+      return {
+        kind: 'answer',
+        text: text + ' Менять что-либо в этом режиме нельзя — переключите режим на «Авто», и я предложу изменение.',
+        evidence: evidence, next: next,
+      };
+    }
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
       const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next });
@@ -434,13 +451,38 @@
     };
   }
 
+  /* What the person set in the composer. The mode pill, the depth segment and
+     the context chips were stored, drawn and dropped — the model never saw any
+     of them. Only the ids and the pinned labels go over: the framing behind an
+     id belongs to the server, because the endpoint is public and framing a
+     caller sends is framing a caller wrote. */
+  function composer() {
+    const s = WS.store || {};
+    const focus = (Array.isArray(s.cgCtx) ? s.cgCtx : []).slice(0, 8)
+      .map((c) => ({ label: String(c && c.label || '').slice(0, 80), att: !!(c && c.att) }))
+      .filter((c) => c.label);
+    return { mode: String(s.cgMode || 'auto'), depth: String(s.cgDepth || 'think'), focus: focus };
+  }
+
+  // How many blocks the chosen depth allows. The server asks for it in words;
+  // the ceiling is kept here, where the blocks are actually built.
+  const DEPTH_BLOCKS = { fast: 3, think: 8, deep: 10 };
+  function blockCap() {
+    return DEPTH_BLOCKS[String((WS.store || {}).cgDepth || 'think')] || 8;
+  }
+
+  // Modes that may not touch the workspace. The server strips `act` on its
+  // side; this is the same rule where the write would actually happen.
+  const READ_ONLY = { roi: true, dd: true, cma: true };
+
   // ---------- transport ----------
 
   async function stream(text, onText) {
     const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: text, digest: digest(), history: history(), scope: scope() }),
+      body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope() },
+        composer())),
     });
     if (!res.ok || !res.body) throw new Error('http ' + res.status);
 
@@ -488,6 +530,10 @@
     const done = await stream(text, opts && opts.onText);
     const reply = toReply(done.say, done.plan || {});
     if (!reply) throw new Error('empty reply');
+    // What actually answered, as the server resolved it — not what the page
+    // hoped it had asked for. An id it does not know falls back over there.
+    reply.mode = done.mode || null;
+    reply.depth = done.depth || null;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;
@@ -550,7 +596,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable,
+    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable, composer,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

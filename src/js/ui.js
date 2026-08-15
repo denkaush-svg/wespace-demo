@@ -541,11 +541,22 @@
     { ic: 'trend', t: 'Что изменилось', d: 'Новые запуски и движения цен с прошлого раза' },
     { ic: 'bell', t: 'Watch · стоящий агент', d: 'Пинг, когда появится подходящий объект' },
   ];
+  /* Depth is a ceiling, not a promise: it cannot buy the model more thinking
+     from a printing CLI, so what it honestly changes is how much is asked for
+     and how long the answer may take. The hints used to promise reasoning
+     steps and multi-source research, neither of which happened. */
   const CG_DEPTH = [
-    { k: 'fast', t: 'Быстро', hint: 'Мгновенный ответ без рассуждений' },
-    { k: 'think', t: 'Размышление', hint: 'Взвешенный разбор в несколько шагов' },
-    { k: 'deep', t: 'Глубоко', hint: 'Многоисточниковое исследование' },
+    { k: 'fast', t: 'Быстро', hint: 'Коротко: две-три фразы, до трёх блоков' },
+    { k: 'think', t: 'Размышление', hint: 'Разбор по существу, до восьми блоков' },
+    { k: 'deep', t: 'Глубоко', hint: 'Полный разбор с оговорками; отвечает дольше' },
   ];
+  // Which modes may propose a change to the workspace. The rule is enforced in
+  // the proxy and again where the write happens; here it is only shown, so the
+  // control says what it does before it is pressed.
+  const CG_READ_ONLY = { roi: true, dd: true, cma: true };
+  const cgModeLabel = (k) => (CG_MODES.find((m) => m.k === k) || {}).t || '';
+  const cgDepthLabel = (k) => (CG_DEPTH.find((d) => d.k === k) || {}).t || '';
+  const cgWrites = (k) => !CG_READ_ONLY[k];
   // Agent workshop — square tiles on the Concierge home. Turn the concierge into YOUR
   // customized agent: build sub-agents, recurring loops, schedules, triggers, sources.
   const CG_WORKSHOP = [
@@ -612,7 +623,9 @@
   // description so it reads as an intelligent posture, not a filter.
   function cgModeMenu() {
     const cur = S().cgMode || 'auto';
-    const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span>' + (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
+    const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) +
+      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">только чтение</span>' : '') + '</b><i>' + m.d + '</i></span>' +
+      (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
     const soon = (m) => '<div class="cg-item mode-row soon">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span><span class="cg-soon">скоро</span></div>';
     return '<div class="cg-pop-inner">' +
       '<div class="cg-sec">Режим Консьержа</div>' + CG_MODES.map(row).join('') +
@@ -5053,7 +5066,8 @@
       '<button class="btn" data-act="closeModal">Оставить как есть</button><button class="btn primary" data-act="reset">Безопасный сброс</button>');
   }
 
-  WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+  WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
+    openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
