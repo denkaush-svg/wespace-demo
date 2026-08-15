@@ -102,6 +102,7 @@
     const p = {
       kind: 'proposal', id: id, tier: dry.tier, ops: ops, revision: WS.store.dataRevision,
       subject: (meta && meta.subject) || null,
+      askedIn: (meta && meta.askedIn) || '',
       title: (meta && meta.title) || 'Изменение',
       lines: (meta && meta.lines) || dry.pending,
       note: dry.tier === 'guarded' ? 'Требует подтверждения — меняются деньги, стадия или владелец.' : 'Применю сразу после подтверждения.',

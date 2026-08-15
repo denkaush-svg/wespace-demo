@@ -1165,25 +1165,33 @@ setTimeout(async () => {
           Object.keys(sent).join(',') === 'mode,depth,focus' &&
           JSON.stringify(sent).indexOf('Инвест') < 0, JSON.stringify(sent).slice(0, 80));
 
-        // A read-only mode is enforced where the write would happen, not only
-        // in the prompt — and the refusal is visible, because a proposal that
-        // silently vanishes reads as the model ignoring the request.
-        const refused = L.toReply('Перевожу дальше.', { act: { op: 'dealStage', id: dd().deals[0].id, stage: 'work' } });
-        check('режим · a read-only mode does not propose a change',
-          !!refused && refused.kind === 'answer' && refused.text.indexOf('нельзя') > 0, JSON.stringify(refused && refused.kind));
-        check('режим · and it says how to get one', !!refused && refused.text.indexOf('«Авто»') > 0, refused && refused.text);
+        /* An instruction is carried out from any mode. It used to be cut out in
+           the analysis modes, so a broker reading a report and saying «переведи
+           сделку дальше» was sent to switch mode and say it again. That gate
+           protected nothing — the change was already inert until a person
+           confirmed the exact old → new diff — and it cost exactly that. */
+        const act = { op: 'dealStage', id: dd().deals[0].id, stage: 'work' };
+        const fromAnalysis = L.toReply('Перевожу дальше.', { act: act });
+        check('режим · an instruction given from an analysis mode is carried out',
+          !!fromAnalysis && fromAnalysis.kind === 'proposal', JSON.stringify(fromAnalysis && fromAnalysis.kind));
+        check('режим · and the card says which posture it was asked from',
+          !!fromAnalysis && fromAnalysis.askedIn === 'Инвест-анализ · ROI', fromAnalysis && fromAnalysis.askedIn);
+        /* What the live path does next: it stamps the resolved ids onto the
+           reply. The posture label lived in the same field, so on the real path
+           — and only there — the card read «запрошено вами · roi». The two
+           belong to different readers and must not share a name. */
+        fromAnalysis.mode = 'roi'; fromAnalysis.depth = 'think';
+        const askedCard = doc.createElement('div');
+        askedCard.innerHTML = WS.engine.agentCard(fromAnalysis, 'mAsk');
+        check('режим · stamping the resolved id does not overwrite the posture on the card',
+          (askedCard.textContent || '').indexOf('· roi') < 0, (askedCard.textContent || '').slice(0, 140));
+        check('режим · so a change is not mistaken for the analysis proposing it',
+          (askedCard.textContent || '').indexOf('запрошено вами') >= 0, (askedCard.textContent || '').slice(0, 140));
 
         st.cgMode = 'auto';
-        const allowed = L.toReply('Перевожу дальше.', { act: { op: 'dealStage', id: dd().deals[0].id, stage: 'work' } });
-        check('режим · in a writing mode the same reply becomes a proposal',
-          !!allowed && allowed.kind === 'proposal', JSON.stringify(allowed && allowed.kind));
-
-        // Switch the pill while an answer is in flight and the mode here is no
-        // longer the mode it was asked in. The server says it already cut the
-        // action out; without honouring that, the reply loses it in silence.
-        const late = L.toReply('Перевожу дальше.', { refusedAct: 'roi' });
-        check('режим · a refusal the server made is not lost when the pill has moved on',
-          !!late && late.kind === 'answer' && late.text.indexOf('нельзя') > 0, JSON.stringify(late && late.kind));
+        const fromAuto = L.toReply('Перевожу дальше.', { act: act });
+        check('режим · from «Авто» the card carries no posture label',
+          !!fromAuto && fromAuto.kind === 'proposal' && !fromAuto.askedIn, JSON.stringify(fromAuto && fromAuto.askedIn));
 
         // Depth is a ceiling, and the ceiling is kept where the blocks are built.
         const many = () => Array.from({ length: 30 }, () => ({ t: 'p', text: 'x' }));
@@ -1213,6 +1221,19 @@ setTimeout(async () => {
             JSON.stringify({ said: said, enforced: enforced }));
         }
 
+        /* The presenter's own hand is a race: switch to «Быстро» while a deep
+           answer is in flight and it used to be cut to three blocks and then
+           labelled «Глубоко». The setting an answer was given under is the one
+           it is shaped by. */
+        st.cgDepth = 'fast';
+        const deepRan = L.toReply('ответ', { blocks: many() }, { mode: 'auto', depth: 'deep' });
+        check('глубина · an answer is cut by the setting it ran under, not the one on screen now',
+          !!deepRan && deepRan.blocks.length === 10, deepRan && deepRan.blocks.length);
+        const askedFrom = L.toReply('ок', { act: { op: 'dealStage', id: dd().deals[0].id, stage: 'work' } },
+          { mode: 'cma', depth: 'think' });
+        check('режим · and marked with the mode it ran under',
+          !!askedFrom && askedFrom.askedIn === 'Оценка · CMA', askedFrom && askedFrom.askedIn);
+
         // A document is asked for outright; the chat's ceiling does not shorten it.
         st.cgDepth = 'fast';
         const rp = L.normReport({ title: 'Разбор', blocks: many() });
@@ -1232,8 +1253,9 @@ setTimeout(async () => {
         check('режим · and stays quiet when nothing was moved off default',
           (plain.textContent || '').indexOf('Размышление') < 0, (plain.textContent || '').slice(0, 90));
 
-        // The control says what it does before it is pressed.
-        check('режим · the picker knows which modes may not write',
+        // The control says what it does before it is pressed — and what it says
+        // is now «не меняет сам», because that is what it does.
+        check('режим · the picker knows which modes keep to analysis',
           WS.ui.cgWrites('auto') === true && WS.ui.cgWrites('roi') === false &&
           WS.ui.cgWrites('cma') === false && WS.ui.cgWrites('qual') === true,
           [WS.ui.cgWrites('auto'), WS.ui.cgWrites('roi')].join(','));

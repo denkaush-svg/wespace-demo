@@ -441,9 +441,13 @@ button { font-family: inherit; cursor: pointer; }
 .an-mode { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px;
   color: var(--faint); font-weight: 600; }
 .an-mode svg { width: 11px; height: 11px; color: var(--acc); }
-/* A mode that may not touch the workspace says so before it is chosen. */
+/* A mode that keeps to analysis says so before it is chosen. */
 .cg-ro { margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .02em;
   color: var(--faint); text-transform: uppercase; }
+/* The posture a change was asked from, on the confirmation card. */
+.pmode { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 10px;
+  font-weight: 600; color: var(--faint); }
+.pmode svg { width: 10px; height: 10px; color: var(--acc); }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

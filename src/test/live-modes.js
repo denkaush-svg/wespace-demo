@@ -65,6 +65,8 @@ const TURNS = [
     out.push(await page.evaluate(() => {
       const r = window.WS.engine.lastReply || {};
       return { kind: r.kind, mode: r.mode, depth: r.depth, blocks: (r.blocks || []).length,
+        askedIn: r.askedIn || '',
+        badge: (document.getElementById('chat').textContent || '').indexOf('запрошено вами') >= 0,
         text: (r.text || '').slice(0, 150) };
     }));
   }
@@ -76,11 +78,17 @@ const TURNS = [
   const ok = (n, c, d) => { console.log((c ? '  OK  ' : '  FAIL ') + n + (d ? '  [' + d + ']' : '')); if (!c) bad++; };
   const [ro, rw, fast, deep] = out;
 
-  ok('a read-only mode answers instead of proposing a change',
-    ro.kind === 'answer', ro.kind + ' · ' + ro.text);
-  ok('and it says where the change can be made', /режим|Авто/i.test(ro.text), ro.text);
-  ok('the same request in a writing mode becomes a proposal',
+  // The instruction is carried out from the analysis mode too — nobody is sent
+  // to switch a setting and say it again.
+  ok('an instruction given from an analysis mode is carried out',
+    ro.kind === 'proposal', ro.kind + ' · ' + ro.text);
+  ok('and nobody is told to switch mode and repeat it',
+    !/переключ/i.test(ro.text), ro.text);
+  ok('the card says which posture it was asked from',
+    ro.askedIn === 'Инвест-анализ · ROI' && ro.badge === true, ro.askedIn + ' badge=' + ro.badge);
+  ok('the same request in a working mode is also a proposal',
     rw.kind === 'proposal', rw.kind + ' · ' + rw.text);
+  ok('and from «Авто» it carries no posture label', !rw.askedIn, rw.askedIn);
   ok('the answer reports the mode the server resolved',
     ro.mode === 'roi' && rw.mode === 'auto', ro.mode + ' / ' + rw.mode);
   ok('«Быстро» keeps the answer short', fast.blocks > 0 && fast.blocks <= 3, 'blocks=' + fast.blocks);

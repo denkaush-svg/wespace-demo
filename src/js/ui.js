@@ -550,9 +550,11 @@
     { k: 'think', t: 'Размышление', hint: 'Разбор по существу, до восьми блоков' },
     { k: 'deep', t: 'Глубоко', hint: 'Полный разбор с оговорками; отвечает дольше' },
   ];
-  // Which modes may propose a change to the workspace. The rule is enforced in
-  // the proxy and again where the write happens; here it is only shown, so the
-  // control says what it does before it is pressed.
+  /* Which modes keep to analysis and do not offer changes unasked. Told, not
+     enforced: the tag used to say «только чтение», and the modes it marked cut
+     the change out entirely — so a broker who instructed one from an analysis
+     was sent to switch mode and repeat himself. The change was already inert
+     until confirmed, so the gate bought nothing and cost that. */
   const CG_READ_ONLY = { roi: true, dd: true, cma: true };
   const cgModeLabel = (k) => (CG_MODES.find((m) => m.k === k) || {}).t || '';
   const cgDepthLabel = (k) => (CG_DEPTH.find((d) => d.k === k) || {}).t || '';
@@ -624,7 +626,7 @@
   function cgModeMenu() {
     const cur = S().cgMode || 'auto';
     const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) +
-      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">только чтение</span>' : '') + '</b><i>' + m.d + '</i></span>' +
+      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">не меняет сам</span>' : '') + '</b><i>' + m.d + '</i></span>' +
       (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
     const soon = (m) => '<div class="cg-item mode-row soon">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span><span class="cg-soon">скоро</span></div>';
     return '<div class="cg-pop-inner">' +

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:09</title>
+  <title>WESPACE · сборка 01:31</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:09';
+    window.WS_BUILD='01:31';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -583,9 +583,13 @@ button { font-family: inherit; cursor: pointer; }
 .an-mode { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px;
   color: var(--faint); font-weight: 600; }
 .an-mode svg { width: 11px; height: 11px; color: var(--acc); }
-/* A mode that may not touch the workspace says so before it is chosen. */
+/* A mode that keeps to analysis says so before it is chosen. */
 .cg-ro { margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .02em;
   color: var(--faint); text-transform: uppercase; }
+/* The posture a change was asked from, on the confirmation card. */
+.pmode { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 10px;
+  font-weight: 600; color: var(--faint); }
+.pmode svg { width: 10px; height: 10px; color: var(--acc); }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4603,7 +4607,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
       said +
       '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
-      '<div class="t">' + esc(p.title) + '</div>' + badge + '</div>' +
+      '<div class="t">' + esc(p.title) +
+      // Asked for while reading an analysis: the card says so, so a change made
+      // from that posture is not mistaken for the analysis proposing it.
+      (p.askedIn ? '<span class="pmode">' + I('sparkle') + 'запрошено вами · ' + esc(p.askedIn) + '</span>' : '') +
+      '</div>' + badge + '</div>' +
       '<div class="pb">' + lines + '</div>' +
       '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
       '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +
@@ -5619,9 +5627,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     { k: 'think', t: 'Размышление', hint: 'Разбор по существу, до восьми блоков' },
     { k: 'deep', t: 'Глубоко', hint: 'Полный разбор с оговорками; отвечает дольше' },
   ];
-  // Which modes may propose a change to the workspace. The rule is enforced in
-  // the proxy and again where the write happens; here it is only shown, so the
-  // control says what it does before it is pressed.
+  /* Which modes keep to analysis and do not offer changes unasked. Told, not
+     enforced: the tag used to say «только чтение», and the modes it marked cut
+     the change out entirely — so a broker who instructed one from an analysis
+     was sent to switch mode and repeat himself. The change was already inert
+     until confirmed, so the gate bought nothing and cost that. */
   const CG_READ_ONLY = { roi: true, dd: true, cma: true };
   const cgModeLabel = (k) => (CG_MODES.find((m) => m.k === k) || {}).t || '';
   const cgDepthLabel = (k) => (CG_DEPTH.find((d) => d.k === k) || {}).t || '';
@@ -5693,7 +5703,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function cgModeMenu() {
     const cur = S().cgMode || 'auto';
     const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) +
-      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">только чтение</span>' : '') + '</b><i>' + m.d + '</i></span>' +
+      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">не меняет сам</span>' : '') + '</b><i>' + m.d + '</i></span>' +
       (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
     const soon = (m) => '<div class="cg-item mode-row soon">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span><span class="cg-soon">скоро</span></div>';
     return '<div class="cg-pop-inner">' +
@@ -10252,6 +10262,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const p = {
       kind: 'proposal', id: id, tier: dry.tier, ops: ops, revision: WS.store.dataRevision,
       subject: (meta && meta.subject) || null,
+      askedIn: (meta && meta.askedIn) || '',
       title: (meta && meta.title) || 'Изменение',
       lines: (meta && meta.lines) || dry.pending,
       note: dry.tier === 'guarded' ? 'Требует подтверждения — меняются деньги, стадия или владелец.' : 'Применю сразу после подтверждения.',
@@ -11128,32 +11139,27 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return s ? s.slice(0, 400) : null;
   }
 
-  function toReply(say, plan) {
+  /* `ran` is what the server actually answered under. Reading the composer
+     instead was a race with the presenter's own hand: switch to «Быстро» while
+     a deep answer is in flight and it was cut to three blocks and then labelled
+     «Глубоко». The setting an answer was given under is the setting it is
+     shaped and marked by. */
+  function toReply(say, plan, ran) {
     const text = String(say || '').trim();
-    const blocks = normBlocks(plan.blocks);
+    const blocks = normBlocks(plan.blocks, ran && DEPTH_BLOCKS[ran.depth]);
     const report = normReport(plan.report);
     const evidence = evidenceFor(plan.read);
     let next = normNext(plan.next);
     const chip = openChip(plan.open);
     if (chip) next = [chip].concat(next || []).slice(0, 3);
 
-    /* A read-only mode may not write, and the refusal is visible: silently
-       dropping the proposal would read as the model ignoring the request.
-
-       `refusedAct` is the server saying it already cut one out. Both are
-       needed: switch the pill while an answer is in flight and the mode here
-       is no longer the mode it was asked in — without the flag that reply
-       would quietly lose its action. */
-    if (plan.refusedAct || (plan.act && READ_ONLY[String((WS.store || {}).cgMode || '')])) {
-      return {
-        kind: 'answer',
-        text: text + ' Менять что-либо в этом режиме нельзя — переключите режим на «Авто», и я предложу изменение.',
-        evidence: evidence, next: next,
-      };
-    }
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
-      const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next });
+      // Which posture the change was asked from. An analysis mode does not
+      // propose changes on its own, but when the broker instructs one it is
+      // carried out — and the card says it came from there, so a change made
+      // while reading a report is not mistaken for the report's own doing.
+      const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next, askedIn: askedMode(ran && ran.mode) });
       if (p && p.kind === 'proposal') { p.text = text; return p; }
       // The store refused the dry run — say so plainly instead of pretending.
       return {
@@ -11191,9 +11197,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return DEPTH_BLOCKS[String((WS.store || {}).cgDepth || 'think')] || 8;
   }
 
-  // Modes that may not touch the workspace. The server strips `act` on its
-  // side; this is the same rule where the write would actually happen.
-  const READ_ONLY = { roi: true, dd: true, cma: true };
+  /* The mode a change was asked from, for the card to say so. It used to be a
+     gate: three modes had `act` cut out on the server and refused again here,
+     so a broker reading an analysis and saying «переведи сделку дальше» was
+     told to switch mode and ask again. That gate protected nothing — every
+     write already waits for a person to confirm the exact old → new diff — and
+     it made someone repeat an instruction they had already given.
+
+     A mode holds the AGENT back from proposing changes unasked. It does not
+     overrule the person. */
+  function askedMode(ran) {
+    const k = String(ran || (WS.store || {}).cgMode || 'auto');
+    return k && k !== 'auto' && WS.ui && WS.ui.cgModeLabel ? WS.ui.cgModeLabel(k) : '';
+  }
 
   // ---------- transport ----------
 
@@ -11248,12 +11264,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!cfg.ready) await probe();
     if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
     const done = await stream(text, opts && opts.onText);
-    const reply = toReply(done.say, done.plan || {});
-    if (!reply) throw new Error('empty reply');
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
-    reply.mode = done.mode || null;
-    reply.depth = done.depth || null;
+    const ran = { mode: done.mode || null, depth: done.depth || null };
+    const reply = toReply(done.say, done.plan || {}, ran);
+    if (!reply) throw new Error('empty reply');
+    reply.mode = ran.mode;
+    reply.depth = ran.depth;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;

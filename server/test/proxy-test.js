@@ -327,7 +327,15 @@ async function modeChecks() {
   const roi = P.buildPrompt({ text: 'вопрос', mode: 'roi', depth: 'deep' });
   ok('the chosen mode reaches the model as its own section',
     roi.indexOf('=== РЕЖИМ ===') >= 0 && roi.indexOf('Инвест-анализ') >= 0, roi.slice(0, 0) + '');
-  ok('a read-only mode is told so', roi.indexOf('только для чтения') >= 0);
+  /* An analysis mode holds the AGENT back, not the person: it does not offer
+     changes unasked, and it carries out one it was told to make. Refusing an
+     explicit instruction was never safety — the change waits for a human to
+     confirm the exact diff either way — it was a wall between someone and the
+     thing they had just asked for. */
+  ok('an analysis mode is told not to start changes itself',
+    roi.indexOf('сам ничего менять не предлагай') >= 0);
+  ok('and told to carry out one it is given',
+    roi.indexOf('прямо велит') >= 0 && roi.indexOf('не отправляй его переключать режим') >= 0);
   ok('and the depth asks for what it says on the control', roi.indexOf('Глубина «Глубоко»') >= 0);
   const auto = P.buildPrompt({ text: 'вопрос' });
   ok('a writing mode is told the other thing', auto.indexOf('только для чтения') < 0 &&
@@ -355,19 +363,17 @@ async function modeChecks() {
   ok('but never past the ceiling', P.depthTimeout('deep') === 1000, String(P.depthTimeout('deep')));
   P.CFG.maxTimeoutMs = capWas;
 
-  /* A read-only mode is enforced, not requested. The rule is in the prompt
-     too, and a rule that lives only in the prompt is one the model may
-     decline — quietly, on the turn that matters. */
+  // An instruction reaches the page from any mode; the page shows where it was
+  // asked from, and the confirmation card is the same one as always.
   refill();
   let res = await ask({ text: 'смени стадию', mode: 'roi' }, 'act');
   let done = events(res.body).find((e) => e.event === 'done');
-  ok('a change proposed in a read-only mode is cut out',
-    !!done && !done.data.plan.act && done.data.plan.refusedAct === 'roi',
-    JSON.stringify(done && done.data.plan));
+  ok('a change instructed from an analysis mode is not cut out',
+    !!done && !!done.data.plan.act, JSON.stringify(done && done.data.plan));
   refill();
   res = await ask({ text: 'смени стадию', mode: 'auto' }, 'act');
   done = events(res.body).find((e) => e.event === 'done');
-  ok('while in a writing mode it survives', !!done && !!done.data.plan.act,
+  ok('and the same holds in a working mode', !!done && !!done.data.plan.act,
     JSON.stringify(done && done.data.plan));
   ok('and the answer says which mode actually ran',
     !!done && done.data.mode === 'auto' && done.data.depth === 'think',

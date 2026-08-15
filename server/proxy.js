@@ -465,7 +465,12 @@ function buildPrompt(body) {
     depth.frame + ' Не больше ' + depth.blocks + ' блоков.',
     mode.writes
       ? 'В этом режиме предложение изменить рабочее место допустимо — как всегда, через act и с подтверждением человека.'
-      : 'Режим только для чтения: ничего не предлагай менять и act не заполняй. Просят изменить — скажи, в каком режиме это делается.',
+      // The mode holds the AGENT back, not the person. Refusing an explicit
+      // instruction and asking for it again in another mode is not safety —
+      // the change was already inert until a human confirmed the exact diff.
+      // It is just a wall between someone and the thing they told you to do.
+      : 'Разбор, а не работа: сам ничего менять не предлагай, подсказки клади в next. ' +
+        'Но если брокер прямо велит что-то изменить — выполняй как обычно, через act, и не отправляй его переключать режим.',
     mode.external
       ? ''
       : 'Внешние источники не подключены. Публичных данных ты сейчас не видишь: не выдавай общее знание за проверенный факт и не ссылайся на источник, которого не открывал.',
@@ -738,12 +743,6 @@ async function handleAsk(req, res) {
   try {
     const full = await call.promise;
     const parts = splitReply(full);
-    // A read-only mode is enforced, not requested. The prompt says it too, but
-    // a rule that only exists in the prompt is a rule the model may decline.
-    if (!MODES[spec.mode].writes && parts.plan && parts.plan.act) {
-      delete parts.plan.act;
-      parts.plan.refusedAct = spec.mode;
-    }
     if (!aborted) {
       // The resolved ids travel back: an unknown mode falls back here, and the
       // page must show what actually answered, not what it hoped it had asked.

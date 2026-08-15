@@ -796,7 +796,11 @@
     return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
       said +
       '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
-      '<div class="t">' + esc(p.title) + '</div>' + badge + '</div>' +
+      '<div class="t">' + esc(p.title) +
+      // Asked for while reading an analysis: the card says so, so a change made
+      // from that posture is not mistaken for the analysis proposing it.
+      (p.askedIn ? '<span class="pmode">' + I('sparkle') + 'запрошено вами · ' + esc(p.askedIn) + '</span>' : '') +
+      '</div>' + badge + '</div>' +
       '<div class="pb">' + lines + '</div>' +
       '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
       '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +

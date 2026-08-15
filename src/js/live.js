@@ -408,32 +408,27 @@
     return s ? s.slice(0, 400) : null;
   }
 
-  function toReply(say, plan) {
+  /* `ran` is what the server actually answered under. Reading the composer
+     instead was a race with the presenter's own hand: switch to «Быстро» while
+     a deep answer is in flight and it was cut to three blocks and then labelled
+     «Глубоко». The setting an answer was given under is the setting it is
+     shaped and marked by. */
+  function toReply(say, plan, ran) {
     const text = String(say || '').trim();
-    const blocks = normBlocks(plan.blocks);
+    const blocks = normBlocks(plan.blocks, ran && DEPTH_BLOCKS[ran.depth]);
     const report = normReport(plan.report);
     const evidence = evidenceFor(plan.read);
     let next = normNext(plan.next);
     const chip = openChip(plan.open);
     if (chip) next = [chip].concat(next || []).slice(0, 3);
 
-    /* A read-only mode may not write, and the refusal is visible: silently
-       dropping the proposal would read as the model ignoring the request.
-
-       `refusedAct` is the server saying it already cut one out. Both are
-       needed: switch the pill while an answer is in flight and the mode here
-       is no longer the mode it was asked in — without the flag that reply
-       would quietly lose its action. */
-    if (plan.refusedAct || (plan.act && READ_ONLY[String((WS.store || {}).cgMode || '')])) {
-      return {
-        kind: 'answer',
-        text: text + ' Менять что-либо в этом режиме нельзя — переключите режим на «Авто», и я предложу изменение.',
-        evidence: evidence, next: next,
-      };
-    }
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
-      const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next });
+      // Which posture the change was asked from. An analysis mode does not
+      // propose changes on its own, but when the broker instructs one it is
+      // carried out — and the card says it came from there, so a change made
+      // while reading a report is not mistaken for the report's own doing.
+      const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next, askedIn: askedMode(ran && ran.mode) });
       if (p && p.kind === 'proposal') { p.text = text; return p; }
       // The store refused the dry run — say so plainly instead of pretending.
       return {
@@ -471,9 +466,19 @@
     return DEPTH_BLOCKS[String((WS.store || {}).cgDepth || 'think')] || 8;
   }
 
-  // Modes that may not touch the workspace. The server strips `act` on its
-  // side; this is the same rule where the write would actually happen.
-  const READ_ONLY = { roi: true, dd: true, cma: true };
+  /* The mode a change was asked from, for the card to say so. It used to be a
+     gate: three modes had `act` cut out on the server and refused again here,
+     so a broker reading an analysis and saying «переведи сделку дальше» was
+     told to switch mode and ask again. That gate protected nothing — every
+     write already waits for a person to confirm the exact old → new diff — and
+     it made someone repeat an instruction they had already given.
+
+     A mode holds the AGENT back from proposing changes unasked. It does not
+     overrule the person. */
+  function askedMode(ran) {
+    const k = String(ran || (WS.store || {}).cgMode || 'auto');
+    return k && k !== 'auto' && WS.ui && WS.ui.cgModeLabel ? WS.ui.cgModeLabel(k) : '';
+  }
 
   // ---------- transport ----------
 
@@ -528,12 +533,13 @@
     if (!cfg.ready) await probe();
     if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
     const done = await stream(text, opts && opts.onText);
-    const reply = toReply(done.say, done.plan || {});
-    if (!reply) throw new Error('empty reply');
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
-    reply.mode = done.mode || null;
-    reply.depth = done.depth || null;
+    const ran = { mode: done.mode || null, depth: done.depth || null };
+    const reply = toReply(done.say, done.plan || {}, ran);
+    if (!reply) throw new Error('empty reply');
+    reply.mode = ran.mode;
+    reply.depth = ran.depth;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;
