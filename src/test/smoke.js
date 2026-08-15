@@ -750,6 +750,12 @@ setTimeout(async () => {
       check(name + ' · панель действий выше вкладок',
         !!bar && !!tabs && (bar.compareDocumentPosition(tabs) & 4) !== 0);
       check(name + ' · панель действий вне тела вкладки', !!bar && !bar.closest('.dx-tabbody'));
+      check(name + ' · в шапке страницы нет второго набора кнопок',
+        !!view && view.querySelectorAll('.obj-page-head button').length === 1,
+        view ? String(view.querySelectorAll('.obj-page-head button').length) : '');
+      // A bar that scrolls sideways hides half its verbs with nothing to say so.
+      check(name + ' · панель действий переносится, а не прокручивается',
+        !!bar && !/overflow-x:\s*auto/.test(bar.getAttribute('style') || ''));
       // Switching tabs must not take the verbs away with the tab content.
       const spec = WS._card;
       if (spec && spec.tabs && spec.tabs.length > 1) {

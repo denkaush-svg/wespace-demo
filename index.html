@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 00:06</title>
+  <title>WESPACE · сборка 00:36</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='00:06';
+    window.WS_BUILD='00:36';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -336,17 +336,19 @@ button { font-family: inherit; cursor: pointer; }
 
 /* goals (personal targets) */
 /* Goal progress — one row shared by the Pulse block and the profile editor. */
-.goal-card { padding: 6px 16px 14px; }
-.goal-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
-.goal-row:last-child { border-bottom: 0; }
-.goal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
-.goal-label { font-size: 13.5px; font-weight: 700; color: var(--ink); }
-.goal-num { font-size: 13.5px; font-weight: 700; color: var(--acc-deep); white-space: nowrap; }
-.goal-num i { font-style: normal; font-weight: 500; color: var(--mut); }
+.goal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.goal-tile { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 13px 15px 12px; min-width: 0; }
+.goal-label { font-size: 12px; color: var(--mut); line-height: 1.3; }
+.goal-num { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; margin-top: 4px; }
+.goal-num i { font-style: normal; font-size: 12px; font-weight: 500; color: var(--faint); letter-spacing: 0; }
+.goal-tile .meter { margin-top: 9px; }
 .goal-meter.is-behind i { background: var(--warn, #c98a3a); }
-.goal-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
-.goal-pct { font-weight: 700; color: var(--ink); }
+.goal-foot { display: flex; align-items: baseline; gap: 9px; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
+.goal-pct { font-weight: 800; color: var(--acc-deep); font-size: 12.5px; }
+.goal-pace { display: flex; align-items: center; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; color: var(--mut); line-height: 1.3; }
+.goal-pace svg { width: 13px; height: 13px; flex: none; color: var(--ok); }
 .goal-pace.is-behind { color: var(--stop); }
+.goal-pace.is-behind svg { color: var(--stop); }
 .goal-acts { display: flex; gap: 6px; margin-left: auto; }
 
 /* attention feed (single inbox) */
@@ -594,13 +596,13 @@ button { font-family: inherit; cursor: pointer; }
 .cm-m { font-size: 11px; color: var(--faint); margin-top: 2px; }
 .cm-empty { display: flex; gap: 9px; font-size: 12px; color: var(--mut); line-height: 1.45; }
 .cm-empty svg { width: 15px; height: 15px; flex: none; color: var(--faint); margin-top: 1px; }
-.qa-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 2px 0 4px;
-  -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
-.qa-act { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
-  padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
-  color: var(--ink); font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+.qa-bar { display: flex; flex-wrap: wrap; gap: 7px; padding: 2px 0 8px; margin: 2px 0 2px; }
+.qa-act { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
+  padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
   transition: border-color .15s ease, color .15s ease, background .15s ease; }
-.qa-act svg { width: 15px; height: 15px; flex: none; }
+.qa-act svg { width: 14px; height: 14px; flex: none; }
+.qa-act.on { border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc-ink); }
 .qa-act:hover { border-color: var(--acc-line); color: var(--acc); }
 .qa-act:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .qa-act.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
@@ -1738,7 +1740,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .osum-l { font-size: 12px; color: var(--mut); margin-top: 4px; }
 .odetail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; align-items: stretch; }
 .odetail-grid > .dx-sec { margin-top: 0; display: flex; flex-direction: column; }
-.odetail-grid .obj-meta { grid-template-columns: 1fr 1fr; row-gap: 15px; margin-top: 0; }
+.odetail-grid .obj-meta { grid-template-columns: 1fr 1fr; row-gap: 16px; column-gap: 30px; margin-top: 0; }
 .odetail-grid .obj-map { flex: 1; display: flex; flex-direction: column; margin-top: 0; }
 .odetail-grid .obj-map-canvas { flex: 1; height: auto; min-height: 172px; }
 .osum-m--hero .osum-v { color: var(--acc-deep); font-size: 23px; }
@@ -5412,13 +5414,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function goalRow(goal, scope) {
     const p = computeGoalProgress(goal, scope);
     const bar = Math.max(2, Math.min(100, p.pct));
-    return '<div class="goal-row">' +
-      '<div class="goal-head"><span class="goal-label">' + escAttr(goal.label) + '</span>' +
-      '<span class="goal-num">' + goalValue(goal.metric, p.fact) + ' <i>из ' + goalValue(goal.metric, p.target) + '</i></span></div>' +
+    return '<div class="goal-tile' + (p.behind ? ' is-behind' : '') + '">' +
+      '<div class="goal-label">' + escAttr(goal.label) + '</div>' +
+      '<div class="goal-num">' + goalValue(goal.metric, p.fact) + '<i> из ' + goalValue(goal.metric, p.target) + '</i></div>' +
       '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
       '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
-      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span>' +
-      '<span class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + p.pace + '</span></div></div>';
+      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span></div>' +
+      '<div class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
+      '</div>';
   }
   function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
   function pulseMyGoals() {
@@ -5435,7 +5438,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<button class="btn sm primary" data-act="addGoal" style="margin-top:10px">' + I('plus') + 'Поставить цель</button></div>';
     }
     const scope = S().role === 'manager' ? 'team' : 'me';
-    return head + '<div class="card goal-card">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
+    return head + '<div class="goal-grid">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
   }
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
@@ -6715,7 +6718,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
-      pageActs: '',
     };
   }
   function companyCard(id) { S().companyId = id; WS.router.go('companyDetail'); }
@@ -7175,7 +7177,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
-      pageActs: '',
     };
   }
   function clientCard(id) { S().clientId = id; WS.router.go('clientDetail'); }
@@ -7687,11 +7688,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
     return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
   }
-  // Full-page entity view (deal / client) — mirrors viewObjectDetail: back header + actions, then the tabbed body.
+  // Full-page entity view. The header is the way back and nothing else: the verbs live in the
+  // action bar inside entityBody, which is the one place a card keeps them.
   function entityPage(spec, backNav, backTab, backLabel) {
-    const back = '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) +
-      (spec.pageActs ? '<div class="obj-page-acts">' + spec.pageActs + '</div>' : '') + '</div>';
-    return back + entityBody(spec);
+    return '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) + '</div>' + entityBody(spec);
   }
   function setEntityTab(type, id, tab, srcEl) {
     WS.store.cardTabs = WS.store.cardTabs || {};
@@ -8060,7 +8060,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
-      pageActs: '',
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
@@ -8361,7 +8360,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
-      pageActs: '',
     };
   }
   // Net yield for the КП preview — reuses the finance model; guarded so a compute miss never breaks render.
@@ -9392,12 +9390,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const o = D().objects.find((x) => x.id === id);
     if (!o) return viewObjects();
     const inSl = inShortlist(o.id);
-    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') +
-      '<div class="obj-page-acts">' +
-      '<button class="btn sm" data-valobj="' + o.id + '">' + I('calc') + 'Оценить</button>' +
-      '<button class="btn sm" data-shortlist="' + o.id + '"' + (inSl ? ' style="border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + I(inSl ? 'check' : 'star') + (inSl ? 'В подборке' : 'В подборку') + '</button>' +
-      '<button class="btn sm primary" data-thread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building">' + I('chat') + 'Чат по объекту</button>' +
-      '</div></div>';
+    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') + '</div>';
+    const acts = entityActionBar([
+      ['chat', 'Чат по объекту', 'data-thread="object:' + o.id + '" data-tlabel="' + escAttr(o.name) + ' · объект" data-ticon="building"', 'primary'],
+      ['calc', 'Оценить', 'data-valobj="' + o.id + '"', ''],
+      [inSl ? 'check' : 'star', inSl ? 'В подборке' : 'В подборку', 'data-shortlist="' + o.id + '"', inSl ? 'on' : ''],
+      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="object" data-obj="' + o.id + '"', ''],
+    ]);
     const paramsInner = '<div class="obj-meta">' + [
       ['Вид', objAttr(o, 'view')], ['Отделка', objAttr(o, 'finish')], ['Спрос на рынке', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'], ['Источник', o.sourceLabel],
@@ -9408,7 +9407,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) +
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o) +
       (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
   }
 
@@ -11742,7 +11741,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
       render: (tab) => contractTabContent(k, tab),
       concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
-      pageActs: '',
     };
   }
   function viewContractDetail(id) {

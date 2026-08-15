@@ -318,13 +318,14 @@
   function goalRow(goal, scope) {
     const p = computeGoalProgress(goal, scope);
     const bar = Math.max(2, Math.min(100, p.pct));
-    return '<div class="goal-row">' +
-      '<div class="goal-head"><span class="goal-label">' + escAttr(goal.label) + '</span>' +
-      '<span class="goal-num">' + goalValue(goal.metric, p.fact) + ' <i>из ' + goalValue(goal.metric, p.target) + '</i></span></div>' +
+    return '<div class="goal-tile' + (p.behind ? ' is-behind' : '') + '">' +
+      '<div class="goal-label">' + escAttr(goal.label) + '</div>' +
+      '<div class="goal-num">' + goalValue(goal.metric, p.fact) + '<i> из ' + goalValue(goal.metric, p.target) + '</i></div>' +
       '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
       '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
-      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span>' +
-      '<span class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + p.pace + '</span></div></div>';
+      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span></div>' +
+      '<div class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
+      '</div>';
   }
   function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
   function pulseMyGoals() {
@@ -341,7 +342,7 @@
         '<button class="btn sm primary" data-act="addGoal" style="margin-top:10px">' + I('plus') + 'Поставить цель</button></div>';
     }
     const scope = S().role === 'manager' ? 'team' : 'me';
-    return head + '<div class="card goal-card">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
+    return head + '<div class="goal-grid">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
   }
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
@@ -1621,7 +1622,6 @@
       tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
-      pageActs: '',
     };
   }
   function companyCard(id) { S().companyId = id; WS.router.go('companyDetail'); }
@@ -2081,7 +2081,6 @@
       tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
-      pageActs: '',
     };
   }
   function clientCard(id) { S().clientId = id; WS.router.go('clientDetail'); }
@@ -2593,11 +2592,10 @@
     if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
     return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
   }
-  // Full-page entity view (deal / client) — mirrors viewObjectDetail: back header + actions, then the tabbed body.
+  // Full-page entity view. The header is the way back and nothing else: the verbs live in the
+  // action bar inside entityBody, which is the one place a card keeps them.
   function entityPage(spec, backNav, backTab, backLabel) {
-    const back = '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) +
-      (spec.pageActs ? '<div class="obj-page-acts">' + spec.pageActs + '</div>' : '') + '</div>';
-    return back + entityBody(spec);
+    return '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) + '</div>' + entityBody(spec);
   }
   function setEntityTab(type, id, tab, srcEl) {
     WS.store.cardTabs = WS.store.cardTabs || {};
@@ -2966,7 +2964,6 @@
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
-      pageActs: '',
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
@@ -3267,7 +3264,6 @@
       tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
-      pageActs: '',
     };
   }
   // Net yield for the КП preview — reuses the finance model; guarded so a compute miss never breaks render.
@@ -4298,12 +4294,13 @@
     const o = D().objects.find((x) => x.id === id);
     if (!o) return viewObjects();
     const inSl = inShortlist(o.id);
-    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') +
-      '<div class="obj-page-acts">' +
-      '<button class="btn sm" data-valobj="' + o.id + '">' + I('calc') + 'Оценить</button>' +
-      '<button class="btn sm" data-shortlist="' + o.id + '"' + (inSl ? ' style="border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + I(inSl ? 'check' : 'star') + (inSl ? 'В подборке' : 'В подборку') + '</button>' +
-      '<button class="btn sm primary" data-thread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building">' + I('chat') + 'Чат по объекту</button>' +
-      '</div></div>';
+    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') + '</div>';
+    const acts = entityActionBar([
+      ['chat', 'Чат по объекту', 'data-thread="object:' + o.id + '" data-tlabel="' + escAttr(o.name) + ' · объект" data-ticon="building"', 'primary'],
+      ['calc', 'Оценить', 'data-valobj="' + o.id + '"', ''],
+      [inSl ? 'check' : 'star', inSl ? 'В подборке' : 'В подборку', 'data-shortlist="' + o.id + '"', inSl ? 'on' : ''],
+      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="object" data-obj="' + o.id + '"', ''],
+    ]);
     const paramsInner = '<div class="obj-meta">' + [
       ['Вид', objAttr(o, 'view')], ['Отделка', objAttr(o, 'finish')], ['Спрос на рынке', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'], ['Источник', o.sourceLabel],
@@ -4314,7 +4311,7 @@
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) +
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o) +
       (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
   }
 
@@ -6648,7 +6645,6 @@
       tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
       render: (tab) => contractTabContent(k, tab),
       concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
-      pageActs: '',
     };
   }
   function viewContractDetail(id) {
