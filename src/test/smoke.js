@@ -792,6 +792,37 @@ setTimeout(async () => {
     }
   }
 
+  // ---- no dated fact on a deal may predate the deal itself ----
+  // Two deals booked a deposit days before they were created. Nothing crashes; the card simply
+  // states an impossible order of events, which is worse than a crash because it looks fine.
+  {
+    const MONTHS2 = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const LEN2 = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const doy = (t) => {
+      const m = /^(\d+)\s*([а-яё]*)/i.exec(t || '');
+      if (!m) return null;
+      const mi = MONTHS2.indexOf((m[2] || '').toLowerCase());
+      const mo = mi >= 0 ? mi + 1 : 5;
+      let n = parseInt(m[1], 10);
+      for (let i = 0; i < mo - 1; i++) n += LEN2[i];
+      return n;
+    };
+    const bad = [];
+    (dd().deals || []).forEach((d) => {
+      const born = doy(d.createdAt);
+      if (born == null) return;
+      if (d.deposit && d.deposit.paid && d.deposit.at) {
+        const paid = doy(d.deposit.at);
+        if (paid != null && paid < born) bad.push(d.id + ': задаток ' + d.deposit.at + ' раньше создания ' + d.createdAt);
+      }
+      ((dd().dealTimeline || {})[d.id] || []).forEach((e) => {
+        const at = doy(e.at);
+        if (at != null && at < born) bad.push(d.id + ': событие ' + e.at + ' раньше создания ' + d.createdAt);
+      });
+    });
+    check('deal · nothing is dated before the deal was created', bad.length === 0, bad.slice(0, 3).join(' | '));
+  }
+
   // ---- sort keys must agree with the dates they claim ----
   //  is a DDHHMM key built for a demo week in May. Entries dated in an earlier month were
   // given day-only keys, so «28 апреля» outranked «06 мая» and a merged feed showed the past on

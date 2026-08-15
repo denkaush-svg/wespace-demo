@@ -343,6 +343,28 @@
     if (el && el.dataset && el.dataset.calc && el.closest && el.closest('#finBody')) {
       WS.ui.finSlider(el.dataset.calc, el.value);
     }
+    // Reference-list search: filter the listbox this input owns. No re-render — the form is open
+    // and a redraw would drop everything already filled in.
+    if (el && el.dataset && el.dataset.pick) {
+      const sel = document.getElementById(el.dataset.pick);
+      if (sel) {
+        const q = (el.value || '').trim().toLowerCase();
+        let shown = 0;
+        Array.prototype.forEach.call(sel.options, (o) => {
+          const hit = !q || (o.textContent || '').toLowerCase().indexOf(q) >= 0;
+          o.hidden = !hit;
+          if (hit) shown++;
+        });
+        const firstVisible = Array.prototype.filter.call(sel.options, (o) => !o.hidden)[0];
+        // Keep a valid selection at all times: after filtering, the chosen row may be hidden, or
+        // nothing may be chosen yet. Either way the first visible row becomes the answer.
+        const cur = sel.selectedOptions[0];
+        if (firstVisible && (!cur || cur.hidden)) firstVisible.selected = true;
+        const n = document.getElementById(el.dataset.pick + '_n');
+        if (n) n.textContent = q ? (shown ? 'найдено ' + shown : 'ничего не найдено') : shown + ' записей';
+      }
+      return;
+    }
     if (el && el.id === 'docSearch') { store.docSearch = el.value; api.emit(); }
     if (el && el.id === 'netSearchInput') { store.netSearch = el.value; api.emit(); }
     if (el && (el.id === 'dealBudFrom' || el.id === 'dealBudTo')) { store[el.id] = el.value.replace(/[^0-9]/g, ''); api.emit(); }

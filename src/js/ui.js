@@ -1243,17 +1243,44 @@
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
     return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
-  // Consolidated funnel for the manager — deals of subordinate agents by stage (item 9).
+  // Control cut-offs, not stages. Every funnel's stages map onto the same four, so the board can
+  // stay long and detailed while the oversight view stays readable.
+  const FUNNEL_BANDS = [
+    { k: 'contact', label: 'Первый контакт', stages: ['work', 'pick', 'kp', 'req'],
+      gate: 'Запрос снят, предложение отправлено' },
+    { k: 'engage', label: 'Работа с клиентом', stages: ['show', 'visit', 'talks'],
+      gate: 'Объект показан, условия обсуждаются' },
+    { k: 'papers', label: 'Документы и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
+      gate: 'Подписание, оплата, регистрация' },
+    { k: 'result', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
+  ];
+  function bandOf(stage) {
+    const b = FUNNEL_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
+    return b ? b.k : 'contact';
+  }
+  // Consolidated funnel for the manager — the whole team's book, grouped into control cut-offs.
   function dealsFunnel() {
     const ds = D().deals;
-    const byStage = STAGES.map((s) => ({ s: s, list: ds.filter((d) => d.stage === s.k) }));
     // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
     // forecast — the exact confusion the won/lost split exists to remove.
     const live = ds.filter((d) => !dealClosed(d));
     const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
-    const cells = byStage.map(({ s, list }) => {
+    const cells = FUNNEL_BANDS.map((b) => {
+      const list = ds.filter((d) => bandOf(d.stage) === b.k);
       const val = list.reduce((a, d) => a + (d.amount || 0), 0);
-      return '<div class="fn-cell"><div class="fn-n">' + list.length + '</div><div class="fn-l">' + s.label + '</div><div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div></div>';
+      const won = list.filter(dealWon).length, lost = list.filter((d) => d.stage === 'lost').length;
+      // Inside a cut-off the stage split still matters — it just belongs in a sub-line, not in
+      // fourteen boxes of its own.
+      const inner = b.k === 'result'
+        ? [won ? won + ' успех' : '', lost ? lost + ' проигрыш' : ''].filter(Boolean).join(' · ')
+        : b.stages.map((k) => ({ k: k, n: list.filter((d) => d.stage === k).length }))
+            .filter((x) => x.n).map((x) => stageLabel(x.k) + ' ' + x.n).join(' · ');
+      return '<div class="fn-cell' + (b.k === 'result' ? ' fn-cell-end' : '') + '">' +
+        '<div class="fn-n">' + list.length + '</div>' +
+        '<div class="fn-l">' + b.label + '</div>' +
+        '<div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div>' +
+        '<div class="fn-in">' + (inner || 'пусто') + '</div>' +
+        '<div class="fn-gate">' + b.gate + '</div></div>';
     }).join('');
     const byAgent = {};
     ds.forEach((d) => { const a = d.agent || 'u_none'; (byAgent[a] = byAgent[a] || []).push(d); });
@@ -1263,7 +1290,7 @@
         '<div class="n">' + list.length + ' сдел. · ' + WS.AED(val) + (hot ? ' · <span style="color:var(--stop)">' + hot + ' ' + I('flame') + '</span>' : '') + '</div></div>';
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
-      '<div class="funnel">' + cells + '</div>' +
+      '<div class="funnel funnel-bands">' + cells + '</div>' +
       '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
   }
@@ -2452,6 +2479,16 @@
       '<div class="w">W</div><div class="ph">Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
       '<div class="send">' + I('arrowRight') + '</div></div>';
   }
+  function pickerField(id, label, optionsHtml, placeholder, cls) {
+    const n = (optionsHtml.match(/<option/g) || []).length;
+    // A listbox with rows does not auto-select its first option the way a collapsed select does,
+    // so without this the form submits with no client and no object at all.
+    const withSel = /selected/.test(optionsHtml) ? optionsHtml : optionsHtml.replace('<option', '<option selected', 1);
+    return '<label class="fld fld-pick' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span>' +
+      '<input class="pick-q" type="search" data-pick="' + id + '" placeholder="' + escAttr(placeholder || 'Начните вводить название…') + '" autocomplete="off">' +
+      '<select id="' + id + '" size="' + Math.min(6, Math.max(3, n)) + '">' + withSel + '</select>' +
+      '<span class="pick-n" id="' + id + '_n">' + n + ' ' + plural(n, 'запись', 'записи', 'записей') + '</span></label>';
+  }
   function entityActionBar(items) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
@@ -3501,12 +3538,12 @@
       sel('objectType', 'Тип объекта') + sel('readiness', 'Готовность') + sel('saleKind', 'Вид сделки') +
       sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
       '<label class="fld"><span>Цель</span><input id="df_goal" type="text" value="' + ((d.goal || '').replace(/"/g, '&quot;')) + '"></label>' +
-      '<label class="fld"><span>Компания</span><select id="df_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      pickerField('df_company', 'Компания', '<option value="">— без компании</option>' + companyOpts, 'Поиск по названию компании…') +
       '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="df_vat"' + (d.vat ? ' checked' : '') + '> Применяется VAT 5%</label>';
     openModal('Параметры сделки · ' + escAttr(d.title), body,
-      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>');
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>', { wide: true });
   }
   function saveDealEdit(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
@@ -4970,7 +5007,7 @@
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' +
       '<div class="form-grid">' +
       '<label class="fld"><span>Что сделать</span><input id="ntTitle" type="text" placeholder="Например: перезвонить по КП"></label>' +
-      '<label class="fld"><span>Клиент</span><select id="ntClient">' + clientOpts + '</select></label>' +
+      pickerField('ntClient', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
       '<label class="fld"><span>Исполнитель</span><select id="ntAssignee">' + teamOpts + '</select></label>' +
       '<label class="fld"><span>Тип</span><select id="ntKind">' + kindOpts + '</select></label>' +
       '<label class="fld"><span>Срок</span><select id="ntWhen"><option value="today">сегодня</option><option value="tomorrow">завтра</option></select></label>' +
@@ -5059,8 +5096,8 @@
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Создать сделку вручную — из формы, приложенной заявки или PDF (в демо — форма). Это структурированный экран, а не диалог с Консьержем.</p>' +
       '<div class="section-label">Кто и что</div><div class="match-grid">' +
       '<label class="fld wide"><span>Суть сделки</span><input id="nd_title" type="text" placeholder="Напр.: Инвест-квартира в Business Bay"></label>' +
-      '<label class="fld"><span>Клиент</span><select id="nd_client">' + clientOpts + '</select></label>' +
-      '<label class="fld"><span>Объект</span><select id="nd_object">' + objOpts + '</select></label>' +
+      pickerField('nd_client', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
+      pickerField('nd_object', 'Объект', objOpts, 'Поиск по названию объекта…') +
       '<label class="fld"><span>Сумма, AED</span><input id="nd_amount" type="number" step="50000"></label>' +
       '<label class="fld"><span>Стадия</span><select id="nd_stage">' + stageOpts + '</select></label>' +
       '</div><div class="section-label">Условия</div><div class="match-grid">' +
@@ -5074,11 +5111,11 @@
       '<label class="fld"><span>Цель</span><input id="nd_goal" type="text"></label>' +
       '<label class="pcheck wide"><input type="checkbox" id="nd_vat"> Применяется VAT 5%</label>' +
       '</div><div class="section-label">Ответственность</div><div class="match-grid">' +
-      '<label class="fld"><span>Компания</span><select id="nd_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      pickerField('nd_company', 'Компания', '<option value="">— без компании</option>' + companyOpts, 'Поиск по названию компании…') +
       '<label class="fld"><span>Ответственный агент</span><select id="nd_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<div class="prov" style="margin-top:10px"><span class="badge">' + I('upload') + 'Приложить заявку (PDF) — демо</span><span class="badge demo">' + I('lock') + 'ручное создание</span></div>';
-    openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>');
+    openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>', { wide: true });
   }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};

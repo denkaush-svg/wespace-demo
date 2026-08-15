@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:00</title>
+  <title>WESPACE · сборка 15:29</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:00';
+    window.WS_BUILD='15:29';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -558,6 +558,26 @@ button { font-family: inherit; cursor: pointer; }
 /* Quick actions — one bar, always directly under the card's title, identical on every entity.
    Scrollable rather than wrapping: a bar that grows to three rows moves everything below it and
    stops being a fixed landmark, which is the whole point of having one. */
+/* Four control cut-offs instead of fourteen stage boxes: each is wide enough to carry the money,
+   the stage split inside it and the condition that has to be true to pass it. */
+.funnel-bands { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.funnel-bands .fn-cell { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); }
+.funnel-bands .fn-cell-end { background: var(--surface); }
+.funnel-bands .fn-n { font-size: 26px; font-weight: 800; line-height: 1.1; color: var(--ink); }
+.funnel-bands .fn-l { font-size: 13px; font-weight: 700; color: var(--ink); }
+.funnel-bands .fn-v { font-size: 12.5px; color: var(--acc-ink); font-weight: 600; }
+.funnel-bands .fn-in { font-size: 11.5px; color: var(--mut); margin-top: 4px; line-height: 1.35; }
+.funnel-bands .fn-gate { font-size: 11px; color: var(--faint); margin-top: 6px;
+  padding-top: 6px; border-top: 1px solid var(--line); line-height: 1.3; }
+/* Search over an open listbox, not a collapsed menu: with a long reference list the useful state
+   is «I typed three letters and I can see the matches», which a <select> alone cannot show. */
+.fld-pick { position: relative; }
+.fld-pick .pick-q { width: 100%; margin-bottom: 6px; }
+/* The app sets a fixed height on selects for the single-line case; a listbox needs its rows. */
+.fld-pick select { width: 100%; height: auto; min-height: 132px; padding: 4px; border-radius: var(--r-s, 10px); overflow-y: auto; }
+.fld-pick select option { padding: 7px 8px; border-radius: 6px; font-size: 13px; }
+.fld-pick .pick-n { display: block; font-size: 11px; color: var(--faint); margin-top: 5px; }
 .qa-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 2px 0 4px;
   -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .qa-act { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
@@ -2431,7 +2451,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'готовый', saleKind: 'вторичка', side: 'покупатель', goal: 'Перепродажа',
       paymentForm: '100% оплата', vat: false, source: 'Реферал', partnerAgent: null, companyId: null,
       consideredProjects: ['Bayline Terraces'], stageDays: 6,
-      nextDue: 'просрочено (касание)', deposit: { kind: 'EOI', amount: 50000, paid: true, at: '8 мая', refundable: true },
+      nextDue: 'просрочено (касание)', deposit: { kind: 'EOI', amount: 50000, paid: true, at: '12 мая', refundable: true },
       gates: { kyc: true },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_viktor', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_marina', amount: 1950000, hot: false, stage: 'book',
@@ -2439,7 +2459,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция',
       paymentForm: 'Ипотека', vat: false, source: 'Property Finder', partnerAgent: null, companyId: 'co_emaar',
       consideredProjects: ['Bayline Terraces'], stageDays: 3, requestId: 'r_viktor',
-      nextDue: '12 мая', deposit: { kind: 'Бронирование (booking)', amount: 97500, paid: true, at: '6 мая', refundable: false },
+      nextDue: '12 мая', deposit: { kind: 'Бронирование (booking)', amount: 97500, paid: true, at: '12 мая', refundable: false },
       gates: { kyc: true, escrow: true, spa: true },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'req',
@@ -6276,17 +6296,44 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
     return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
-  // Consolidated funnel for the manager — deals of subordinate agents by stage (item 9).
+  // Control cut-offs, not stages. Every funnel's stages map onto the same four, so the board can
+  // stay long and detailed while the oversight view stays readable.
+  const FUNNEL_BANDS = [
+    { k: 'contact', label: 'Первый контакт', stages: ['work', 'pick', 'kp', 'req'],
+      gate: 'Запрос снят, предложение отправлено' },
+    { k: 'engage', label: 'Работа с клиентом', stages: ['show', 'visit', 'talks'],
+      gate: 'Объект показан, условия обсуждаются' },
+    { k: 'papers', label: 'Документы и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
+      gate: 'Подписание, оплата, регистрация' },
+    { k: 'result', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
+  ];
+  function bandOf(stage) {
+    const b = FUNNEL_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
+    return b ? b.k : 'contact';
+  }
+  // Consolidated funnel for the manager — the whole team's book, grouped into control cut-offs.
   function dealsFunnel() {
     const ds = D().deals;
-    const byStage = STAGES.map((s) => ({ s: s, list: ds.filter((d) => d.stage === s.k) }));
     // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
     // forecast — the exact confusion the won/lost split exists to remove.
     const live = ds.filter((d) => !dealClosed(d));
     const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
-    const cells = byStage.map(({ s, list }) => {
+    const cells = FUNNEL_BANDS.map((b) => {
+      const list = ds.filter((d) => bandOf(d.stage) === b.k);
       const val = list.reduce((a, d) => a + (d.amount || 0), 0);
-      return '<div class="fn-cell"><div class="fn-n">' + list.length + '</div><div class="fn-l">' + s.label + '</div><div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div></div>';
+      const won = list.filter(dealWon).length, lost = list.filter((d) => d.stage === 'lost').length;
+      // Inside a cut-off the stage split still matters — it just belongs in a sub-line, not in
+      // fourteen boxes of its own.
+      const inner = b.k === 'result'
+        ? [won ? won + ' успех' : '', lost ? lost + ' проигрыш' : ''].filter(Boolean).join(' · ')
+        : b.stages.map((k) => ({ k: k, n: list.filter((d) => d.stage === k).length }))
+            .filter((x) => x.n).map((x) => stageLabel(x.k) + ' ' + x.n).join(' · ');
+      return '<div class="fn-cell' + (b.k === 'result' ? ' fn-cell-end' : '') + '">' +
+        '<div class="fn-n">' + list.length + '</div>' +
+        '<div class="fn-l">' + b.label + '</div>' +
+        '<div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div>' +
+        '<div class="fn-in">' + (inner || 'пусто') + '</div>' +
+        '<div class="fn-gate">' + b.gate + '</div></div>';
     }).join('');
     const byAgent = {};
     ds.forEach((d) => { const a = d.agent || 'u_none'; (byAgent[a] = byAgent[a] || []).push(d); });
@@ -6296,7 +6343,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="n">' + list.length + ' сдел. · ' + WS.AED(val) + (hot ? ' · <span style="color:var(--stop)">' + hot + ' ' + I('flame') + '</span>' : '') + '</div></div>';
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
-      '<div class="funnel">' + cells + '</div>' +
+      '<div class="funnel funnel-bands">' + cells + '</div>' +
       '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
   }
@@ -7485,6 +7532,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="w">W</div><div class="ph">Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
       '<div class="send">' + I('arrowRight') + '</div></div>';
   }
+  function pickerField(id, label, optionsHtml, placeholder, cls) {
+    const n = (optionsHtml.match(/<option/g) || []).length;
+    // A listbox with rows does not auto-select its first option the way a collapsed select does,
+    // so without this the form submits with no client and no object at all.
+    const withSel = /selected/.test(optionsHtml) ? optionsHtml : optionsHtml.replace('<option', '<option selected', 1);
+    return '<label class="fld fld-pick' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span>' +
+      '<input class="pick-q" type="search" data-pick="' + id + '" placeholder="' + escAttr(placeholder || 'Начните вводить название…') + '" autocomplete="off">' +
+      '<select id="' + id + '" size="' + Math.min(6, Math.max(3, n)) + '">' + withSel + '</select>' +
+      '<span class="pick-n" id="' + id + '_n">' + n + ' ' + plural(n, 'запись', 'записи', 'записей') + '</span></label>';
+  }
   function entityActionBar(items) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
@@ -8534,12 +8591,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       sel('objectType', 'Тип объекта') + sel('readiness', 'Готовность') + sel('saleKind', 'Вид сделки') +
       sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
       '<label class="fld"><span>Цель</span><input id="df_goal" type="text" value="' + ((d.goal || '').replace(/"/g, '&quot;')) + '"></label>' +
-      '<label class="fld"><span>Компания</span><select id="df_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      pickerField('df_company', 'Компания', '<option value="">— без компании</option>' + companyOpts, 'Поиск по названию компании…') +
       '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="df_vat"' + (d.vat ? ' checked' : '') + '> Применяется VAT 5%</label>';
     openModal('Параметры сделки · ' + escAttr(d.title), body,
-      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>');
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>', { wide: true });
   }
   function saveDealEdit(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
@@ -10003,7 +10060,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' +
       '<div class="form-grid">' +
       '<label class="fld"><span>Что сделать</span><input id="ntTitle" type="text" placeholder="Например: перезвонить по КП"></label>' +
-      '<label class="fld"><span>Клиент</span><select id="ntClient">' + clientOpts + '</select></label>' +
+      pickerField('ntClient', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
       '<label class="fld"><span>Исполнитель</span><select id="ntAssignee">' + teamOpts + '</select></label>' +
       '<label class="fld"><span>Тип</span><select id="ntKind">' + kindOpts + '</select></label>' +
       '<label class="fld"><span>Срок</span><select id="ntWhen"><option value="today">сегодня</option><option value="tomorrow">завтра</option></select></label>' +
@@ -10092,8 +10149,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Создать сделку вручную — из формы, приложенной заявки или PDF (в демо — форма). Это структурированный экран, а не диалог с Консьержем.</p>' +
       '<div class="section-label">Кто и что</div><div class="match-grid">' +
       '<label class="fld wide"><span>Суть сделки</span><input id="nd_title" type="text" placeholder="Напр.: Инвест-квартира в Business Bay"></label>' +
-      '<label class="fld"><span>Клиент</span><select id="nd_client">' + clientOpts + '</select></label>' +
-      '<label class="fld"><span>Объект</span><select id="nd_object">' + objOpts + '</select></label>' +
+      pickerField('nd_client', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
+      pickerField('nd_object', 'Объект', objOpts, 'Поиск по названию объекта…') +
       '<label class="fld"><span>Сумма, AED</span><input id="nd_amount" type="number" step="50000"></label>' +
       '<label class="fld"><span>Стадия</span><select id="nd_stage">' + stageOpts + '</select></label>' +
       '</div><div class="section-label">Условия</div><div class="match-grid">' +
@@ -10107,11 +10164,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<label class="fld"><span>Цель</span><input id="nd_goal" type="text"></label>' +
       '<label class="pcheck wide"><input type="checkbox" id="nd_vat"> Применяется VAT 5%</label>' +
       '</div><div class="section-label">Ответственность</div><div class="match-grid">' +
-      '<label class="fld"><span>Компания</span><select id="nd_company"><option value="">—</option>' + companyOpts + '</select></label>' +
+      pickerField('nd_company', 'Компания', '<option value="">— без компании</option>' + companyOpts, 'Поиск по названию компании…') +
       '<label class="fld"><span>Ответственный агент</span><select id="nd_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<div class="prov" style="margin-top:10px"><span class="badge">' + I('upload') + 'Приложить заявку (PDF) — демо</span><span class="badge demo">' + I('lock') + 'ручное создание</span></div>';
-    openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>');
+    openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>', { wide: true });
   }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
@@ -12274,6 +12331,28 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const el = e.target;
     if (el && el.dataset && el.dataset.calc && el.closest && el.closest('#finBody')) {
       WS.ui.finSlider(el.dataset.calc, el.value);
+    }
+    // Reference-list search: filter the listbox this input owns. No re-render — the form is open
+    // and a redraw would drop everything already filled in.
+    if (el && el.dataset && el.dataset.pick) {
+      const sel = document.getElementById(el.dataset.pick);
+      if (sel) {
+        const q = (el.value || '').trim().toLowerCase();
+        let shown = 0;
+        Array.prototype.forEach.call(sel.options, (o) => {
+          const hit = !q || (o.textContent || '').toLowerCase().indexOf(q) >= 0;
+          o.hidden = !hit;
+          if (hit) shown++;
+        });
+        const firstVisible = Array.prototype.filter.call(sel.options, (o) => !o.hidden)[0];
+        // Keep a valid selection at all times: after filtering, the chosen row may be hidden, or
+        // nothing may be chosen yet. Either way the first visible row becomes the answer.
+        const cur = sel.selectedOptions[0];
+        if (firstVisible && (!cur || cur.hidden)) firstVisible.selected = true;
+        const n = document.getElementById(el.dataset.pick + '_n');
+        if (n) n.textContent = q ? (shown ? 'найдено ' + shown : 'ничего не найдено') : shown + ' записей';
+      }
+      return;
     }
     if (el && el.id === 'docSearch') { store.docSearch = el.value; api.emit(); }
     if (el && el.id === 'netSearchInput') { store.netSearch = el.value; api.emit(); }
