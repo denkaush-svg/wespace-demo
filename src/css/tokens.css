@@ -4,6 +4,9 @@
    ============================================================ */
 
 :root {
+  /* Card body rhythm: one step between rows, one tighter step inside a block. */
+  --card-gap: 14px;
+  --card-gap-tight: 8px;
   /* light "paper" — default product surface */
   --bg:        #f6f2ea;
   --bg-2:      #efe9dd;

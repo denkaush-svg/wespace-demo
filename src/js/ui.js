@@ -1564,20 +1564,18 @@
     }
     if (tab === 'history') return companyFeedBlock(co);
     // overview
-    return entityActionBar([
-      ['chat', 'Чат по компании', 'data-thread="company:' + co.id + '" data-tlabel="' + escAttr(co.name) + '" data-ticon="building"', 'primary'],
-      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="company" data-coid="' + co.id + '"', ''],
-      ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
-    ]) + companyOps(co) + '<div style="margin-top:14px">' + dxSec('sparkle', 'Справка Консьержа', '', '<p class="deal-brief">' + companyBriefSentences(co).join(' ') + '</p>') + '</div>' +
-      '<div style="margin-top:14px">' + dxSec('building', 'Реквизиты', '', '<div class="dfields">' +
-      dfPair('Тип', co.kind) +
-      dfPair('Лицензия / ORN', co.license || '—') +
-      dfPair('TRN', co.trn || '—') +
-      dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
-      dfPair('Условия комиссии', co.commission) +
-      dfPair('Сделок', String(deals.length)) + '</div>' +
-      (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : '')) + '</div>' +
-      '<div style="margin-top:14px">' + companyFeedBlock(co, 5) + '</div>';
+    return cxStack([
+      [dxSec('sparkle', 'Справка Консьержа', '', '<p class="deal-brief">' + companyBriefSentences(co).join(' ') + '</p>'),
+       dxSec('building', 'Реквизиты', '', '<div class="dfields">' +
+         dfPair('Тип', co.kind) +
+         dfPair('Лицензия / ORN', co.license || '—') +
+         dfPair('TRN', co.trn || '—') +
+         dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
+         dfPair('Условия комиссии', co.commission) +
+         dfPair('Сделок', String(deals.length)) + '</div>' +
+         (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''))],
+      companyFeedBlock(co, 5),
+    ]);
   }
   // Same band as the client hero — the markup contract is `.chero > img + scrim + content(avatar,
   // info(name, facts))`; anything else lands unstyled on a dark gradient and reads as broken.
@@ -1612,7 +1610,14 @@
     const peopleCount = (co.people || []).length;
     const status = statusChip([kyc]);
     return {
-      type: 'company', id: id, title: co.name, status: companyHero(co) + status,
+      type: 'company', id: id, title: co.name,
+      hero: companyHero(co) + status,
+      acts: entityActionBar([
+        ['chat', 'Чат по компании', 'data-thread="company:' + co.id + '" data-tlabel="' + escAttr(co.name) + '" data-ticon="building"', 'primary'],
+        ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="company" data-coid="' + co.id + '"', ''],
+        ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
+      ]),
+      state: companyOps(co),
       tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
@@ -2038,11 +2043,12 @@
     const actions = '';   // the bar under the hero carries them now — see clientActions()
     // Two-column rows are for blocks of comparable weight. A feed is not one of them: it grows with
     // the client's history and drags whatever sits beside it to the same height.
-    return entityActionBar(clientActions(c)) + clientOps(c) +
-      '<div class="dx-grid2" style="margin-top:14px">' + conciergeClientHandover(c) + contactBlock(c) + '</div>' +
-      '<div style="margin-top:14px">' + key + '</div>' +
-      '<div class="dx-grid2" style="margin-top:14px">' + psychSummary(c) + sig + '</div>' +
-      '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
+    return cxStack([
+      [conciergeClientHandover(c), contactBlock(c)],
+      key,
+      [psychSummary(c), sig],
+      contactFeedBlock(c, 5),
+    ]);
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
@@ -2057,7 +2063,10 @@
       { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие на связь есть' : 'Нет согласия на связь', tone: c.consent ? 'ok' : 'stop' },
     ]);
     return {
-      type: 'contact', id: id, title: c.name, status: clientHero(c) + status,
+      type: 'contact', id: id, title: c.name,
+      hero: clientHero(c) + status,
+      acts: entityActionBar(clientActions(c)),
+      state: clientOps(c),
       tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
@@ -2485,6 +2494,23 @@
       '<select id="' + id + '" size="' + Math.min(6, Math.max(3, n)) + '">' + withSel + '</select>' +
       '<span class="pick-n" id="' + id + '_n">' + n + ' ' + plural(n, 'запись', 'записи', 'записей') + '</span></label>';
   }
+  // Rows of a card body. A string is a full-width row; a two-element array is a facing pair that
+  // degrades to full width when one half is missing.
+  function cxCol(blocks) {
+    const html = (blocks || []).filter(Boolean).join('');
+    return html ? '<div class="cx-col">' + html + '</div>' : '';
+  }
+  function cxStack(rows) {
+    const html = (rows || []).map((r) => {
+      if (!r) return '';
+      if (typeof r === 'string') return r.trim() ? '<div class="cx-row">' + r + '</div>' : '';
+      const a = (r[0] || '').trim(), b = (r[1] || '').trim();
+      if (!a && !b) return '';
+      if (!a || !b) return '<div class="cx-row">' + (a || b) + '</div>';
+      return '<div class="cx-row cx-pair">' + a + b + '</div>';
+    }).join('');
+    return '<div class="cx-stack">' + html + '</div>';
+  }
   function entityActionBar(items) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
@@ -2524,7 +2550,7 @@
     WS._cardByType = WS._cardByType || {};
     WS._cardByType[spec.type] = spec;
     WS._card = spec;
-    return (spec.status || '') + tabBar +
+    return (spec.hero || spec.status || '') + (spec.acts || '') + (spec.state || '') + tabBar +
       '<div class="dx-tabbody" id="dxTabBody">' + spec.render(tab) + '</div>' +
       (spec.concierge ? '<div class="dx-concierge">' + spec.concierge + '</div>' : '');
   }
@@ -2586,9 +2612,11 @@
     if (tab === 'docs') {
       const kpN = dealKpObjects(d).length;
       const kpBtn = kpN ? '<button class="btn xs" data-act="openDealKp" data-deal="' + d.id + '">' + I('doc') + 'КП сделки · ' + kpN + '</button>' : '';
-      return gatesBlock(d) + '<div style="height:14px"></div>' +
-        (kpN ? dxSec('doc', 'Коммерческое предложение', kpBtn, '<div class="gate-foot" style="margin-top:0">Собрано по ' + kpN + ' ' + plural(kpN, 'объекту', 'объектам', 'объектам') + '.</div>') + '<div style="height:14px"></div>' : '') +
-        dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
+      return cxStack([
+        gatesBlock(d),
+        kpN ? dxSec('doc', 'Коммерческое предложение', kpBtn, '<div class="gate-foot" style="margin-top:0">Собрано по ' + kpN + ' ' + plural(kpN, 'объекту', 'объектам', 'объектам') + '.</div>') : '',
+        dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет')),
+      ]);
     }
     if (tab === 'history') return dealHistoryTab(d);
     if (tab === 'tasks') {
@@ -2604,11 +2632,13 @@
       '<div class="gate-foot">Сделка закрыта на подписании. Всё, что идёт дальше — платежи, регистрация, продления — ведётся договором.</div>') : '';
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    return (req ? req + '<div style="height:14px"></div>' : '') +
-      (kblock ? kblock + '<div style="height:14px"></div>' : '') +
-      dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealParamsExtra(d) + '</div>') +
-      (cf ? '<div style="height:14px"></div>' + cf : '') +
-      (ho ? '<div style="height:14px"></div>' + ho : '');
+    return cxStack([
+      req,
+      kblock,
+      dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields cols2">' + dealParamsExtra(d) + '</div>'),
+      cf,
+      ho,
+    ]);
   }
   // Hero sections reuse the object-hero family (variant B: photo backdrop + dark scrim) at the top of
   // entity cards — client (name overlaid), deal (linked object), КП (flagship object).
@@ -2871,15 +2901,15 @@
   }
   // Header order (client feedback v2): compact hero → inline-editable title → narrow stepper → one-line essence status →
   // facing cards (LEFT key params · RIGHT client contacts + objects) → "что сейчас" detail.
-  function dealHeader(d) {
-    return dealHero(d) +
-      dealTitleEdit(d) +
-      entityActionBar(dealActions(d)) +
-      '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
+  function dealHero2(d) { return dealHero(d) + dealTitleEdit(d); }
+  function dealState(d) {
+    return '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       dealChipRow(d) +
-      '<div class="deal-top"><div class="deal-top-cell">' + dealStatusBrief(d) + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
-      '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
-      dealLotsBlock(d);
+      cxStack([
+        [cxCol([dealStatusBrief(d), dealKeyCard(d), dealNextStepCard(d)]),
+         cxCol([dealClientCard(d), dealRecentCard(d)])],
+        dealLotsBlock(d),
+      ]);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -2899,7 +2929,9 @@
     const c = D().clients.find((x) => x.id === d.clientId) || {};
     return {
       type: 'deal', id: id, title: d.title,
-      status: dealHeader(d),
+      hero: dealHero2(d),
+      acts: entityActionBar(dealActions(d)),
+      state: dealState(d),
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
@@ -3143,18 +3175,34 @@
     }).join('');
     return dxSec('briefcase', 'Сделки по заявке · ' + deals.length, '', '<div class="feed">' + dealRows + '</div>');
   }
-  function reqSecondaryBlocks(r) {
+  // Returns a cxStack ROW (a pair when both blocks exist), for the caller to place in its stack.
+  function reqSecondaryRow(r) {
     const parts = [reqPrefProfile(r), dealsOfRequest(r.id).length ? reqDealsBlock(r) : ''].filter(Boolean);
-    return parts.length ? '<div class="req-secondary">' + parts.join('') + '</div>' : '';
+    return parts.length === 2 ? parts : (parts[0] || '');
   }
-  function requestHeader(r) {
-    return requestHero(r) +
-      '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>' +
-      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
-      '<div class="deal-top"><div class="deal-top-cell">' + reqKeyCard(r) + reqNextStepCard(r) + '</div>' +
-      '<div class="deal-top-cell">' + reqClientCard(r) + reqRecentCard(r) + '</div></div>' +
-      reqOffersStatusBlock(r) +
-      reqSecondaryBlocks(r);
+  function requestHero2(r) {
+    return requestHero(r) + '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>';
+  }
+  // The заявка had no action bar at all — its verbs were scattered through the blocks, so «что
+  // можно сделать» had a different answer here than on every other card.
+  function requestActions(r) {
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const sel = (r.offered || []).filter((o) => o.state === 'selected').length;
+    return [
+      ['plus', 'Добавить объект', 'data-act="reqAddObject" data-req="' + r.id + '"', 'primary'],
+      sel ? ['doc', 'Собрать КП · ' + sel, 'data-act="reqFormKp" data-req="' + r.id + '"', ''] : null,
+      sel ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
+      c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', ''] : null,
+      ['pencil', 'Изменить заявку', 'data-act="editRequest" data-req="' + r.id + '"', ''],
+    ];
+  }
+  function requestState(r) {
+    return '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
+      cxStack([
+        [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
+        reqOffersStatusBlock(r),
+        reqSecondaryRow(r),
+      ]);
   }
   function requestTimelineInner(r) {
     const tl = (D().requestTimeline || {})[r.id] || [];
@@ -3173,7 +3221,7 @@
     // docs — КП + документооборот КП→MOU→SPA→DLD (объекты, профиль, сделки — в основной части)
     const rDeals = dealsOfRequest(r.id);
     const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(docIdx)) : -1;
-    return reqKpBlock(r) + '<div style="height:14px"></div>' + docChainBlock(sidx, !!(r.kp && r.kp.formed), '');
+    return cxStack([reqKpBlock(r), docChainBlock(sidx, !!(r.kp && r.kp.formed), '')]);
   }
   function requestSpec(id) {
     const r = requestById(id); if (!r) return null;
@@ -3182,7 +3230,9 @@
     const tid = dealForC ? 'deal:' + dealForC.id : 'general';
     return {
       type: 'request', id: id, title: 'Заявка · ' + r.title,
-      status: requestHeader(r),
+      hero: requestHero2(r),
+      acts: entityActionBar(requestActions(r)),
+      state: requestState(r),
       tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
@@ -4228,14 +4278,16 @@
       ['Вид', objAttr(o, 'view')], ['Отделка', objAttr(o, 'finish')], ['Спрос на рынке', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'], ['Источник', o.sourceLabel],
     ].map((p) => '<div><div class="omk">' + p[0] + '</div><div class="omv">' + p[1] + '</div></div>').join('') + '</div>';
-    const grid = '<div class="odetail-grid">' +
-      dxSec('grid', 'Параметры объекта', '', paramsInner) +
-      dxSec('compass', 'Расположение на карте', '', objMap(o)) + '</div>';
+
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) +
-      (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) + cxStack([
+      [ctx, dxSec('grid', 'Параметры объекта', '', paramsInner)],
+      dxSec('compass', 'Расположение на карте', '', objMap(o)),
+      statuses,
+      docs,
+    ]);
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
@@ -6475,15 +6527,16 @@
     // for a deal that does not exist.
     return dealClientCard({ clientId: c.id, id: k.id }, 'contract:' + k.id);
   }
-  function contractHeader(k) {
+  function contractHero2(k) {
     return contractHero(k) +
       '<div class="deal-title-edit"><span class="deal-title-lbl">' + I('doc') + 'Договор</span>' +
-      '<span class="deal-title-text is-static">' + contractKind(k).label + ' · ' + k.number + '</span></div>' +
-      entityActionBar(contractActions(k)) +
-      '<div class="deal-stepper-compact">' + contractStepperSection(k) + '</div>' +
+      '<span class="deal-title-text is-static">' + contractKind(k).label + ' · ' + k.number + '</span></div>';
+  }
+  function contractState(k) {
+    return '<div class="deal-stepper-compact">' + contractStepperSection(k) + '</div>' +
       contractChipRow(k) +
-      '<div class="deal-top"><div class="deal-top-cell">' + contractStatusBrief(k) + contractSchedule(k) + '</div>' +
-      '<div class="deal-top-cell">' + contractClientCard(k) + contractRecentCard(k) + '</div></div>';
+      cxStack([[cxCol([contractStatusBrief(k), contractSchedule(k)]),
+                cxCol([contractClientCard(k), contractRecentCard(k)])]]);
   }
   // Things you do TO a contract, as opposed to reading it: amend it, invoice against it, renew or
   // terminate it. They live in the same bar as every other card's actions.
@@ -6542,15 +6595,16 @@
     const o = (D().objects || []).find((x) => x.id === k.objectId);
     const d = (D().deals || []).find((x) => x.id === k.dealId);
     // The step line is up in the header now, so the tab carries the dated detail behind it.
-    return dxSec('doc', 'Вехи договора', '<span class="badge acc">' + contractStep(k).done + ' из ' + contractStep(k).total + '</span>', contractMilestones(k, false)) +
-      '<div style="height:14px"></div>' +
-      dxSec('briefcase', 'Реквизиты договора', '', '<div class="dfields">' +
+    return cxStack([
+      dxSec('doc', 'Вехи договора', '<span class="badge acc">' + contractStep(k).done + ' из ' + contractStep(k).total + '</span>', contractMilestones(k, false)),
+      dxSec('briefcase', 'Реквизиты договора', '', '<div class="dfields cols2">' +
         dfPair('Номер', k.number) + dfPair('Подписан', k.signedAt) +
         dfPair('Клиент', c.name || '—') + (co ? dfPair('Компания', co.name) : '') +
         (o ? dfPair('Объект', o.name) : '') + dfPair('Сумма договора', WS.AED(k.amount || 0)) +
         (k.nextDue ? dfPair('Ближайший срок', k.nextDue) : '') +
         (d ? dfPair('Из сделки', '<a href="#" data-deal="' + d.id + '">' + d.title + '</a>') : dfPair('Из сделки', 'закрыта до демо-периода')) +
-        '</div>');
+        '</div>'),
+    ]);
   }
   function contractSpec(id) {
     const k = contractById(id); if (!k) return null;
@@ -6558,7 +6612,9 @@
     const money = commissionState(k);
     return {
       type: 'contract', id: id, title: contractKind(k).label + ' · ' + (c.name || ''),
-      status: contractHeader(k),
+      hero: contractHero2(k),
+      acts: entityActionBar(contractActions(k)),
+      state: contractState(k),
       tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
       render: (tab) => contractTabContent(k, tab),
       concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),

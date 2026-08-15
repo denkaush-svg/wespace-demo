@@ -727,15 +727,68 @@ setTimeout(async () => {
     }
   }
 
+  // ---- one card grammar: the verbs sit in the same place on every entity, on every tab ----
+  {
+    const cards = [
+      ['сделка', () => WS.ui.dealCard(dd().deals[0].id)],
+      ['клиент', () => WS.ui.clientCard('c_anna')],
+      ['компания', () => WS.ui.companyCard(dd().companies[0].id)],
+      ['заявка', () => WS.ui.requestCard(dd().requests[0].id)],
+      ['договор', () => WS.ui.contractCard('k_palm')],
+    ];
+    cards.forEach(([name, open]) => {
+      open();
+      const view = doc.querySelector('#app .view');
+      const bar = view && view.querySelector('.qa-bar');
+      const tabs = view && view.querySelector('.dx-tabs');
+      check(name + ' · панель действий есть', !!bar);
+      check(name + ' · панель действий выше вкладок',
+        !!bar && !!tabs && (bar.compareDocumentPosition(tabs) & 4) !== 0);
+      check(name + ' · панель действий вне тела вкладки', !!bar && !bar.closest('.dx-tabbody'));
+      // Switching tabs must not take the verbs away with the tab content.
+      const spec = WS._card;
+      if (spec && spec.tabs && spec.tabs.length > 1) {
+        WS.ui.setEntityTab(spec.type, spec.id, spec.tabs[spec.tabs.length - 1][0]);
+        check(name + ' · панель действий пережила смену вкладки',
+          !!doc.querySelector('#app .view .qa-bar'));
+        WS.ui.setEntityTab(spec.type, spec.id, spec.tabs[0][0]);   // leave the card as we found it
+      }
+      // A feed grows with the record; pairing it with a fixed block stretches the neighbour.
+      const paired = [].slice.call(doc.querySelectorAll('#app .cx-pair')).filter((r) =>
+        /Лента событий|История/.test(r.textContent) && r.children.length === 2);
+      check(name + ' · лента не стоит в паре с другим блоком', paired.length === 0,
+        paired.length ? paired[0].textContent.slice(0, 50) : '');
+      // Rhythm belongs to the stack: a row that also carries its own margin is hand-spacing.
+      const inlineRows = [].slice.call(doc.querySelectorAll('#app .cx-row')).filter((r) => r.style && r.style.marginTop);
+      check(name + ' · ряды не носят собственных отступов', inlineRows.length === 0, String(inlineRows.length));
+    });
+  }
+
+  // ---- the stylesheet parses: an unbalanced brace silently kills every rule after it ----
+  {
+    ['tokens.css', 'app.css', 'theme.css'].forEach((f) => {
+      const css = read('css/' + f).replace(/\/\*[\s\S]*?\*\//g, '');
+      const open = (css.match(/\{/g) || []).length, close = (css.match(/\}/g) || []).length;
+      check('css · ' + f + ' — скобки сходятся', open === close, open + ' { против ' + close + ' }');
+    });
+    // Every class the card constructor emits has to exist in the stylesheet, or a card renders
+    // as an unstyled stack of blocks.
+    const all = ['tokens.css', 'app.css', 'theme.css'].map((f) => read('css/' + f)).join(' ');
+    ['cx-stack', 'cx-row', 'cx-pair', 'cx-col'].forEach((cls) => {
+      check('css · .' + cls + ' описан', all.indexOf('.' + cls) >= 0);
+    });
+    check('css · --card-gap задан', /--card-gap\s*:/.test(all));
+  }
+
   // ---- the client overview: a feed spans the page, and no two blocks state the same thing ----
   {
     WS.ui.clientCard('c_anna');
-    const rows = [].slice.call(doc.querySelectorAll('#app .dx-tabbody > div'));
+    const rows = [].slice.call(doc.querySelectorAll('#app .cx-stack > .cx-row'));
     const last = rows[rows.length - 1];
     check('client · лента событий — последний блок', !!last && last.innerHTML.indexOf('Лента событий') >= 0,
       last ? last.innerHTML.slice(0, 60) : 'нет строк');
     check('client · лента идёт во всю ширину, а не в половине',
-      !!last && last.className.indexOf('dx-grid2') < 0 && last.children.length === 1,
+      !!last && last.className.indexOf('cx-pair') < 0 && last.children.length === 1,
       last ? last.className + ' kids=' + last.children.length : '');
     const sigRow = rows.find((r) => r.innerHTML.indexOf('Сигналы и приоритет') >= 0);
     check('client · сигналы не растянуты лентой', !!sigRow && sigRow.innerHTML.indexOf('Лента событий') < 0);
