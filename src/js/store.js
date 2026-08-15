@@ -31,6 +31,9 @@
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     capture: {}, dealFunnel: 'sale', contractId: null, dealsFilter: {}, savedView: null,
+    // Where the user came from. A card opened from another card has to return to it, and the
+    // hard-coded «Назад к сделкам» on every card could only ever return to a list.
+    navStack: [], navHere: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
     cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
@@ -156,6 +159,7 @@
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
+    store.navStack = []; store.navHere = null;
     store.incompatible = false;
     // UI-state added this cycle — return to defaults on reset so the stand starts clean.
     store.navHidden = ['tasks']; store.setMenuOpen = false;

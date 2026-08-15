@@ -1757,10 +1757,7 @@
   };
   // Contact info surfaced explicitly at the top of the client overview — compact row of preferred + filled channels.
   function contactBlock(c) {
-    const dealForC = D().deals.find((x) => x.clientId === c.id);
-    const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const pref = prefChannel(c);
-    const prefLabel = chanMeta(pref)[1];
     const vals = clientContactVals(c);
     // Preferred channel first, then the ones that actually hold a value — an empty channel used to
     // take a full row saying «—», which is how five contacts filled the whole fold.
@@ -1772,11 +1769,9 @@
         '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
         (isPref ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
     }).join('');
-    // Language and consent are stated once, up in the hero and the status chip — the foot keeps only
-    // the action.
-    const inner = '<div class="cd-list">' + channels + '</div>' +
-      '<div class="cd-foot"><button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
-    return dxSec('phone', 'Контактные данные', '', inner);
+    // Language, consent and «Написать» are all stated elsewhere on this screen — in the hero, in the
+    // status chips and in the action bar. What only this block holds are the numbers themselves.
+    return dxSec('phone', 'Контактные данные', '', '<div class="cd-list">' + channels + '</div>');
   }
   // Client portrait — the summary shown on the overview tab; the full version lives on its own tab.
   function psychSummary(c) {
@@ -1796,7 +1791,7 @@
     const all = [];
     (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
     if (!all.length) return '';
-    return reqPrefProfile({ offered: all });
+    return prefProfileInner({ offered: all });
   }
   // Справка Консьержа — human handover brief for the next agent picking up this client.
   // Handover brief on the client card — what one agent tells another before picking this client up.
@@ -2025,7 +2020,7 @@
       }));
       return names;
     })();
-    const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields">' +
+    const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields cols2">' +
       (dir.types.length ? dfPair('Типы объектов', joinRu(dir.types)) : '') +
       (dir.ready.length ? dfPair('Готовность', joinRu(dir.ready)) : '') +
       (dir.services.length ? dfPair('Интересуют услуги', joinRu(dir.services)) : '') +
@@ -2033,22 +2028,21 @@
       dfPair('Язык и канал', [c.lang, chanMeta(prefChannel(c))[1]].filter(Boolean).join(' · ')) +
       (rejectedNames.length ? dfPair('Отклонял', joinRu(rejectedNames)) : '') +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
-      (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : ''));
+      (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : '') +
+      (clientPrefProfile(c) ? '<div class="pref-observed">' + clientPrefProfile(c) + '</div>' : ''));
     const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
     // Deal-level actions («подобрать объекты», «расчёт и КП», «назначить показ») belong to a deal
     // and already live on the deal card and in the page header; on the client they invited an agent
     // to act on a transaction from a screen that does not know which transaction.
 
     const actions = '';   // the bar under the hero carries them now — see clientActions()
-    const pref = clientPrefProfile(c);
-    // Everything on the overview is paired into a two-column grid, and the pairs are chosen so the
-    // two halves carry comparable weight. Single full-width blocks between two-column rows were
-    // what made the page read as a patchwork with holes in it.
+    // Two-column rows are for blocks of comparable weight. A feed is not one of them: it grows with
+    // the client's history and drags whatever sits beside it to the same height.
     return entityActionBar(clientActions(c)) + clientOps(c) +
       '<div class="dx-grid2" style="margin-top:14px">' + conciergeClientHandover(c) + contactBlock(c) + '</div>' +
-      '<div class="dx-grid2" style="margin-top:14px">' + key + psychSummary(c) + '</div>' +
-      '<div class="dx-grid2" style="margin-top:14px">' + sig + contactFeedBlock(c, 5) + '</div>' +
-      (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '');
+      '<div style="margin-top:14px">' + key + '</div>' +
+      '<div class="dx-grid2" style="margin-top:14px">' + psychSummary(c) + sig + '</div>' +
+      '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
@@ -2537,9 +2531,35 @@
   function entityCard(spec) {
     openModal(spec.title, entityBody(spec), spec.footer, { wide: true, flexBody: true });
   }
+  // What to call a screen in a «назад» button. Names beat screen types: «Назад · Анна Петрова»
+  // tells you what you will see; «Назад к клиентам» is where the code came from, not the user.
+  function routeName(r) {
+    if (!r) return '';
+    const short = (t) => { t = String(t || ''); return t.length > 30 ? t.slice(0, 29).trim() + '…' : t; };
+    const by = (arr, id) => (arr || []).find((x) => x.id === id) || null;
+    let x = null;
+    switch (r.view) {
+      case 'dealDetail': x = by(D().deals, r.id); return short(x ? x.title : 'сделка');
+      case 'clientDetail': x = by(D().clients, r.id); return short(x ? x.name : 'клиент');
+      case 'objectDetail': x = by(D().objects, r.id); return short(x ? x.name : 'объект');
+      case 'companyDetail': x = by(D().companies, r.id); return short(x ? x.name : 'компания');
+      case 'requestDetail': x = by(D().requests, r.id); return short(x ? x.title : 'заявка');
+      case 'contractDetail': x = by(D().contracts, r.id); return short(x ? 'договор ' + x.number : 'договор');
+      case 'clients': return r.tab === 'contacts' ? 'Клиенты' : 'Сделки';
+      default: break;
+    }
+    const nav = NAV.concat(NAV_MORE, NAV_MGR, NAV_MGR_MORE).find((n) => n.id === r.view);
+    return nav ? nav.label : r.view;
+  }
+  // The back button of any card: the previous screen when there is one, the owning list otherwise.
+  function backBtn(fallbackNav, fallbackTab, fallbackLabel) {
+    const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
+    if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
+    return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
   // Full-page entity view (deal / client) — mirrors viewObjectDetail: back header + actions, then the tabbed body.
   function entityPage(spec, backNav, backTab, backLabel) {
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="' + backNav + '" data-tab="' + backTab + '">' + I('chevLeft') + backLabel + '</button>' +
+    const back = '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) +
       (spec.pageActs ? '<div class="obj-page-acts">' + spec.pageActs + '</div>' : '') + '</div>';
     return back + entityBody(spec);
   }
@@ -3194,7 +3214,7 @@
       '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
       '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
   }
-  function reqPrefProfile(r) {
+  function prefProfileInner(r) {
     const off = r.offered || [];
     const pick = (state) => off.filter((o) => o.state === state).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean);
     const sel = pick('selected'), rej = pick('rejected');
@@ -3204,12 +3224,15 @@
     const likeViews = uniq(sel.map((o) => o.attrs && o.attrs.view));
     const like = sel.length ? '<div class="pref-row"><span class="badge ok">' + I('check') + 'Заходит</span><span>' + [likeAreas.join(', '), likeViews.length ? 'вид: ' + likeViews.join(', ') : ''].filter(Boolean).join(' · ') + '</span></div>' : '';
     const rejl = rej.length ? '<div class="pref-row"><span class="badge stop">' + I('x') + 'Не заходит</span><span>' + rejAreas.join(', ') + '</span></div>' : '';
-    return dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>',
-      like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>');
+    return like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>';
+  }
+  function reqPrefProfile(r) {
+    const inner = prefProfileInner(r);
+    return inner ? dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>', inner) : '';
   }
   function viewRequestDetail(id) {
     const spec = requestSpec(id);
-    if (!spec) return '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>' +
+    if (!spec) return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад к заявкам') + '</div>' +
       '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
     return entityPage(spec, 'requests', '', 'Назад к заявкам');
   }
@@ -4195,7 +4218,7 @@
     const o = D().objects.find((x) => x.id === id);
     if (!o) return viewObjects();
     const inSl = inShortlist(o.id);
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="objects">' + I('chevLeft') + 'Назад к объектам</button>' +
+    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') +
       '<div class="obj-page-acts">' +
       '<button class="btn sm" data-valobj="' + o.id + '">' + I('calc') + 'Оценить</button>' +
       '<button class="btn sm" data-shortlist="' + o.id + '"' + (inSl ? ' style="border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + I(inSl ? 'check' : 'star') + (inSl ? 'В подборке' : 'В подборку') + '</button>' +
@@ -6619,6 +6642,7 @@
     if (focusId) { const elx = document.getElementById(focusId); if (elx) { elx.focus(); try { elx.setSelectionRange(caret, caret); } catch (e) {} } }
     // docked chat lives outside #app (survives re-render); keep the engine pointed at it while open
     if (st.cgDock) { const m = document.getElementById('cgdockmsgs'); if (m) WS.engine.mount(m, renderDockMsgs); }
+    if (WS.router && WS.router.mark) WS.router.mark();
   }
 
   function showIncompatible() {
@@ -6634,5 +6658,5 @@
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

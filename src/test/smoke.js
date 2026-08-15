@@ -727,6 +727,91 @@ setTimeout(async () => {
     }
   }
 
+  // ---- the client overview: a feed spans the page, and no two blocks state the same thing ----
+  {
+    WS.ui.clientCard('c_anna');
+    const rows = [].slice.call(doc.querySelectorAll('#app .dx-tabbody > div'));
+    const last = rows[rows.length - 1];
+    check('client · лента событий — последний блок', !!last && last.innerHTML.indexOf('Лента событий') >= 0,
+      last ? last.innerHTML.slice(0, 60) : 'нет строк');
+    check('client · лента идёт во всю ширину, а не в половине',
+      !!last && last.className.indexOf('dx-grid2') < 0 && last.children.length === 1,
+      last ? last.className + ' kids=' + last.children.length : '');
+    const sigRow = rows.find((r) => r.innerHTML.indexOf('Сигналы и приоритет') >= 0);
+    check('client · сигналы не растянуты лентой', !!sigRow && sigRow.innerHTML.indexOf('Лента событий') < 0);
+    const body = doc.querySelector('#app .dx-tabbody').innerHTML;
+    const prefTitles = (body.match(/Профиль предпочтений/g) || []).length;
+    check('client · «Профиль предпочтений» на карточке один', prefTitles === 1, 'встретился ' + prefTitles + ' раз(а)');
+  }
+
+  // ---- «назад» returns to where you came FROM, not to a list the code guessed ----
+  {
+    const app = () => doc.getElementById('app');
+    const clickIn = (sel) => { const el = app().querySelector(sel); if (el) el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); return !!el; };
+    const backEl = () => app().querySelector('[data-act="navBack"]');
+
+    const nd = dd().deals.find((d) => d.clientId);
+    WS.router.go('clients');
+    WS.store.navStack = [];          // start the trail at the list, whatever ran before
+    WS.ui.dealCard(nd.id);
+    check('nav · сделка из списка помнит список', WS.store.navStack.length === 1 && WS.store.navStack[0].view === 'clients',
+      JSON.stringify(WS.store.navStack));
+
+    // deal → client
+    const wentToClient = clickIn('[data-client]');
+    check('nav · the deal page offers a way to the client', wentToClient);
+    check('nav · клиент открыт', WS.store.view === 'clientDetail', 'view=' + WS.store.view);
+    const b1 = backEl();
+    check('nav · клиент показывает кнопку «назад»', !!b1, 'head=' + (app().querySelector('.obj-page-head') || {}).innerHTML);
+    check('nav · кнопка названа сделкой, из которой пришли', !!b1 && b1.textContent.indexOf(nd.title.slice(0, 12)) >= 0,
+      b1 ? b1.textContent : '');
+
+    // клиент → назад → сделка
+    const b2 = backEl();
+    if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('nav · назад с клиента возвращает в ту же сделку',
+      WS.store.view === 'dealDetail' && WS.store.dealId === nd.id, 'view=' + WS.store.view + ' id=' + WS.store.dealId);
+
+    // сделка → объект → клиент → назад → объект → назад → сделка: три уровня, пройденные обратно.
+    const wentToObj = clickIn('[data-obj]');
+    check('nav · объект открыт из сделки', wentToObj && WS.store.view === 'objectDetail', 'view=' + WS.store.view);
+    if (wentToObj) {
+      const oid = WS.store.objectId;
+      check('nav · объект показывает «назад»', !!backEl());
+      WS.ui.clientCard(nd.clientId);
+      const bo = backEl();
+      check('nav · клиент помнит объект, а не список', !!bo && bo.textContent.indexOf('Назад') >= 0, bo ? bo.textContent : '');
+      if (bo) bo.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('nav · назад возвращает к объекту', WS.store.view === 'objectDetail' && WS.store.objectId === oid,
+        'view=' + WS.store.view);
+      const bo2 = backEl();
+      if (bo2) bo2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('nav · и следующий шаг назад — снова сделка',
+        WS.store.view === 'dealDetail' && WS.store.dealId === nd.id, 'view=' + WS.store.view);
+    }
+
+    // Alt+← is the same action from the keyboard.
+    clickIn('[data-client]');
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true }));
+    check('nav · Alt+← работает как «назад»', WS.store.view === 'dealDetail' && WS.store.dealId === nd.id,
+      'view=' + WS.store.view);
+
+    // A trail that loops rewinds instead of growing: сделка → клиент → та же сделка leaves one entry.
+    WS.store.navStack = []; WS.router.go('clients');
+    WS.ui.dealCard(nd.id); WS.ui.clientCard(nd.clientId); WS.ui.dealCard(nd.id);
+    check('nav · возврат по кругу не наращивает историю', WS.store.navStack.length <= 1,
+      'stack=' + JSON.stringify(WS.store.navStack.map((r) => r.view)));
+
+    // With no history at all the card still offers the owning list — never a dead header.
+    WS.store.navStack = []; WS.store.navHere = null;
+    WS.ui.dealCard(nd.id);
+    WS.store.navStack = [];
+    WS.ui.render();
+    const head = app().querySelector('.obj-page-head');
+    check('nav · без истории остаётся возврат к списку',
+      !!head && head.innerHTML.indexOf('data-nav=') >= 0, head ? head.innerHTML.slice(0, 120) : 'нет шапки');
+  }
+
   // ---- a stage that the deal's funnel does not have is refused, not silently applied ----
   {
     const sd = dd().deals.find((d) => d.funnel === 'sale' && d.stage !== 'won' && d.stage !== 'lost');

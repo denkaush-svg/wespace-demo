@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:49</title>
+  <title>WESPACE · сборка 16:31</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:49';
+    window.WS_BUILD='16:31';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -578,6 +578,9 @@ button { font-family: inherit; cursor: pointer; }
 .fld-pick select { width: 100%; height: auto; min-height: 132px; padding: 4px; border-radius: var(--r-s, 10px); overflow-y: auto; }
 .fld-pick select option { padding: 7px 8px; border-radius: 6px; font-size: 13px; }
 .fld-pick .pick-n { display: block; font-size: 11px; color: var(--faint); margin-top: 5px; }
+/* Observed choices sit under the declared parameters inside one preference block, divided rather
+   than repeated as a second section with the same heading. */
+.pref-observed { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .qa-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 2px 0 4px;
   -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .qa-act { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
@@ -1214,6 +1217,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dfields { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 4px; }
 .dfield { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .dfield:last-child { border-bottom: 0; }
+/* A full-width parameter list reads as a long thin column of pairs; two columns give it the same
+   height as the blocks it sits between. */
+.dfields.cols2 { grid-template-columns: 1fr 1fr; column-gap: 26px; }
+.dfields.cols2 .dfield:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+@media (max-width: 760px) { .dfields.cols2 { grid-template-columns: 1fr; } }
 .dfield .dk { color: var(--mut); flex: 0 0 auto; }
 .dfield .dv { color: var(--ink); font-weight: 600; text-align: right; flex: 1 1 auto; min-width: 0; }
 .prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }
@@ -3428,6 +3436,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     capture: {}, dealFunnel: 'sale', contractId: null, dealsFilter: {}, savedView: null,
+    // Where the user came from. A card opened from another card has to return to it, and the
+    // hard-coded «Назад к сделкам» on every card could only ever return to a list.
+    navStack: [], navHere: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
     cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
@@ -3553,6 +3564,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
+    store.navStack = []; store.navHere = null;
     store.incompatible = false;
     // UI-state added this cycle — return to defaults on reset so the stand starts clean.
     store.navHidden = ['tasks']; store.setMenuOpen = false;
@@ -6810,10 +6822,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   };
   // Contact info surfaced explicitly at the top of the client overview — compact row of preferred + filled channels.
   function contactBlock(c) {
-    const dealForC = D().deals.find((x) => x.clientId === c.id);
-    const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const pref = prefChannel(c);
-    const prefLabel = chanMeta(pref)[1];
     const vals = clientContactVals(c);
     // Preferred channel first, then the ones that actually hold a value — an empty channel used to
     // take a full row saying «—», which is how five contacts filled the whole fold.
@@ -6825,11 +6834,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
         (isPref ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
     }).join('');
-    // Language and consent are stated once, up in the hero and the status chip — the foot keeps only
-    // the action.
-    const inner = '<div class="cd-list">' + channels + '</div>' +
-      '<div class="cd-foot"><button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
-    return dxSec('phone', 'Контактные данные', '', inner);
+    // Language, consent and «Написать» are all stated elsewhere on this screen — in the hero, in the
+    // status chips and in the action bar. What only this block holds are the numbers themselves.
+    return dxSec('phone', 'Контактные данные', '', '<div class="cd-list">' + channels + '</div>');
   }
   // Client portrait — the summary shown on the overview tab; the full version lives on its own tab.
   function psychSummary(c) {
@@ -6849,7 +6856,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const all = [];
     (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
     if (!all.length) return '';
-    return reqPrefProfile({ offered: all });
+    return prefProfileInner({ offered: all });
   }
   // Справка Консьержа — human handover brief for the next agent picking up this client.
   // Handover brief on the client card — what one agent tells another before picking this client up.
@@ -7078,7 +7085,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       }));
       return names;
     })();
-    const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields">' +
+    const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields cols2">' +
       (dir.types.length ? dfPair('Типы объектов', joinRu(dir.types)) : '') +
       (dir.ready.length ? dfPair('Готовность', joinRu(dir.ready)) : '') +
       (dir.services.length ? dfPair('Интересуют услуги', joinRu(dir.services)) : '') +
@@ -7086,22 +7093,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dfPair('Язык и канал', [c.lang, chanMeta(prefChannel(c))[1]].filter(Boolean).join(' · ')) +
       (rejectedNames.length ? dfPair('Отклонял', joinRu(rejectedNames)) : '') +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
-      (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : ''));
+      (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : '') +
+      (clientPrefProfile(c) ? '<div class="pref-observed">' + clientPrefProfile(c) + '</div>' : ''));
     const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
     // Deal-level actions («подобрать объекты», «расчёт и КП», «назначить показ») belong to a deal
     // and already live on the deal card and in the page header; on the client they invited an agent
     // to act on a transaction from a screen that does not know which transaction.
 
     const actions = '';   // the bar under the hero carries them now — see clientActions()
-    const pref = clientPrefProfile(c);
-    // Everything on the overview is paired into a two-column grid, and the pairs are chosen so the
-    // two halves carry comparable weight. Single full-width blocks between two-column rows were
-    // what made the page read as a patchwork with holes in it.
+    // Two-column rows are for blocks of comparable weight. A feed is not one of them: it grows with
+    // the client's history and drags whatever sits beside it to the same height.
     return entityActionBar(clientActions(c)) + clientOps(c) +
       '<div class="dx-grid2" style="margin-top:14px">' + conciergeClientHandover(c) + contactBlock(c) + '</div>' +
-      '<div class="dx-grid2" style="margin-top:14px">' + key + psychSummary(c) + '</div>' +
-      '<div class="dx-grid2" style="margin-top:14px">' + sig + contactFeedBlock(c, 5) + '</div>' +
-      (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '');
+      '<div style="margin-top:14px">' + key + '</div>' +
+      '<div class="dx-grid2" style="margin-top:14px">' + psychSummary(c) + sig + '</div>' +
+      '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
@@ -7590,9 +7596,35 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function entityCard(spec) {
     openModal(spec.title, entityBody(spec), spec.footer, { wide: true, flexBody: true });
   }
+  // What to call a screen in a «назад» button. Names beat screen types: «Назад · Анна Петрова»
+  // tells you what you will see; «Назад к клиентам» is where the code came from, not the user.
+  function routeName(r) {
+    if (!r) return '';
+    const short = (t) => { t = String(t || ''); return t.length > 30 ? t.slice(0, 29).trim() + '…' : t; };
+    const by = (arr, id) => (arr || []).find((x) => x.id === id) || null;
+    let x = null;
+    switch (r.view) {
+      case 'dealDetail': x = by(D().deals, r.id); return short(x ? x.title : 'сделка');
+      case 'clientDetail': x = by(D().clients, r.id); return short(x ? x.name : 'клиент');
+      case 'objectDetail': x = by(D().objects, r.id); return short(x ? x.name : 'объект');
+      case 'companyDetail': x = by(D().companies, r.id); return short(x ? x.name : 'компания');
+      case 'requestDetail': x = by(D().requests, r.id); return short(x ? x.title : 'заявка');
+      case 'contractDetail': x = by(D().contracts, r.id); return short(x ? 'договор ' + x.number : 'договор');
+      case 'clients': return r.tab === 'contacts' ? 'Клиенты' : 'Сделки';
+      default: break;
+    }
+    const nav = NAV.concat(NAV_MORE, NAV_MGR, NAV_MGR_MORE).find((n) => n.id === r.view);
+    return nav ? nav.label : r.view;
+  }
+  // The back button of any card: the previous screen when there is one, the owning list otherwise.
+  function backBtn(fallbackNav, fallbackTab, fallbackLabel) {
+    const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
+    if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
+    return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
   // Full-page entity view (deal / client) — mirrors viewObjectDetail: back header + actions, then the tabbed body.
   function entityPage(spec, backNav, backTab, backLabel) {
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="' + backNav + '" data-tab="' + backTab + '">' + I('chevLeft') + backLabel + '</button>' +
+    const back = '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) +
       (spec.pageActs ? '<div class="obj-page-acts">' + spec.pageActs + '</div>' : '') + '</div>';
     return back + entityBody(spec);
   }
@@ -8247,7 +8279,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
       '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
   }
-  function reqPrefProfile(r) {
+  function prefProfileInner(r) {
     const off = r.offered || [];
     const pick = (state) => off.filter((o) => o.state === state).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean);
     const sel = pick('selected'), rej = pick('rejected');
@@ -8257,12 +8289,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const likeViews = uniq(sel.map((o) => o.attrs && o.attrs.view));
     const like = sel.length ? '<div class="pref-row"><span class="badge ok">' + I('check') + 'Заходит</span><span>' + [likeAreas.join(', '), likeViews.length ? 'вид: ' + likeViews.join(', ') : ''].filter(Boolean).join(' · ') + '</span></div>' : '';
     const rejl = rej.length ? '<div class="pref-row"><span class="badge stop">' + I('x') + 'Не заходит</span><span>' + rejAreas.join(', ') + '</span></div>' : '';
-    return dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>',
-      like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>');
+    return like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>';
+  }
+  function reqPrefProfile(r) {
+    const inner = prefProfileInner(r);
+    return inner ? dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>', inner) : '';
   }
   function viewRequestDetail(id) {
     const spec = requestSpec(id);
-    if (!spec) return '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>' +
+    if (!spec) return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад к заявкам') + '</div>' +
       '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
     return entityPage(spec, 'requests', '', 'Назад к заявкам');
   }
@@ -9248,7 +9283,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const o = D().objects.find((x) => x.id === id);
     if (!o) return viewObjects();
     const inSl = inShortlist(o.id);
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="objects">' + I('chevLeft') + 'Назад к объектам</button>' +
+    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') +
       '<div class="obj-page-acts">' +
       '<button class="btn sm" data-valobj="' + o.id + '">' + I('calc') + 'Оценить</button>' +
       '<button class="btn sm" data-shortlist="' + o.id + '"' + (inSl ? ' style="border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + I(inSl ? 'check' : 'star') + (inSl ? 'В подборке' : 'В подборку') + '</button>' +
@@ -11672,6 +11707,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (focusId) { const elx = document.getElementById(focusId); if (elx) { elx.focus(); try { elx.setSelectionRange(caret, caret); } catch (e) {} } }
     // docked chat lives outside #app (survives re-render); keep the engine pointed at it while open
     if (st.cgDock) { const m = document.getElementById('cgdockmsgs'); if (m) WS.engine.mount(m, renderDockMsgs); }
+    if (WS.router && WS.router.mark) WS.router.mark();
   }
 
   function showIncompatible() {
@@ -11687,7 +11723,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});
 
 </script>
@@ -12012,15 +12048,57 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const store = WS.store;
   const api = WS.storeApi;
 
-  // ---- router ----
+  // ---- router + navigation history ----
+  // A route in this app is a screen plus the one id that screen reads. That pair is the whole of
+  // what «где я был» means here, so history is a list of such pairs — no URL layer needed.
+  const ROUTE_ID = {
+    dealDetail: 'dealId', clientDetail: 'clientId', objectDetail: 'objectId',
+    companyDetail: 'companyId', requestDetail: 'requestId', contractDetail: 'contractId',
+  };
+  function routeNow() {
+    const f = ROUTE_ID[store.view];
+    return { view: store.view, id: f ? store[f] : null, tab: store.view === 'clients' ? store.clientsTab : null };
+  }
+  function sameRoute(a, b) { return !!a && !!b && a.view === b.view && a.id === b.id && a.tab === b.tab; }
+  // The route being LEFT is the one that was last rendered, not the one the store holds now: card
+  // openers write their id before navigating, so reading the store at this point would already
+  // return the destination.
+  function pushHistory() {
+    const from = store.navHere, to = routeNow();
+    if (!from || sameRoute(from, to)) return;
+    const st = store.navStack || (store.navStack = []);
+    // Returning to a screen already in the trail rewinds to it instead of stacking: сделка →
+    // клиент → сделка → клиент would otherwise grow a trail nobody can walk back out of.
+    const seen = st.findIndex((r) => sameRoute(r, to));
+    if (seen >= 0) { st.length = seen; return; }
+    if (!sameRoute(st[st.length - 1], from)) st.push(from);
+    if (st.length > 24) st.shift();
+  }
   WS.router = {
     go(view, opts) {
       opts = opts || {};
       store.navOpen = false;
       WS.ui.closeModal();
       store.view = view;
+      if (!opts.replace) pushHistory();
       api.emit();
     },
+    peek() { const st = store.navStack || []; return st[st.length - 1] || null; },
+    back() {
+      const st = store.navStack || [];
+      const prev = st.pop();
+      if (!prev) return false;
+      store.navOpen = false;
+      WS.ui.closeModal();
+      const f = ROUTE_ID[prev.view];
+      if (f) store[f] = prev.id;
+      if (prev.tab) store.clientsTab = prev.tab;
+      store.view = prev.view;
+      api.emit();
+      return true;
+    },
+    // Called by the renderer once a screen is actually on display.
+    mark() { store.navHere = routeNow(); },
   };
 
   // ---- free-text routing ----
@@ -12082,7 +12160,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.scn) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.startScenario(d.scn); }
     if (d.replay) { api.setScenarioStatus(d.replay, 'not'); api.resetScene(d.replay); store.navOpen = false; return WS.engine.startScenario(d.replay); }
     if (d.scenereset) { api.resetScene(d.scenereset); api.toast('Сцена ' + d.scenereset + ' сброшена'); return; }
-    if (d.role) { store.view = 'start'; store.navOpen = false; return api.setRole(d.role); }
+    if (d.role) { store.view = 'start'; store.navOpen = false; store.navStack = []; return api.setRole(d.role); }
     if (d.teamagent) { store.teamAgent = d.teamagent; return api.emit(); }
     if (d.taskpreset) { const m = { open: ['open', 'all'], today: ['open', 'today'], overdue: ['open', 'overdue'], done: ['done', 'all'], all: ['all', 'all'] }[d.taskpreset]; if (m) { store.tasksStatus = m[0]; store.tasksDue = m[1]; } return api.emit(); }
     if (d.tasksdue) { store.tasksDue = d.tasksdue; return api.emit(); }
@@ -12183,6 +12261,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'contractDoc': WS.ui.contractDocOpen(t.dataset.kref, t.dataset.docname); break;
       case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
         WS.ui.contractAct(act, t.dataset.kref); break;
+      case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
@@ -12315,6 +12394,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- Enter key on prompts ----
   document.addEventListener('keydown', (e) => {
+    // e.target is document when the key is pressed with nothing focused — it has no closest().
+    if (e.key === 'ArrowLeft' && e.altKey && !(e.target.closest && e.target.closest('[contenteditable="true"], input, textarea, select'))) {
+      if (WS.router.back()) e.preventDefault();
+      return;
+    }
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }

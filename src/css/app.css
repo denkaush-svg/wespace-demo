@@ -436,6 +436,9 @@ button { font-family: inherit; cursor: pointer; }
 .fld-pick select { width: 100%; height: auto; min-height: 132px; padding: 4px; border-radius: var(--r-s, 10px); overflow-y: auto; }
 .fld-pick select option { padding: 7px 8px; border-radius: 6px; font-size: 13px; }
 .fld-pick .pick-n { display: block; font-size: 11px; color: var(--faint); margin-top: 5px; }
+/* Observed choices sit under the declared parameters inside one preference block, divided rather
+   than repeated as a second section with the same heading. */
+.pref-observed { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .qa-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 2px 0 4px;
   -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .qa-act { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
@@ -1072,6 +1075,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dfields { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 4px; }
 .dfield { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .dfield:last-child { border-bottom: 0; }
+/* A full-width parameter list reads as a long thin column of pairs; two columns give it the same
+   height as the blocks it sits between. */
+.dfields.cols2 { grid-template-columns: 1fr 1fr; column-gap: 26px; }
+.dfields.cols2 .dfield:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+@media (max-width: 760px) { .dfields.cols2 { grid-template-columns: 1fr; } }
 .dfield .dk { color: var(--mut); flex: 0 0 auto; }
 .dfield .dv { color: var(--ink); font-weight: 600; text-align: right; flex: 1 1 auto; min-width: 0; }
 .prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }

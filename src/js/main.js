@@ -5,15 +5,57 @@
   const store = WS.store;
   const api = WS.storeApi;
 
-  // ---- router ----
+  // ---- router + navigation history ----
+  // A route in this app is a screen plus the one id that screen reads. That pair is the whole of
+  // what «где я был» means here, so history is a list of such pairs — no URL layer needed.
+  const ROUTE_ID = {
+    dealDetail: 'dealId', clientDetail: 'clientId', objectDetail: 'objectId',
+    companyDetail: 'companyId', requestDetail: 'requestId', contractDetail: 'contractId',
+  };
+  function routeNow() {
+    const f = ROUTE_ID[store.view];
+    return { view: store.view, id: f ? store[f] : null, tab: store.view === 'clients' ? store.clientsTab : null };
+  }
+  function sameRoute(a, b) { return !!a && !!b && a.view === b.view && a.id === b.id && a.tab === b.tab; }
+  // The route being LEFT is the one that was last rendered, not the one the store holds now: card
+  // openers write their id before navigating, so reading the store at this point would already
+  // return the destination.
+  function pushHistory() {
+    const from = store.navHere, to = routeNow();
+    if (!from || sameRoute(from, to)) return;
+    const st = store.navStack || (store.navStack = []);
+    // Returning to a screen already in the trail rewinds to it instead of stacking: сделка →
+    // клиент → сделка → клиент would otherwise grow a trail nobody can walk back out of.
+    const seen = st.findIndex((r) => sameRoute(r, to));
+    if (seen >= 0) { st.length = seen; return; }
+    if (!sameRoute(st[st.length - 1], from)) st.push(from);
+    if (st.length > 24) st.shift();
+  }
   WS.router = {
     go(view, opts) {
       opts = opts || {};
       store.navOpen = false;
       WS.ui.closeModal();
       store.view = view;
+      if (!opts.replace) pushHistory();
       api.emit();
     },
+    peek() { const st = store.navStack || []; return st[st.length - 1] || null; },
+    back() {
+      const st = store.navStack || [];
+      const prev = st.pop();
+      if (!prev) return false;
+      store.navOpen = false;
+      WS.ui.closeModal();
+      const f = ROUTE_ID[prev.view];
+      if (f) store[f] = prev.id;
+      if (prev.tab) store.clientsTab = prev.tab;
+      store.view = prev.view;
+      api.emit();
+      return true;
+    },
+    // Called by the renderer once a screen is actually on display.
+    mark() { store.navHere = routeNow(); },
   };
 
   // ---- free-text routing ----
@@ -75,7 +117,7 @@
     if (d.scn) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.startScenario(d.scn); }
     if (d.replay) { api.setScenarioStatus(d.replay, 'not'); api.resetScene(d.replay); store.navOpen = false; return WS.engine.startScenario(d.replay); }
     if (d.scenereset) { api.resetScene(d.scenereset); api.toast('Сцена ' + d.scenereset + ' сброшена'); return; }
-    if (d.role) { store.view = 'start'; store.navOpen = false; return api.setRole(d.role); }
+    if (d.role) { store.view = 'start'; store.navOpen = false; store.navStack = []; return api.setRole(d.role); }
     if (d.teamagent) { store.teamAgent = d.teamagent; return api.emit(); }
     if (d.taskpreset) { const m = { open: ['open', 'all'], today: ['open', 'today'], overdue: ['open', 'overdue'], done: ['done', 'all'], all: ['all', 'all'] }[d.taskpreset]; if (m) { store.tasksStatus = m[0]; store.tasksDue = m[1]; } return api.emit(); }
     if (d.tasksdue) { store.tasksDue = d.tasksdue; return api.emit(); }
@@ -176,6 +218,7 @@
       case 'contractDoc': WS.ui.contractDocOpen(t.dataset.kref, t.dataset.docname); break;
       case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
         WS.ui.contractAct(act, t.dataset.kref); break;
+      case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
@@ -308,6 +351,11 @@
 
   // ---- Enter key on prompts ----
   document.addEventListener('keydown', (e) => {
+    // e.target is document when the key is pressed with nothing focused — it has no closest().
+    if (e.key === 'ArrowLeft' && e.altKey && !(e.target.closest && e.target.closest('[contenteditable="true"], input, textarea, select'))) {
+      if (WS.router.back()) e.preventDefault();
+      return;
+    }
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
