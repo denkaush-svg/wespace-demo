@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 16:09</title>
+  <title>WESPACE · сборка 17:14</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='16:09';
+    window.WS_BUILD='17:14';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -448,10 +448,14 @@ button { font-family: inherit; cursor: pointer; }
 .field.rejected { opacity: .5; }
 .field.rejected .v { text-decoration: line-through; }
 
-.approval { display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-top: 1px solid var(--line); background: var(--surface-2); }
-.approval .note { font-size: 11.5px; color: var(--mut); flex: 1; display: flex; align-items: center; gap: 7px; }
+/* The note takes the room that is left, and the buttons drop to their own line
+   when there is none. Without the wrap the confirm button hung 20px past the
+   card on a 390px screen — on the one control the whole write layer exists
+   for, at the width the stand is actually shown at. */
+.approval { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 13px 15px; border-top: 1px solid var(--line); background: var(--surface-2); }
+.approval .note { font-size: 11.5px; color: var(--mut); flex: 1 1 150px; min-width: 0; display: flex; align-items: center; gap: 7px; }
 .approval .note svg { width: 15px; height: 15px; color: var(--warn); flex: none; }
-.approval .acts { display: flex; gap: 8px; }
+.approval .acts { display: flex; gap: 8px; flex: none; margin-left: auto; }
 
 /* level tag */
 .lvl-tag { font-size: 10px; font-weight: 700; letter-spacing: .03em; padding: 2px 8px; border-radius: var(--r-pill); border: 1px solid; }
@@ -573,6 +577,8 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--faint); font-weight: 600; }
 .an-src svg { width: 11px; height: 11px; color: var(--faint); }
 .an-src.ok svg { color: var(--ok); }
+/* Drawn at a revision the data has since left behind. */
+.an-src .moved { color: var(--warn); font-weight: 600; }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3436,6 +3442,47 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return null;
   }
 
+  /* What a person is actually being asked to confirm. The preview used to list
+     the field names alone — «deals d_anna: amount» — so a figure the model
+     picked was written into the workspace by someone who never saw it. The
+     whole write layer exists so a change passes through a human; showing the
+     name of the field and not its value made that passage ceremonial.
+
+     And it is read in Russian, on a phone, by a broker: the internals of the
+     store are not the vocabulary to confirm a change in. */
+  const COLL_RU = { deals: 'Сделка', clients: 'Контакт', objects: 'Объект', tasks: 'Задача', requests: 'Заявка' };
+  const FIELD_RU = {
+    amount: 'сумма', stage: 'стадия', hot: 'горячая', funnel: 'воронка', dealType: 'тип сделки',
+    objectType: 'тип объекта', goal: 'цель', paymentForm: 'форма оплаты', vat: 'НДС', source: 'источник',
+    agent: 'ответственный', partnerAgent: 'агент партнёра', companyId: 'компания', stageDays: 'дней на стадии',
+    contacts: 'контакты', tags: 'теги', sub: 'подпись', title: 'название', updated: 'обновлено',
+    note: 'заметка', nextStep: 'следующий шаг', consideredProjects: 'проекты в работе',
+    areas: 'районы', horizon: 'горизонт', viewed: 'просмотрено', budget: 'бюджет', tag: 'метка',
+    channel: 'канал', lang: 'язык', name: 'имя', phone: 'телефон', psych: 'психотип',
+    match: 'соответствие', price: 'цена', verified: 'проверен', checkedAt: 'проверен',
+    sourceLabel: 'подпись источника', commissionPct: 'комиссия, %', size: 'площадь', br: 'спален',
+    area: 'район', address: 'адрес', purpose: 'назначение',
+    due: 'срок', kind: 'тип', assignee: 'исполнитель', status: 'статус', when: 'когда',
+    bedrooms: 'спален', nextContact: 'следующий контакт', leadStatus: 'статус лида',
+    temperature: 'температура', funding: 'финансирование',
+  };
+  const fieldRu = (f) => FIELD_RU[f] || f;
+  const stageRu = (k) => ((WS.ui && WS.ui.stageLabel) ? (WS.ui.stageLabel(k) || k) : k);
+  // The record as a person knows it, falling back to the id when it has no name.
+  function recordRu(coll, rec) {
+    const who = rec && (rec.name || rec.title || rec.sub);
+    return (COLL_RU[coll] || coll) + ' ' + (who ? '«' + String(who).slice(0, 40) + '»' : (rec && rec.id) || '');
+  }
+
+  function shown(v) {
+    if (v === undefined || v === null || v === '') return '—';
+    if (typeof v === 'number') return isFinite(v) ? v.toLocaleString('ru-RU') : String(v);
+    if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+    if (typeof v === 'object') return JSON.stringify(v).slice(0, 40);
+    const s = String(v);
+    return s.length > 40 ? s.slice(0, 39) + '…' : s;
+  }
+
   // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
   function planOp(o, i) {
     const at = 'операция ' + (i + 1) + ': ';
@@ -3493,7 +3540,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       if (stages.indexOf(o.stage) < 0) {
         return fail('bad_value', at + 'нет такой стадии «' + o.stage + '»', { stages: stages });
       }
-      return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
+      return { ok: true, tier: 'guarded',
+        summary: recordRu(spec.coll, rec) + ' · стадия: ' + stageRu(rec.stage) + ' → ' + stageRu(o.stage),
+        run: () => { rec.stage = o.stage; } };
     }
 
     const patch = o.patch;
@@ -3513,7 +3562,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     return {
       ok: true, tier: tier,
-      summary: spec.coll + ' ' + o.id + ': ' + keys.join(', '),
+      summary: recordRu(spec.coll, rec) + ' · ' +
+        keys.map((f) => fieldRu(f) + ': ' + shown(rec[f]) + ' → ' + shown(patch[f])).join('; '),
       run: () => { Object.assign(rec, patch); },
     };
   }
@@ -4427,8 +4477,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const t = String(b && b.t);
     if (t !== 'table' && t !== 'bars' && t !== 'kv') return '';
     if (b.src === 'data') {
+      // The block was built at a revision. Scrolling back to it an hour later,
+      // after a stage moved and a deal was added, the rows are still the old
+      // ones — true when they were drawn, and quietly wrong now unless the
+      // card says which moment it is showing.
+      const now = WS.store && WS.store.dataRevision;
+      const moved = b.revision != null && now != null && b.revision !== now;
       return '<div class="an-src ok">' + I('source') + 'из данных' +
-        (b.count ? ' · ' + b.count + ' ' + plural(b.count, ['запись', 'записи', 'записей']) : '') + '</div>';
+        (b.count ? ' · ' + b.count + ' ' + plural(b.count, ['запись', 'записи', 'записей']) : '') +
+        (moved ? '<span class="moved">· данные с тех пор менялись</span>' : '') + '</div>';
     }
     return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
   }
@@ -10518,24 +10575,43 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '';
   }
 
-  // Whoever receives this file did not watch it being made, so the footer says
-  // what it is and where its figures came from. A demo figure leaving the
-  // stand unlabelled is the one failure this whole design exists to prevent.
-  function provenance() {
+  /* Whoever receives this file did not watch it being made, so the footer says
+     what it is and where its figures came from. A demo figure leaving the
+     stand unlabelled is the one failure this whole design exists to prevent.
+
+     The claim is made about what is actually in the document. It used to be
+     printed unconditionally — «посчитаны по данным рабочего места» under
+     whatever the page happened to contain. A model-typed table is refused
+     upstream now, so the sentence is true; but it is built from the blocks
+     rather than asserted over them, because the day the filter changes the
+     footer must change with it, not keep vouching out of habit. */
+  function provenance(blocks) {
     const rows = (WS.store && WS.store.data && WS.store.data.market) || [];
     const demo = rows.some((r) => r.basis && r.basis !== 'публикация');
     const who = (WS.store && WS.store.data && WS.store.data.tenant) || {};
+    const list = Array.isArray(blocks) ? blocks : [];
+    const numeric = list.filter((b) => b && (b.t === 'table' || b.t === 'bars' || b.t === 'kv'));
+    const counted = numeric.filter((b) => b.src === 'data').length;
+    const rev = (WS.store && WS.store.dataRevision);
+    let figures = '';
+    if (numeric.length && counted === numeric.length) {
+      figures = 'Все величины в документе посчитаны кодом по данным рабочего места' +
+        (rev != null ? ' (ревизия ' + rev + ')' : '') + '.';
+    } else if (numeric.length) {
+      figures = 'Часть величин в документе не сверена с данными рабочего места — проверьте перед отправкой.';
+    }
     return [
       'Собрано Консьержем WESPACE' + (who.name ? ' · ' + who.name : '') + '.',
       demo ? 'Рыночные величины в этом документе демонстрационные, не из публикации — проверьте перед отправкой клиенту.' : '',
-      'Показатели по сделкам и задачам посчитаны по данным рабочего места на момент сборки.',
+      figures,
     ].filter(Boolean).join(' ');
   }
 
   function build(spec) {
     const s = spec || {};
     const title = esc(s.title || 'Аналитическая записка');
-    const blocks = (Array.isArray(s.blocks) ? s.blocks : []).map(blockHtml).join('');
+    const list = Array.isArray(s.blocks) ? s.blocks : [];
+    const blocks = list.map(blockHtml).join('');
     const stamp = (WS.storeApi && WS.storeApi.clockLabel) ? WS.storeApi.clockLabel() : {};
     const meta = [stamp.date, stamp.time].filter(Boolean)
       .map((x) => '<span>' + esc(x) + '</span>').join('');
@@ -10551,7 +10627,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       (s.subtitle ? '<p class="sub">' + esc(s.subtitle) + '</p>' : '') +
       (meta ? '<div class="meta">' + meta + '</div>' : '') +
       blocks +
-      '<div class="foot">' + esc(provenance()) + '</div>' +
+      '<div class="foot">' + esc(provenance(list)) + '</div>' +
       '</div></div></body></html>';
   }
 
@@ -10859,6 +10935,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // then threw on .slice() while the chat was mid-render, stranding the card.
   // Every shape declares which of its fields must be arrays.
   const BLOCK_ARRAYS = { p: [], h: [], note: [], list: ['items'], kv: ['rows'], table: ['rows'], bars: ['rows'] };
+  // The shapes that carry measured values, and therefore carry a provenance.
+  const NUMERIC = { kv: true, table: true, bars: true };
 
   /* ---------- blocks built from data, not from the model's text ----------
 
@@ -10876,18 +10954,43 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      A block that still carries its own rows is rendered, and marked. Marking is
      honest and it makes the right path visibly the better one.                */
 
+  // An average comes back as 8.133333333333333. Rounding belongs to the code:
+  // asking the model to round would hand the last digit back to it.
+  function fmtNum(v) {
+    return String(Math.round(v * 100) / 100).replace('.', ',');
+  }
+
   function fmtCell(v, money) {
     if (v == null) return '';
     if (money && isFinite(Number(v))) return WS.AED(Number(v));
-    if (typeof v === 'number') return String(v).replace('.', ',');
+    if (typeof v === 'number') return fmtNum(v);
     return String(v);
   }
 
+  /* A quantity dressed as a label. The cells of a data-backed block belong to
+     the code, but the model still names the columns — and «Доходность 12%» in a
+     header reads exactly as authoritative as the figures under it. Words that
+     merely contain digits («Топ-5», «2026 год») are left alone; a measured
+     value is not. */
+  const FIGURE = /\d[.,]\d|\d[\s ]\d{3}|\d{5}|\d\s?(%|₽|\$|AED|дирх|м²|м2|млн|млрд|тыс)/i;
+  function hasFigure(s) { return FIGURE.test(String(s == null ? '' : s)); }
+
+  /* Runs the query behind a block. A grouped query answers «по стадиям», «по
+     районам», «по ответственным» — the shape most analytical questions have —
+     and it comes back as groups, not rows. Flattening it here is what keeps
+     such an answer on the data path instead of pushing it back into prose. */
   function runSpec(spec) {
     if (!spec || typeof spec !== 'object') return null;
     let res = null;
-    try { res = WS.query.run(Object.assign({}, spec, { aggregate: null })); } catch (e) { return null; }
-    if (!res || res.ok === false || !Array.isArray(res.rows)) return null;
+    try { res = WS.query.run(spec); } catch (e) { return null; }
+    if (!res || res.ok === false) return null;
+    if (res.groups) {
+      const rows = Object.keys(res.groups)
+        .map((k) => ({ group: k, value: res.groups[k].value }))
+        .sort((a, b) => Number(b.value) - Number(a.value));
+      return rows.length ? { rows: rows, count: res.count, revision: res.revision } : null;
+    }
+    if (!Array.isArray(res.rows)) return null;
     return res;
   }
 
@@ -10898,18 +11001,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!res) return null;
     const rows = res.rows.slice(0, 8).map((r) => cols.map((c) => fmtCell(r[c.field], c.money)));
     if (!rows.length) return null;
-    return { t: 'table', head: cols.map((c) => String(c.label || c.field)), rows: rows, src: 'data', count: res.count };
+    const head = cols.map((c) => (c.label && !hasFigure(c.label) ? String(c.label) : String(c.field)));
+    return { t: 'table', head: head, rows: rows, src: 'data', count: res.count,
+      spec: b.from, revision: res.revision };
   }
 
   function fillBars(b) {
     if (!b.label || !b.value) return null;
     const res = runSpec(b.from);
     if (!res) return null;
+    const suffix = b.suffix && !hasFigure(b.suffix) ? String(b.suffix).slice(0, 8) : '';
     const rows = res.rows.slice(0, 6)
       .filter((r) => isFinite(Number(r[b.value])))
-      .map((r) => ({ label: String(r[b.label]), value: Number(r[b.value]), suffix: b.suffix ? String(b.suffix) : '' }));
+      .map((r) => ({ label: String(r[b.label]), value: Number(r[b.value]), suffix: suffix }));
     if (!rows.length) return null;
-    return { t: 'bars', rows: rows, src: 'data', count: res.count };
+    return { t: 'bars', rows: rows, src: 'data', count: res.count,
+      spec: b.from, revision: res.revision };
   }
 
   // A kv block over named readings: the same figures the tiles and the chips
@@ -10920,7 +11027,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const rows = keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
       .map((r) => ({ k: r.label, v: r.money ? WS.AED(r.value) : String(r.value) }));
     if (!rows.length) return null;
-    return { t: 'kv', rows: rows, src: 'data' };
+    return { t: 'kv', rows: rows, src: 'data', revision: (WS.store && WS.store.dataRevision) };
   }
 
   function resolve(b) {
@@ -10952,14 +11059,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return out.length ? out : null;
   }
 
-  // A report is the same shapes, assembled into a file instead of a bubble.
+  /* A report is the same shapes, assembled into a file instead of a bubble —
+     and that difference is the whole reason the rules here are stricter. A
+     marked table in the chat is honest: the mark is on the screen next to it,
+     and whoever asked the question is looking at both. The file leaves the
+     room. It gets forwarded, and its footer says the figures were computed
+     from the workspace — so a model-typed table inside it turns that footer
+     into a false claim. Numbers in a document come from a query or not at all. */
   function normReport(r) {
     if (!r || typeof r !== 'object') return null;
-    const blocks = normBlocks(r.blocks);
-    if (!blocks) return null;
+    const all = normBlocks(r.blocks);
+    if (!all) return null;
+    const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data');
+    if (!blocks.length) return null;
+    const title = String(r.title || '').slice(0, 120);
+    const subtitle = r.subtitle ? String(r.subtitle).slice(0, 200) : '';
     return {
-      title: String(r.title || 'Аналитическая записка').slice(0, 120),
-      subtitle: r.subtitle ? String(r.subtitle).slice(0, 200) : '',
+      title: (title && !hasFigure(title)) ? title : 'Аналитическая записка',
+      subtitle: hasFigure(subtitle) ? '' : subtitle,
       blocks: blocks,
     };
   }

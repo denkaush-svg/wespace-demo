@@ -54,9 +54,10 @@ function events(raw) {
   });
 }
 
-function ask(body, mode) {
+function ask(body, mode, headers) {
   process.env.FAKE_CLI_MODE = mode || 'ok';
-  return req({ method: 'POST', path: '/ask', headers: { 'content-type': 'application/json' } }, body);
+  return req({ method: 'POST', path: '/ask',
+    headers: Object.assign({ 'content-type': 'application/json' }, headers || {}) }, body);
 }
 
 function refill() { state.ips.clear(); state.dayCount = 0; }
@@ -324,6 +325,21 @@ async function guardChecks() {
   for (let i = 0; i < CFG.perIpBurst; i++) await ask({ text: 'вопрос ' + i });
   res = await ask({ text: 'ещё' });
   ok('a flood from one address is throttled', res.status === 429 && JSON.parse(res.body).code === 'rate', res.status + '');
+
+  /* The bucket is spent by address, and the address used to be read from the
+     first entry of X-Forwarded-For — a header the caller writes. A new value
+     per request meant a fresh bucket per request, and the limiter never fired.
+     The proxy in front appends the address it actually accepted, so the last
+     entry is the only one nobody outside chose. */
+  refill();
+  // As it arrives in production: the caller wrote the first entry, the proxy
+  // in front appended the address it actually accepted the connection from.
+  const spoofed = (n) => ({ 'x-forwarded-for': '9.9.9.' + n + ', 127.0.0.1' });
+  for (let i = 0; i < CFG.perIpBurst; i++) await ask({ text: 'вопрос ' + i }, 'ok', spoofed(i));
+  res = await ask({ text: 'ещё' }, 'ok', spoofed(99));
+  ok('a made-up forwarding header does not buy a fresh bucket',
+    res.status === 429 && JSON.parse(res.body).code === 'rate', res.status + '');
+  ok('and the caller was counted under one address, not many', state.ips.size === 1, 'buckets=' + state.ips.size);
 
   // The caps used to be checked before the body was read and counted after —
   // two calls that both looked at an idle server both got through.

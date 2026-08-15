@@ -60,6 +60,20 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     ).catch(() => {});
     await wait(400);
 
+    /* The change waiting for a click is the control the whole write layer
+       exists for, and it is pressed on a phone. Built here rather than asked
+       for, so the check measures the card and not the model's mood. */
+    await page.evaluate(() => {
+      const d = window.WS.store.data.deals[0];
+      const pr = window.WS.agent.tools.propose(
+        [{ op: 'updateDeal', id: d.id, patch: { amount: 4321000, note: 'клиент просит пересмотреть график платежей и снизить первый транш' } }],
+        { title: 'Изменение по просьбе' });
+      if (pr && pr.kind === 'proposal') {
+        document.getElementById('chat').insertAdjacentHTML('beforeend', window.WS.engine.agentCard(pr, 'mMobProp'));
+      }
+    });
+    await wait(120);
+
     const m = await page.evaluate(() => {
       const doc = document.documentElement;
       const chat = document.getElementById('chat');
@@ -78,6 +92,13 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         // A reply is useless if the composer covers it.
         replyBottom: msgs.length ? Math.round(msgs[msgs.length - 1].getBoundingClientRect().bottom) : 0,
         viewH: window.innerHeight,
+        approval: (() => {
+          const box = chat ? chat.querySelector('.approval') : null;
+          const acts = box ? box.querySelector('.acts') : null;
+          if (!box || !acts) return null;
+          const b = box.getBoundingClientRect(); const a = acts.getBoundingClientRect();
+          return { spill: Math.round(a.right - b.right), confirm: Math.round(a.right) };
+        })(),
       };
     });
     await page.screenshot({ path: path.join(SHOTS, 'mobile-' + s.name + '.png') });
@@ -91,6 +112,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(tag + ' · the reply fits above the fold or scrolls to it', m.replyBottom > 0, 'bottom=' + m.replyBottom);
     ok(tag + ' · no page errors', errs.length === 0, errs.join('; '));
     ok(tag + ' · the answer is still on the Concierge screen', m.msgs > 0, 'messages=' + m.msgs);
+    ok(tag + ' · the confirm button stays inside its card',
+      !!m.approval && m.approval.spill <= 0, m.approval ? 'spill=' + m.approval.spill + 'px' : 'no proposal card');
     // The proxy refills six tokens a minute; two viewports back to back would
     // measure the throttle instead of the layout.
     await wait(11000);

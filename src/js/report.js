@@ -108,24 +108,43 @@
     return '';
   }
 
-  // Whoever receives this file did not watch it being made, so the footer says
-  // what it is and where its figures came from. A demo figure leaving the
-  // stand unlabelled is the one failure this whole design exists to prevent.
-  function provenance() {
+  /* Whoever receives this file did not watch it being made, so the footer says
+     what it is and where its figures came from. A demo figure leaving the
+     stand unlabelled is the one failure this whole design exists to prevent.
+
+     The claim is made about what is actually in the document. It used to be
+     printed unconditionally — «посчитаны по данным рабочего места» under
+     whatever the page happened to contain. A model-typed table is refused
+     upstream now, so the sentence is true; but it is built from the blocks
+     rather than asserted over them, because the day the filter changes the
+     footer must change with it, not keep vouching out of habit. */
+  function provenance(blocks) {
     const rows = (WS.store && WS.store.data && WS.store.data.market) || [];
     const demo = rows.some((r) => r.basis && r.basis !== 'публикация');
     const who = (WS.store && WS.store.data && WS.store.data.tenant) || {};
+    const list = Array.isArray(blocks) ? blocks : [];
+    const numeric = list.filter((b) => b && (b.t === 'table' || b.t === 'bars' || b.t === 'kv'));
+    const counted = numeric.filter((b) => b.src === 'data').length;
+    const rev = (WS.store && WS.store.dataRevision);
+    let figures = '';
+    if (numeric.length && counted === numeric.length) {
+      figures = 'Все величины в документе посчитаны кодом по данным рабочего места' +
+        (rev != null ? ' (ревизия ' + rev + ')' : '') + '.';
+    } else if (numeric.length) {
+      figures = 'Часть величин в документе не сверена с данными рабочего места — проверьте перед отправкой.';
+    }
     return [
       'Собрано Консьержем WESPACE' + (who.name ? ' · ' + who.name : '') + '.',
       demo ? 'Рыночные величины в этом документе демонстрационные, не из публикации — проверьте перед отправкой клиенту.' : '',
-      'Показатели по сделкам и задачам посчитаны по данным рабочего места на момент сборки.',
+      figures,
     ].filter(Boolean).join(' ');
   }
 
   function build(spec) {
     const s = spec || {};
     const title = esc(s.title || 'Аналитическая записка');
-    const blocks = (Array.isArray(s.blocks) ? s.blocks : []).map(blockHtml).join('');
+    const list = Array.isArray(s.blocks) ? s.blocks : [];
+    const blocks = list.map(blockHtml).join('');
     const stamp = (WS.storeApi && WS.storeApi.clockLabel) ? WS.storeApi.clockLabel() : {};
     const meta = [stamp.date, stamp.time].filter(Boolean)
       .map((x) => '<span>' + esc(x) + '</span>').join('');
@@ -141,7 +160,7 @@
       (s.subtitle ? '<p class="sub">' + esc(s.subtitle) + '</p>' : '') +
       (meta ? '<div class="meta">' + meta + '</div>' : '') +
       blocks +
-      '<div class="foot">' + esc(provenance()) + '</div>' +
+      '<div class="foot">' + esc(provenance(list)) + '</div>' +
       '</div></div></body></html>';
   }
 

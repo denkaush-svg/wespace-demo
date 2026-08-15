@@ -132,9 +132,18 @@ function originAllowed(req) {
   return CFG.origins.indexOf(o) >= 0 || CFG.origins.indexOf('*') >= 0;
 }
 
+/* Whose bucket to spend. The reverse proxy in front of us APPENDS the address
+   it accepted the connection from, so the last entry is the only one we did
+   not receive from the caller. Reading the first entry — the usual reflex —
+   read a header the caller writes: any address at all, a different one each
+   request, and the per-address limiter never fires. The day this runs behind a
+   second hop, that hop has to be counted here too. */
 function clientIp(req) {
   const fwd = req.headers['x-forwarded-for'];
-  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim();
+  if (typeof fwd === 'string' && fwd) {
+    const hops = fwd.split(',').map((s) => s.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1];
+  }
   return req.socket.remoteAddress || 'unknown';
 }
 
@@ -177,6 +186,8 @@ const SYSTEM = [
   'ОТЧЁТ. Слова «отчёт», «записка», «документ», «собери файл», «отправлю клиенту» — это report, а не blocks.',
   'В report клади полный разбор с заголовками; в тексте ответа — одна фраза о том, что собрано. Дублировать его в blocks не надо.',
   'Документ уйдёт клиенту без тебя, поэтому оговорку о происхождении цифр ставь отдельным блоком note внутри report.',
+  'В документе таблица, столбики и kv берутся ТОЛЬКО запросом. Блок с готовыми rows в отчёт не попадёт — его выбросят молча.',
+  'В заголовке и подзаголовке отчёта чисел не пиши: величины живут в блоках, где их считает код.',
   '',
   'BLOCKS. Разбор — сравнение районов, расклад по воронке, оценка варианта — выдаётся ТОЛЬКО через blocks.',
   'Сравнил две и более величины и не положил их в blocks — это ошибка: сплошной текст с цифрами не читается.',
@@ -190,6 +201,13 @@ const SYSTEM = [
   'Имена полей в примере — из этого стенда; всегда сверяйся со схемой, не угадывай.',
   '   {"t":"kv","reads":["deals_active","deals_active_sum"]}   — ключи из ДАННЫЕ.показатели',
   'В from можно where: [{"field":"stage","op":"eq","value":"docs"}], sort, limit.',
+  '',
+  'РАЗРЕЗ «ПО ЧЕМУ-ТО» — groupBy и aggregate (сумма по стадиям, средняя доходность по районам, сделки по ответственным).',
+  'В такой таблице ровно две колонки: group — значение разреза, value — посчитанная величина.',
+  '   {"t":"table","from":{"from":"deals","groupBy":"stage","aggregate":{"fn":"sum","field":"amount"}},',
+  '    "columns":[{"field":"group","label":"Стадия"},{"field":"value","label":"Сумма","money":true}]}',
+  '   {"t":"bars","from":{"from":"deals","groupBy":"agent","aggregate":{"fn":"count"}},"label":"group","value":"value"}',
+  'Функции: count, sum, avg, min, max. Считает код — ни складывать, ни усреднять самому не надо.',
   'Блок с готовыми rows тоже примут, но под ним встанет пометка «собрано моделью, не сверено с данными».',
   'Каждый раз, когда величины можно взять запросом, — бери запросом. Пометка на таблице читается как слабость ответа.',
   '',

@@ -677,8 +677,15 @@
     const t = String(b && b.t);
     if (t !== 'table' && t !== 'bars' && t !== 'kv') return '';
     if (b.src === 'data') {
+      // The block was built at a revision. Scrolling back to it an hour later,
+      // after a stage moved and a deal was added, the rows are still the old
+      // ones — true when they were drawn, and quietly wrong now unless the
+      // card says which moment it is showing.
+      const now = WS.store && WS.store.dataRevision;
+      const moved = b.revision != null && now != null && b.revision !== now;
       return '<div class="an-src ok">' + I('source') + 'из данных' +
-        (b.count ? ' · ' + b.count + ' ' + plural(b.count, ['запись', 'записи', 'записей']) : '') + '</div>';
+        (b.count ? ' · ' + b.count + ' ' + plural(b.count, ['запись', 'записи', 'записей']) : '') +
+        (moved ? '<span class="moved">· данные с тех пор менялись</span>' : '') + '</div>';
     }
     return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
   }

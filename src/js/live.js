@@ -252,6 +252,8 @@
   // then threw on .slice() while the chat was mid-render, stranding the card.
   // Every shape declares which of its fields must be arrays.
   const BLOCK_ARRAYS = { p: [], h: [], note: [], list: ['items'], kv: ['rows'], table: ['rows'], bars: ['rows'] };
+  // The shapes that carry measured values, and therefore carry a provenance.
+  const NUMERIC = { kv: true, table: true, bars: true };
 
   /* ---------- blocks built from data, not from the model's text ----------
 
@@ -269,18 +271,43 @@
      A block that still carries its own rows is rendered, and marked. Marking is
      honest and it makes the right path visibly the better one.                */
 
+  // An average comes back as 8.133333333333333. Rounding belongs to the code:
+  // asking the model to round would hand the last digit back to it.
+  function fmtNum(v) {
+    return String(Math.round(v * 100) / 100).replace('.', ',');
+  }
+
   function fmtCell(v, money) {
     if (v == null) return '';
     if (money && isFinite(Number(v))) return WS.AED(Number(v));
-    if (typeof v === 'number') return String(v).replace('.', ',');
+    if (typeof v === 'number') return fmtNum(v);
     return String(v);
   }
 
+  /* A quantity dressed as a label. The cells of a data-backed block belong to
+     the code, but the model still names the columns — and «Доходность 12%» in a
+     header reads exactly as authoritative as the figures under it. Words that
+     merely contain digits («Топ-5», «2026 год») are left alone; a measured
+     value is not. */
+  const FIGURE = /\d[.,]\d|\d[\s ]\d{3}|\d{5}|\d\s?(%|₽|\$|AED|дирх|м²|м2|млн|млрд|тыс)/i;
+  function hasFigure(s) { return FIGURE.test(String(s == null ? '' : s)); }
+
+  /* Runs the query behind a block. A grouped query answers «по стадиям», «по
+     районам», «по ответственным» — the shape most analytical questions have —
+     and it comes back as groups, not rows. Flattening it here is what keeps
+     such an answer on the data path instead of pushing it back into prose. */
   function runSpec(spec) {
     if (!spec || typeof spec !== 'object') return null;
     let res = null;
-    try { res = WS.query.run(Object.assign({}, spec, { aggregate: null })); } catch (e) { return null; }
-    if (!res || res.ok === false || !Array.isArray(res.rows)) return null;
+    try { res = WS.query.run(spec); } catch (e) { return null; }
+    if (!res || res.ok === false) return null;
+    if (res.groups) {
+      const rows = Object.keys(res.groups)
+        .map((k) => ({ group: k, value: res.groups[k].value }))
+        .sort((a, b) => Number(b.value) - Number(a.value));
+      return rows.length ? { rows: rows, count: res.count, revision: res.revision } : null;
+    }
+    if (!Array.isArray(res.rows)) return null;
     return res;
   }
 
@@ -291,18 +318,22 @@
     if (!res) return null;
     const rows = res.rows.slice(0, 8).map((r) => cols.map((c) => fmtCell(r[c.field], c.money)));
     if (!rows.length) return null;
-    return { t: 'table', head: cols.map((c) => String(c.label || c.field)), rows: rows, src: 'data', count: res.count };
+    const head = cols.map((c) => (c.label && !hasFigure(c.label) ? String(c.label) : String(c.field)));
+    return { t: 'table', head: head, rows: rows, src: 'data', count: res.count,
+      spec: b.from, revision: res.revision };
   }
 
   function fillBars(b) {
     if (!b.label || !b.value) return null;
     const res = runSpec(b.from);
     if (!res) return null;
+    const suffix = b.suffix && !hasFigure(b.suffix) ? String(b.suffix).slice(0, 8) : '';
     const rows = res.rows.slice(0, 6)
       .filter((r) => isFinite(Number(r[b.value])))
-      .map((r) => ({ label: String(r[b.label]), value: Number(r[b.value]), suffix: b.suffix ? String(b.suffix) : '' }));
+      .map((r) => ({ label: String(r[b.label]), value: Number(r[b.value]), suffix: suffix }));
     if (!rows.length) return null;
-    return { t: 'bars', rows: rows, src: 'data', count: res.count };
+    return { t: 'bars', rows: rows, src: 'data', count: res.count,
+      spec: b.from, revision: res.revision };
   }
 
   // A kv block over named readings: the same figures the tiles and the chips
@@ -313,7 +344,7 @@
     const rows = keys.map((k) => WS.agent.tools.read(String(k))).filter(Boolean)
       .map((r) => ({ k: r.label, v: r.money ? WS.AED(r.value) : String(r.value) }));
     if (!rows.length) return null;
-    return { t: 'kv', rows: rows, src: 'data' };
+    return { t: 'kv', rows: rows, src: 'data', revision: (WS.store && WS.store.dataRevision) };
   }
 
   function resolve(b) {
@@ -345,14 +376,24 @@
     return out.length ? out : null;
   }
 
-  // A report is the same shapes, assembled into a file instead of a bubble.
+  /* A report is the same shapes, assembled into a file instead of a bubble —
+     and that difference is the whole reason the rules here are stricter. A
+     marked table in the chat is honest: the mark is on the screen next to it,
+     and whoever asked the question is looking at both. The file leaves the
+     room. It gets forwarded, and its footer says the figures were computed
+     from the workspace — so a model-typed table inside it turns that footer
+     into a false claim. Numbers in a document come from a query or not at all. */
   function normReport(r) {
     if (!r || typeof r !== 'object') return null;
-    const blocks = normBlocks(r.blocks);
-    if (!blocks) return null;
+    const all = normBlocks(r.blocks);
+    if (!all) return null;
+    const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data');
+    if (!blocks.length) return null;
+    const title = String(r.title || '').slice(0, 120);
+    const subtitle = r.subtitle ? String(r.subtitle).slice(0, 200) : '';
     return {
-      title: String(r.title || 'Аналитическая записка').slice(0, 120),
-      subtitle: r.subtitle ? String(r.subtitle).slice(0, 200) : '',
+      title: (title && !hasFigure(title)) ? title : 'Аналитическая записка',
+      subtitle: hasFigure(subtitle) ? '' : subtitle,
       blocks: blocks,
     };
   }

@@ -306,10 +306,14 @@ button { font-family: inherit; cursor: pointer; }
 .field.rejected { opacity: .5; }
 .field.rejected .v { text-decoration: line-through; }
 
-.approval { display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-top: 1px solid var(--line); background: var(--surface-2); }
-.approval .note { font-size: 11.5px; color: var(--mut); flex: 1; display: flex; align-items: center; gap: 7px; }
+/* The note takes the room that is left, and the buttons drop to their own line
+   when there is none. Without the wrap the confirm button hung 20px past the
+   card on a 390px screen — on the one control the whole write layer exists
+   for, at the width the stand is actually shown at. */
+.approval { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 13px 15px; border-top: 1px solid var(--line); background: var(--surface-2); }
+.approval .note { font-size: 11.5px; color: var(--mut); flex: 1 1 150px; min-width: 0; display: flex; align-items: center; gap: 7px; }
 .approval .note svg { width: 15px; height: 15px; color: var(--warn); flex: none; }
-.approval .acts { display: flex; gap: 8px; }
+.approval .acts { display: flex; gap: 8px; flex: none; margin-left: auto; }
 
 /* level tag */
 .lvl-tag { font-size: 10px; font-weight: 700; letter-spacing: .03em; padding: 2px 8px; border-radius: var(--r-pill); border: 1px solid; }
@@ -431,6 +435,8 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--faint); font-weight: 600; }
 .an-src svg { width: 11px; height: 11px; color: var(--faint); }
 .an-src.ok svg { color: var(--ok); }
+/* Drawn at a revision the data has since left behind. */
+.an-src .moved { color: var(--warn); font-weight: 600; }
 .an-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 9px; }
 .an-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 2fr) auto; align-items: center; gap: 9px; }
 .an-bar .bl { font-size: 12.5px; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

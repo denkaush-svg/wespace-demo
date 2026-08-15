@@ -945,18 +945,203 @@ setTimeout(async () => {
       // in the test drifts from the shipped text without either side noticing.
       {
         const rules = fs.readFileSync(path.join(D, '..', 'server', 'proxy.js'), 'utf8');
-        const m = /\{"t":"table","from":\{[\s\S]*?\}\]\}/.exec(rules.replace(/',\s*\n\s*'/g, ''));
-        let example = null;
-        try { example = m ? JSON.parse(m[0]) : null; } catch (e) { example = null; }
-        check('числа · the table example in the rules is parseable', !!example, m ? m[0].slice(0, 80) : 'not found');
-        const asDocumented = example ? L.normBlocks([example]) : null;
-        check('числа · and the query it teaches actually resolves against this stand',
-          !!asDocumented && asDocumented[0].src === 'data' && asDocumented[0].rows.length > 0 &&
-          asDocumented[0].rows.every((r) => r.every((c) => c !== '')),
-          JSON.stringify(asDocumented && asDocumented[0] && asDocumented[0].rows[0]));
-        const sortField = example && example.from && example.from.sort && example.from.sort.field;
-        check('числа · including the field it sorts by',
-          !sortField || (dd().market || []).every((r) => r[sortField] !== undefined), String(sortField));
+        const flatRules = rules.replace(/',\s*\n\s*'/g, '');
+        // Balanced scan rather than a pattern: the examples nest objects and
+        // arrays, and a non-greedy match stops at whichever brace comes first.
+        const objAt = (s, start) => {
+          let depth = 0, inStr = false, esc = false;
+          for (let i = start; i < s.length; i++) {
+            const c = s[i];
+            if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+            if (c === '"') { inStr = true; continue; }
+            if (c === '{') depth++;
+            else if (c === '}' && !--depth) return s.slice(start, i + 1);
+          }
+          return null;
+        };
+        const found = [];
+        for (let i = 0; i < flatRules.length; i++) {
+          if (/^\{"t":"(table|bars)","from":/.test(flatRules.slice(i, i + 26))) {
+            const got = objAt(flatRules, i);
+            if (got) { found.push(got); i += got.length - 1; }
+          }
+        }
+        const examples = found.map((s) => { try { return JSON.parse(s); } catch (e) { return null; } });
+        check('числа · every block example in the rules is parseable',
+          examples.length >= 4 && examples.every(Boolean),
+          examples.length + ' found, ' + found.filter((s, i) => !examples[i]).join(' | ').slice(0, 120));
+        examples.filter(Boolean).forEach((ex, i) => {
+          const built = L.normBlocks([ex]);
+          check('числа · example ' + (i + 1) + ' (' + ex.t + (ex.from.groupBy ? ', разрез' : '') + ') resolves against this stand',
+            !!built && built[0].src === 'data' && built[0].rows.length > 0 &&
+            (ex.t !== 'table' || built[0].rows.every((r) => r.every((c) => c !== ''))),
+            JSON.stringify(ex.from) + ' → ' + JSON.stringify(built && built[0] && built[0].rows[0]));
+        });
+        const fields = examples.filter(Boolean).flatMap((ex) => [
+          ex.from.groupBy, ex.from.sort && ex.from.sort.field, ex.from.aggregate && ex.from.aggregate.field,
+        ].filter(Boolean).map((f) => [ex.from.from, f]));
+        check('числа · including every field those queries name',
+          fields.every(([coll, f]) => (dd()[coll] || []).every((r) => r[f] !== undefined)),
+          JSON.stringify(fields.filter(([coll, f]) => !(dd()[coll] || []).every((r) => r[f] !== undefined))));
+      }
+
+      /* «Сколько по каждой стадии», «средняя доходность по районам», «сделки
+         по ответственным» — the shape most analytical questions have. It comes
+         back from the read layer as groups, and the block builder used to want
+         rows, so every such question fell off the data path and back into
+         prose the model typed. The more analytical the question, the more
+         likely the answer was model-authored: exactly backwards. */
+      {
+        const deals = dd().deals || [];
+        const bySt = {};
+        deals.forEach((d) => { bySt[d.stage] = (bySt[d.stage] || 0) + d.amount; });
+        const grouped = L.normBlocks([{
+          t: 'table',
+          from: { from: 'deals', groupBy: 'stage', aggregate: { fn: 'sum', field: 'amount' } },
+          columns: [{ field: 'group', label: 'Стадия' }, { field: 'value', label: 'Сумма', money: true }],
+        }]);
+        check('разрез · a grouped query becomes a data-backed table',
+          !!grouped && grouped[0].src === 'data' && grouped[0].rows.length === Object.keys(bySt).length,
+          JSON.stringify(grouped && grouped[0] && grouped[0].rows));
+        const biggest = Object.keys(bySt).sort((a, b) => bySt[b] - bySt[a])[0];
+        check('разрез · and the aggregate is the code’s own sum, ordered by it',
+          !!grouped && grouped[0].rows[0][0] === biggest && grouped[0].rows[0][1] === WS.AED(bySt[biggest]),
+          JSON.stringify(grouped && grouped[0] && grouped[0].rows[0]) + ' vs ' + biggest + '=' + bySt[biggest]);
+
+        const gBars = L.normBlocks([{
+          t: 'bars', from: { from: 'deals', groupBy: 'agent', aggregate: { fn: 'count' } },
+          label: 'group', value: 'value',
+        }]);
+        const agents = {};
+        deals.forEach((d) => { agents[d.agent] = (agents[d.agent] || 0) + 1; });
+        check('разрез · bars can be grouped too',
+          !!gBars && gBars[0].src === 'data' && gBars[0].rows.length === Object.keys(agents).length &&
+          gBars[0].rows.every((r) => agents[r.label] === r.value),
+          JSON.stringify(gBars && gBars[0] && gBars[0].rows));
+
+        // An average arrives as 8.133333333333333. Rounding is the code's; the
+        // alternative is asking the model to round, which hands the last digit
+        // back to it.
+        const avg = L.normBlocks([{
+          t: 'table', from: { from: 'deals', groupBy: 'stage', aggregate: { fn: 'avg', field: 'amount' } },
+          columns: [{ field: 'group', label: 'Стадия' }, { field: 'value', label: 'Средняя' }],
+        }]);
+        // Guard against passing on an empty stomach: if no group averages to a
+        // fraction here, the rounding is not being exercised at all.
+        check('разрез · this stand really does produce a repeating average',
+          Object.values(bySt).length > 0 &&
+          deals.some((d) => deals.filter((x) => x.stage === d.stage).length === 3),
+          JSON.stringify(Object.keys(bySt).map((s) => s + ':' + deals.filter((x) => x.stage === s).length)));
+        check('разрез · an average is rounded by the code, not left raw',
+          !!avg && avg[0].rows.every((r) => !/[.,]\d{3}/.test(r[1])),
+          JSON.stringify(avg && avg[0] && avg[0].rows));
+      }
+
+      /* The cells belong to the code, but the model still names the columns.
+         «Доходность 12%» in a header reads exactly as authoritative as the
+         figures under it — and nothing under it says that number was typed. */
+      {
+        const dressed = L.normBlocks([{
+          t: 'table', from: { from: 'market', limit: 2 },
+          columns: [{ field: 'район', label: 'Топ-5 районов' }, { field: 'доходностьПроцент', label: 'Доходность 12%' }],
+        }]);
+        check('подписи · a figure in a column label is refused, the field name stands in',
+          !!dressed && dressed[0].head[1] === 'доходностьПроцент', JSON.stringify(dressed && dressed[0].head));
+        check('подписи · a label that merely contains a digit is left alone',
+          !!dressed && dressed[0].head[0] === 'Топ-5 районов', JSON.stringify(dressed && dressed[0].head));
+        const suffixed = L.normBlocks([{
+          t: 'bars', from: { from: 'market', limit: 2 }, label: 'район', value: 'доходностьПроцент', suffix: '8,1%',
+        }]);
+        check('подписи · and a figure smuggled into a bar suffix is dropped',
+          !!suffixed && suffixed[0].rows[0].suffix === '', JSON.stringify(suffixed && suffixed[0].rows[0]));
+      }
+
+      /* A block was built at a revision. Scrolled back to after a stage moved,
+         its rows are the old ones — true when drawn, quietly wrong now. */
+      {
+        const dated = L.normBlocks([{
+          t: 'table', from: { from: 'market', limit: 2 },
+          columns: [{ field: 'район', label: 'Район' }],
+        }]);
+        check('ревизия · a data-backed block remembers its query and its revision',
+          !!dated && dated[0].revision === WS.store.dataRevision && !!dated[0].spec,
+          JSON.stringify(dated && { r: dated[0].revision, s: dated[0].spec }));
+        const fresh = doc.createElement('div');
+        fresh.innerHTML = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [], blocks: dated }, 'mRev1');
+        check('ревизия · while the data has not moved the card says nothing extra',
+          (fresh.textContent || '').indexOf('данные с тех пор менялись') < 0);
+        WS.storeApi.apply([{ op: 'addEvent', scope: 'deal', id: dd().deals[0].id, type: 'note', text: 'сдвиг' }], { confirmed: true });
+        const stale = doc.createElement('div');
+        stale.innerHTML = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [], blocks: dated }, 'mRev2');
+        check('ревизия · once it has, the same block says so',
+          (stale.textContent || '').indexOf('данные с тех пор менялись') >= 0,
+          (stale.textContent || '').slice(0, 120));
+      }
+
+      /* A marked table in the chat is honest — the mark is on the screen next
+         to it. A file leaves the room: it gets forwarded, and its footer says
+         the figures were computed from the workspace. A model-typed table
+         inside one turns that footer into a false claim. */
+      {
+        const rep = L.normReport({
+          title: 'Разбор', blocks: [
+            { t: 'p', text: 'вывод' },
+            { t: 'table', head: ['Район'], rows: [['999 999']] },
+            { t: 'table', from: { from: 'market', limit: 2 }, columns: [{ field: 'район', label: 'Район' }] },
+          ],
+        });
+        check('отчёт · a model-typed table does not get into a document',
+          !!rep && rep.blocks.length === 2 && JSON.stringify(rep.blocks).indexOf('999 999') < 0,
+          JSON.stringify(rep && rep.blocks.map((b) => b.t + ':' + (b.src || 'model'))));
+        check('отчёт · while the data-backed one does',
+          !!rep && rep.blocks.some((b) => b.t === 'table' && b.src === 'data'));
+
+        const titled = L.normReport({ title: 'Доходность 8,1% по Arjan', subtitle: 'рост на 12%', blocks: [{ t: 'p', text: 'x' }] });
+        check('отчёт · a figure in the title is refused — a headline is not a computed value',
+          !!titled && titled.title === 'Аналитическая записка' && titled.subtitle === '',
+          JSON.stringify(titled && { t: titled.title, s: titled.subtitle }));
+        const plainTitle = L.normReport({ title: 'Топ-5 районов', blocks: [{ t: 'p', text: 'x' }] });
+        check('отчёт · an ordinary title survives', !!plainTitle && plainTitle.title === 'Топ-5 районов');
+
+        // The footer is built from what the page holds, not asserted over it:
+        // the day the filter changes, the claim has to change with it.
+        const okDoc = WS.report.build({ title: 'x', blocks: rep.blocks });
+        check('отчёт · the footer vouches for the figures only when it can',
+          okDoc.indexOf('посчитаны кодом по данным') >= 0, okDoc.slice(-320));
+        const mixedDoc = WS.report.build({ title: 'x', blocks: [{ t: 'table', head: ['a'], rows: [['999 999']] }] });
+        check('отчёт · a page holding a model-typed figure says so instead',
+          mixedDoc.indexOf('не сверена') >= 0 && mixedDoc.indexOf('посчитаны кодом по данным') < 0,
+          mixedDoc.slice(-320));
+        const proseDoc = WS.report.build({ title: 'x', blocks: [{ t: 'p', text: 'без величин' }] });
+        check('отчёт · and a page with no figures claims nothing about figures',
+          proseDoc.indexOf('посчитаны кодом') < 0 && proseDoc.indexOf('не сверена') < 0);
+      }
+
+      /* The write layer exists so a change passes through a person. Listing the
+         field names alone — «deals d_anna: amount» — made that passage
+         ceremonial: a figure the model picked was confirmed by someone who
+         never saw it. */
+      {
+        const d0 = dd().deals[0];
+        const was = d0.amount;
+        const pv = WS.storeApi.preview([{ op: 'updateDeal', id: d0.id, patch: { amount: 4321000 } }]);
+        const line = (pv.pending || []).join(' ');
+        check('подтверждение · the preview shows the value, not just the field',
+          pv.ok === true && line.indexOf('→') >= 0 && line.replace(/ | |\s/g, '').indexOf('4321000') >= 0,
+          line);
+        check('подтверждение · and what is being replaced',
+          line.replace(/ | |\s/g, '').indexOf(String(was)) >= 0, line);
+        const other = (WS.ui.STAGE_CODES || []).find((s) => s !== d0.stage);
+        const st = WS.storeApi.preview([{ op: 'dealStage', id: d0.id, stage: other }]);
+        check('подтверждение · a stage change names the stage it leaves',
+          st.ok === true && (st.pending || []).join(' ')
+            .indexOf(WS.ui.stageLabel(d0.stage) + ' → ' + WS.ui.stageLabel(other)) >= 0,
+          (st.pending || []).join(' '));
+        // It is read in Russian, on a phone, by a broker — the store's own
+        // vocabulary («deals d_anna: amount») is not what a change is confirmed in.
+        check('подтверждение · and it names the record the way a person knows it',
+          line.indexOf('Сделка «') === 0 && line.indexOf('сумма') > 0 && line.indexOf('deals ') < 0,
+          line);
       }
 
       // Evidence carries the revision it was read at.

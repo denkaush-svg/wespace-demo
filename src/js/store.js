@@ -333,6 +333,47 @@
     return null;
   }
 
+  /* What a person is actually being asked to confirm. The preview used to list
+     the field names alone — «deals d_anna: amount» — so a figure the model
+     picked was written into the workspace by someone who never saw it. The
+     whole write layer exists so a change passes through a human; showing the
+     name of the field and not its value made that passage ceremonial.
+
+     And it is read in Russian, on a phone, by a broker: the internals of the
+     store are not the vocabulary to confirm a change in. */
+  const COLL_RU = { deals: 'Сделка', clients: 'Контакт', objects: 'Объект', tasks: 'Задача', requests: 'Заявка' };
+  const FIELD_RU = {
+    amount: 'сумма', stage: 'стадия', hot: 'горячая', funnel: 'воронка', dealType: 'тип сделки',
+    objectType: 'тип объекта', goal: 'цель', paymentForm: 'форма оплаты', vat: 'НДС', source: 'источник',
+    agent: 'ответственный', partnerAgent: 'агент партнёра', companyId: 'компания', stageDays: 'дней на стадии',
+    contacts: 'контакты', tags: 'теги', sub: 'подпись', title: 'название', updated: 'обновлено',
+    note: 'заметка', nextStep: 'следующий шаг', consideredProjects: 'проекты в работе',
+    areas: 'районы', horizon: 'горизонт', viewed: 'просмотрено', budget: 'бюджет', tag: 'метка',
+    channel: 'канал', lang: 'язык', name: 'имя', phone: 'телефон', psych: 'психотип',
+    match: 'соответствие', price: 'цена', verified: 'проверен', checkedAt: 'проверен',
+    sourceLabel: 'подпись источника', commissionPct: 'комиссия, %', size: 'площадь', br: 'спален',
+    area: 'район', address: 'адрес', purpose: 'назначение',
+    due: 'срок', kind: 'тип', assignee: 'исполнитель', status: 'статус', when: 'когда',
+    bedrooms: 'спален', nextContact: 'следующий контакт', leadStatus: 'статус лида',
+    temperature: 'температура', funding: 'финансирование',
+  };
+  const fieldRu = (f) => FIELD_RU[f] || f;
+  const stageRu = (k) => ((WS.ui && WS.ui.stageLabel) ? (WS.ui.stageLabel(k) || k) : k);
+  // The record as a person knows it, falling back to the id when it has no name.
+  function recordRu(coll, rec) {
+    const who = rec && (rec.name || rec.title || rec.sub);
+    return (COLL_RU[coll] || coll) + ' ' + (who ? '«' + String(who).slice(0, 40) + '»' : (rec && rec.id) || '');
+  }
+
+  function shown(v) {
+    if (v === undefined || v === null || v === '') return '—';
+    if (typeof v === 'number') return isFinite(v) ? v.toLocaleString('ru-RU') : String(v);
+    if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+    if (typeof v === 'object') return JSON.stringify(v).slice(0, 40);
+    const s = String(v);
+    return s.length > 40 ? s.slice(0, 39) + '…' : s;
+  }
+
   // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
   function planOp(o, i) {
     const at = 'операция ' + (i + 1) + ': ';
@@ -390,7 +431,9 @@
       if (stages.indexOf(o.stage) < 0) {
         return fail('bad_value', at + 'нет такой стадии «' + o.stage + '»', { stages: stages });
       }
-      return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
+      return { ok: true, tier: 'guarded',
+        summary: recordRu(spec.coll, rec) + ' · стадия: ' + stageRu(rec.stage) + ' → ' + stageRu(o.stage),
+        run: () => { rec.stage = o.stage; } };
     }
 
     const patch = o.patch;
@@ -410,7 +453,8 @@
     }
     return {
       ok: true, tier: tier,
-      summary: spec.coll + ' ' + o.id + ': ' + keys.join(', '),
+      summary: recordRu(spec.coll, rec) + ' · ' +
+        keys.map((f) => fieldRu(f) + ': ' + shown(rec[f]) + ' → ' + shown(patch[f])).join('; '),
       run: () => { Object.assign(rec, patch); },
     };
   }
