@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:50</title>
+  <title>WESPACE · сборка 14:22</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:50';
+    window.WS_BUILD='14:22';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -752,7 +752,9 @@ button { font-family: inherit; cursor: pointer; }
 .dx-sec-h { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 13.5px; margin-bottom: 13px; }
 .dx-sec-h .ic { width: 27px; height: 27px; border-radius: 8px; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; }
 .dx-sec-h .r { margin-left: auto; }
-.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+/* A brief is naturally shorter than the contact list facing it. Stretching it leaves an empty
+   half-card, which reads as content that failed to load rather than as a card that is short. */
+.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .dx-grid2 > .dx-sec { margin-top: 0; }
 @media (max-width: 640px) { .dx-grid2 { grid-template-columns: 1fr; } }
 .dx-cbar-lbl { font-size: 11px; color: var(--mut); margin: 0 0 6px 2px; display: flex; align-items: center; gap: 6px; }
@@ -6741,65 +6743,111 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Every clause is built from the client's own records and disappears when the data is absent, so a
   // bare new contact yields two honest sentences instead of a skeleton of dashes. Phrases are shaped
   // to avoid Russian case agreement: a name never lands in a slot that would require declension.
+  // How long this person has been ours, counted from the oldest thing in their history.
+  function clientSince(c) {
+    const feed = contactFeedEntries(c).filter((e) => !(e.ord > NOW_ORD));
+    const first = feed.length ? feed[feed.length - 1] : null;
+    if (!first || !first.at) return null;
+    const at = String(first.at).split('·')[0].trim();
+    const days = (function () {
+      const m = /^(\d+)\s*([а-яё]*)/i.exec(at);
+      if (!m) return null;
+      const mi = RU_MONTHS.indexOf((m[2] || '').toLowerCase());
+      const mo = mi >= 0 ? mi + 1 : demoNow().mo;
+      return dayOfYear(demoNow().d, demoNow().mo) - dayOfYear(parseInt(m[1], 10), mo);
+    })();
+    return { at: at, days: days };
+  }
+  // What we have actually shown this client, across every deal and request — the thing no single
+  // card row can say. Services, property types and how the choosing has gone so far.
+  function clientDirections(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const services = Array.from(new Set(deals.map((d) => lowerFirst(d.dealType || '')).filter(Boolean)));
+    const types = Array.from(new Set(deals.map((d) => d.objectType).filter(Boolean)));
+    const ready = Array.from(new Set(deals.map((d) => d.readiness).filter(Boolean)));
+    let offered = 0, picked = 0, rejected = 0;
+    reqs.forEach((r) => (r.offered || []).forEach((o) => {
+      offered++;
+      if (o && o.state === 'selected') picked++;
+      if (o && o.state === 'rejected') rejected++;
+    }));
+    return { services: services, types: types, ready: ready, offered: offered, picked: picked, rejected: rejected, deals: deals, reqs: reqs };
+  }
+  function afterDash(t) {
+    const i = String(t || '').indexOf('—');
+    return i >= 0 ? String(t).slice(i + 1).trim() : String(t || '').trim();
+  }
+  // The client brief. Five sentences at most, and none of them restates a field the card already
+  // shows: it answers «кто это, что мы ему возили, как он решает и как с ним говорить».
   function clientBriefSentences(c) {
     const out = [];
-    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
-    const active = deals.filter((d) => !dealClosed(d));
-    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const dir = clientDirections(c);
+    const active = dir.deals.filter((d) => !dealClosed(d));
+    const won = dir.deals.filter(dealWon);
+    const since = clientSince(c);
 
-    // 1. Who and what the request is.
-    const want = [];
-    if (c.goal) want.push(lowerFirst(c.goal) + (c.budget ? ' до ' + WS.AED(c.budget) : ''));
-    else if (c.budget) want.push('бюджет до ' + WS.AED(c.budget));
-    if ((c.areas || []).length) want.push('районы ' + joinRu(c.areas));
-    if (c.horizon) want.push('срок ' + c.horizon);
-    out.push(c.name + (c.lang ? ', ' + c.lang : '') + '. ' + (want.length ? 'Запрос — ' + want.join('; ') + '.' : 'Запрос ещё не зафиксирован.'));
+    // 1. Since when, and through what door.
+    let intro = c.name;
+    if (since) {
+      intro += (since.days != null && since.days > 0)
+        ? ' — в работе ' + since.days + ' ' + plural(since.days, 'день', 'дня', 'дней') + ', с ' + since.at
+        : ' — в работе с ' + since.at;
+    } else intro += ' — только что заведён';
+    const src = (dir.deals[0] || {}).source || (dir.reqs[0] || {}).source;
+    if (src) intro += '; источник — ' + src;
+    out.push(intro + '.');
 
-    // 2. Where the client stands right now.
-    if (active.length) {
-      const d0 = active[0];
-      const stageL = funnelSteps(d0).cols[funnelSteps(d0).idx];
-      let line = 'В работе ' + active.length + ' ' + plural(active.length, 'сделка', 'сделки', 'сделок') +
-        ': «' + d0.title + '», стадия «' + stageL + '»';
-      if (d0.amount) line += ', ' + WS.AED(d0.amount);
-      out.push(line + '; ведёт ' + agentName(d0.agent) + '.');
-    } else if (reqs.length) {
-      const offered = reqs.reduce((n, r) => n + ((r.offered || []).length), 0);
-      out.push('Активных сделок нет: ' + reqs.length + ' ' + plural(reqs.length, 'заявка', 'заявки', 'заявок') +
-        (offered ? ', предложено ' + offered + ' ' + plural(offered, 'объект', 'объекта', 'объектов') : '') + '.');
+    // 2. What we have been doing with them — the history, not the current row.
+    if (dir.deals.length || dir.offered) {
+      let line = dir.deals.length
+        ? ((dir.deals.length === 1 ? 'Одна' : dir.deals.length) + ' ' + plural(dir.deals.length, 'сделка', 'сделки', 'сделок') +
+           (dir.services.length ? ' — ' + joinRu(dir.services) : ''))
+        : 'Сделок пока нет';
+      if (dir.types.length) line += '. Объекты — ' + joinRu(dir.types);
+      if (dir.ready.length === 1) line += ' (' + dir.ready[0] + ')';
+      if (dir.offered) {
+        line += '. Показали ' + dir.offered + ' ' + plural(dir.offered, 'объект', 'объекта', 'объектов');
+        const tail = [];
+        if (dir.picked) tail.push('выбрали ' + dir.picked);
+        if (dir.rejected) tail.push('отклонили ' + dir.rejected);
+        if (tail.length) line += ', ' + tail.join(', ');
+      }
+      if (won.length) line += '. ' + capFirst(plural(won.length, 'одна сделка доведена', 'сделки доведены', 'сделок доведено')) +
+        (won.length > 1 ? ' (' + won.length + ')' : '') + ' до конца';
+      out.push(line + '.');
     } else {
-      out.push('Активных сделок и заявок пока нет — контакт в базе, работа не начата.');
+      out.push('Работа ещё не начиналась — ни заявок, ни сделок, только контакт в базе.');
     }
 
-    // 3. The last thing that actually happened. The feed also carries planned shows and open tasks
-    // («что было и что предстоит» share one ribbon) — a 16:00 показ is not a «последнее касание» at
-    // 9:12, so anything dated in the future is skipped here.
-    const feed = contactFeedEntries(c).filter((e) => !(e.ord > NOW_ORD));
-    if (feed.length) {
-      const last = feed[0];
-      const what = (last.text || last.t || '').replace(/\s+/g, ' ').trim();
-      if (what) out.push('Последнее касание — ' + (last.at || 'недавно') + ': ' + lowerFirst(what.length > 90 ? what.slice(0, 90).replace(/\s+\S*$/, '') + '…' : what.replace(/[.!?]*$/, '')) + '.');
-    }
-
-    // 4. What to watch out for.
-    const watch = [];
-    const k = kycOf(c);
-    if (k.st !== 'ok') watch.push(lowerFirst(k.label));
-    if (c.consent === false) watch.push('нет согласия на связь (PDPL)');
-    const overdue = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue').length;
-    if (overdue) watch.push(overdue + ' ' + plural(overdue, 'просроченная задача', 'просроченные задачи', 'просроченных задач'));
-    const sig = (D().clientSignals || {})[c.id];
-    if (sig) (sig.signals || []).filter((x) => !x.ok).forEach((x) => watch.push(lowerFirst(x.t)));
-    if (watch.length) out.push('Внимание: ' + joinRu(watch) + '.');
-
-    // 5. How to talk to them — only when the портрет is filled in.
+    // 3. How this person decides. Interpretation, not a dump of the portrait fields.
     const p = c.psych;
     if (p && p.filled) {
-      const how = [lowerFirst(commTips(p)[0])];
-      if (p.channel) how.push('канал — ' + p.channel);            // «WhatsApp» is a name, not a word to lowercase
-      if (p.bestTime) how.push('лучшее время — ' + lowerFirst(p.bestTime));
-      out.push('Как говорить: ' + how.join(', ') + '.');
+      const how = [];
+      if (p.decision) how.push(afterDash(p.decision));
+      if (p.pace) how.push(lowerFirst(afterDash(p.pace)));
+      if ((p.values || []).length) how.push('ценит ' + joinRu(p.values.map(lowerFirst)));
+      if (how.length) out.push(capFirst(how.join(', ')) + '.');
+      // Channel, tone and time are three separate answers; the source strings already carry their
+      // own punctuation, so they are joined with sentence breaks rather than more commas.
+      const talk = [];
+      if (p.channel) talk.push('канал — ' + p.channel);
+      if (p.tone) talk.push('тон — ' + lowerFirst(p.tone));
+      if (p.bestTime) talk.push('время — ' + lowerFirst(p.bestTime));
+      if (talk.length) out.push(talk.map(capFirst).join('. ') + '.');
+      if ((p.triggers || []).length) out.push('Триггеры решения: ' + joinRu(p.triggers.map(lowerFirst)) + '.');
+    } else if (active.length || dir.offered) {
+      out.push('Портрет не заполнен — стиль общения приходится угадывать по переписке.');
     }
+
+    // 4. The one thing that would go wrong if nobody looked.
+    const watch = [];
+    if (c.consent === false) watch.push('нет согласия на связь — адресные отправки заблокированы');
+    const k = kycOf(c);
+    if (k.st === 'stop') watch.push('KYC не начат');
+    const overdue = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue').length;
+    if (overdue) watch.push(overdue + ' ' + plural(overdue, 'просроченная задача', 'просроченные задачи', 'просроченных задач'));
+    if (watch.length) out.push('Держать в голове: ' + joinRu(watch) + '.');
     return out;
   }
   function conciergeClientHandover(c) {
@@ -6813,7 +6861,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const deals = (D().deals || []).filter((d) => d.clientId === c.id);
     const deal = deals.find((d) => !dealClosed(d)) || deals[0];
     const owner = deal ? agentName(deal.agent) : 'не назначен';
-    const stage = deal ? ({ new: 'Новый лид', work: 'В переговорах', docs: 'Документы', done: 'Закрыт' })[deal.stage] : 'Без активной сделки';
+    // Stages come from the deal's own funnel now; the old four-key map returned undefined for
+    // everything except «work», and the strip printed it.
+    const stage = deal ? (dealWon(deal) ? 'Сделка закрыта' : (deal.stage === 'lost' ? 'Сделка проиграна' : stageLabel(deal.stage))) : 'Без активной сделки';
     const nextTask = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done')
       .sort((a, b) => (a.when === 'overdue' ? -1 : b.when === 'overdue' ? 1 : 0))[0];
     const nextC = nextTask ? ((nextTask.when === 'overdue' ? 'просрочено · ' : '') + nextTask.due) : null;
@@ -6863,23 +6913,45 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // overview
     const s = (D().clientSignals || {})[c.id];
     const prio = s ? '<span class="prio prio-' + s.priority + '">' + s.priority + '</span>' : '';
-    const key = dxSec('users', 'Ключевое', '', '<div class="dfields">' +
-      dfPair('Цель', c.goal) + dfPair('Районы', (c.areas || []).join(', ')) +
+    // What this client wants ACROSS everything we have run for them — derived from their own deal
+    // and request history, not copied from whichever деal happens to be first in the array. «Цель»
+    // was exactly that copy: a parameter of one заявка, printed as a property of the person.
+    const dir = clientDirections(c);
+    const rejectedNames = (function () {
+      const names = [];
+      (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => {
+        if (o && o.state === 'rejected') {
+          const ob = (D().objects || []).find((x) => x.id === (o.id || o));
+          if (ob) names.push(ob.name.split(',')[0]);
+        }
+      }));
+      return names;
+    })();
+    const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields">' +
+      (dir.types.length ? dfPair('Типы объектов', joinRu(dir.types)) : '') +
+      (dir.ready.length ? dfPair('Готовность', joinRu(dir.ready)) : '') +
+      (dir.services.length ? dfPair('Интересуют услуги', joinRu(dir.services)) : '') +
+      dfPair('Районы интереса', (c.areas || []).join(', ')) +
+      dfPair('Язык и канал', [c.lang, chanMeta(prefChannel(c))[1]].filter(Boolean).join(' · ')) +
+      (rejectedNames.length ? dfPair('Отклонял', joinRu(rejectedNames)) : '') +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
       (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : ''));
     const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
-    const actions = dxSec('sparkle', 'Действия по сделке', '',
-      '<div class="qa-row">' +
-      '<button class="chip" data-act="newDeal" data-cid="' + c.id + '">' + I('briefcase') + 'Создать сделку</button>' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объекты</button>' +
-      '<button class="chip" data-nav="calc">' + I('money') + 'Расчёт и КП</button>' +
-      '<button class="chip" data-scn="S3">' + I('calendar') + 'Назначить показ</button>' +
-      '<button class="chip" data-scn="S6">' + I('handshake') + 'Подключить партнёра</button>' +
-      '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
-      '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
+    // Deal-level actions («подобрать объекты», «расчёт и КП», «назначить показ») belong to a deal
+    // and already live on the deal card and in the page header; on the client they invited an agent
+    // to act on a transaction from a screen that does not know which transaction.
+    const clientActs = [
+      ['clock', 'Запланировать касание', 'data-act="newTask"'],
+      ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"'],
+      ['sparkle', 'Бриф к звонку', 'data-scn="S8"'],
+      !(c.psych && c.psych.filled) ? ['users', 'Заполнить портрет', 'data-act="psychForm" data-cid="' + c.id + '"'] : null,
+    ].filter(Boolean);
+    const actions = dxSec('users', 'Действия с клиентом', '',
+      '<div class="qa-row">' + clientActs.map((a) => '<button class="chip" ' + a[2] + '>' + I(a[0]) + a[1] + '</button>').join('') +
+      '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Работа по конкретной сделке — на её карточке. Здесь только то, что относится к человеку.</div>');
     const pref = clientPrefProfile(c);
-    return clientOps(c) + '<div style="margin-top:14px">' + conciergeClientHandover(c) + '</div>' +
-      '<div style="margin-top:14px">' + contactBlock(c) + '</div>' +
+    return clientOps(c) +
+      '<div class="dx-grid2" style="margin-top:14px">' + conciergeClientHandover(c) + contactBlock(c) + '</div>' +
       '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
       '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
       (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
@@ -7584,15 +7656,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const c = D().clients.find((x) => x.id === d.clientId) || {};
     const out = [];
 
-    // 1. Where we stand.
+    // 1. Where we stand, how long, and who is carrying it.
     const days = d.stageDays || 0;
-    let stand = 'Сделка на стадии «' + s.cols[s.idx] + '»';
+    let stand = 'Стадия «' + s.cols[s.idx] + '»';
     if (days > 0) stand += ', ' + days + '-й день';
-    if (d.createdAt) stand += '; заведена ' + d.createdAt;
+    stand += '; ведёт ' + agentName(d.agent);
+    if (d.createdAt) stand += ', сделка заведена ' + d.createdAt;
     out.push(stand + '.');
 
-    // 2. What is already settled — money, paper, inventory.
+    // 2. What is already settled — money, paper, inventory, control points.
     const settled = [];
+    const gp = gateProgress(d);
+    if (gp.total) settled.push('пройдено ' + gp.done + ' из ' + gp.total + ' контрольных точек');
     const dep = d.deposit;
     if (dep && dep.paid) settled.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' внесён' + (dep.at ? ' ' + dep.at : ''));
     const kpN = dealKpObjects(d).length;
@@ -7605,6 +7680,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
     // 3. What is holding it up.
     const risks = [];
+    const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
+    if (nextGate && GATES[nextGate]) risks.push('не закрыт гейт «' + GATES[nextGate].label + '»');
     if (/просроч/i.test(d.nextDue || '')) risks.push('касание просрочено');
     const cf = (D().conflicts || {})[d.id];
     if (cf) risks.push('по полю «' + cf.field + '» расходятся два источника');
@@ -7612,16 +7689,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (dep && !dep.paid) risks.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' ещё не внесён');
     const openTasks = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done').length;
     if (openTasks) risks.push('по клиенту ' + plural(openTasks, 'висит', 'висят', 'висят') + ' ' + openTasks + ' ' + plural(openTasks, 'задача', 'задачи', 'задач'));
-    if (risks.length) out.push('Мешает: ' + joinRu(risks) + '.');
+    if (risks.length && !dealClosed(d)) out.push('Мешает: ' + joinRu(risks) + '.');
 
     // 4. Whose move. The agent's name goes after a dash rather than into a case-inflected phrase —
     // "Ход за Марина Волкова" is the kind of un-Russian line a template produces.
     if (!dealClosed(d)) {
-      const step = nbaActions(d).doIt[0] || 'Согласовать следующий шаг с клиентом';
+      const step = nbaActions(d).doIt[0] || 'Созвониться с клиентом и назначить дату';
       // `nextDue` holds either a date («сегодня 16:00») or an overdue marker («просрочено (касание)»);
       // only the former makes sense after the word «срок», and the latter is already in «Мешает».
       const due = /просроч/i.test(d.nextDue || '') ? '' : (d.nextDue ? ', срок ' + d.nextDue : '');
-      out.push('Следующий шаг — ' + lowerFirst(step) + due + '; ведёт ' + agentName(d.agent) + '.');
+      out.push('Следующий шаг — ' + lowerFirst(step) + due + '.');
     } else {
       out.push('Сделка закрыта, комиссия зафиксирована — остаётся запросить отзыв у клиента.');
     }
@@ -7657,8 +7734,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dealTitleEdit(d) +
       '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       dealChipRow(d) +
-      dealStatusBrief(d) +
-      '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
+      '<div class="deal-top"><div class="deal-top-cell">' + dealStatusBrief(d) + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
       '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
       dealLotsBlock(d);
   }

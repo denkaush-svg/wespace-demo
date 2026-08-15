@@ -610,7 +610,9 @@ button { font-family: inherit; cursor: pointer; }
 .dx-sec-h { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 13.5px; margin-bottom: 13px; }
 .dx-sec-h .ic { width: 27px; height: 27px; border-radius: 8px; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; }
 .dx-sec-h .r { margin-left: auto; }
-.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+/* A brief is naturally shorter than the contact list facing it. Stretching it leaves an empty
+   half-card, which reads as content that failed to load rather than as a card that is short. */
+.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .dx-grid2 > .dx-sec { margin-top: 0; }
 @media (max-width: 640px) { .dx-grid2 { grid-template-columns: 1fr; } }
 .dx-cbar-lbl { font-size: 11px; color: var(--mut); margin: 0 0 6px 2px; display: flex; align-items: center; gap: 6px; }
