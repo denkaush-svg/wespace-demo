@@ -413,6 +413,24 @@ button { font-family: inherit; cursor: pointer; }
 .gate-row.on .gate-l { color: var(--acc-ink); }
 .gate-h { font-size: 11.5px; color: var(--mut); line-height: 1.35; }
 .gate-foot { font-size: 11.5px; color: var(--faint); line-height: 1.4; margin-top: 12px; }
+/* Quick actions — one bar, always directly under the card's title, identical on every entity.
+   Scrollable rather than wrapping: a bar that grows to three rows moves everything below it and
+   stops being a fixed landmark, which is the whole point of having one. */
+.qa-bar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; margin: 2px 0 4px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.qa-act { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 44px;
+  padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink); font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.qa-act svg { width: 15px; height: 15px; flex: none; }
+.qa-act:hover { border-color: var(--acc-line); color: var(--acc); }
+.qa-act:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.qa-act.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
+.qa-act.primary:hover { color: #fff; filter: brightness(1.05); }
+.qa-act.danger:hover { border-color: var(--stop); color: var(--stop); }
+@media (prefers-reduced-motion: reduce) { .qa-act { transition: none; } }
+/* A contract's title is a fact, not a field — same line, no edit affordance. */
+.deal-title-text.is-static { cursor: default; border-color: transparent; background: none; }
 .kanban-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint);
   margin: 0 0 8px 2px; }
 .kanban-hint svg { width: 13px; height: 13px; opacity: .7; }
@@ -610,9 +628,17 @@ button { font-family: inherit; cursor: pointer; }
 .dx-sec-h { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 13.5px; margin-bottom: 13px; }
 .dx-sec-h .ic { width: 27px; height: 27px; border-radius: 8px; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; }
 .dx-sec-h .r { margin-left: auto; }
-/* A brief is naturally shorter than the contact list facing it. Stretching it leaves an empty
-   half-card, which reads as content that failed to load rather than as a card that is short. */
-.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+/* Cards in a row share one height, and their bodies stretch to fill it — a ragged edge between
+   two half-width cards is what reads as a hole in the page. Pair blocks of similar weight and the
+   shared height costs nothing; pair a two-line card with a ten-row list and it will always look
+   wrong however it is aligned. */
+.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+.dx-grid2 > .dx-sec, .deal-top-cell > .dx-sec { display: flex; flex-direction: column; }
+.dx-grid2 > .dx-sec > :last-child, .deal-top-cell > .dx-sec > :last-child { flex: 1 1 auto; }
+/* The deal/contract facing pair is the same contract: two columns, equal height, no ragged edge. */
+.deal-top { align-items: stretch; }
+.deal-top-cell { display: flex; flex-direction: column; gap: 14px; }
+.deal-top-cell > .dx-sec:last-child { flex: 1 1 auto; }
 .dx-grid2 > .dx-sec { margin-top: 0; }
 @media (max-width: 640px) { .dx-grid2 { grid-template-columns: 1fr; } }
 .dx-cbar-lbl { font-size: 11px; color: var(--mut); margin: 0 0 6px 2px; display: flex; align-items: center; gap: 6px; }

@@ -166,6 +166,8 @@
       case 'theme': api.setTheme(store.theme === 'dark' ? 'light' : 'dark'); break;
       case 'notif': api.toast('Уведомления: ' + (store.unsaved || 0) + ' несохранённых подтверждений'); break;
       case 'wallet': WS.ui.openWallet(); break;
+      case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
+        WS.ui.contractAct(d.act, t.dataset.contract); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':

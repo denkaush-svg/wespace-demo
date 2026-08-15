@@ -506,6 +506,19 @@
         { k: 'keys', label: 'Ключи переданы, snag list закрыт', client: 'Приёмка объекта и передача ключей', at: '—', state: 'wait' },
         { k: 'title', label: 'Title Deed получен', client: 'Право собственности оформлено', at: '—', state: 'wait' },
       ],
+      schedule: [
+        { label: 'Первый платёж · 10%', pct: 10, amount: 175000, due: '28 апреля', state: 'paid' },
+        { label: 'Второй платёж · 25%', pct: 25, amount: 437500, due: '20 июня', state: 'due' },
+        { label: 'Третий платёж · 40%', pct: 40, amount: 700000, due: 'по готовности 60%', state: 'wait' },
+        { label: 'Финальный платёж · 25%', pct: 25, amount: 437500, due: 'при передаче', state: 'wait' },
+      ],
+      documents: [
+        { name: 'SPA · договор купли-продажи', at: '28 апреля', state: 'ok' },
+        { name: 'Квитанция escrow · 10%', at: '28 апреля', state: 'ok' },
+        { name: 'Сертификат Oqood', at: '06 мая', state: 'ok' },
+        { name: 'Квитанция DLD 4%', at: '06 мая', state: 'ok' },
+        { name: 'Title Deed', at: '—', state: 'wait' },
+      ],
       commission: { total: 70000, payer: 'застройщик', vat: false, split: null,
         entries: [
           { k: 'accrued', label: 'Начислено', amount: 70000, at: '06 мая', state: 'done' },
@@ -528,6 +541,18 @@
         { k: 'renewal', label: 'Уведомление за 90 дней', client: 'Подготовка к продлению договора', at: 'до 02 декабря', state: 'wait' },
         { k: 'closed', label: 'Продлён либо выезд и возврат депозита', client: 'Продление или завершение аренды', at: '—', state: 'wait' },
       ],
+      schedule: [
+        { label: 'Чек 1 · квартал', pct: 25, amount: 23750, due: '02 марта', state: 'paid' },
+        { label: 'Чек 2 · квартал', pct: 25, amount: 23750, due: '02 мая', state: 'paid' },
+        { label: 'Чек 3 · квартал', pct: 25, amount: 23750, due: '02 июня', state: 'due' },
+        { label: 'Чек 4 · квартал', pct: 25, amount: 23750, due: '02 сентября', state: 'wait' },
+      ],
+      documents: [
+        { name: 'Договор аренды', at: '02 марта', state: 'ok' },
+        { name: 'Сертификат Ejari', at: '02 марта', state: 'ok' },
+        { name: 'Квитанция депозита 5%', at: '02 марта', state: 'ok' },
+        { name: 'Уведомление о продлении', at: 'до 02 декабря', state: 'wait' },
+      ],
       commission: { total: 4750, payer: 'арендатор', vat: true, split: null,
         entries: [
           { k: 'accrued', label: 'Начислено', amount: 4750, at: '02 марта', state: 'done' },
@@ -549,6 +574,17 @@
         { k: 'movein', label: 'Заселение', client: 'Арендатор заселён', at: '01 апреля', state: 'done' },
         { k: 'payments', label: 'Контроль оплат от арендатора', client: 'Платежи поступают по графику', at: 'ежемесячно', state: 'now' },
         { k: 'report', label: 'Отчётность собственнику', client: 'Отчёт по объекту за период', at: 'до 31 мая', state: 'now' },
+      ],
+      schedule: [
+        { label: 'Отчёт и комиссия · март', pct: 0, amount: 13000, due: '31 марта', state: 'paid' },
+        { label: 'Отчёт и комиссия · апрель', pct: 0, amount: 13000, due: '30 апреля', state: 'due' },
+        { label: 'Отчёт и комиссия · май', pct: 0, amount: 13000, due: '31 мая', state: 'wait' },
+      ],
+      documents: [
+        { name: 'Договор управления', at: '21 февраля', state: 'ok' },
+        { name: 'Доверенность', at: '21 февраля', state: 'ok' },
+        { name: 'Договор аренды с арендатором', at: '19 марта', state: 'ok' },
+        { name: 'Отчёт собственнику · апрель', at: 'до 31 мая', state: 'wait' },
       ],
       commission: { total: 26000, payer: 'собственник', vat: true, split: null,
         entries: [

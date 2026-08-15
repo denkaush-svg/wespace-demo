@@ -743,8 +743,11 @@ setTimeout(async () => {
       const m = withInternal.milestones.find((x) => x.internalOnly);
       WS.ui.contractCard(withInternal.id);
       WS.ui.setEntityTab('contract', withInternal.id, 'client');
-      const h = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
-      check('contract · an internal milestone stays out of the client view', h.indexOf(m.label) < 0, m.label);
+      // Scoped to the tab body: that IS the client view. The page around it — the step line in the
+      // header — is ours and legitimately shows internal work.
+      const cv = doc.querySelector('.dx-tabbody');
+      const h = cv ? cv.innerHTML : '';
+      check('contract · an internal milestone stays out of the client view', !!cv && h.indexOf(m.label) < 0, m.label);
       WS.ui.setEntityTab('contract', withInternal.id, 'milestones');
       const h2 = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
       check('contract · the internal milestone is still on our side', h2.indexOf(m.label) >= 0);
