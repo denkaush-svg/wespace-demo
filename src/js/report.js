@@ -52,6 +52,7 @@
     '.bar .bv{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:14px}',
     '.note{display:flex;gap:9px;padding:12px 14px;background:var(--acc-soft);',
     'border:1px solid var(--acc-line);border-radius:11px;color:var(--ink2);font-size:13px;margin-bottom:14px}',
+    '.wsrc{margin:-8px 0 14px;color:var(--faint);font-size:11px;font-weight:600}',
     '.foot{margin-top:30px;padding-top:15px;border-top:1px solid var(--hair);',
     'color:var(--faint);font-size:11.5px;line-height:1.55}',
     '@media(max-width:640px){.wrap{padding:14px 12px 40px}.sheet{padding:22px 17px 20px;border-radius:13px}',
@@ -69,6 +70,14 @@
     return suf === '%' ? s + suf : s + '\u00a0' + suf;
   }
 
+  /* An external figure carries its source INTO the file. In the chat the mark
+     sits next to the block on a screen the reader is already looking at; a
+     forwarded document has only what is printed on it. */
+  function srcLine(b) {
+    if (!b || b.src !== 'web' || !b.source) return '';
+    return '<div class="wsrc">Источник: ' + esc(b.source) + (b.asOf ? ' · ' + esc(b.asOf) : '') + '</div>';
+  }
+
   // The same shapes the chat renders, drawn for a standalone page.
   function blockHtml(b) {
     if (!b || typeof b !== 'object') return '';
@@ -83,7 +92,7 @@
     if (t === 'kv') {
       return (Array.isArray(b.rows) ? b.rows : []).slice(0, 20).map((x) =>
         '<div class="kv"><span class="k">' + esc(x && x.k) + '</span>' +
-        '<span class="v">' + esc(x && x.v) + '</span></div>').join('');
+        '<span class="v">' + esc(x && x.v) + '</span></div>').join('') + srcLine(b);
     }
     if (t === 'table') {
       const head = (Array.isArray(b.head) ? b.head : []).slice(0, 6);
@@ -92,7 +101,7 @@
       if (!body) return '';
       return '<div class="tw"><table>' +
         (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
-        '<tbody>' + body + '</tbody></table></div>';
+        '<tbody>' + body + '</tbody></table></div>' + srcLine(b);
     }
     if (t === 'bars') {
       const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 12).filter((x) => x && isFinite(Number(x.value)));
@@ -103,7 +112,7 @@
         return '<div class="bar"><span class="bl">' + esc(x.label) + '</span>' +
           '<span class="bt"><i style="width:' + w + '%"></i></span>' +
           '<span class="bv">' + esc(val(x.value, x.suffix)) + '</span></div>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' + srcLine(b);
     }
     return '';
   }
@@ -125,11 +134,20 @@
     const list = Array.isArray(blocks) ? blocks : [];
     const numeric = list.filter((b) => b && (b.t === 'table' || b.t === 'bars' || b.t === 'kv'));
     const counted = numeric.filter((b) => b.src === 'data').length;
+    const outside = numeric.filter((b) => b.src === 'web');
     const rev = (WS.store && WS.store.dataRevision);
+    const stamp = (rev != null ? ' (ревизия ' + rev + ')' : '');
     let figures = '';
     if (numeric.length && counted === numeric.length) {
-      figures = 'Все величины в документе посчитаны кодом по данным рабочего места' +
-        (rev != null ? ' (ревизия ' + rev + ')' : '') + '.';
+      figures = 'Все величины в документе посчитаны кодом по данным рабочего места' + stamp + '.';
+    } else if (numeric.length && counted + outside.length === numeric.length) {
+      // Two kinds of figure in one document. Saying only the flattering half
+      // would make the footer a half-truth on the page that leaves the room.
+      const where = outside.map((b) => b.source).filter(Boolean)
+        .filter((s, i, a) => a.indexOf(s) === i).join(', ');
+      figures = (counted ? 'Величины по рабочему месту посчитаны кодом' + stamp + '. ' : '') +
+        'Рыночные величины взяты из внешних источников' + (where ? ' (' + where + ')' : '') +
+        ' — они подписаны у соответствующих блоков; проверьте актуальность перед отправкой.';
     } else if (numeric.length) {
       figures = 'Часть величин в документе не сверена с данными рабочего места — проверьте перед отправкой.';
     }

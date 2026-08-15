@@ -347,6 +347,21 @@
     return { t: 'kv', rows: rows, src: 'data', revision: (WS.store && WS.store.dataRevision) };
   }
 
+  /* A figure the model brought back from the web. The code cannot own it — no
+     query stands behind it — so what it owns instead is that such a figure is
+     never mixed in with its own: it carries where it came from and as of when,
+     and it says so under the block. A claim of a source with no source named
+     is worse than no claim, so it is refused. */
+  const DOMAIN = /^[a-z0-9.-]+\.[a-z]{2,}$/i;
+  function fromWeb(b) {
+    if (b.src !== 'web') return null;
+    const src = String(b.source || '').trim().replace(/^https?:\/\//i, '').split('/')[0].slice(0, 60);
+    if (!src || !DOMAIN.test(src)) return null;
+    const out = Object.assign({}, b, { src: 'web', source: src });
+    out.asOf = b.asOf ? String(b.asOf).slice(0, 40) : '';
+    return out;
+  }
+
   function resolve(b) {
     const t = String(b.t);
     if (t === 'table' && b.from) return fillTable(b);
@@ -372,6 +387,12 @@
       if (b.from || Array.isArray(b.reads)) return;
       if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) return;
       if (b.head != null && !Array.isArray(b.head)) return;
+      const web = fromWeb(b);
+      if (web) { out.push(web); return; }
+      // Claimed to come from outside and did not say from where: dropped. The
+      // attribution IS the provenance for such a figure — without it the block
+      // is an unsourced number wearing a source's authority.
+      if (b.src === 'web') return;
       out.push(b);
     });
     return out.length ? out : null;
@@ -390,7 +411,10 @@
     // reply in the chat — does not shorten it.
     const all = normBlocks(r.blocks, 10);
     if (!all) return null;
-    const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data');
+    // A sourced external figure may travel in a document — that is what makes a
+    // market note worth sending — but it goes with its source attached, and the
+    // footer says the document holds both kinds.
+    const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data' || b.src === 'web');
     if (!blocks.length) return null;
     const title = String(r.title || '').slice(0, 120);
     const subtitle = r.subtitle ? String(r.subtitle).slice(0, 200) : '';

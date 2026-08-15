@@ -676,6 +676,13 @@
   function srcNote(b) {
     const t = String(b && b.t);
     if (t !== 'table' && t !== 'bars' && t !== 'kv') return '';
+    // Brought back from outside: no query owns it, so the source and the date
+    // are what stand in for one. Deliberately not the green «из данных» mark —
+    // the two must never read as the same kind of figure.
+    if (b.src === 'web') {
+      return '<div class="an-src web">' + I('globe') + 'из внешнего источника · ' + esc(b.source) +
+        (b.asOf ? ' · ' + esc(b.asOf) : '') + '</div>';
+    }
     if (b.src === 'data') {
       // The block was built at a revision. Scrolling back to it an hour later,
       // after a stage moved and a deal was added, the rows are still the old

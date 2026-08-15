@@ -1144,6 +1144,54 @@ setTimeout(async () => {
           line);
       }
 
+      /* A figure the model brought back from the web. No query stands behind
+         it, so the code cannot own it the way it owns its own — what it owns
+         instead is that the two are never mixed up: an outside figure carries
+         where it came from and as of when, and says so under the block. */
+      {
+        const webBlock = {
+          t: 'table', src: 'web', source: 'https://www.bayut.com/market/jvc',
+          asOf: 'июль 2026', head: ['Показатель', 'Значение'], rows: [['Цена за м²', '16 200 AED']],
+        };
+        const web = L.normBlocks([webBlock]);
+        check('внешнее · a sourced outside figure is kept',
+          !!web && web[0].src === 'web', JSON.stringify(web && web[0] && web[0].src));
+        check('внешнее · and its source is reduced to the host that stands behind it',
+          !!web && web[0].source === 'www.bayut.com' && web[0].asOf === 'июль 2026',
+          JSON.stringify(web && { s: web[0].source, a: web[0].asOf }));
+        // A claim of a source with no source named is worse than no claim: it
+        // is an unsourced number wearing a source's authority.
+        const unsourced = L.normBlocks([Object.assign({}, webBlock, { source: '' })]);
+        check('внешнее · a figure claiming the outside without naming it is dropped', unsourced === null,
+          JSON.stringify(unsourced));
+        const notAHost = L.normBlocks([Object.assign({}, webBlock, { source: 'по данным рынка' })]);
+        check('внешнее · and so is one whose source is not a place at all', notAHost === null,
+          JSON.stringify(notAHost));
+
+        const webCard = doc.createElement('div');
+        webCard.innerHTML = WS.engine.agentCard({ kind: 'answer', text: '', evidence: [], next: [], blocks: web }, 'mWeb');
+        check('внешнее · the card names the source instead of claiming the data',
+          (webCard.textContent || '').indexOf('из внешнего источника · www.bayut.com') >= 0 &&
+          (webCard.textContent || '').indexOf('из данных') < 0, (webCard.textContent || '').slice(0, 140));
+
+        /* A market note is worth sending precisely because it carries outside
+           figures — so they may travel, with the source printed on the page and
+           a footer that admits the document holds two kinds of number. */
+        const mixed = L.normReport({ title: 'Рынок', blocks: [
+          { t: 'table', from: { from: 'market', limit: 2 }, columns: [{ field: 'район', label: 'Район' }] },
+          webBlock,
+        ] });
+        check('отчёт · an outside figure may travel in a document',
+          !!mixed && mixed.blocks.length === 2 && mixed.blocks.some((b) => b.src === 'web'),
+          JSON.stringify(mixed && mixed.blocks.map((b) => b.src)));
+        const mixedDoc = WS.report.build({ title: 'Рынок', blocks: mixed.blocks });
+        check('отчёт · with the source printed beside it, not only on screen',
+          mixedDoc.indexOf('Источник: www.bayut.com') >= 0, mixedDoc.slice(-500, -200));
+        check('отчёт · and a footer that admits both kinds are inside',
+          mixedDoc.indexOf('Величины по рабочему месту посчитаны кодом') >= 0 &&
+          mixedDoc.indexOf('из внешних источников (www.bayut.com)') >= 0, mixedDoc.slice(-360));
+      }
+
       /* The composer had a mode pill, a depth segment and context chips, and
          none of the three reached the model: stored, drawn, dropped. A control
          that changes nothing teaches the person that the handles on this thing

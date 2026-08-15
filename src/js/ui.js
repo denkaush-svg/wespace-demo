@@ -556,6 +556,10 @@
      was sent to switch mode and repeat himself. The change was already inert
      until confirmed, so the gate bought nothing and cost that. */
   const CG_READ_ONLY = { roi: true, dd: true, cma: true };
+  // Which modes may look outside the stand. Not a decoration: the proxy launches
+  // the model with search available only for these, and a figure that comes back
+  // from there is marked with its source instead of being passed off as ours.
+  const CG_EXTERNAL = { auto: true, roi: true, dd: true, cma: true };
   const cgModeLabel = (k) => (CG_MODES.find((m) => m.k === k) || {}).t || '';
   const cgDepthLabel = (k) => (CG_DEPTH.find((d) => d.k === k) || {}).t || '';
   const cgWrites = (k) => !CG_READ_ONLY[k];
@@ -626,7 +630,10 @@
   function cgModeMenu() {
     const cur = S().cgMode || 'auto';
     const row = (m) => '<button class="cg-item mode-row' + (cur === m.k ? ' on' : '') + '" data-cgmode="' + m.k + '">' + I(m.ic) +
-      '<span class="cg-item-tx"><b>' + m.t + (CG_READ_ONLY[m.k] ? '<span class="cg-ro">не меняет сам</span>' : '') + '</b><i>' + m.d + '</i></span>' +
+      '<span class="cg-item-tx"><b>' + m.t +
+      (CG_READ_ONLY[m.k] ? '<span class="cg-ro">не меняет сам</span>' : '') +
+      (CG_EXTERNAL[m.k] ? '<span class="cg-ro web">' + I('globe') + 'ищет в сети</span>' : '') +
+      '</b><i>' + m.d + '</i></span>' +
       (cur === m.k ? '<span class="ck">' + I('check') + '</span>' : '') + '</button>';
     const soon = (m) => '<div class="cg-item mode-row soon">' + I(m.ic) + '<span class="cg-item-tx"><b>' + m.t + '</b><i>' + m.d + '</i></span><span class="cg-soon">скоро</span></div>';
     return '<div class="cg-pop-inner">' +

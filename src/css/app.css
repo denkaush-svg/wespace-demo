@@ -435,6 +435,9 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--faint); font-weight: 600; }
 .an-src svg { width: 11px; height: 11px; color: var(--faint); }
 .an-src.ok svg { color: var(--ok); }
+/* From outside the stand: attributed and dated, never the same mark as «из данных». */
+.an-src.web svg { color: var(--acc); }
+.an-src.web { color: var(--ink-2); }
 /* Drawn at a revision the data has since left behind. */
 .an-src .moved { color: var(--warn); font-weight: 600; }
 /* Which setting produced the answer — shown only when it was moved off default. */
@@ -444,6 +447,8 @@ button { font-family: inherit; cursor: pointer; }
 /* A mode that keeps to analysis says so before it is chosen. */
 .cg-ro { margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .02em;
   color: var(--faint); text-transform: uppercase; }
+.cg-ro.web { display: inline-flex; align-items: center; gap: 3px; color: var(--acc); }
+.cg-ro.web svg { width: 10px; height: 10px; }
 /* The posture a change was asked from, on the confirmation card. */
 .pmode { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 10px;
   font-weight: 600; color: var(--faint); }

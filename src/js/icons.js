@@ -33,6 +33,7 @@
     shield:  '<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
     lock:    '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
     source:  '<circle cx="12" cy="12" r="8.5"/><path d="M12 8v4l2.5 1.5"/><path d="M3.5 12h2M18.5 12h2"/>',
+    globe:   '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.5 2.5 2.5 14.5 0 17c-2.5-2.5-2.5-14.5 0-17z"/>',
     whatsapp:'<path d="M4 20l1.4-4A8 8 0 1 1 9 19.2z"/><path d="M9 9c0 3 3 6 6 6 1-.4 1.4-1 1.4-1.6l-1.8-1-.9 1c-1-.4-2-1.4-2.4-2.4l1-.9-1-1.8C10.6 7 10 7.4 9.6 8.4z"/>',
     mail:    '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>',
     instagram:'<rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17" cy="7" r="1"/>',
