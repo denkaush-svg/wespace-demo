@@ -840,6 +840,52 @@ setTimeout(async () => {
       /дешевле района/.test(flat) && /18 600 AED/.test(flat));
   }
 
+  // ---- the two-level stage model: one request funnel, deal steps derived from the contract ----
+  {
+    const RS = WS.REQ_STAGES || [], RL = WS.REQ_STAGE_LABELS || {}, DS = WS.DEAL_STEPS || {};
+    // Одна воронка заявки на все услуги — список стадий существует ровно один.
+    check('model · воронка заявки одна и терминальна', RS.length > 3 &&
+      RS.indexOf('agreed') > RS.indexOf('talks') && RS[RS.length - 1] === 'lost', RS.join(' '));
+    check('model · у каждой стадии заявки есть подпись', RS.every((k) => !!RL[k]),
+      RS.filter((k) => !RL[k]).join(' '));
+    // Услуги расходятся подписью, а не набором стадий: там, где расхождение есть, оно по стороне.
+    check('model · подпись предложения зависит от стороны',
+      RL.offer && RL.offer.buyer !== RL.offer.owner && !!RL.offer.any,
+      JSON.stringify(RL.offer || {}));
+    check('model · подпись встречи зависит от стороны',
+      RL.meet && RL.meet.buyer !== RL.meet.owner, JSON.stringify(RL.meet || {}));
+
+    // Шаги сделки следуют из вида договора: агент их не выбирает.
+    const kinds = Object.keys(dd().CONTRACT_KINDS || WS.fixtures.CONTRACT_KINDS || {});
+    check('model · у каждого вида договора есть шаги', kinds.length > 0 && kinds.every((k) => Array.isArray(DS[k])),
+      kinds.filter((k) => !DS[k]).join(' '));
+    check('model · бронь есть только у оффплана',
+      DS.offplan_spa.indexOf('book') >= 0 && DS.resale_title.indexOf('book') < 0 && DS.lease.indexOf('book') < 0);
+    check('model · у услуги собственнику регистрации нет',
+      DS.management.indexOf('reg') < 0 && DS.exclusive.indexOf('reg') < 0);
+    check('model · у услуги есть выполнение работ', DS.service.indexOf('exec') >= 0);
+    check('model · регистрация называется по своему реестру',
+      /Oqood/.test(WS.REG_LABELS.offplan_spa) && /Ejari/.test(WS.REG_LABELS.lease) &&
+      /Title Deed/.test(WS.REG_LABELS.resale_title));
+    // Каждый шаг всякого вида договора должен уметь назваться — иначе лента покажет ключ.
+    const SL = WS.fixtures.STAGE_LABELS || {};
+    const nameless = [];
+    kinds.forEach((k) => (DS[k] || []).forEach((st) => { if (!SL[st]) nameless.push(k + ':' + st); }));
+    check('model · у каждого шага сделки есть подпись', nameless.length === 0, nameless.join(' '));
+
+    // Услуга + готовность объекта → вид договора. Продажу различает готовность, остальные — услуга.
+    const ck = WS.contractKindFor;
+    check('model · оффплан ведёт к SPA, готовое — к вторичке',
+      ck('sale', 'оффплан') === 'offplan_spa' && ck('sale', 'готовый') === 'resale_title');
+    check('model · у каждой услуги стенда выводится вид договора',
+      (WS.FUNNELS || []).every((f) => !!DS[ck(f.k, 'готовый')]),
+      (WS.FUNNELS || []).filter((f) => !DS[ck(f.k, 'готовый')]).map((f) => f.k).join(' '));
+    // Вид договора, выведенный из услуги, должен существовать в справочнике договоров.
+    const CK = WS.fixtures.CONTRACT_KINDS || {};
+    check('model · выведенный вид договора есть в справочнике',
+      (WS.FUNNELS || []).every((f) => !!CK[ck(f.k, 'оффплан')] && !!CK[ck(f.k, 'готовый')]));
+  }
+
   // ---- object maps: real imagery for every object, with the attribution the licence requires ----
   {
     const objs = dd().objects || [];

@@ -71,6 +71,13 @@
   // Срез рынка по районам — такая же статическая конфигурация, как воронки: он не редактируется
   // из интерфейса и не должен клонироваться на каждый сброс сцены.
   WS.AREAS = WS.fixtures.AREAS;
+  // Стадии двух уровней — тоже статическая конфигурация: они не редактируются из интерфейса.
+  WS.REQ_STAGES = WS.fixtures.REQ_STAGES;
+  WS.REQ_STAGE_LABELS = WS.fixtures.REQ_STAGE_LABELS;
+  WS.REQ_SIDE = WS.fixtures.REQ_SIDE;
+  WS.DEAL_STEPS = WS.fixtures.DEAL_STEPS;
+  WS.REG_LABELS = WS.fixtures.REG_LABELS;
+  WS.contractKindFor = WS.fixtures.contractKindFor;
 
   function initStatuses() {
     const st = {};

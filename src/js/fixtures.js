@@ -331,6 +331,59 @@
       stages: ['work', 'kp', 'talks', 'prep', 'sign', 'exec', 'won', 'lost'] },
   ];
 
+  // ============================================================================================
+  // Модель двух уровней (docs/2026-08-17-request-deal-design.md).
+  //
+  // ЗАЯВКА — одна воронка на все услуги. В пресейле услуги расходятся ОДНИМ СЛОВОМ: покупателю
+  // «направлен подбор», собственнику «направлено КП», партнёру «запрос отправлен». Смысл стадии
+  // при этом один — мы сделали предложение. Шесть досок, различающихся подписью, — бюрократия,
+  // поэтому список стадий один, а подпись берётся по стороне сделки.
+  // ============================================================================================
+  const REQ_STAGES = ['new', 'qual', 'offer', 'meet', 'talks', 'agreed', 'lost'];
+  const REQ_STAGE_LABELS = {
+    new: 'Приняли',
+    qual: 'Квалифицировали',
+    offer: { buyer: 'Направлен подбор', owner: 'Направлено КП', partner: 'Запрос партнёру', any: 'Направлено предложение' },
+    meet: { buyer: 'Показ', owner: 'Встреча / осмотр', any: 'Встреча' },
+    talks: 'Переговоры',
+    agreed: 'Условия согласованы',
+    lost: 'Отказ',
+  };
+  // Сторона сделки решает только подпись. `side` в заявке хранится словами клиента, а не ключом.
+  const REQ_SIDE = { 'покупатель': 'buyer', 'арендатор': 'buyer', 'собственник': 'owner', 'партнёр': 'partner' };
+
+  // ============================================================================================
+  // СДЕЛКА — шаги не выбираются, а следуют из вида договора, которым сделка заканчивается.
+  // Один список с необязательными шагами вместо шести списков: агент выбирает объекты и услугу,
+  // остальное выводится. `book` появляется только у оффплана, `reg` — там, где есть регистрация,
+  // и называется по своей регистрации: Oqood, Title Deed, Ejari.
+  // ============================================================================================
+  const DEAL_STEPS = {
+    offplan_spa: ['prep', 'book', 'sign', 'reg', 'won', 'lost'],
+    resale_title: ['prep', 'sign', 'reg', 'won', 'lost'],
+    lease: ['prep', 'sign', 'reg', 'won', 'lost'],
+    lease_comm: ['prep', 'sign', 'reg', 'won', 'lost'],
+    management: ['prep', 'sign', 'won', 'lost'],
+    exclusive: ['prep', 'sign', 'won', 'lost'],
+    service: ['prep', 'sign', 'exec', 'won', 'lost'],
+  };
+  // Подпись шага регистрации — своя на каждый вид договора; шаг один, реестр разный.
+  const REG_LABELS = {
+    offplan_spa: 'Регистрация Oqood',
+    resale_title: 'Передача · Title Deed',
+    lease: 'Регистрация Ejari',
+    lease_comm: 'Регистрация Ejari',
+  };
+  // Услуга + готовность объекта → вид договора. Связь уже была в FUNNELS[].contract; здесь она
+  // доведена до конкретного вида, потому что у продажи их два и различает их готовность.
+  function contractKindFor(funnelKey, readiness) {
+    if (funnelKey === 'sale') return /оффплан|off-plan/i.test(readiness || '') ? 'offplan_spa' : 'resale_title';
+    if (funnelKey === 'rent') return 'lease';
+    if (funnelKey === 'manage') return 'management';
+    if (funnelKey === 'exclusive') return 'exclusive';
+    return 'service';
+  }
+
   // Companies (R5, A10) — entity above contacts/deals; carries KYC STATUS (not a rating).
   const companies = [
     { id: 'co_emaar', name: 'Emaar Properties', kind: 'Застройщик', kyc: 'verified', note: 'Крупный застройщик, эскроу-счета DLD.',
@@ -717,6 +770,7 @@
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, AREAS, refModel,
     deals, requests, tasks, events, inbox, analytics,
-    FUNNELS, STAGE_LABELS, contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
+    contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});

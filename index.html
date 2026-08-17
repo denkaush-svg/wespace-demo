@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 02:57</title>
+  <title>WESPACE · сборка 12:57</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='02:57';
+    window.WS_BUILD='12:57';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2727,6 +2727,59 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       stages: ['work', 'kp', 'talks', 'prep', 'sign', 'exec', 'won', 'lost'] },
   ];
 
+  // ============================================================================================
+  // Модель двух уровней (docs/2026-08-17-request-deal-design.md).
+  //
+  // ЗАЯВКА — одна воронка на все услуги. В пресейле услуги расходятся ОДНИМ СЛОВОМ: покупателю
+  // «направлен подбор», собственнику «направлено КП», партнёру «запрос отправлен». Смысл стадии
+  // при этом один — мы сделали предложение. Шесть досок, различающихся подписью, — бюрократия,
+  // поэтому список стадий один, а подпись берётся по стороне сделки.
+  // ============================================================================================
+  const REQ_STAGES = ['new', 'qual', 'offer', 'meet', 'talks', 'agreed', 'lost'];
+  const REQ_STAGE_LABELS = {
+    new: 'Приняли',
+    qual: 'Квалифицировали',
+    offer: { buyer: 'Направлен подбор', owner: 'Направлено КП', partner: 'Запрос партнёру', any: 'Направлено предложение' },
+    meet: { buyer: 'Показ', owner: 'Встреча / осмотр', any: 'Встреча' },
+    talks: 'Переговоры',
+    agreed: 'Условия согласованы',
+    lost: 'Отказ',
+  };
+  // Сторона сделки решает только подпись. `side` в заявке хранится словами клиента, а не ключом.
+  const REQ_SIDE = { 'покупатель': 'buyer', 'арендатор': 'buyer', 'собственник': 'owner', 'партнёр': 'partner' };
+
+  // ============================================================================================
+  // СДЕЛКА — шаги не выбираются, а следуют из вида договора, которым сделка заканчивается.
+  // Один список с необязательными шагами вместо шести списков: агент выбирает объекты и услугу,
+  // остальное выводится. `book` появляется только у оффплана, `reg` — там, где есть регистрация,
+  // и называется по своей регистрации: Oqood, Title Deed, Ejari.
+  // ============================================================================================
+  const DEAL_STEPS = {
+    offplan_spa: ['prep', 'book', 'sign', 'reg', 'won', 'lost'],
+    resale_title: ['prep', 'sign', 'reg', 'won', 'lost'],
+    lease: ['prep', 'sign', 'reg', 'won', 'lost'],
+    lease_comm: ['prep', 'sign', 'reg', 'won', 'lost'],
+    management: ['prep', 'sign', 'won', 'lost'],
+    exclusive: ['prep', 'sign', 'won', 'lost'],
+    service: ['prep', 'sign', 'exec', 'won', 'lost'],
+  };
+  // Подпись шага регистрации — своя на каждый вид договора; шаг один, реестр разный.
+  const REG_LABELS = {
+    offplan_spa: 'Регистрация Oqood',
+    resale_title: 'Передача · Title Deed',
+    lease: 'Регистрация Ejari',
+    lease_comm: 'Регистрация Ejari',
+  };
+  // Услуга + готовность объекта → вид договора. Связь уже была в FUNNELS[].contract; здесь она
+  // доведена до конкретного вида, потому что у продажи их два и различает их готовность.
+  function contractKindFor(funnelKey, readiness) {
+    if (funnelKey === 'sale') return /оффплан|off-plan/i.test(readiness || '') ? 'offplan_spa' : 'resale_title';
+    if (funnelKey === 'rent') return 'lease';
+    if (funnelKey === 'manage') return 'management';
+    if (funnelKey === 'exclusive') return 'exclusive';
+    return 'service';
+  }
+
   // Companies (R5, A10) — entity above contacts/deals; carries KYC STATUS (not a rating).
   const companies = [
     { id: 'co_emaar', name: 'Emaar Properties', kind: 'Застройщик', kyc: 'verified', note: 'Крупный застройщик, эскроу-счета DLD.',
@@ -3113,7 +3166,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     version: 1,
     DEMO_NOW, tenant, users, roster, clients, objects, AREAS, refModel,
     deals, requests, tasks, events, inbox, analytics,
-    FUNNELS, STAGE_LABELS, contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
+    FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
+    contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});
 
@@ -3603,6 +3657,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Срез рынка по районам — такая же статическая конфигурация, как воронки: он не редактируется
   // из интерфейса и не должен клонироваться на каждый сброс сцены.
   WS.AREAS = WS.fixtures.AREAS;
+  // Стадии двух уровней — тоже статическая конфигурация: они не редактируются из интерфейса.
+  WS.REQ_STAGES = WS.fixtures.REQ_STAGES;
+  WS.REQ_STAGE_LABELS = WS.fixtures.REQ_STAGE_LABELS;
+  WS.REQ_SIDE = WS.fixtures.REQ_SIDE;
+  WS.DEAL_STEPS = WS.fixtures.DEAL_STEPS;
+  WS.REG_LABELS = WS.fixtures.REG_LABELS;
+  WS.contractKindFor = WS.fixtures.contractKindFor;
 
   function initStatuses() {
     const st = {};
