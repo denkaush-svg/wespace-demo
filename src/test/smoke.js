@@ -2656,6 +2656,50 @@ setTimeout(async () => {
         done.ok === true && (dd().tasks || []).length === before + 1 && !!(dd().tasks || [])[0].id,
         done.error || '');
 
+      // A conversation can create a new request for an existing client.
+      // addRequest was in applyEffects (scripted scenes) but not in OP_SPEC, so
+      // the model had no path to create one — it either invented an unknown op
+      // that was rejected, or froze waiting for something to happen.
+      {
+        const cid = dd().clients[0].id;
+        const beforeR = (dd().requests || []).length;
+        const dryR = WS.storeApi.preview([{ op: 'addRequest', obj: { clientId: cid, title: 'Апартаменты в JVC', goal: 'Инвестиция', budget: 1500000, temperature: 'warm' } }]);
+        check('addRequest · preview passes for an existing client', dryR.ok === true, dryR.error || '');
+        check('addRequest · preview is guarded (needs confirmation)', dryR.tier === 'guarded', dryR.tier);
+        check('addRequest · summary names the request, not the id',
+          Array.isArray(dryR.pending) && /Заявка.*Апартаменты/.test(dryR.pending[0] || ''),
+          (dryR.pending || [])[0] || '');
+        const doneR = WS.storeApi.apply([{ op: 'addRequest', obj: { clientId: cid, title: 'Апартаменты в JVC', goal: 'Инвестиция', budget: 1500000, temperature: 'warm' } }], { confirmed: true });
+        check('addRequest · confirmed apply lands in store', doneR.ok === true && (dd().requests || []).length === beforeR + 1, doneR.error || '');
+        check('addRequest · new record has an auto-assigned id', !!((dd().requests || [])[0].id), '');
+        const dryBadRef = WS.storeApi.preview([{ op: 'addRequest', obj: { clientId: 'c_ghost_xyz', title: 'Тест' } }]);
+        check('addRequest · unknown clientId is refused', dryBadRef.ok === false && dryBadRef.code === 'bad_ref', dryBadRef.code);
+      }
+
+      // A conversation can also register a new contact. Use a name that does not
+      // collide with fixture contacts — a second «Анна» would confuse the offline
+      // planner's name lookup in the e2e section that runs after this one.
+      {
+        const beforeC = (dd().clients || []).length;
+        const dryC = WS.storeApi.preview([{ op: 'addClient', obj: { name: 'Тест Интеграции', channel: 'whatsapp', tag: 'Клиент' } }]);
+        check('addClient · preview passes', dryC.ok === true, dryC.error || '');
+        check('addClient · preview is guarded', dryC.tier === 'guarded', dryC.tier);
+        check('addClient · summary names the contact',
+          Array.isArray(dryC.pending) && /Контакт.*Тест/.test(dryC.pending[0] || ''),
+          (dryC.pending || [])[0] || '');
+        const doneC = WS.storeApi.apply([{ op: 'addClient', obj: { name: 'Тест Интеграции', channel: 'whatsapp', tag: 'Клиент' } }], { confirmed: true });
+        check('addClient · confirmed apply lands in store', doneC.ok === true && (dd().clients || []).length === beforeC + 1, doneC.error || '');
+      }
+
+      // The old OP_SPEC had a duplicate updateRequest key — the second one silently
+      // overwrote the first, which is a JS quirk, not an error. Now it is gone.
+      {
+        const unknown = WS.storeApi.preview([{ op: 'createRequest' }]);
+        check('unknown op is refused with a list of known ones', unknown.ok === false && unknown.code === 'unknown_op', unknown.code);
+        check('available ops include addRequest', unknown.available && unknown.available.indexOf('addRequest') >= 0, JSON.stringify(unknown.available));
+        check('available ops include addClient', unknown.available && unknown.available.indexOf('addClient') >= 0, JSON.stringify(unknown.available));
+      }
+
       // A stage the board has no column for takes the deal off the board.
       const okStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: otherStep(dd().deals[0]) }]);
       const badStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: 'подписан' }]);

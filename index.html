@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:06</title>
+  <title>WESPACE · сборка 01:58</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:06';
+    window.WS_BUILD='01:58';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -4429,9 +4429,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
     updateTask: { coll: 'tasks', kind: 'patch' },
-    updateRequest: { coll: 'requests', kind: 'patch' },
     dealStage: { coll: 'deals', kind: 'stage' },
     addTask: { coll: 'tasks', kind: 'add' },
+    // Conversation-created entities. A new request or contact needs explicit
+    // confirmation — tier:'guarded' — so the broker sees what will land in the
+    // workspace before it does, not after.
+    addRequest: { coll: 'requests', kind: 'add', tier: 'guarded' },
+    addClient: { coll: 'clients', kind: 'add', tier: 'guarded' },
     removeTask: { coll: 'tasks', kind: 'remove' },
     // Feed writes live in ui.js, where the ordering rules for a timeline are.
     // Routed through here anyway so a conversation has exactly one way to write,
@@ -4547,7 +4551,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const rec = Object.assign({}, src);
       if (!rec.id) rec.id = 't_ag' + (++addSeq) + '_' + spec.coll;
       if (coll.some((x) => x.id === rec.id)) return fail('duplicate', at + 'запись ' + rec.id + ' уже есть');
-      return { ok: true, tier: 'safe', summary: o.op + ' ' + rec.id, run: () => { coll.unshift(rec); } };
+      // Show the entity by a name a person recognises, not by its internal id.
+      const label = rec.name || rec.title || (rec.task && rec.task.title) || rec.id;
+      const addTier = spec.tier || 'safe';
+      return {
+        ok: true, tier: addTier,
+        summary: (COLL_RU[spec.coll] || spec.coll) + ' · «' + String(label).slice(0, 60) + '»',
+        run: () => { coll.unshift(rec); },
+      };
     }
     if (spec.kind === 'remove') {
       const idx = coll.findIndex((x) => x.id === o.id);

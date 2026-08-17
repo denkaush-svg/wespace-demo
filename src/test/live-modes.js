@@ -32,8 +32,11 @@ const serve = http.createServer((req, res) => {
 const TURNS = [
   { mode: 'roi', depth: 'think', q: 'переведи сделку Анны на следующую стадию' },
   { mode: 'auto', depth: 'think', q: 'переведи сделку Анны на следующую стадию' },
-  { mode: 'auto', depth: 'fast', q: 'разложи сумму сделок по стадиям' },
-  { mode: 'auto', depth: 'deep', q: 'разложи сумму сделок по стадиям' },
+  // Each depth in its own thread: asked the same question twice in one
+  // conversation, the model sees its own answer a minute old and declines to
+  // repeat it at length — which measures its manners, not the ceiling.
+  { mode: 'auto', depth: 'fast', q: 'разложи сумму сделок по стадиям', fresh: 'd1' },
+  { mode: 'auto', depth: 'deep', q: 'разложи сумму сделок по стадиям', fresh: 'd2' },
 ];
 
 (async () => {
@@ -53,6 +56,7 @@ const TURNS = [
     const t = TURNS[i];
     await page.evaluate((turn, first) => {
       if (first) { window.WS.engine.openThread('mod', 'Режимы', 'chat'); window.WS.router.go('concierge'); }
+      if (turn.fresh) window.WS.engine.openThread('mod-' + turn.fresh, 'Режимы · ' + turn.fresh, 'chat');
       window.WS.store.cgMode = turn.mode;
       window.WS.store.cgDepth = turn.depth;
       window.__seen = (window.WS.engine.lastReply || {});

@@ -327,9 +327,13 @@
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
     updateTask: { coll: 'tasks', kind: 'patch' },
-    updateRequest: { coll: 'requests', kind: 'patch' },
     dealStage: { coll: 'deals', kind: 'stage' },
     addTask: { coll: 'tasks', kind: 'add' },
+    // Conversation-created entities. A new request or contact needs explicit
+    // confirmation — tier:'guarded' — so the broker sees what will land in the
+    // workspace before it does, not after.
+    addRequest: { coll: 'requests', kind: 'add', tier: 'guarded' },
+    addClient: { coll: 'clients', kind: 'add', tier: 'guarded' },
     removeTask: { coll: 'tasks', kind: 'remove' },
     // Feed writes live in ui.js, where the ordering rules for a timeline are.
     // Routed through here anyway so a conversation has exactly one way to write,
@@ -445,7 +449,14 @@
       const rec = Object.assign({}, src);
       if (!rec.id) rec.id = 't_ag' + (++addSeq) + '_' + spec.coll;
       if (coll.some((x) => x.id === rec.id)) return fail('duplicate', at + 'запись ' + rec.id + ' уже есть');
-      return { ok: true, tier: 'safe', summary: o.op + ' ' + rec.id, run: () => { coll.unshift(rec); } };
+      // Show the entity by a name a person recognises, not by its internal id.
+      const label = rec.name || rec.title || (rec.task && rec.task.title) || rec.id;
+      const addTier = spec.tier || 'safe';
+      return {
+        ok: true, tier: addTier,
+        summary: (COLL_RU[spec.coll] || spec.coll) + ' · «' + String(label).slice(0, 60) + '»',
+        run: () => { coll.unshift(rec); },
+      };
     }
     if (spec.kind === 'remove') {
       const idx = coll.findIndex((x) => x.id === o.id);
