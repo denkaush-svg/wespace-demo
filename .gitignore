@@ -3,3 +3,6 @@ node_modules/
 package-lock.json
 *.log
 server/OFF
+
+# runtime counter written by the proxy on the server
+server/usage.json
