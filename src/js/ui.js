@@ -5262,6 +5262,7 @@
     if (id === 's8_brief') return openBriefS8();
     if (id === 'dossier') return openDossier();
     if (id.indexOf('client:') === 0) return clientCard(id.slice(7));
+    if (id.indexOf('request:') === 0) return requestCard(id.slice(8));
     if (id.indexOf('object:') === 0) return objectCard(id.slice(7));
     if (id.indexOf('doc:') === 0) return openDoc(id.slice(4));
     if (id.indexOf('nav:') === 0) { WS.router.go(id.slice(4)); return; }

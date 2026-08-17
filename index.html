@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:08</title>
+  <title>WESPACE · сборка 22:21</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:08';
+    window.WS_BUILD='22:21';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2641,11 +2641,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // structural fields + per-field provenance prov{field:'ai'|'confirmed'} (R3/A1),
   // stageDays (R12), companyId (R5), source for attribution (R9). Dubai taxonomy (§4).
   const deals = [
-    { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'show',
-      title: 'Инвест-квартира до 2 млн AED', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня', createdAt: '14 мая',
+    // Сделка рождается не входящим сообщением, а согласованными условиями: показ прошёл 9 мая,
+    // объект клиент выбрал 11-го, рассрочку 60/40 подтвердили 13-го вечером — с этого и начинается
+    // сделка. Всё, что было до, живёт в заявке r_anna и здесь не повторяется.
+    { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'prep',
+      title: 'Инвест-квартира до 2 млн AED', sub: 'Creekline 1208 · подготовка к бронированию', tags: ['G1'], updated: 'сегодня', createdAt: '13 мая',
       funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
-      consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
+      consideredProjects: ['Creekline Residences', 'Bayline Terraces'], stageDays: 1, requestId: 'r_anna',
       nextDue: 'сегодня 16:00', deposit: { kind: 'EOI', amount: 100000, paid: false, refundable: true },
       contacts: [
         { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
@@ -2895,11 +2898,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // the deal card renders in array order; the contact feed merges channels and sorts on `ord`.
   const dealTimeline = {
     d_anna: [
-      { at: '14 мая · 09:05', ord: 140905, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Голосовое: ищу инвест-квартиру до 2 млн, Business Bay.', capture: true },
-      { at: '14 мая · 09:12', ord: 140912, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Извлечены параметры заявки, создана сделка (уверенность 0,86).' },
-      { at: '14 мая · 09:20', ord: 140920, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Просила график первого платежа — приоритет доходность.' },
-      { at: '14 мая · 09:25', ord: 140925, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Назначить показ Creekline 1208 на сегодня 16:00, подтвердить с клиентом.' },
-      { at: '14 мая · 09:30', ord: 140930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Показ добавлен в календарь на 16:00; клиент подтвердил в WhatsApp.' },
+      { at: '13 мая · 18:10', ord: 131810, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Условия по Creekline 1208 согласованы — из заявки создана сделка, рассрочка 60/40.' },
+      { at: '13 мая · 18:40', ord: 131840, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Собрать пакет на бронирование: паспорт, подтверждение средств, форма EOI.' },
+      { at: '14 мая · 09:05', ord: 140905, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Жду точный график первого платежа — до него бронь не подтверждаю.', capture: true },
+      { at: '14 мая · 09:20', ord: 140920, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Запросила у застройщика график платежей 60/40 по 1208 — обещали к вечеру.', capture: true },
+      { at: '14 мая · 09:30', ord: 140930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Звонок с графиком поставлен на 16:00; клиент подтвердил время в WhatsApp.' },
     ],
     d_igor: [
       { at: '10 мая · 11:00', ord: 101100, ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 4:12 — обсудили перепродажу Bayline.', capture: true },
@@ -3183,7 +3186,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // Upcoming events.
   const events = [
-    { id: 'e_show', clientId: 'c_anna', title: 'Показ Creekline 1208 — Анна', when: 'сегодня 16:00', kind: 'show' },
+    // Показ Creekline прошёл 9 мая (см. requestTimeline.r_anna) — в календаре стоит то, что
+    // действительно впереди: разговор про график первого платежа, который держит бронирование.
+    { id: 'e_call_anna', clientId: 'c_anna', title: 'Звонок Анне — график первого платежа', when: 'сегодня 16:00', kind: 'call' },
     { id: 'e_call_karim', clientId: 'c_partner', title: 'Звонок Karim Aziz', when: 'завтра 11:30', kind: 'call' },
   ];
 
@@ -3288,14 +3293,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           fields: [ { k: 'Канал', now: 'WhatsApp · согласие есть', src: 'профиль' },
                     { k: 'Текст', now: 'Приняла запрос, сегодня пришлю 3 варианта…', src: 'черновик' } ],
           branch: { label: 'WhatsApp недоступен', text: 'Резерв: email, копирование текста или ручная отправка — пакет не теряется.' } },
-        { type: 'result', title: 'Заявка создана', artifact: { id: 'client:c_anna', label: 'Открыть заявку Анны' }, events: [
+        { type: 'result', title: 'Заявка создана', artifact: { id: 'request:r_anna', label: 'Открыть заявку Анны' }, events: [
             'Создана заявка Анны Петровой',
             'Клиент обновлён, расшифровка сохранена',
             'Ответ отправлен (delivered)',
             'Создана задача: подбор сегодня',
           ],
           effects: [
-            { op: 'updateDeal', id: 'd_anna', patch: { tags: ['Заявка', 'ответ отправлен'], sub: 'Инвест. квартира · до 2,0 млн AED · срок 1–3 мес' } },
+            { op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'Квалифицирован', horizon: '1–3 месяца',
+              note: 'Голосовое из WhatsApp: инвест-квартира до 2 млн, Business Bay и Creek Harbour.' } },
             { op: 'updateClient', id: 'c_anna', patch: { horizon: '1–3 месяца' } },
             { op: 'clearInbox', id: 'in_anna_vn' },
             { op: 'addTask', task: { id: 't_g1_pick', clientId: 'c_anna', title: 'Подобрать Анне 3 объекта', due: 'сегодня', when: 'today', kind: 'touch', scenario: 'G2', why: 'Заявка создана из голосового, обещан подбор сегодня' } },
@@ -3324,13 +3330,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           ],
           branch: { label: 'Объект с истёкшей проверкой', text: 'Bayline исключается из пакета или уходит в S9. Ошибка канала не уничтожает материалы.' } },
         { type: 'result', title: 'Пакет отправлен', artifact: { id: 'kp', label: 'Открыть КП' }, events: [
-            'Подборка сохранена в сделке',
+            'Подборка сохранена в заявке',
             'PDF и Excel доступны для просмотра/скачивания',
             'Сообщение: delivered',
             'Создано напоминание о следующем касании',
           ],
           effects: [
-            { op: 'updateDeal', id: 'd_anna', patch: { stage: 'work', tags: ['КП отправлено', 'подборка ×3'], package: true, shortlist: 3 } },
+            { op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'КП отправлено',
+              kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_bayline'] } } },
             { op: 'setObject', id: 'o_bayline', patch: { flagged: true } },
             { op: 'removeTask', id: 't_g1_pick' },
             { op: 'addTask', task: { id: 't_g2_follow', clientId: 'c_anna', title: 'Напоминание после КП — Анна', due: 'завтра', when: 'tomorrow', kind: 'touch', scenario: 'G3', why: 'КП отправлено, ждём реакции по трём объектам' } },
@@ -3340,35 +3347,42 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     },
     {
       id: 'G3', code: 'G3', group: 'golden', durationMinutes: 3,
-      title: 'Итог показа → обновлённая сделка',
-      value: 'Полевая голосовая заметка превращается в подтверждённое обновление сделки.',
+      title: 'Итог показа → обновлённая заявка',
+      value: 'Полевая голосовая заметка превращается в подтверждённое обновление заявки.',
       affects: ['Клиенты и сделки', 'Пульс'],
       related: ['S5'], snapshot: 'anna_postshow',
       flow: [
         { type: 'user', channel: 'voice', text: 'Заметка после показа Анны' },
         { type: 'process', label: 'Разбираю заметку', kind: 'voice',
-          steps: ['Расшифровка 0:31', 'Определяю клиента, сделку и объекты', 'Извлекаю результат показа'] },
-        { type: 'ai', text: 'Заметка: второй объект (Palm Court) понравился, смущает первый платёж, нужен уточнённый график и звонок завтра после обеда.' },
-        { type: 'preview', title: 'Изменения по сделке', level: 'A3',
+          steps: ['Расшифровка 0:31', 'Определяю клиента, заявку и объекты', 'Извлекаю результат показа'] },
+        { type: 'ai', text: 'Заметка: после показа клиент выбрал Creekline 1208, смущает первый платёж, нужен уточнённый график рассрочки и звонок завтра после обеда.' },
+        { type: 'preview', title: 'Изменения по заявке', level: 'A3',
           note: 'Значения до/после. Отклонённые поля не применяются; после — доступен полный откат пакета.',
           fields: [
-            { k: 'Результат показа', now: 'Понравился Palm Court 704', src: 'заметка' },
-            { k: 'Предпочтительный объект', was: 'Creekline 1208', now: 'Palm Court 704', src: 'заметка' },
+            { k: 'Результат показа', now: 'Creekline 1208 подошёл', src: 'заметка' },
+            { k: 'Выбор клиента', was: 'сравнивает Creekline и Bayline', now: 'Creekline 1208', src: 'заметка' },
             { k: 'Возражение', now: 'Первый платёж', src: 'заметка' },
-            { k: 'Статус сделки', was: 'Подбор', now: 'Переговоры', src: 'правило' },
+            { k: 'Стадия заявки', was: 'Показ', now: 'Переговоры', src: 'правило' },
             { k: 'Следующий шаг', now: 'Звонок с графиком платежей', src: 'заметка' },
             { k: 'Срок задачи', now: 'завтра, после обеда', src: 'заметка' },
           ],
           // per-field effects: rejecting a field skips exactly its change (spec §18.5)
+          // Стадию заявки никто не присваивает: она следует из выбора клиента (поле 1) и
+          // собранного КП. Поле 3 записывает не стадию, а то, чем она подтверждается.
           fieldEffects: {
-            1: [{ op: 'updateClient', id: 'c_anna', patch: { preferred: 'Palm Court Residence 704' } }],
-            3: [{ op: 'dealStage', id: 'd_anna', stage: 'work' },
-                { op: 'updateDeal', id: 'd_anna', patch: { tags: ['Переговоры', 'Palm Court 704'], sub: 'Palm Court 704 · возражение: первый платёж' } }],
-            5: [{ op: 'addTask', task: { id: 't_g3_call', clientId: 'c_anna', title: 'Звонок Анне — график платежей', due: 'завтра, после обеда', when: 'tomorrow', kind: 'call', scenario: null, why: 'После показа: понравился Palm Court, возражение по первому платежу' } }],
+            1: [{ op: 'updateClient', id: 'c_anna', patch: { preferred: 'Creekline Residences, Unit 1208' } },
+                { op: 'updateRequest', id: 'r_anna', patch: { offered: [
+                  { id: 'o_creekline', state: 'selected' },
+                  { id: 'o_jvcpark', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
+                  { id: 'o_bayline', state: 'offered' },
+                ] } }],
+            3: [{ op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'В переговорах', temperature: 'hot',
+                  note: 'После показа Creekline 1208: объект подтверждён, возражение по первому платежу.' } }],
+            5: [{ op: 'addTask', task: { id: 't_g3_call', clientId: 'c_anna', title: 'Звонок Анне — график платежей', due: 'завтра, после обеда', when: 'tomorrow', kind: 'call', scenario: null, why: 'После показа: выбран Creekline, возражение по первому платежу' } }],
           },
-          branch: { label: 'Две подходящие сделки', text: 'Если у клиента 2 активные сделки — Консьерж задаёт уточняющий вопрос и ничего не записывает.' } },
-        { type: 'result', title: 'Сделка обновлена', rollback: true, artifact: { id: 'client:c_anna', label: 'Открыть обновлённую сделку' }, events: [
-            'Обновлена сделка Анны (Переговоры)',
+          branch: { label: 'Две подходящие заявки', text: 'Если у клиента 2 открытые заявки — Консьерж задаёт уточняющий вопрос и ничего не записывает.' } },
+        { type: 'result', title: 'Заявка обновлена', rollback: true, artifact: { id: 'request:r_anna', label: 'Открыть обновлённую заявку' }, events: [
+            'Обновлена заявка Анны (Переговоры)',
             'Готово сообщение с графиком платежей',
             'Создана задача на звонок (завтра)',
             'Пакет в истории — доступен полный откат',
@@ -3873,6 +3887,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (store.tour && store.tour.scenarioId === id) store.tour = { active: false, scenarioId: null, stepIndex: 0 };
     sceneEffects(id).forEach((e) => {
       if (e.op === 'updateDeal' || e.op === 'dealStage') restoreEntity('deals', e.id);
+      else if (e.op === 'updateRequest') restoreEntity('requests', e.id);
       else if (e.op === 'updateClient') restoreEntity('clients', e.id);
       else if (e.op === 'setObject') restoreEntity('objects', e.id);
       else if (e.op === 'addTask') store.data.tasks = store.data.tasks.filter((t) => t.id !== e.task.id);
@@ -3901,6 +3916,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       } else if (e.op === 'dealStage') {
         const dl = d.deals.find((x) => x.id === e.id);
         if (dl) dl.stage = e.stage;
+      } else if (e.op === 'updateRequest') {
+        // Пресейл живёт на заявке, а не на сделке: сценарии, которые раньше двигали стадию
+        // сделки на «в работе», записывают факт сюда. Стадии здесь нет намеренно — она
+        // вычисляется из фактов (см. reqStage), и присвоить её нечем.
+        const r = (d.requests || []).find((x) => x.id === e.id);
+        if (r) Object.assign(r, e.patch);
       } else if (e.op === 'updateClient') {
         const c = d.clients.find((x) => x.id === e.id);
         if (c) Object.assign(c, e.patch);
@@ -3959,10 +3980,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       safe: ['title', 'due', 'kind', 'assignee'],
       guarded: ['status', 'when'],
     },
+    // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
+    // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
+    requests: {
+      safe: ['note', 'title', 'nextContact', 'temperature', 'horizon', 'bedrooms', 'goal', 'areas'],
+      guarded: ['budget', 'leadStatus', 'assignee', 'offered', 'kp', 'interest', 'paymentForm',
+        'dealType', 'objectType', 'funding', 'vat', 'source', 'partnerAgent'],
+    },
   };
 
   const OP_SPEC = {
     updateDeal: { coll: 'deals', kind: 'patch' },
+    updateRequest: { coll: 'requests', kind: 'patch' },
     updateClient: { coll: 'clients', kind: 'patch' },
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
@@ -5062,13 +5091,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     },
     {
       id: 'ev_kp', icon: 'doc', at: '09:40', kind: 'signal',
-      title: 'Ответ клиента на КП — Анна Петрова',
-      sub: 'Анна ответила на отправленное вчера КП',
+      title: 'Вопрос по первому платежу — Анна Петрова',
+      sub: 'Анна ответила по сделке: объект подтверждён, платёж — нет',
       thread: 'deal:d_anna', tlabel: 'Анна Петрова · сделка', ticon: 'users',
-      say: 'Анна ответила на КП: <b>понравился Palm Court</b>, но <b>смущает первый платёж</b>. Определил сделку и объект, подготовил обновление и график платежей. Есть неоднозначность в сроке — <b>подсветил, не решаю сам</b>.',
+      say: 'Анна ответила по сделке: <b>Creekline 1208 подтверждён</b>, но <b>смущает первый платёж</b> — просит точный график рассрочки. Определил сделку и объект, подготовил запрос застройщику. Есть неоднозначность в сроке — <b>подсветил, не решаю сам</b>.',
       mark: 'prepared',
-      effects: [{ op: 'updateDeal', id: 'd_anna', patch: { tags: ['ответ на КП', 'Palm Court 704'], sub: 'Palm Court 704 · возражение: первый платёж' } }],
-      changed: ['Реакция клиента распознана', 'Сделка: подготовлено обновление (Переговоры)', 'Готов график платежей (черновик)', 'Неоднозначность срока — помечена для агента'],
+      effects: [{ op: 'updateDeal', id: 'd_anna', patch: { tags: ['возражение: первый платёж'], sub: 'Creekline 1208 · ждём график рассрочки 60/40' } }],
+      changed: ['Реакция клиента распознана', 'Сделка: подготовлено обновление', 'Готов запрос застройщику по графику (черновик)', 'Неоднозначность срока — помечена для агента'],
       open: { scn: 'G3' },
       fb: 'Система сама поняла реакцию клиента и перестроила сделку. Как разрешите действовать?',
     },
@@ -10640,6 +10669,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (id === 's8_brief') return openBriefS8();
     if (id === 'dossier') return openDossier();
     if (id.indexOf('client:') === 0) return clientCard(id.slice(7));
+    if (id.indexOf('request:') === 0) return requestCard(id.slice(8));
     if (id.indexOf('object:') === 0) return objectCard(id.slice(7));
     if (id.indexOf('doc:') === 0) return openDoc(id.slice(4));
     if (id.indexOf('nav:') === 0) { WS.router.go(id.slice(4)); return; }

@@ -214,11 +214,14 @@
   // structural fields + per-field provenance prov{field:'ai'|'confirmed'} (R3/A1),
   // stageDays (R12), companyId (R5), source for attribution (R9). Dubai taxonomy (§4).
   const deals = [
-    { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'show',
-      title: 'Инвест-квартира до 2 млн AED', sub: 'Инвест. квартира · до 2,0 млн AED', tags: ['G1'], updated: 'сегодня', createdAt: '14 мая',
+    // Сделка рождается не входящим сообщением, а согласованными условиями: показ прошёл 9 мая,
+    // объект клиент выбрал 11-го, рассрочку 60/40 подтвердили 13-го вечером — с этого и начинается
+    // сделка. Всё, что было до, живёт в заявке r_anna и здесь не повторяется.
+    { id: 'd_anna', clientId: 'c_anna', objectId: 'o_creekline', agent: 'u_marina', amount: 2000000, hot: true, stage: 'prep',
+      title: 'Инвест-квартира до 2 млн AED', sub: 'Creekline 1208 · подготовка к бронированию', tags: ['G1'], updated: 'сегодня', createdAt: '13 мая',
       funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция под аренду',
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
-      consideredProjects: ['Creekline Residences', 'Palm Court Residence'], stageDays: 0, requestId: 'r_anna',
+      consideredProjects: ['Creekline Residences', 'Bayline Terraces'], stageDays: 1, requestId: 'r_anna',
       nextDue: 'сегодня 16:00', deposit: { kind: 'EOI', amount: 100000, paid: false, refundable: true },
       contacts: [
         { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
@@ -468,11 +471,11 @@
   // the deal card renders in array order; the contact feed merges channels and sorts on `ord`.
   const dealTimeline = {
     d_anna: [
-      { at: '14 мая · 09:05', ord: 140905, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Голосовое: ищу инвест-квартиру до 2 млн, Business Bay.', capture: true },
-      { at: '14 мая · 09:12', ord: 140912, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Извлечены параметры заявки, создана сделка (уверенность 0,86).' },
-      { at: '14 мая · 09:20', ord: 140920, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Просила график первого платежа — приоритет доходность.' },
-      { at: '14 мая · 09:25', ord: 140925, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Назначить показ Creekline 1208 на сегодня 16:00, подтвердить с клиентом.' },
-      { at: '14 мая · 09:30', ord: 140930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Показ добавлен в календарь на 16:00; клиент подтвердил в WhatsApp.' },
+      { at: '13 мая · 18:10', ord: 131810, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Условия по Creekline 1208 согласованы — из заявки создана сделка, рассрочка 60/40.' },
+      { at: '13 мая · 18:40', ord: 131840, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Собрать пакет на бронирование: паспорт, подтверждение средств, форма EOI.' },
+      { at: '14 мая · 09:05', ord: 140905, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Жду точный график первого платежа — до него бронь не подтверждаю.', capture: true },
+      { at: '14 мая · 09:20', ord: 140920, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Запросила у застройщика график платежей 60/40 по 1208 — обещали к вечеру.', capture: true },
+      { at: '14 мая · 09:30', ord: 140930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Звонок с графиком поставлен на 16:00; клиент подтвердил время в WhatsApp.' },
     ],
     d_igor: [
       { at: '10 мая · 11:00', ord: 101100, ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 4:12 — обсудили перепродажу Bayline.', capture: true },
@@ -756,7 +759,9 @@
 
   // Upcoming events.
   const events = [
-    { id: 'e_show', clientId: 'c_anna', title: 'Показ Creekline 1208 — Анна', when: 'сегодня 16:00', kind: 'show' },
+    // Показ Creekline прошёл 9 мая (см. requestTimeline.r_anna) — в календаре стоит то, что
+    // действительно впереди: разговор про график первого платежа, который держит бронирование.
+    { id: 'e_call_anna', clientId: 'c_anna', title: 'Звонок Анне — график первого платежа', when: 'сегодня 16:00', kind: 'call' },
     { id: 'e_call_karim', clientId: 'c_partner', title: 'Звонок Karim Aziz', when: 'завтра 11:30', kind: 'call' },
   ];
 

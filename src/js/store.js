@@ -211,6 +211,7 @@
     if (store.tour && store.tour.scenarioId === id) store.tour = { active: false, scenarioId: null, stepIndex: 0 };
     sceneEffects(id).forEach((e) => {
       if (e.op === 'updateDeal' || e.op === 'dealStage') restoreEntity('deals', e.id);
+      else if (e.op === 'updateRequest') restoreEntity('requests', e.id);
       else if (e.op === 'updateClient') restoreEntity('clients', e.id);
       else if (e.op === 'setObject') restoreEntity('objects', e.id);
       else if (e.op === 'addTask') store.data.tasks = store.data.tasks.filter((t) => t.id !== e.task.id);
@@ -239,6 +240,12 @@
       } else if (e.op === 'dealStage') {
         const dl = d.deals.find((x) => x.id === e.id);
         if (dl) dl.stage = e.stage;
+      } else if (e.op === 'updateRequest') {
+        // Пресейл живёт на заявке, а не на сделке: сценарии, которые раньше двигали стадию
+        // сделки на «в работе», записывают факт сюда. Стадии здесь нет намеренно — она
+        // вычисляется из фактов (см. reqStage), и присвоить её нечем.
+        const r = (d.requests || []).find((x) => x.id === e.id);
+        if (r) Object.assign(r, e.patch);
       } else if (e.op === 'updateClient') {
         const c = d.clients.find((x) => x.id === e.id);
         if (c) Object.assign(c, e.patch);
@@ -297,10 +304,18 @@
       safe: ['title', 'due', 'kind', 'assignee'],
       guarded: ['status', 'when'],
     },
+    // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
+    // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
+    requests: {
+      safe: ['note', 'title', 'nextContact', 'temperature', 'horizon', 'bedrooms', 'goal', 'areas'],
+      guarded: ['budget', 'leadStatus', 'assignee', 'offered', 'kp', 'interest', 'paymentForm',
+        'dealType', 'objectType', 'funding', 'vat', 'source', 'partnerAgent'],
+    },
   };
 
   const OP_SPEC = {
     updateDeal: { coll: 'deals', kind: 'patch' },
+    updateRequest: { coll: 'requests', kind: 'patch' },
     updateClient: { coll: 'clients', kind: 'patch' },
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name

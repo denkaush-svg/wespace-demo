@@ -252,7 +252,7 @@ setTimeout(async () => {
       WS.ui.setEntityTab('deal', 'd_anna', 'history');
       const hd = doc.getElementById('app').innerHTML;
       const iNew = hd.indexOf('СМОУК: запись по сделке');
-      const iOld = hd.indexOf('Просила график первого платежа');
+      const iOld = hd.indexOf('Запросила у застройщика график платежей');
       check('deal entry renders ABOVE the 09:20 note (newest first)', iNew < iOld && iNew > 0, 'iNew=' + iNew + ' iOld=' + iOld);
     } else { check('deal event form opened', false); }
   }
@@ -1330,6 +1330,113 @@ setTimeout(async () => {
       });
     });
     check('deal · nothing is dated before the deal was created', bad.length === 0, bad.slice(0, 3).join(' | '));
+  }
+
+  // ---- заявка старше своей сделки, и ни один сценарий не ссылается в пустоту ----
+  // Стенд рассказывал две несовместимые истории про одного клиента: показ прошёл 9 мая по заявке,
+  // а сделка утверждала, что заявка пришла 14-го и показ ещё впереди. Проверки ниже держат не
+  // конкретный случай, а класс: у следствия не может быть даты раньше причины, а сценарий не
+  // может двигать запись, которой нет, или называть объект, которого клиенту не предлагали.
+  {
+    const MO = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const LN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const day = (t) => {
+      const m = /^(\d+)\s*([а-яё]*)/i.exec(t || '');
+      if (!m) return null;
+      const mi = MO.indexOf((m[2] || '').toLowerCase());
+      const mo = mi >= 0 ? mi + 1 : 5;
+      let n = parseInt(m[1], 10);
+      for (let i = 0; i < mo - 1; i++) n += LN[i];
+      return n;
+    };
+    const reqById = (id) => (dd().requests || []).find((r) => r.id === id);
+
+    const early = [];
+    (dd().deals || []).forEach((d) => {
+      const r = d.requestId && reqById(d.requestId);
+      if (!r) return;
+      const born = day(d.createdAt); const asked = day(r.createdAt);
+      if (born != null && asked != null && born < asked) {
+        early.push(d.id + ': сделка ' + d.createdAt + ' раньше заявки ' + r.createdAt);
+      }
+    });
+    check('данные · сделка не рождается раньше своей заявки', early.length === 0, early.join(' | '));
+
+    // Сценарии и события дня трогают общие данные. Опечатка в id — это молчаливый ноль: эффект
+    // применяется, ничего не меняется, демонстрация выглядит исправной.
+    const COLL = { updateDeal: 'deals', dealStage: 'deals', updateRequest: 'requests', updateClient: 'clients',
+      setObject: 'objects', updateObject: 'objects', removeTask: 'tasks' };
+    const effectsOf = (s) => {
+      let out = [];
+      (s.flow || []).forEach((st) => {
+        if (st.effects) out = out.concat(st.effects);
+        if (st.result && st.result.effects) out = out.concat(st.result.effects);
+        if (st.fieldEffects) Object.keys(st.fieldEffects).forEach((k) => { out = out.concat(st.fieldEffects[k]); });
+      });
+      return out;
+    };
+    const sources = (WS.scenarioList || []).map((s) => [s.id, effectsOf(s)])
+      .concat(((WS.events && WS.events.EVENTS) || []).map((e) => [e.id, e.effects || []]));
+    // Задача, созданная одним сценарием и снятая следующим, в покое не существует — это не
+    // призрак, а звено цепочки, поэтому созданное сценариями считается существующим.
+    const born = {};
+    sources.forEach(([, eff]) => (eff || []).forEach((e) => {
+      const rec = e.task || e.obj || e.record;
+      if (rec && rec.id) born[rec.id] = 1;
+    }));
+    const ghosts = [];
+    sources.forEach(([name, eff]) => (eff || []).forEach((e) => {
+      const coll = COLL[e.op]; if (!coll) return;
+      if (born[e.id]) return;
+      if (!(dd()[coll] || []).some((x) => x.id === e.id)) ghosts.push(name + ' → ' + e.op + ' ' + e.id);
+    }));
+    check('сценарии · каждый эффект попадает в существующую запись', ghosts.length === 0, ghosts.slice(0, 3).join(' | '));
+
+    // Объект, который сценарий объявляет выбранным, должен быть среди предложенных клиенту.
+    // Иначе карточка заявки и рассказ сценария расходятся: «клиент выбрал» то, чего не видел.
+    const strays = [];
+    sources.forEach(([name, eff]) => (eff || []).forEach((e) => {
+      if (e.op !== 'updateClient' || !e.patch || !e.patch.preferred) return;
+      const offered = (dd().requests || []).filter((r) => r.clientId === e.id)
+        .reduce((a, r) => a.concat((r.offered || []).map((o) => o.id)), []);
+      const names = offered.map((id) => ((dd().objects || []).find((o) => o.id === id) || {}).name || '');
+      const pref = String(e.patch.preferred);
+      // Точное совпадение с именем объекта, а не «похоже»: «Creekline Residences 1208» вместо
+      // «Creekline Residences, Unit 1208» — это уже другое название, и клиент увидит другое.
+      if (names.indexOf(pref) < 0) {
+        strays.push(name + ': «' + pref + '» клиенту ' + e.id + ' не предлагали');
+      }
+    }));
+    check('сценарии · выбранным можно назвать только предложенное', strays.length === 0, strays.join(' | '));
+
+    // Календарь обещает будущее. Показ, который ленты уже записали как состоявшийся, —
+    // это не напоминание, а противоречие: агент придёт на встречу, которая была неделю назад.
+    // В прозе объект зовут не полным именем из карточки, а проектом и номером: «Creekline 1208»
+    // при name = «Creekline Residences, Unit 1208». Сверяем по этой паре — иначе проверка
+    // молчит ровно там, где нужна.
+    const keyOf = (o) => {
+      const first = String(o.name || '').split(/[\s,]+/)[0];
+      const unit = (/(\d{2,})\s*$/.exec(o.name || '') || [])[1];
+      return first && unit ? [first, unit] : null;
+    };
+    const has = (t, k) => t.indexOf(k[0]) >= 0 && t.indexOf(k[1]) >= 0;
+    const stale = [];
+    (dd().events || []).forEach((ev) => {
+      if (ev.kind !== 'show' || !ev.clientId) return;
+      const feeds = [].concat(
+        (dd().requests || []).filter((r) => r.clientId === ev.clientId).map((r) => (dd().requestTimeline || {})[r.id] || []),
+        (dd().deals || []).filter((x) => x.clientId === ev.clientId).map((x) => (dd().dealTimeline || {})[x.id] || []));
+      (dd().objects || []).forEach((o) => {
+        const k = keyOf(o);
+        if (!k || !has(ev.title || '', k)) return;
+        feeds.forEach((f) => f.forEach((it) => {
+          if (it.ch === 'meet' && has(it.text || '', k)) {
+            stale.push(ev.id + ': показ ' + o.name + ' уже проведён (' + it.at + ')');
+          }
+        }));
+      });
+    });
+    check('календарь · не назначает показ, который уже состоялся', stale.length === 0, stale.slice(0, 3).join(' | '));
   }
 
   // ---- sort keys must agree with the dates they claim ----
