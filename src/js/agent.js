@@ -79,6 +79,20 @@
     if (!live.length) { const all = dealsOf(clientId); return all.length === 1 ? all[0] : null; }
     return null;
   }
+  // Уточнение имеет смысл, только если названное можно узнать. Раньше Консьерж спрашивал,
+  // о какой сделке речь, и на ответ отвечал тем же вопросом: названия сделок он не разбирал.
+  function dealByText(clientId, t) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    const low = String(t || '').toLowerCase();
+    const words = (s) => String(s || '').toLowerCase().split(/[^a-zа-яё0-9]+/i).filter((w) => w.length > 3);
+    const hit = live.filter((d) => {
+      if (low.indexOf(String(d.id).toLowerCase()) >= 0) return true;
+      const o = (WS.store.data.objects || []).find((x) => x.id === d.objectId);
+      const pool = words(d.title).concat(words(d.sub)).concat(words(o && o.name)).concat(words(o && o.project));
+      return pool.some((w) => low.indexOf(w) >= 0);
+    });
+    return hit.length === 1 ? hit[0] : null;
+  }
   function dealChoiceText(clientId) {
     const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
     if (live.length < 2) return '';
@@ -234,7 +248,7 @@
     // stage change
     if (RE.stage.test(t)) {
       const st = (STAGES.find((x) => x[0].test(t)) || [])[1];
-      const deal = ent && ent.kind === 'contact' ? dealOf(ent.id) : null;
+      const deal = ent && ent.kind === 'contact' ? (dealOf(ent.id) || dealByText(ent.id, t)) : null;
       if (!st && PRESALE_WORDS.test(t)) {
         return { kind: 'answer', text: 'Это стадия заявки, а не сделки, и она не выставляется вручную: заявка сама встаёт на подбор, показ или переговоры, когда появляется факт. Отметьте на заявке предложенный объект или добавьте событие — стадия сдвинется сама.', evidence: [], next: suggestions() };
       }

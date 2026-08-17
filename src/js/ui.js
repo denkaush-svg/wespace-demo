@@ -3328,6 +3328,9 @@
   function reqOfferStatus(r, off) {
     const dealObjIds = {};
     dealsOfRequest(r.id).forEach((d) => {
+      // Проигранная сделка лот отпускает: договор не состоялся, объект снова свободен и его
+      // можно предложить заново. Держать его занятым значит вычеркнуть объект из работы навсегда.
+      if (d.stage === 'lost') return;
       const done = dealWon(d);
       (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
     });
@@ -3365,7 +3368,10 @@
   // can spawn several deals, so we key off free-selected, not "any deal exists").
   function reqSelectedFree(r) {
     const inDeal = {};
-    dealsOfRequest(r.id).forEach((d) => (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) inDeal[oid] = 1; }));
+    dealsOfRequest(r.id).forEach((d) => {
+      if (d.stage === 'lost') return;   // см. reqOfferStatus: проигрыш освобождает лот
+      (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) inDeal[oid] = 1; });
+    });
     return (r.offered || []).filter((o) => o.state === 'selected' && !inDeal[o.id]).map((o) => o.id);
   }
   function reqKpActions(r) {
@@ -3613,9 +3619,12 @@
   // проходят одним договором и остаются лотами внутри сделки; другой комплекс — другой договор,
   // другой такт подписания и другая сделка. Ключ группы — комплекс и продавец: башня или корпус
   // («Creekline Residences · Tower B») договор не делит, поэтому в ключ идёт часть до разделителя.
+  // Продавец, а не застройщик: во вторичке договор подписывает собственник, в аренде —
+  // арендодатель, и два юнита одного комплекса от разных собственников идут двумя договорами.
+  // Пока у объекта не заполнен `seller`, ключом остаётся застройщик — на оффплане это он и есть.
   function contractGroupKey(o) {
     const dev = String(o.project || o.name || '').split('·')[0].trim();
-    return dev + ' | ' + (o.developer || '—');
+    return dev + ' | ' + (o.seller || o.developer || '—');
   }
   function groupName(o) { return String(o.project || o.name || '').split('·')[0].trim(); }
   function objReadiness(o) { return /off-?plan|оффплан/i.test(o.segment || '') ? 'оффплан' : 'готовый'; }
@@ -3935,8 +3944,12 @@
     'Эксклюзив': 'exclusive', 'Кросс-продажи': 'cross', 'Консалтинг': 'consult',
   };
   function funnelForType(t) { return FUNNEL_BY_TYPE[t] || 'sale'; }
-  function clampStage(funnelKey, stage) {
-    const list = stepsForFunnel(funnelKey);
+  // Зажимать по услуге мало: у продажи два вида договора, и «Бронь (EOI)» с готовностью
+  // «готовый» давало вторичную сделку на шаге, которого в её договоре нет, — колонка доски и
+  // лента карточки после этого расходились.
+  function clampStage(funnelKey, stage, readiness) {
+    const ck = WS.contractKindFor;
+    const list = (readiness && ck) ? ((WS.DEAL_STEPS || {})[ck(funnelKey, readiness)] || []) : stepsForFunnel(funnelKey);
     if (!list.length) return stage;
     return list.indexOf(stage) >= 0 ? stage : list[0];
   }
@@ -5268,11 +5281,17 @@
   // Документы сделки: свои плюс унаследованные — от заявки, из которой она выросла, и от клиента.
   function docsOfDeal(d) {
     if (!d) return [];
+    // Документы объекта — по КАЖДОМУ лоту: Trakheesi и Form A нужны на каждый юнит, который
+    // уходит по этому договору, и показать их только по головному объекту значит спрятать
+    // отсутствие разрешения по второму.
+    const lots = {};
+    ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) lots[id] = 1; });
     return docRegistry().filter((x) => {
       const sc = docScope(x);
       if (sc === 'deal') return x.deal === d.id;
       if (sc === 'request') return !!d.requestId && x.request === d.requestId;
       if (sc === 'client') return x.client === d.clientId;
+      if (sc === 'object') return !!lots[x.object];
       return false;
     }).map((x) => Object.assign({}, x, { from: SCOPE_FROM[docScope(x)] || '' }));
   }
@@ -5808,7 +5827,8 @@
     // The stage list came from the board in view; the funnel comes from the chosen service. If the
     // agent changed the service after opening the form, the stage is pulled into the new funnel
     // instead of filing the deal where no column can draw it.
-    const stage = clampStage(funnel, _g('nd_stage') || 'work');
+    const readiness = _g('nd_readiness') || 'готовый';
+    const stage = clampStage(funnel, _g('nd_stage') || 'prep', readiness);
     // The essence is what the deal is called everywhere afterwards; fall back to the client's name
     // only when the agent left it blank, which is what the card used to do unconditionally.
     const title = (_g('nd_title') || '').trim() || c.name || 'Сделка';
@@ -5818,8 +5838,28 @@
       const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
       return now.d + ' ' + months[now.mo];
     })();
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: _g('nd_agent') || 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: stage, title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, funnel: funnel, dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: _g('nd_readiness') || 'готовый', saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } }]);
-    closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
+    // У сделки всегда есть заявка, из которой она выросла, — даже когда её заводят руками.
+    // Ручное заведение это перенос уже идущей работы: запрос клиента был, просто не записан.
+    // Заводим его тем же движением, иначе у сделки нет ни истории запроса, ни места, где живут
+    // клиентские документы, и она выпадает из сводной воронки как сирота.
+    const rid = 'rm_' + id.slice(3);
+    const objForDeal = _g('nd_object');
+    const amount = parseInt(_g('nd_amount'), 10) || 0;
+    WS.storeApi.applyEffects([
+      { op: 'addRequest', obj: { id: rid, clientId: cid, title: title, createdAt: createdAt, channel: 'crm',
+        funnel: funnel, interest: dealType, paymentForm: _g('nd_paymentForm') || '100% оплата',
+        vat: !!(document.getElementById('nd_vat') || {}).checked, source: _g('nd_source') || 'Импорт', partnerAgent: null,
+        dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', bedrooms: '', goal: _g('nd_goal') || '',
+        budget: amount, areas: [], horizon: null, assignee: _g('nd_agent') || 'u_marina',
+        leadStatus: 'Условия согласованы', temperature: 'warm', nextContact: '—', funding: '',
+        offered: objForDeal ? [{ id: objForDeal, state: 'selected' }] : [], kp: { formed: false },
+        note: 'Заявка заведена вместе со сделкой при ручном переносе: запрос клиента был, в системе его не было.' } },
+      { op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: objForDeal, agent: _g('nd_agent') || 'u_marina', amount: amount, hot: false, stage: stage, title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, requestId: rid, funnel: funnel, dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: readiness, saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } },
+    ]);
+    D().requestTimeline = D().requestTimeline || {};
+    D().requestTimeline[rid] = [{ ch: 'crm', kind: 'raw', by: 'Система', at: createdAt, ord: 999,
+      text: 'Перенос: сделка и её заявка заведены вручную, условия уже согласованы.' }];
+    closeModal(); WS.storeApi.toast('Сделка создана вместе с заявкой', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 
   // Manager's team view (inner HTML — embedded into "Рабочий день").
@@ -7315,7 +7355,7 @@
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope, reqStage, boardFits,
+    docsOfDeal, docsOfRequest, docScope, reqStage, boardFits, reqOfferStatus, reqSelectedFree, clampStage,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

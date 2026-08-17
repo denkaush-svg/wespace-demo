@@ -1290,6 +1290,66 @@ setTimeout(async () => {
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
   }
 
+  // ---- что нашёл сторонний ревьюер: пять дыр, каждая без своей проверки ----
+  {
+    // Проигрыш освобождает лот. Иначе объект вычеркнут из работы навсегда: договор не состоялся,
+    // а заявка показывает «В сделке» и не даёт предложить его заново.
+    const rs = dd().requests.find((x) => x.id === 'r_sarah_apr');
+    const lost = dd().deals.find((d) => d.id === 'd_sarah_apr');
+    check('данные · на стенде есть проигранная сделка с лотом', !!lost && lost.stage === 'lost' && !!lost.objectId);
+    const st = WS.ui.reqOfferStatus(rs, (rs.offered || [])[0]);
+    check('проигрыш · лот больше не числится в сделке', st.label !== 'В сделке' && st.label !== 'Сделка закрыта', st.label);
+    check('проигрыш · освобождённый объект снова доступен к переходу',
+      WS.ui.reqSelectedFree(rs).indexOf('o_jvcpark') >= 0, WS.ui.reqSelectedFree(rs).join(' '));
+
+    // Шаг зажимается видом договора, а не услугой: у вторички брони нет.
+    check('форма · бронь недоступна вторичке', WS.ui.clampStage('sale', 'book', 'готовый') !== 'book',
+      WS.ui.clampStage('sale', 'book', 'готовый'));
+    check('форма · оффплану бронь остаётся', WS.ui.clampStage('sale', 'book', 'оффплан') === 'book');
+
+    // Сделка, заведённая руками, тоже растёт из заявки — иначе она сирота в сводной воронке.
+    const nBefore = dd().deals.length, rBefore = dd().requests.length;
+    WS.ui.openDealForm();
+    const setv = (id, v) => { const el = doc.getElementById(id); if (el) el.value = v; };
+    setv('nd_client', 'c_anna'); setv('nd_title', 'СМОУК: ручная сделка');
+    setv('nd_amount', '1000000'); setv('nd_readiness', 'готовый'); setv('nd_stage', 'book');
+    WS.ui.createDeal();
+    check('ручное заведение · сделка создана', dd().deals.length === nBefore + 1);
+    check('ручное заведение · заявка создана вместе с ней', dd().requests.length === rBefore + 1);
+    const made = dd().deals[0].id === dd().deals[0].id ? dd().deals.find((d) => d.title === 'СМОУК: ручная сделка') : null;
+    check('ручное заведение · у сделки есть родительская заявка',
+      !!made && !!made.requestId && dd().requests.some((r) => r.id === made.requestId), made && made.requestId);
+    check('ручное заведение · шаг зажат видом договора, а не услугой',
+      !!made && ((WS.DEAL_STEPS || {})[WS.contractKindFor(made.funnel, made.readiness)] || []).indexOf(made.stage) >= 0,
+      made && (made.stage + '/' + made.readiness));
+    if (made) {
+      dd().deals = dd().deals.filter((d) => d.id !== made.id);
+      dd().requests = dd().requests.filter((r) => r.id !== made.requestId);
+    }
+
+    // Документы объекта видны по КАЖДОМУ лоту: разрешение на второй юнит нельзя спрятать.
+    const port = dd().deals.find((d) => d.id === 'd_rentbiz');
+    if (port) {
+      const objDocs = WS.ui.docsOfDeal(port).filter((x) => x.from === 'по объекту');
+      const lots = (port.lots || []);
+      check('документы · сделка видит документы своих лотов',
+        objDocs.length === 0 || objDocs.every((x) => lots.indexOf(x.object) >= 0),
+        objDocs.map((x) => x.object).join(' '));
+      // Проверяем механику на объекте, у которого документ точно есть.
+      const anna = dd().deals.find((d) => d.id === 'd_anna');
+      check('документы · документ объекта поднимается в сделку по этому объекту',
+        WS.ui.docsOfDeal(anna).some((x) => x.object === 'o_creekline' && x.from === 'по объекту'),
+        WS.ui.docsOfDeal(anna).map((x) => x.open + ':' + (x.from || '—')).join(' '));
+    }
+
+    // Уточнение имеет смысл, только если названное можно узнать.
+    const ask1 = WS.agent.ask('переведи сделку Виктора Орлова в подписание');
+    check('консьерж · без уточнения по-прежнему спрашивает', ask1.kind !== 'proposal', ask1.kind);
+    const ask2 = WS.agent.ask('переведи сделку Виктора Орлова по портфелю DIFC в подписание');
+    check('консьерж · названную сделку узнаёт и предлагает шаг', ask2.kind === 'proposal',
+      ask2.kind + ' · ' + (ask2.text || '').slice(0, 80));
+  }
+
   // ---- заявки адресуемы запросом, и сделка клиента не выбирается наугад ----
   {
     const q = WS.query.run({ from: 'requests', where: [{ field: 'clientId', op: 'eq', value: 'c_docs' }] });

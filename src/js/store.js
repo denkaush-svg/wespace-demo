@@ -254,6 +254,8 @@
         if (o) Object.assign(o, e.patch);
       } else if (e.op === 'addObject') {
         if (!d.objects.some((o) => o.id === e.obj.id)) d.objects.unshift(e.obj);
+      } else if (e.op === 'addRequest') {
+        if (!d.requests.some((x) => x.id === e.obj.id)) d.requests.unshift(e.obj);
       } else if (e.op === 'addDeal') {
         if (!d.deals.some((x) => x.id === e.obj.id)) d.deals.unshift(e.obj);
       } else if (e.op === 'addClient') {
