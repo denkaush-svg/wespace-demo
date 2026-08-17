@@ -4164,7 +4164,9 @@
     if (off) fit.push('инвестору, который готов ждать сдачи ради цены входа');
     if (y && y >= 5) fit.push('покупателю под аренду');
     if (a.prestige === 'high') fit.push('клиенту, которому важен адрес');
-    if (!off && a.finish === 'new') fit.push('тому, кто въезжает сразу');
+    // «Въезжает сразу» верно только для свободного объекта: сданный занят арендатором до конца срока.
+    if (!off && a.finish === 'new' && /vacant|свободн/i.test(o.occupancy || '')) fit.push('тому, кто въезжает сразу');
+    if (!off && /сдан|аренд/i.test(o.occupancy || '')) fit.push('покупателю с горизонтом от двух лет — объект занят до конца договора');
     
 
     // 5. And where it does not fit. A brief that only sells is not a brief.

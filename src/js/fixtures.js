@@ -119,6 +119,30 @@
       handover: 'Q2 2027', paymentPlan: '20% бронь · 40% в стройку · 40% post-handover (2 года)',
       serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null,
       usp: 'Post-handover 40% на два года после ключей: покупатель заходит в Creek Harbour, оплатив до сдачи 60%, и гасит остаток уже с арендного потока.' },
+    // Два смежных блока в одном комплексе: продаются одним договором, и это единственная на стенде
+    // живая иллюстрация правила «один ЖК — один договор, сколько бы лотов в нём ни было».
+    { id: 'o_difc_a', name: 'DIFC Gate District, Office 1204', source: 'club',
+      sourceLabel: 'Клубный эксклюзив', area: 'DIFC', price: 2050000, size: 112, br: 'Офис',
+      address: 'DIFC, Gate District, Building 4, Level 12, Unit 1204', commissionPct: 2,
+      availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
+      trakheesi: 'ok', madmoun: 'ok',
+      attrs: { view: 'city', floor: 12, floors: 15, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
+      match: 'DIFC, действующий арендатор, доход не прогнозный, а по договору.',
+      segment: 'готовое · вторичка', developer: 'DIFC Authority', project: 'DIFC Gate District',
+      handover: null, paymentPlan: null, serviceCharge: '22 AED/фт²·год', escrow: null,
+      occupancy: 'Сдан · договор до июня 2027',
+      usp: 'Арендатор — юридическая фирма с договором до июня 2027 и индексацией 5% в год: доход на два года вперёд известен, а не рассчитан.' },
+    { id: 'o_difc_b', name: 'DIFC Gate District, Office 1206', source: 'club',
+      sourceLabel: 'Клубный эксклюзив', area: 'DIFC', price: 2150000, size: 118, br: 'Офис',
+      address: 'DIFC, Gate District, Building 4, Level 12, Unit 1206', commissionPct: 2,
+      availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
+      trakheesi: 'ok', madmoun: 'ok',
+      attrs: { view: 'city', floor: 12, floors: 15, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
+      match: 'DIFC, смежный блок к 1204 — берутся вместе одним договором.',
+      segment: 'готовое · вторичка', developer: 'DIFC Authority', project: 'DIFC Gate District',
+      handover: null, paymentPlan: null, serviceCharge: '22 AED/фт²·год', escrow: null,
+      occupancy: 'Сдан · договор до марта 2027',
+      usp: 'Смежный блок на том же этаже, что и 1204: два юнита берутся одним договором и при желании объединяются в один офис без согласования планировки с DIFC.' },
   ];
 
   // Reference financial model (spec §12.2) — single source of truth for
@@ -138,6 +162,12 @@
       tenant: 'Семьи и молодые пары. Живут по два-три года, съезжают редко — арендный поток ровный.',
       driver: 'Школы, клиники и районный ретейл догнали жильё: район перестал быть окраиной с одними домами.',
       risk: 'Метро нет и в планах не стоит. Клиент без машины район не рассматривает.',
+    },
+    'DIFC': {
+      perM2: 19500, priceYoY: 14, rentYoY: 11, yieldTypical: 4.6, dom: 46,
+      tenant: 'Юридические и финансовые фирмы. Договоры на три-пять лет с индексацией, съезжают редко: переезд из DIFC задевает лицензию.',
+      driver: 'Финансовый фрихолд с собственным правом и судом. Свободных площадей мало, новые очереди выходят медленно — спрос упирается в предложение.',
+      risk: 'Порог входа выше жилого: отделка и service charge съедают первый год. Покупатель здесь институциональный, ликвидность узкая.',
     },
     'Dubai Creek Harbour': {
       perM2: 23200, priceYoY: 7, rentYoY: 4, yieldTypical: 4.7, dom: 52,
@@ -225,11 +255,11 @@
       paymentForm: 'Поэтапно', vat: true, source: 'Реферал', partnerAgent: null, companyId: 'co_meydan',
       consideredProjects: [], stageDays: 4,
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
-    { id: 'd_rentbiz', clientId: 'c_docs', objectId: 'o_bayline', agent: 'u_omar', amount: 4200000, hot: false, stage: 'prep',
+    { id: 'd_rentbiz', clientId: 'c_docs', objectId: 'o_difc_a', agent: 'u_omar', amount: 4200000, hot: false, stage: 'prep',
       title: 'Готовый арендный бизнес в DIFC', sub: 'Готовый арендный бизнес · DIFC', tags: ['портфель'], updated: 'вчера', createdAt: '11 мая',
       funnel: 'sale', dealType: 'Продажа', objectType: 'ГАБ', readiness: 'готовый', saleKind: 'вторичка', side: 'покупатель', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
-      consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_bayline', 'o_creekline'],
+      consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_difc_a', 'o_difc_b'],
       gates: { kyc: true, title: true, leases: true },
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_won', clientId: 'c_anna', objectId: 'o_palmcourt', agent: 'u_marina', amount: 1750000, hot: false, stage: 'won',
@@ -284,9 +314,10 @@
       assignee: 'u_marina', leadStatus: 'В переговорах', temperature: 'warm', nextContact: '12 мая, 11:00', funding: 'Cash 100% · подтв. средств ✓',
       offered: [
         { id: 'o_bayline', state: 'selected' },
-        { id: 'o_creekline', state: 'selected' },
+        { id: 'o_difc_a', state: 'selected' },
+        { id: 'o_difc_b', state: 'selected' },
       ],
-      kp: { formed: true, at: '05 мая', objectIds: ['o_bayline', 'o_creekline'] },
+      kp: { formed: true, at: '05 мая', objectIds: ['o_bayline', 'o_difc_a', 'o_difc_b'] },
       note: 'Одна заявка → две сделки: бронирование Bayline (свой договор) и портфель DIFC на 2 лота (свой договор).' },
   ];
 

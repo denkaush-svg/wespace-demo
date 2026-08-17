@@ -889,6 +889,36 @@ setTimeout(async () => {
       (WS.FUNNELS || []).every((f) => !!CK[ck(f.k, 'оффплан')] && !!CK[ck(f.k, 'готовый')]));
   }
 
+  // ---- one deal is one contract: every lot in it sits in the same development ----
+  {
+    const objById = {};
+    (dd().objects || []).forEach((o) => { objById[o.id] = o; });
+    const bad = [];
+    (dd().deals || []).forEach((d) => {
+      const ids = (d.lots && d.lots.length) ? d.lots : (d.objectId ? [d.objectId] : []);
+      const projects = ids.map((id) => (objById[id] || {}).project).filter(Boolean);
+      const sellers = ids.map((id) => (objById[id] || {}).developer).filter(Boolean);
+      if (new Set(projects).size > 1 || new Set(sellers).size > 1) bad.push(d.id + ': ' + projects.join(' | '));
+    });
+    // Сделка заканчивается одним договором. Несколько лотов допустимы, пока они в одном ЖК у одного
+    // продавца: другой комплекс — другой договор, а значит другая сделка.
+    check('deal · лоты сделки — один ЖК и один продавец', bad.length === 0, bad.join(' ; '));
+    // Один объект не может стоять в двух сделках ОДНОЙ заявки: клиент не покупает один юнит дважды.
+    // Более широкая версия правила — «объект занят не более чем одной живой сделкой на весь стенд» —
+    // сейчас нарушается записями, которые после миграции станут заявками, и включится вместе с ней.
+    const perReq = {}, twice = [];
+    (dd().deals || []).forEach((d) => {
+      if (!d.requestId || d.stage === 'lost') return;
+      const m = perReq[d.requestId] || (perReq[d.requestId] = {});
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => {
+        if (!id) return;
+        if (m[id] && m[id] !== d.id) twice.push(id + ' в ' + m[id] + ' и ' + d.id);
+        m[id] = d.id;
+      });
+    });
+    check('deal · объект не стоит в двух сделках одной заявки', twice.length === 0, twice.join(' ; '));
+  }
+
   // ---- object maps: real imagery for every object, with the attribution the licence requires ----
   {
     const objs = dd().objects || [];
