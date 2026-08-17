@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:05</title>
+  <title>WESPACE · сборка 23:12</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:05';
+    window.WS_BUILD='23:12';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -633,6 +633,17 @@ button { font-family: inherit; cursor: pointer; }
 /* Лента шагов без заголовка: сама цепочка и есть заголовок. */
 .dx-sec-bare { padding-top: 16px; }
 .dx-sec-bare .dx-stepper { margin-top: 0; }
+/* Две конверсии рядом, каждая со своим знаменателем. */
+.cv-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
+  margin: 10px 0 2px; padding: 11px 13px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface-2); }
+.cv-cell { flex: none; min-width: 128px; }
+.cv-n { font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.cv-l { font-size: 12px; font-weight: 700; color: var(--mut); margin-top: 3px; }
+.cv-d { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.cv-note { flex: 1 1 240px; min-width: 0; display: flex; gap: 7px; align-items: flex-start;
+  font-size: 11.5px; color: var(--faint); line-height: 1.45; text-wrap: pretty; }
+.cv-note svg { width: 13px; height: 13px; flex: none; color: var(--acc); margin-top: 1px; }
 /* Унаследованный документ: откуда он пришёл, рядом с названием. */
 .doc-from { margin-left: 7px; font-weight: 600; }
 .doc-from svg { width: 11px; height: 11px; }
@@ -2686,6 +2697,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_difc_a', 'o_difc_b'],
       gates: { kyc: true, title: true, leases: true },
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
+    // Сорвавшаяся сделка. Без неё воронка показывала 100% успеха на одном наблюдении — число,
+    // которое ничего не измеряет. Объект она отпустила: у проигранной сделки лот снова свободен.
+    { id: 'd_sarah_apr', clientId: 'c_night', objectId: 'o_jvcpark', agent: 'u_marina', amount: 92000, hot: false, stage: 'lost',
+      title: 'Аренда Park Terrace 903', sub: 'Аренда · сорвалась на подписании', tags: ['проигрыш'], updated: '29 апреля', createdAt: '24 апреля',
+      funnel: 'rent', dealType: 'Аренда', objectType: 'апартаменты', readiness: 'готовый', saleKind: '', side: 'арендатор', goal: 'Аренда под проживание',
+      paymentForm: 'Годовой чек', vat: false, source: 'Bayut', partnerAgent: null, companyId: null,
+      consideredProjects: ['Park Terrace'], stageDays: 5, requestId: 'r_sarah_apr',
+      lostReason: 'Собственник поднял ставку на 8% перед подписанием — клиент отказался.',
+      gates: { kyc: true },
+      prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     { id: 'd_won', clientId: 'c_anna', objectId: 'o_palmcourt', agent: 'u_marina', amount: 1750000, hot: false, stage: 'won',
       title: 'Покупка Palm Court 704', sub: 'Продажа · первичка · закрыта', tags: ['успех'], updated: '6 мая', createdAt: '18 апреля',
       funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: 'Инвестиция под аренду',
@@ -2782,6 +2803,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       funding: '100% предоплата',
       offered: [], kp: { formed: true, at: '12 мая', objectIds: [] },
       note: 'Проверка договоров аренды по портфелю DIFC до сделки. Открыт объём: только договоры или ещё долги по service charge.' },
+    { id: 'r_sarah_apr', clientId: 'c_night', title: 'Аренда 1BR в JVC · апрель', createdAt: '20 апреля', channel: 'whatsapp',
+      funnel: 'rent', interest: 'Аренда', paymentForm: 'Годовой чек', vat: false, source: 'Bayut', partnerAgent: null,
+      dealType: 'Аренда', objectType: 'Квартира', bedrooms: '1BR', goal: 'Аренда под проживание', budget: 92000,
+      areas: ['JVC'], horizon: null,
+      assignee: 'u_marina', leadStatus: 'Закрыта', temperature: 'cold', nextContact: '—',
+      funding: 'Годовой чек · один платёж',
+      offered: [{ id: 'o_jvcpark', state: 'selected' }],
+      kp: { formed: true, at: '22 апреля', objectIds: ['o_jvcpark'] },
+      note: 'Апрельский поиск: объект выбран, сделка сорвалась на подписании. В мае клиент вернулся с новой заявкой.' },
+    // Заявка, по которой сделки не будет. Без неё «заявка → сделка» читалась как 100%.
+    { id: 'r_villa', clientId: 'c_partner', title: 'Вилла в Damac Hills до 6 млн', createdAt: '14 апреля', channel: 'whatsapp',
+      funnel: 'sale', interest: 'Покупка', paymentForm: '100% оплата', vat: false, source: 'Клуб', partnerAgent: null,
+      dealType: 'Продажа · вторичка', objectType: 'Вилла', bedrooms: '4BR', goal: 'Для проживания семьи', budget: 6000000,
+      areas: ['Damac Hills'], horizon: null,
+      assignee: 'u_lina', leadStatus: 'Отказ', temperature: 'cold', nextContact: '—',
+      funding: 'Cash 100%',
+      offered: [], kp: { formed: false },
+      note: 'Клиент вышел на застройщика напрямую и купил без брокера. Возражение было по комиссии, не по объекту.' },
     // Закрытая заявка: показывает конец пути — всё предложенное ушло в сделку, сделка выиграна.
     { id: 'r_won', clientId: 'c_anna', title: 'Студия под аренду до 1,8 млн', createdAt: '10 апреля', channel: 'whatsapp',
       funnel: 'sale', interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null,
@@ -2943,6 +2982,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '13 мая · 09:45', ord: 130945, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Банк запросил подтверждение дохода — поставлена задача агенту собрать пакет.' },
       { at: '13 мая · 15:30', ord: 131530, ch: 'email', kind: 'raw', by: 'Агент', text: 'Отправлен черновик договора бронирования.', capture: true },
       { at: '13 мая · 16:10', ord: 131610, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Ждём подтверждение ипотеки от банка.' },
+    ],
+    d_sarah_apr: [
+      { at: '24 апреля · 16:30', ord: -144930, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Условия по Park Terrace 903 согласованы — из заявки создана сделка.' },
+      { at: '27 апреля · 12:10', ord: -140630, ch: 'call', kind: 'raw', by: 'Собственник', text: 'Звонок 3:20 — собственник поднял ставку на 8% перед подписанием.', capture: true },
+      { at: '29 апреля · 09:15', ord: -137745, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'По новой ставке не готова, ищем дальше.', capture: true },
     ],
     d_won: [
       { at: '18 апреля · 11:00', ord: -118900, ch: 'meet', kind: 'raw', by: 'Марина Волкова', text: 'Встреча — выбрана студия Palm Court 704, рассрочка 60/40.', capture: true },
@@ -3251,6 +3295,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       { at: '12 мая · 09:30', ord: 120930, ch: 'call', kind: 'raw', by: 'Марина Волкова', text: 'Звонок 3:40 — просят проверить договоры аренды по портфелю до сделки.', capture: true },
       { at: '12 мая · 18:00', ord: 121800, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлено КП на юридическую проверку: объём, срок, гонорар.' },
       { at: '13 мая · 12:45', ord: 131245, ch: 'note', kind: 'note', by: 'Марина Волкова', text: 'Согласовать объём: только договоры аренды или ещё долги по service charge.' },
+    ],
+    r_sarah_apr: [
+      { at: '20 апреля · 19:40', ord: -150620, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Ищу 1BR в JVC на год, бюджет около 92 тыс.', capture: true },
+      { at: '22 апреля · 11:15', ord: -147885, ch: 'email', kind: 'raw', by: 'Марина Волкова', text: 'Отправлен Park Terrace 903: ставка, депозит, условия по чекам.' },
+      { at: '24 апреля · 16:05', ord: -144955, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Условия согласованы — заведена сделка по Park Terrace 903.' },
+    ],
+    r_villa: [
+      { at: '14 апреля · 13:20', ord: -159340, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Смотрю виллу в Damac Hills, 4 спальни, до 6 млн.', capture: true },
+      { at: '17 апреля · 10:00', ord: -155400, ch: 'call', kind: 'raw', by: 'Лина Хассан', text: 'Созвон 7:10 — обсудили комиссию, клиент взял паузу.', capture: true },
+      { at: '21 апреля · 09:30', ord: -149430, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Купил напрямую у застройщика, брокер не понадобился. Спасибо.', capture: true },
     ],
     r_won: [
       { at: '10 апреля · 10:30', ord: -159030, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Первое обращение: студия под аренду до 1,8 млн, интересует доходность.', capture: true },
@@ -3718,7 +3772,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 20; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request.
+  const SCHEMA = 21; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -6684,42 +6738,58 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
     return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
-  // Control cut-offs, not stages. Every funnel's stages map onto the same four, so the board can
-  // stay long and detailed while the oversight view stays readable.
-  const FUNNEL_BANDS = [
-    { k: 'contact', label: 'Первый контакт', stages: ['work', 'pick', 'kp', 'req'],
-      gate: 'Запрос снят, предложение отправлено' },
-    { k: 'engage', label: 'Работа с клиентом', stages: ['show', 'visit', 'talks'],
-      gate: 'Объект показан, условия обсуждаются' },
-    { k: 'papers', label: 'Документы и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
+  // ============================================================================================
+  // Сводная воронка руководителя идёт по всей книге, а не по одним сделкам: половина работы
+  // живёт в заявках, и после разделения двух уровней первые два отсека остались бы пустыми —
+  // руководитель видел бы «ноль в первом контакте» при десяти заявках в работе.
+  //
+  // Отсеки заявок считаются по вычисленной стадии заявки, отсеки сделок — по шагу договора.
+  // Закрытая заявка не считается нигде: она уже представлена своими сделками, и учесть её ещё
+  // раз значило бы посчитать одну сделку дважды.
+  // ============================================================================================
+  const BOOK_BANDS = [
+    { k: 'intake', of: 'request', label: 'Заявки в работе', stages: ['new', 'qual'],
+      gate: 'Запрос снят, критерии известны' },
+    { k: 'engage', of: 'request', label: 'Предложение и переговоры', stages: ['offer', 'meet', 'talks'],
+      gate: 'Предложение отправлено, условия обсуждаются' },
+    { k: 'papers', of: 'deal', label: 'Договор и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
       gate: 'Подписание, оплата, регистрация' },
-    { k: 'result', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
+    { k: 'result', of: 'deal', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
   ];
   function bandOf(stage) {
-    const b = FUNNEL_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
-    return b ? b.k : 'contact';
+    const b = BOOK_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
+    return b ? b.k : 'intake';
   }
   // Consolidated funnel for the manager — the whole team's book, grouped into control cut-offs.
   function dealsFunnel() {
     const ds = D().deals;
     // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
     // forecast — the exact confusion the won/lost split exists to remove.
+    const rs = D().requests || [];
     const live = ds.filter((d) => !dealClosed(d));
     const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
-    const cells = FUNNEL_BANDS.map((b) => {
-      const list = ds.filter((d) => bandOf(d.stage) === b.k);
-      const val = list.reduce((a, d) => a + (d.amount || 0), 0);
-      const won = list.filter(dealWon).length, lost = list.filter((d) => d.stage === 'lost').length;
-      // Inside a cut-off the stage split still matters — it just belongs in a sub-line, not in
-      // fourteen boxes of its own.
+    // Бюджет заявки — намерение клиента, сумма сделки — согласованная цифра. Складывать их в
+    // один пайплайн значит выдать надежду за прогноз, поэтому потенциал стоит отдельной строкой.
+    const openReqs = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0);
+    const potential = openReqs.reduce((a, r) => a + (r.budget || 0), 0);
+    const cells = BOOK_BANDS.map((b) => {
+      const isReq = b.of === 'request';
+      const list = isReq ? rs.filter((r) => b.stages.indexOf(reqStage(r)) >= 0)
+                         : ds.filter((d) => b.stages.indexOf(d.stage) >= 0);
+      const val = list.reduce((a, x) => a + (isReq ? (x.budget || 0) : (x.amount || 0)), 0);
+      // Внутри отсека разбивка по стадиям остаётся — она просто не заслуживает своих коробок.
       const inner = b.k === 'result'
-        ? [won ? won + ' успех' : '', lost ? lost + ' проигрыш' : ''].filter(Boolean).join(' · ')
-        : b.stages.map((k) => ({ k: k, n: list.filter((d) => d.stage === k).length }))
-            .filter((x) => x.n).map((x) => stageLabel(x.k) + ' ' + x.n).join(' · ');
+        ? [list.filter(dealWon).length ? list.filter(dealWon).length + ' успех' : '',
+           list.filter((d) => d.stage === 'lost').length ? list.filter((d) => d.stage === 'lost').length + ' проигрыш' : '',
+           rs.filter((r) => reqStage(r) === 'lost').length ? rs.filter((r) => reqStage(r) === 'lost').length + ' отказ по заявке' : ''
+          ].filter(Boolean).join(' · ')
+        : b.stages.map((k) => ({ k: k, n: isReq ? list.filter((r) => reqStage(r) === k).length : list.filter((d) => d.stage === k).length }))
+            .filter((x) => x.n)
+            .map((x) => (isReq ? reqStageLabel(x.k, list.find((r) => reqStage(r) === x.k)) : stageLabel(x.k)) + ' ' + x.n).join(' · ');
       return '<div class="fn-cell' + (b.k === 'result' ? ' fn-cell-end' : '') + '">' +
         '<div class="fn-n">' + list.length + '</div>' +
         '<div class="fn-l">' + b.label + '</div>' +
-        '<div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div>' +
+        '<div class="fn-v">' + (val ? WS.AED(val) + (isReq ? ' · бюджет' : '') : '—') + '</div>' +
         '<div class="fn-in">' + (inner || 'пусто') + '</div>' +
         '<div class="fn-gate">' + b.gate + '</div></div>';
     }).join('');
@@ -6732,8 +6802,35 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
       '<div class="funnel funnel-bands">' + cells + '</div>' +
-      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
+      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн по сделкам: ' + WS.AED(totalVal) + '</span>' +
+      '<span class="badge">' + I('mail') + 'Потенциал заявок: ' + WS.AED(potential) + '</span>' +
+      '<span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span>' +
+      '<span class="badge">' + I('users') + Object.keys(byAgent).length + ' ' + plural(Object.keys(byAgent).length, 'агент', 'агента', 'агентов') + '</span></div>' +
+      conversionRow() +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
+  }
+  // ============================================================================================
+  // Две конверсии, и это ДВЕ РАЗНЫЕ величины. «Заявка → сделка» считается по заявкам: одна
+  // заявка даёт одно наблюдение, даже если из неё вышло три договора, — иначе клиент, купивший
+  // два лота в разных ЖК, поднимал бы конверсию вдвое, ничего не изменив в работе агента.
+  // «Сделка → успех» считается по сделкам: наблюдений столько, сколько договоров.
+  // Одним числом их не показать, поэтому и стоят рядом с явными знаменателями.
+  // ============================================================================================
+  function conversionRow() {
+    const rs = D().requests || [], ds = D().deals || [];
+    const settled = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) >= 0);
+    const converted = settled.filter((r) => ds.some((d) => d.requestId === r.id));
+    const closedDeals = ds.filter(dealClosed);
+    const wonDeals = closedDeals.filter(dealWon);
+    const pct = (a, b) => (b ? Math.round(a / b * 100) + '%' : '—');
+    const cell = (label, a, b, unit) =>
+      '<div class="cv-cell"><div class="cv-n">' + pct(a, b) + '</div>' +
+      '<div class="cv-l">' + label + '</div>' +
+      '<div class="cv-d">' + a + ' из ' + b + ' ' + unit + '</div></div>';
+    return '<div class="cv-row">' +
+      cell('Заявка → сделка', converted.length, settled.length, plural(settled.length, 'завершённой заявки', 'завершённых заявок', 'завершённых заявок')) +
+      cell('Сделка → успех', wonDeals.length, closedDeals.length, plural(closedDeals.length, 'закрытой сделки', 'закрытых сделок', 'закрытых сделок')) +
+      '<div class="cv-note">' + I('sparkle') + 'Считаются по-разному: заявка даёт одно наблюдение, сколько бы договоров из неё ни вышло; сделка — своё. Складывать их нельзя.</div></div>';
   }
   // Stages live in fixtures next to the funnels that order them. STAGES is the canonical SPINE —
   // every stage any funnel uses, in the order work → … → won → lost. It is what cross-funnel views
@@ -12706,7 +12803,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope,
+    docsOfDeal, docsOfRequest, docScope, reqStage,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

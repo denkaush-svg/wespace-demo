@@ -1238,42 +1238,58 @@
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
     return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
-  // Control cut-offs, not stages. Every funnel's stages map onto the same four, so the board can
-  // stay long and detailed while the oversight view stays readable.
-  const FUNNEL_BANDS = [
-    { k: 'contact', label: 'Первый контакт', stages: ['work', 'pick', 'kp', 'req'],
-      gate: 'Запрос снят, предложение отправлено' },
-    { k: 'engage', label: 'Работа с клиентом', stages: ['show', 'visit', 'talks'],
-      gate: 'Объект показан, условия обсуждаются' },
-    { k: 'papers', label: 'Документы и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
+  // ============================================================================================
+  // Сводная воронка руководителя идёт по всей книге, а не по одним сделкам: половина работы
+  // живёт в заявках, и после разделения двух уровней первые два отсека остались бы пустыми —
+  // руководитель видел бы «ноль в первом контакте» при десяти заявках в работе.
+  //
+  // Отсеки заявок считаются по вычисленной стадии заявки, отсеки сделок — по шагу договора.
+  // Закрытая заявка не считается нигде: она уже представлена своими сделками, и учесть её ещё
+  // раз значило бы посчитать одну сделку дважды.
+  // ============================================================================================
+  const BOOK_BANDS = [
+    { k: 'intake', of: 'request', label: 'Заявки в работе', stages: ['new', 'qual'],
+      gate: 'Запрос снят, критерии известны' },
+    { k: 'engage', of: 'request', label: 'Предложение и переговоры', stages: ['offer', 'meet', 'talks'],
+      gate: 'Предложение отправлено, условия обсуждаются' },
+    { k: 'papers', of: 'deal', label: 'Договор и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
       gate: 'Подписание, оплата, регистрация' },
-    { k: 'result', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
+    { k: 'result', of: 'deal', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
   ];
   function bandOf(stage) {
-    const b = FUNNEL_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
-    return b ? b.k : 'contact';
+    const b = BOOK_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
+    return b ? b.k : 'intake';
   }
   // Consolidated funnel for the manager — the whole team's book, grouped into control cut-offs.
   function dealsFunnel() {
     const ds = D().deals;
     // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
     // forecast — the exact confusion the won/lost split exists to remove.
+    const rs = D().requests || [];
     const live = ds.filter((d) => !dealClosed(d));
     const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
-    const cells = FUNNEL_BANDS.map((b) => {
-      const list = ds.filter((d) => bandOf(d.stage) === b.k);
-      const val = list.reduce((a, d) => a + (d.amount || 0), 0);
-      const won = list.filter(dealWon).length, lost = list.filter((d) => d.stage === 'lost').length;
-      // Inside a cut-off the stage split still matters — it just belongs in a sub-line, not in
-      // fourteen boxes of its own.
+    // Бюджет заявки — намерение клиента, сумма сделки — согласованная цифра. Складывать их в
+    // один пайплайн значит выдать надежду за прогноз, поэтому потенциал стоит отдельной строкой.
+    const openReqs = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0);
+    const potential = openReqs.reduce((a, r) => a + (r.budget || 0), 0);
+    const cells = BOOK_BANDS.map((b) => {
+      const isReq = b.of === 'request';
+      const list = isReq ? rs.filter((r) => b.stages.indexOf(reqStage(r)) >= 0)
+                         : ds.filter((d) => b.stages.indexOf(d.stage) >= 0);
+      const val = list.reduce((a, x) => a + (isReq ? (x.budget || 0) : (x.amount || 0)), 0);
+      // Внутри отсека разбивка по стадиям остаётся — она просто не заслуживает своих коробок.
       const inner = b.k === 'result'
-        ? [won ? won + ' успех' : '', lost ? lost + ' проигрыш' : ''].filter(Boolean).join(' · ')
-        : b.stages.map((k) => ({ k: k, n: list.filter((d) => d.stage === k).length }))
-            .filter((x) => x.n).map((x) => stageLabel(x.k) + ' ' + x.n).join(' · ');
+        ? [list.filter(dealWon).length ? list.filter(dealWon).length + ' успех' : '',
+           list.filter((d) => d.stage === 'lost').length ? list.filter((d) => d.stage === 'lost').length + ' проигрыш' : '',
+           rs.filter((r) => reqStage(r) === 'lost').length ? rs.filter((r) => reqStage(r) === 'lost').length + ' отказ по заявке' : ''
+          ].filter(Boolean).join(' · ')
+        : b.stages.map((k) => ({ k: k, n: isReq ? list.filter((r) => reqStage(r) === k).length : list.filter((d) => d.stage === k).length }))
+            .filter((x) => x.n)
+            .map((x) => (isReq ? reqStageLabel(x.k, list.find((r) => reqStage(r) === x.k)) : stageLabel(x.k)) + ' ' + x.n).join(' · ');
       return '<div class="fn-cell' + (b.k === 'result' ? ' fn-cell-end' : '') + '">' +
         '<div class="fn-n">' + list.length + '</div>' +
         '<div class="fn-l">' + b.label + '</div>' +
-        '<div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div>' +
+        '<div class="fn-v">' + (val ? WS.AED(val) + (isReq ? ' · бюджет' : '') : '—') + '</div>' +
         '<div class="fn-in">' + (inner || 'пусто') + '</div>' +
         '<div class="fn-gate">' + b.gate + '</div></div>';
     }).join('');
@@ -1286,8 +1302,35 @@
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
       '<div class="funnel funnel-bands">' + cells + '</div>' +
-      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
+      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн по сделкам: ' + WS.AED(totalVal) + '</span>' +
+      '<span class="badge">' + I('mail') + 'Потенциал заявок: ' + WS.AED(potential) + '</span>' +
+      '<span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span>' +
+      '<span class="badge">' + I('users') + Object.keys(byAgent).length + ' ' + plural(Object.keys(byAgent).length, 'агент', 'агента', 'агентов') + '</span></div>' +
+      conversionRow() +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
+  }
+  // ============================================================================================
+  // Две конверсии, и это ДВЕ РАЗНЫЕ величины. «Заявка → сделка» считается по заявкам: одна
+  // заявка даёт одно наблюдение, даже если из неё вышло три договора, — иначе клиент, купивший
+  // два лота в разных ЖК, поднимал бы конверсию вдвое, ничего не изменив в работе агента.
+  // «Сделка → успех» считается по сделкам: наблюдений столько, сколько договоров.
+  // Одним числом их не показать, поэтому и стоят рядом с явными знаменателями.
+  // ============================================================================================
+  function conversionRow() {
+    const rs = D().requests || [], ds = D().deals || [];
+    const settled = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) >= 0);
+    const converted = settled.filter((r) => ds.some((d) => d.requestId === r.id));
+    const closedDeals = ds.filter(dealClosed);
+    const wonDeals = closedDeals.filter(dealWon);
+    const pct = (a, b) => (b ? Math.round(a / b * 100) + '%' : '—');
+    const cell = (label, a, b, unit) =>
+      '<div class="cv-cell"><div class="cv-n">' + pct(a, b) + '</div>' +
+      '<div class="cv-l">' + label + '</div>' +
+      '<div class="cv-d">' + a + ' из ' + b + ' ' + unit + '</div></div>';
+    return '<div class="cv-row">' +
+      cell('Заявка → сделка', converted.length, settled.length, plural(settled.length, 'завершённой заявки', 'завершённых заявок', 'завершённых заявок')) +
+      cell('Сделка → успех', wonDeals.length, closedDeals.length, plural(closedDeals.length, 'закрытой сделки', 'закрытых сделок', 'закрытых сделок')) +
+      '<div class="cv-note">' + I('sparkle') + 'Считаются по-разному: заявка даёт одно наблюдение, сколько бы договоров из неё ни вышло; сделка — своё. Складывать их нельзя.</div></div>';
   }
   // Stages live in fixtures next to the funnels that order them. STAGES is the canonical SPINE —
   // every stage any funnel uses, in the order work → … → won → lost. It is what cross-funnel views
@@ -7260,7 +7303,7 @@
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope,
+    docsOfDeal, docsOfRequest, docScope, reqStage,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

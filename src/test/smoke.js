@@ -969,8 +969,12 @@ setTimeout(async () => {
         steps.length + ' против ' + path.length);
       check('req ' + r.id + ' · стадию заявки нельзя переставить кликом',
         steps.every((el) => el.tagName !== 'BUTTON' && !el.getAttribute('data-stage')));
+      // У отказной заявки текущего шага нет — как и у проигранной сделки: рисовать его значило бы
+      // показать движение там, где его прекратили. Вместо него стоит подпись об отказе.
+      const lost = WS.ui.reqStage(r) === 'lost';
       check('req ' + r.id + ' · ровно один текущий шаг',
-        view.querySelectorAll('.dx-stepper .dx-step.cur').length === 1);
+        view.querySelectorAll('.dx-stepper .dx-step.cur').length === (lost ? 0 : 1));
+      if (lost) check('req ' + r.id + ' · отказ назван словами', !!view.querySelector('.dx-lost'));
     });
     // Текущий шаг читается с самой ленты: заголовка и счётчика над ней больше нет — они не
     // сообщали ничего, чего не видно по галочкам и подсветке.
@@ -1284,6 +1288,44 @@ setTimeout(async () => {
     check('сделка · регистрация названа своим реестром',
       /Oqood/.test(doc.querySelector('#app .view').textContent),
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
+  }
+
+  // ---- сводная воронка идёт по всей книге, и две конверсии не складываются ----
+  {
+    const roleWas = WS.store.role;
+    WS.storeApi.setRole('manager');
+    WS.store.clientsTab = 'deals'; WS.router.go('clients');
+    const cells = [].slice.call(doc.querySelectorAll('#app .fn-cell')).map((c) => ({
+      n: parseInt(c.querySelector('.fn-n').textContent, 10),
+      l: c.querySelector('.fn-l').textContent,
+    }));
+    check('воронка · четыре отсека на месте', cells.length === 4, JSON.stringify(cells.map((c) => c.l)));
+    check('воронка · ни один отсек не пуст', cells.every((c) => c.n > 0),
+      cells.filter((c) => !c.n).map((c) => c.l).join(' '));
+    // Заявки и сделки считаются каждая по своему уровню, а закрытая заявка — нигде: она уже
+    // представлена своими сделками, и посчитать её ещё раз значило бы удвоить одну работу.
+    const openReq = (dd().requests || []).filter((r) => ['closed', 'lost'].indexOf(WS.ui.reqStage(r)) < 0).length;
+    check('воронка · в отсеках заявок ровно открытые заявки',
+      cells[0].n + cells[1].n === openReq, (cells[0].n + cells[1].n) + ' против ' + openReq);
+    const liveDeals = (dd().deals || []).filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
+    check('воронка · в отсеке договоров ровно живые сделки', cells[2].n === liveDeals,
+      cells[2].n + ' против ' + liveDeals);
+
+    // Деньги заявки — намерение, деньги сделки — согласованная цифра. В одну строку они не идут.
+    const prov = doc.querySelector('#app .card .prov').textContent;
+    check('воронка · пайплайн и потенциал названы порознь',
+      /Пайплайн по сделкам/.test(prov) && /Потенциал заявок/.test(prov), prov.slice(0, 90));
+
+    // Две конверсии считают разное, и у каждой виден свой знаменатель.
+    const cv = [].slice.call(doc.querySelectorAll('#app .cv-cell')).map((c) => c.textContent);
+    check('воронка · показаны обе конверсии', cv.length === 2, cv.join(' | '));
+    check('воронка · у каждой конверсии виден знаменатель',
+      cv.every((t) => /\d+ из \d+/.test(t)), cv.join(' | '));
+    // Число, равное 100% на одном наблюдении, ничего не измеряет: на стенде есть и отказ, и проигрыш.
+    check('воронка · конверсии не упираются в 100%', cv.every((t) => t.indexOf('100%') !== 0), cv.join(' | '));
+    check('воронка · сказано, что складывать их нельзя',
+      /Складывать их нельзя/.test(doc.querySelector('#app .cv-note').textContent));
+    WS.storeApi.setRole(roleWas);
   }
 
   // ---- документы: собранное по клиенту не собирается заново на каждый договор ----
