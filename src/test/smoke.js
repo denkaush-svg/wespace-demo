@@ -942,18 +942,27 @@ setTimeout(async () => {
   // ---- справки следуют одним правилам (docs/2026-08-17-brief-writing-rules.md) ----
   {
     const briefOf = (open, id) => { open(id); const e = doc.querySelector('#app .view .deal-brief'); return e ? e.textContent.trim() : ''; };
+    // Покрытие — все виды справок, а не только те, что переписывались последними: дыра в покрытии
+    // читается как исправность, пока в неё кто-нибудь не заглянет.
     const cases = [
       ['сделка', () => WS.ui.dealCard('d_anna')], ['сделка·бронь', () => WS.ui.dealCard('d_viktor')],
-      ['портфель', () => WS.ui.dealCard('d_rentbiz')], ['клиент', () => WS.ui.clientCard('c_anna')],
-      ['клиент·EN', () => WS.ui.clientCard('c_partner')],
-    ];
+      ['портфель', () => WS.ui.dealCard('d_rentbiz')], ['сделка·успех', () => WS.ui.dealCard('d_won')],
+      ['клиент', () => WS.ui.clientCard('c_anna')], ['клиент·EN', () => WS.ui.clientCard('c_partner')],
+      ['клиент·ночной', () => WS.ui.clientCard('c_night')],
+    ].concat((dd().companies || []).map((co) => ['компания·' + co.id, () => WS.ui.companyCard(co.id)]))
+     .concat((dd().objects || []).map((o) => ['объект·' + o.id, () => WS.ui.objectCard(o.id)]))
+     .concat((dd().contracts || []).map((k) => ['договор·' + k.id, () => WS.ui.contractCard(k.id)]));
     cases.forEach(([name, open]) => {
       open();
       const el = doc.querySelector('#app .view .deal-brief');
       const t = el ? el.textContent.trim() : '';
       check('brief ' + name + ' · справка есть', t.length > 40, t.slice(0, 40));
       // Счётчик — не содержание: «пройдено 2 из 5 контрольных точек» агенту не сообщает ничего.
-      check('brief ' + name + ' · без счётчиков «N из M»', !/\d+\s+из\s+\d+/.test(t) && !/контрольных точек/.test(t), t.slice(0, 80));
+      // Запрещён счётчик, пересказывающий ленту шагов, а не любое «N из M»: у договора аренды
+      // «оплата по чекам — 2 из 4» и есть факт, которого больше нигде нет.
+      check('brief ' + name + ' · без счётчиков прогресса',
+        !/пройдено\s+\d+\s+из\s+\d+/i.test(t) && !/шаг\s+\d+\s+из\s+\d+/i.test(t) && !/контрольных точек/i.test(t),
+        t.slice(0, 80));
       // Связный текст: от трёх до семи предложений, каждое закрыто точкой.
       const sent = t.split(/(?<=[.!?])\s+/).filter((x) => x.trim());
       check('brief ' + name + ' · от трёх до семи предложений', sent.length >= 3 && sent.length <= 7, String(sent.length));
