@@ -304,6 +304,72 @@ async function modelChecks() {
     sent.indexOf('ТОЛЬКО_В_ДАННЫХ') < sent.indexOf('=== КОНЕЦ ДАННЫХ ==='));
 
   await modeChecks();
+  budgetChecks();
+}
+
+/* ---------- the smoke detector ----------
+
+   The endpoint is public and the subscription is shared. A door was one answer;
+   this is the other — a message when the stand has eaten most of the week's
+   budget. Worth saying plainly that a detector reports a fire rather than
+   preventing one, and that the budget is OURS: the platform does not hand out
+   how much of the weekly limit is left, so nothing here can claim to read it. */
+function budgetChecks() {
+  const P = require('../proxy.js');
+  const sent = [];
+  const realSend = P.alerts.send;
+  const file = P.CFG.usageFile;
+  P.alerts.send = (t) => { sent.push(t); return true; };
+  P.CFG.usageFile = path.join(os.tmpdir(), 'wespace-usage-test.json');
+  P.usage.days = {}; P.usage.notified = [];
+  const budgetWas = P.CFG.weekBudget;
+  P.CFG.weekBudget = 10;
+
+  try {
+    for (let i = 0; i < 8; i++) P.noteCall(0.1, 0);
+    ok('below the threshold nothing is said', sent.length === 0, sent.length + ' sent');
+    ok('and the week is counted', P.weekTotals().calls === 8, JSON.stringify(P.weekTotals()));
+
+    P.noteCall(0.1, 1);                                  // 9/10 = 90%
+    ok('at ninety per cent one message goes out', sent.length === 1, sent.length + ' sent');
+    ok('it says how much of what', /90% недельного бюджета/.test(sent[0]) && /9 из 10/.test(sent[0]), sent[0]);
+    // The number is ours, and a message that let it read as the platform's
+    // would be the whole point of the alert, wrong.
+    ok('and admits the budget is ours, not the subscription’s',
+      /НАШ бюджет для стенда, а не остаток подписки/.test(sent[0]), sent[0].slice(-160));
+    ok('it says what to do if the count grew on its own',
+      /файл OFF/.test(sent[0]) && /публичная/.test(sent[0]), sent[0].slice(-200));
+
+    P.noteCall(0.1, 0);                                  // 10/10 = 100%, crosses 95 too
+    ok('ninety-five speaks once more, and ninety does not repeat itself',
+      sent.length === 2 && /порог 95%/.test(sent[1]), sent.length + ' · ' + (sent[1] || '').slice(0, 60));
+    P.noteCall(0.1, 0);
+    P.noteCall(0.1, 0);
+    ok('and then it stops talking', sent.length === 2, sent.length + ' sent');
+
+    // Days outside the window are dropped, not kept forever: the file is a
+    // count, not a log — and a week that rolls off re-arms the thresholds.
+    const old = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
+    P.usage.days[old] = { calls: 500, cost: 9, web: 0 };
+    const after = P.weekTotals();
+    ok('a day older than the window is not counted', after.calls === 12, JSON.stringify(after));
+    ok('and is dropped from the file', !P.usage.days[old], Object.keys(P.usage.days).join(','));
+
+    // Written down, so a deploy — which restarts the unit on every ship — does
+    // not hand the counter back to zero.
+    P.usage.days = {}; P.usage.notified = [];
+    P.loadUsage();
+    ok('the count survives a restart', P.weekTotals().calls === 12, JSON.stringify(P.weekTotals()));
+
+    ok('with no token the alert is simply off, not an error',
+      realSend('проверка') === false, 'sent anyway');
+  } finally {
+    P.alerts.send = realSend;
+    try { fs.unlinkSync(P.CFG.usageFile); } catch (e) { /* fine */ }
+    P.CFG.usageFile = file;
+    P.CFG.weekBudget = budgetWas;
+    P.usage.days = {}; P.usage.notified = [];
+  }
 }
 
 /* ---------- the composer's handles ----------

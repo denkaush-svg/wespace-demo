@@ -74,6 +74,23 @@ const CFG = {
   perIpBurst: Number(process.env.WESPACE_PROXY_IP_BURST || 3),
   dailyCap: Number(process.env.WESPACE_PROXY_DAILY_CAP || 400),
 
+  /* What the stand is allowed to spend in a rolling week, and when to say so.
+
+     The platform does not hand out «you have used N% of your weekly limit» —
+     not through the CLI, not in any local cache; the result event carries
+     tokens and a cost equivalent and nothing about the ceiling. So this is OUR
+     budget for the stand, not a reading of the subscription, and the message
+     says which of the two it is. */
+  weekBudget: Number(process.env.WESPACE_PROXY_WEEK_BUDGET || 700),
+  alertAt: (process.env.WESPACE_PROXY_ALERT_AT || '90,95')
+    .split(',').map((s) => Number(s.trim())).filter((n) => n > 0).sort((a, b) => a - b),
+  usageFile: process.env.WESPACE_PROXY_USAGE_FILE || path.join(__dirname, 'usage.json'),
+  // Telegram, if the machine has been given the two values. Never in this file
+  // and never on a command line: sourced from the environment like the
+  // subscription credential, and simply off when absent.
+  botToken: process.env.WESPACE_ALERT_BOT_TOKEN || '',
+  chatId: process.env.WESPACE_ALERT_CHAT_ID || '',
+
   // Presence of this file disables the live head without a restart.
   offFile: process.env.WESPACE_PROXY_OFF_FILE || path.join(__dirname, 'OFF'),
   // The CLI runs here so that a stray file read finds nothing of ours.
@@ -117,6 +134,110 @@ function takeToken(ip) {
   if (b.tokens < 1) return false;
   b.tokens -= 1;
   return true;
+}
+
+/* ---------- what the stand has spent this week ----------
+
+   The worry this answers: the subscription is shared with the diagnostic bot,
+   the radar and the cockpit, and the stand's endpoint is public. A door was one
+   answer; this is the other — not a lock but a smoke detector, and it is worth
+   being clear that a detector reports a fire rather than preventing one.
+
+   A rolling seven days, kept on disk so a deploy does not reset the count. */
+const usage = { days: {}, notified: [] };
+
+function loadUsage() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(CFG.usageFile, 'utf8'));
+    if (raw && typeof raw === 'object') {
+      usage.days = (raw.days && typeof raw.days === 'object') ? raw.days : {};
+      usage.notified = Array.isArray(raw.notified) ? raw.notified : [];
+    }
+  } catch (e) { /* first run, or unreadable: start clean */ }
+}
+
+function saveUsage() {
+  try { fs.writeFileSync(CFG.usageFile, JSON.stringify(usage)); } catch (e) { /* best effort */ }
+}
+
+function weekAgo() {
+  const d = new Date(Date.now() - 6 * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
+// Days outside the window are dropped rather than kept forever: the file is the
+// count, not a log.
+function weekTotals() {
+  const from = weekAgo();
+  let calls = 0, cost = 0, web = 0;
+  Object.keys(usage.days).forEach((d) => {
+    if (d < from) { delete usage.days[d]; return; }
+    const r = usage.days[d] || {};
+    calls += r.calls || 0; cost += r.cost || 0; web += r.web || 0;
+  });
+  return { calls: calls, cost: cost, web: web, from: from };
+}
+
+function noteCall(cost, web) {
+  const d = today();
+  const row = usage.days[d] || (usage.days[d] = { calls: 0, cost: 0, web: 0 });
+  row.calls += 1;
+  row.cost += Number(cost) || 0;
+  row.web += Number(web) || 0;
+  const total = weekTotals();
+  const pct = CFG.weekBudget > 0 ? (total.calls / CFG.weekBudget) * 100 : 0;
+  // Each threshold speaks once per window. Re-crossing after the week rolls
+  // off is a new event; crossing 95 does not re-announce 90.
+  const due = CFG.alertAt.filter((t) => pct >= t && usage.notified.indexOf(t) < 0);
+  if (due.length) {
+    usage.notified = usage.notified.concat(due);
+    tell(budgetMessage(due[due.length - 1], total, pct));
+  }
+  if (!CFG.alertAt.some((t) => pct >= t)) usage.notified = [];
+  saveUsage();
+  return total;
+}
+
+function budgetMessage(threshold, total, pct) {
+  return [
+    'WESPACE · стенд израсходовал ' + Math.round(pct) + '% недельного бюджета (порог ' + threshold + '%).',
+    'Вызовов за 7 дней: ' + total.calls + ' из ' + CFG.weekBudget + '.',
+    'Поисков в сети: ' + total.web + '. Эквивалент по API: $' + total.cost.toFixed(2) + '.',
+    '',
+    'Это НАШ бюджет для стенда, а не остаток подписки — процент квоты платформа не отдаёт.',
+    'Точка входа публичная: если цифра выросла не от показа, стоит закрыть доступ или снять стенд ' +
+      '(файл OFF рядом с прокси гасит живую голову без рестарта).',
+  ].join('\n');
+}
+
+/* One message, best effort. An alert that throws inside the path that answers a
+   visitor would turn a warning into an outage.
+
+   The delivery sits behind `alerts.send` so a test can watch what would be
+   said without a token and without the network — the thresholds are the part
+   worth testing, and they are not testable through a live bot. */
+const alerts = { send: telegramSend, last: '' };
+
+function tell(text) {
+  alerts.last = text;
+  try { return alerts.send(text); } catch (e) { return false; }
+}
+
+function telegramSend(text) {
+  if (!CFG.botToken || !CFG.chatId) return false;
+  try {
+    const body = JSON.stringify({ chat_id: CFG.chatId, text: text, disable_web_page_preview: true });
+    const req = require('https').request({
+      host: 'api.telegram.org', method: 'POST',
+      path: '/bot' + CFG.botToken + '/sendMessage',
+      headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+      timeout: 8000,
+    }, (res) => { res.resume(); });
+    req.on('error', () => {});
+    req.on('timeout', () => req.destroy());
+    req.end(body);
+    return true;
+  } catch (e) { return false; }
 }
 
 function isOff() {
@@ -555,6 +676,8 @@ function cliArgs(external) {
    too clever by half — this is the same thing, spelled out. */
 function startCall(prompt, onDelta, timeoutMs, external) {
   let cancel = () => {};
+  // Filled from the CLI's own result event, read by the caller afterwards.
+  const spent = { cost: 0, web: 0 };
   const promise = new Promise((resolve, reject) => {
     try { fs.mkdirSync(CFG.workDir, { recursive: true }); } catch (e) { /* best effort */ }
 
@@ -616,6 +739,13 @@ function startCall(prompt, onDelta, timeoutMs, external) {
           return;
         }
         if (typeof ev.result === 'string') result = ev.result;
+        // What the call cost. The platform does not report how much of the
+        // week is left, but it does report what this one took — which is the
+        // only honest basis for saying the stand is eating into the shared
+        // subscription.
+        spent.cost = Number(ev.total_cost_usd) || 0;
+        const st = (ev.usage && ev.usage.server_tool_use) || {};
+        spent.web = (Number(st.web_search_requests) || 0) + (Number(st.web_fetch_requests) || 0);
         sawResult = true;
       }
     }
@@ -654,7 +784,7 @@ function startCall(prompt, onDelta, timeoutMs, external) {
     child.stdin.end(prompt, 'utf8');
   });
   // The executor above runs synchronously, so `cancel` is real by now.
-  return { promise: promise, cancel: () => cancel() };
+  return { promise: promise, cancel: () => cancel(), spent: spent };
 }
 
 // Kept for callers that only want the answer.
@@ -745,7 +875,22 @@ async function handleAsk(req, res) {
   if (off) { bump('off:' + off); return json(res, 503, { ok: false, code: 'off' }); }
   if (!originAllowed(req)) { bump('origin'); return json(res, 403, { ok: false, code: 'origin' }); }
   if (state.inFlight >= CFG.concurrency) { bump('busy'); return json(res, 503, { ok: false, code: 'busy' }); }
-  if (dailyLeft() <= 0) { bump('daily'); return json(res, 503, { ok: false, code: 'daily' }); }
+  if (dailyLeft() <= 0) {
+    bump('daily');
+    // The day's allowance gone is the unambiguous version of the worry: on a
+    // demo day it is spent by us, and on any other day by someone who found a
+    // public endpoint. Said once, not once per refused request.
+    const d = today();
+    const row = usage.days[d] || (usage.days[d] = { calls: 0, cost: 0, web: 0 });
+    if (!row.capTold) {
+      row.capTold = 1;
+      saveUsage();
+      tell('WESPACE · дневной потолок стенда исчерпан: ' + CFG.dailyCap + ' вызовов за сегодня.\n' +
+        'Живая голова отвечать не будет до полуночи UTC — стенд падает на офлайн-планировщик.\n' +
+        'Если сегодня показа не было, значит точку входа нашли: рядом с прокси есть файл OFF, он гасит её без рестарта.');
+    }
+    return json(res, 503, { ok: false, code: 'daily' });
+  }
   if (!takeToken(clientIp(req))) { bump('rate'); return json(res, 429, { ok: false, code: 'rate' }); }
 
   // Both slots are claimed BEFORE the first await: reading the body yields, and
@@ -785,6 +930,7 @@ async function handleAsk(req, res) {
   res.on('close', () => { if (!res.writableEnded) call.cancel(); });
   try {
     const full = await call.promise;
+    noteCall(call.spent.cost, call.spent.web);
     const parts = splitReply(full);
     if (!aborted) {
       // The resolved ids travel back: an unknown mode falls back here, and the
@@ -819,6 +965,10 @@ const server = http.createServer((req, res) => {
       daily_used: state.dayCount,
       daily_cap: CFG.dailyCap,
       refused: state.refused,
+      // Visible without reading the file, so «is the stand eating the shared
+      // subscription» is one curl away rather than a guess.
+      week: (() => { const t = weekTotals(); return { calls: t.calls, budget: CFG.weekBudget, web: t.web, usd: Number(t.cost.toFixed(2)), since: t.from }; })(),
+      alerts: (CFG.botToken && CFG.chatId) ? 'telegram' : 'off',
     });
   }
   if (req.method === 'POST' && url === '/ask') return handleAsk(req, res);
@@ -832,11 +982,17 @@ const server = http.createServer((req, res) => {
 server.headersTimeout = CFG.maxTimeoutMs + 15000;
 server.requestTimeout = CFG.maxTimeoutMs + 15000;
 
+// The week's count survives a deploy: the unit restarts on every ship, and a
+// counter that resets with it would never reach a threshold.
+loadUsage();
+
 if (require.main === module) {
   server.listen(CFG.port, CFG.host, () => {
     console.log('wespace concierge proxy on http://' + CFG.host + ':' + CFG.port +
-      ' model=' + CFG.model + ' cli=' + CFG.cli);
+      ' model=' + CFG.model + ' cli=' + CFG.cli +
+      ' week=' + weekTotals().calls + '/' + CFG.weekBudget +
+      ' alerts=' + ((CFG.botToken && CFG.chatId) ? 'telegram' : 'off'));
   });
 }
 
-module.exports = { CFG, buildPrompt, fitDigest, turnText, startCall, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM, MODES, DEPTHS, resolveCall, depthTimeout, callTimeout };
+module.exports = { CFG, buildPrompt, fitDigest, turnText, startCall, splitReply, takeToken, cliArgs, originAllowed, state, server, SYSTEM, MODES, DEPTHS, resolveCall, depthTimeout, callTimeout, usage, alerts, noteCall, weekTotals, loadUsage };
