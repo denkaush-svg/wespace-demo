@@ -2024,7 +2024,7 @@
       const kRows = contractsOfClient(c.id).map(contractRow).join('');
       return dxSec('briefcase', 'Сделки контакта · ' + ds.length, '', '<div class="feed">' + dealRows + '</div>') +
         (kRows ? '<div style="margin-top:14px">' + dxSec('doc', 'Договоры контакта', '', '<div class="feed">' + kRows + '</div>') + '</div>' : '') +
-        '<div style="margin-top:14px">' + dxSec('doc', 'Документы по сделкам', '', docsRows(docsFor((x) => x.client === c.id), 'по этому контакту документов пока нет')) + '</div>';
+        '<div style="margin-top:14px">' + dxSec('doc', 'Документы клиента', '', docsRows(docsFor((x) => x.client === c.id), 'по этому контакту документов пока нет')) + '</div>';
     }
     if (tab === 'history') {
       // Session action log (what the demo operator did) stays available under the event feed —
@@ -2734,7 +2734,7 @@
       return cxStack([
         gatesBlock(d),
         kpN ? dxSec('doc', 'Коммерческое предложение', kpBtn, '<div class="gate-foot" style="margin-top:0">Собрано по ' + kpN + ' ' + plural(kpN, 'объекту', 'объектам', 'объектам') + '.</div>') : '',
-        dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет')),
+        dxSec('doc', 'Документы сделки', '', docsRows(docsOfDeal(d), 'по этой сделке документов пока нет')),
       ]);
     }
     if (tab === 'history') return dealHistoryTab(d);
@@ -3462,7 +3462,8 @@
     // docs — КП + документооборот КП→MOU→SPA→DLD (объекты, профиль, сделки — в основной части)
     const rDeals = dealsOfRequest(r.id);
     const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(docIdx)) : -1;
-    return cxStack([reqKpBlock(r), docChainBlock(sidx, !!(r.kp && r.kp.formed), '')]);
+    return cxStack([reqKpBlock(r), docChainBlock(sidx, !!(r.kp && r.kp.formed), ''),
+      dxSec('doc', 'Документы заявки', '', docsRows(docsOfRequest(r), 'по этой заявке документов пока нет'))]);
   }
   function requestSpec(id) {
     const r = requestById(id); if (!r) return null;
@@ -5164,6 +5165,12 @@
       { open: 'doc:oqood',   title: 'Форма Oqood (регистрация off-plan)', status: 'external', deal: 'd_viktor', client: 'c_docs',    object: 'o_bayline',   sub: 'DLD · внешний шаг' },
       { open: 'doc:formI',   title: 'Соглашение брокеров (Form I)',       status: 'draft',    request: 'r_karim', client: 'c_partner',                      sub: 'co-broking · S6' },
       { open: 's13_pkg',     title: 'Клубный пакет (адресная рассылка)',  status: 'ready',                                          object: 'o_palmcourt', sub: 'эксклюзив клуба · S13' },
+      // Документы клиента. Собираются один раз — под заявку — и действуют по всем её сделкам:
+      // паспорт не переподписывают на каждый договор, и требовать его дважды значит не помнить.
+      { open: 'doc:passport', title: 'Паспорт и Emirates ID',               status: 'ready',    client: 'c_anna',    scope: 'client',       sub: 'KYC · удостоверение личности' },
+      { open: 'doc:funds',    title: 'Подтверждение источника средств',     status: 'ready',    client: 'c_anna',    scope: 'client',       sub: 'AML · выписка банка' },
+      { open: 'doc:passport', title: 'Паспорт и Emirates ID',               status: 'ready',    client: 'c_docs',    scope: 'client',       sub: 'KYC · удостоверение личности' },
+      { open: 'doc:funds',    title: 'Подтверждение источника средств',     status: 'draft',    client: 'c_docs',    scope: 'client',       sub: 'AML · запрошено банком' },
     ];
   }
   const DOC_ST = { ready: ['ok', 'check', 'готов'], draft: ['warn', 'clock', 'черновик'], external: ['info', 'link', 'внешний шаг'], phase: ['', 'clock', 'Фаза 3'] };
@@ -5182,11 +5189,49 @@
     const s = DOC_ST[d.status] || DOC_ST.ready;
     const who = withWho && docClientName(d) ? docClientName(d) + ' · ' : '';
     const links = withWho ? docLinks(d) : ''; // show entity links only in the central Documents view
-    return '<div class="feed-row"><div class="fi i-acc">' + I('doc') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + who + (d.sub || '') + '</div>' + links + '</div>' +
+    // Унаследованный документ помечен источником: иначе он читается как собранный здесь, и агент
+    // не понимает, почему правка на этой карточке не обновила его в соседней.
+    const from = d.from ? '<span class="badge doc-from">' + I('arrowRight') + d.from + '</span>' : '';
+    return '<div class="feed-row"><div class="fi i-acc">' + I('doc') + '</div><div class="ft"><div class="t">' + d.title + from + '</div><div class="m">' + who + (d.sub || '') + '</div>' + links + '</div>' +
       '<span class="badge ' + s[0] + '">' + I(s[1]) + s[2] + '</span>' +
       '<button class="btn sm" data-artopen="' + d.open + '" style="margin-left:8px">' + I('eye') + 'Открыть</button></div>';
   }
   function docsFor(pred) { return docRegistry().filter(pred); }
+  // ============================================================================================
+  // Четыре области документа: объект, клиент, заявка, сделка. Область — это владелец, а не
+  // ссылка: у документа сделки в записи стоит и клиент, но принадлежит он сделке.
+  //
+  // Наследование идёт вниз по тому же пути, по которому шла работа: клиентские документы видны
+  // в каждой заявке и в каждой сделке этого клиента, документы заявки — во всех сделках, из неё
+  // выросших. Это и есть требование «переиспользовать собранное по клиенту»: агент не собирает
+  // паспорт заново на второй договор, а видит, что он уже есть.
+  // ============================================================================================
+  function docScope(x) {
+    return x.scope || (x.deal ? 'deal' : x.request ? 'request' : x.object ? 'object' : x.client ? 'client' : 'other');
+  }
+  const SCOPE_FROM = { client: 'по клиенту', request: 'из заявки', object: 'по объекту' };
+  // Документы сделки: свои плюс унаследованные — от заявки, из которой она выросла, и от клиента.
+  function docsOfDeal(d) {
+    if (!d) return [];
+    return docRegistry().filter((x) => {
+      const sc = docScope(x);
+      if (sc === 'deal') return x.deal === d.id;
+      if (sc === 'request') return !!d.requestId && x.request === d.requestId;
+      if (sc === 'client') return x.client === d.clientId;
+      return false;
+    }).map((x) => Object.assign({}, x, { from: SCOPE_FROM[docScope(x)] || '' }));
+  }
+  // Документы заявки: свои плюс клиентские. Документы её сделок сюда не поднимаются — заявка
+  // не отвечает за договорную работу, и подтянуть их значило бы показать чужой этап как свой.
+  function docsOfRequest(r) {
+    if (!r) return [];
+    return docRegistry().filter((x) => {
+      const sc = docScope(x);
+      if (sc === 'request') return x.request === r.id;
+      if (sc === 'client') return x.client === r.clientId;
+      return false;
+    }).map((x) => Object.assign({}, x, { from: SCOPE_FROM[docScope(x)] || '' }));
+  }
   // A drill-down "Документы …" block for an entity card (deal/object/contact).
   function docsRows(list, emptyHint) {
     return list.length ? list.map((d) => docRow(d, false)).join('')
@@ -5266,6 +5311,8 @@
       formF: ['Form F — MOU купли-продажи (RERA)', [['Продавец', 'DEMO Owner'], ['Покупатель', 'Анна Петрова'], ['Объект', 'Creekline 1208'], ['Цена', '1 820 000 AED'], ['Депозит', '10%'], ['Статус', 'черновик — подписи сторон']]],
       formI: ['Form I — соглашение брокеров A2A (RERA)', [['Брокер 1', 'Harbour Key Realty'], ['Брокер 2', 'клубный партнёр'], ['Объект', 'Downtown'], ['Сплит комиссии', '50 / 50'], ['Раскрытие контакта', 'после принятия']]],
       oqood: ['Форма Oqood — регистрация off-plan (DLD)', [['Объект', 'Bayline Terraces 1603'], ['Застройщик', 'DEMO Developer'], ['Статус', 'внешний шаг — очередь DLD'], ['Требуется', 'подпись сторон, оплата DLD 4%']]],
+      passport: ['Паспорт и Emirates ID', [['Область', 'Документ клиента — действует по всем его заявкам и сделкам'], ['Проверка', 'KYC пройден'], ['Срок действия', 'до 08.2029'], ['Где используется', 'Form B, договор бронирования, регистрация']]],
+      funds: ['Подтверждение источника средств', [['Область', 'Документ клиента — действует по всем его заявкам и сделкам'], ['Основание', 'AML / требование банка'], ['Форма', 'выписка + справка о происхождении средств'], ['Где используется', 'эскроу, ипотечная заявка, регистрация']]],
       ejari: ['Договор аренды + Ejari (Фаза 3)', [['Объект', '—'], ['Статус', 'вне MVP — включается с арендой (Фаза 3)']]],
     };
     const m = meta[kind]; if (!m) { WS.router.go('docs'); return; }
@@ -7213,6 +7260,7 @@
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+    docsOfDeal, docsOfRequest, docScope,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

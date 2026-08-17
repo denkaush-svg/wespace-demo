@@ -1286,6 +1286,48 @@ setTimeout(async () => {
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
   }
 
+  // ---- документы: собранное по клиенту не собирается заново на каждый договор ----
+  {
+    const anna = dd().deals.find((d) => d.id === 'd_anna');
+    WS.ui.dealCard('d_anna'); WS.ui.setEntityTab('deal', 'd_anna', 'docs');
+    const txt = doc.querySelector('#app .view').textContent;
+    check('документы · паспорт клиента виден в сделке', /Паспорт и Emirates ID/.test(txt), txt.slice(0, 60));
+    check('документы · унаследованный помечен источником', /по клиенту/.test(txt));
+    check('документы · собственные документы сделки на месте', /Form B/.test(txt));
+
+    // Обе сделки одного клиента видят один и тот же клиентский документ — он собран один раз.
+    const bothSee = ['d_anna', 'd_won'].every((id) => {
+      const d = dd().deals.find((x) => x.id === id);
+      return WS.ui.docsOfDeal(d).some((x) => x.open === 'doc:passport');
+    });
+    check('документы · один паспорт обслуживает все сделки клиента', bothSee);
+
+    // Документ заявки поднимается в её сделки, но не наоборот: заявка не отвечает за договор.
+    const karim = dd().requests.find((r) => r.id === 'r_karim');
+    check('документы · соглашение брокеров живёт на заявке',
+      WS.ui.docsOfRequest(karim).some((x) => x.open === 'doc:formI'));
+    check('документы · документ сделки не всплывает в заявку',
+      !WS.ui.docsOfRequest(dd().requests.find((r) => r.id === 'r_anna')).some((x) => x.open === 'doc:formB'));
+
+    // Область — это владелец, а не любая ссылка: у Form B в записи есть клиент, но принадлежит
+    // он сделке, и в список клиентских документов попадать не должен.
+    const annaClientDocs = WS.ui.docsOfDeal(anna).filter((x) => x.from === 'по клиенту');
+    check('документы · ссылка на клиента не делает документ клиентским',
+      !annaClientDocs.some((x) => x.open === 'doc:formB'),
+      annaClientDocs.map((x) => x.open).join(' '));
+
+    // Каждый документ открывается: шаблон, которого нет, молча выкидывает в общий реестр.
+    const noTpl = [];
+    WS.ui.docsOfDeal(anna).concat(WS.ui.docsOfRequest(karim)).forEach((x) => {
+      if (x.open.indexOf('doc:') !== 0) return;
+      WS.store.view = 'probe';
+      WS.ui.openArtifactId(x.open);
+      if (WS.store.view !== 'probe') noTpl.push(x.open);
+      WS.ui.closeModal();
+    });
+    check('документы · у каждого документа есть что открыть', noTpl.length === 0, noTpl.join(' '));
+  }
+
   // ---- переход: один комплекс — один договор — одна сделка ----
   // Кнопка «создать сделку» делала одну сделку из всего выбранного, чем бы оно ни было: две
   // квартиры в разных ЖК от разных застройщиков попадали под один договор, которого не бывает.

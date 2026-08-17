@@ -483,6 +483,9 @@ button { font-family: inherit; cursor: pointer; }
 /* Лента шагов без заголовка: сама цепочка и есть заголовок. */
 .dx-sec-bare { padding-top: 16px; }
 .dx-sec-bare .dx-stepper { margin-top: 0; }
+/* Унаследованный документ: откуда он пришёл, рядом с названием. */
+.doc-from { margin-left: 7px; font-weight: 600; }
+.doc-from svg { width: 11px; height: 11px; }
 /* Что предложить — подборка под клиента: процент, объект и причина в одну строку. */
 .of-list { display: flex; flex-direction: column; gap: 10px; }
 .of-row { display: flex; gap: 11px; align-items: flex-start; cursor: pointer; }
