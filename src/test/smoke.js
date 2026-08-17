@@ -939,6 +939,37 @@ setTimeout(async () => {
     check('req · покупателю подбор, а не КП', /Направлен подбор/.test(doc.querySelector('#app .view').textContent));
   }
 
+  // ---- справки следуют одним правилам (docs/2026-08-17-brief-writing-rules.md) ----
+  {
+    const briefOf = (open, id) => { open(id); const e = doc.querySelector('#app .view .deal-brief'); return e ? e.textContent.trim() : ''; };
+    const cases = [
+      ['сделка', () => WS.ui.dealCard('d_anna')], ['сделка·бронь', () => WS.ui.dealCard('d_viktor')],
+      ['портфель', () => WS.ui.dealCard('d_rentbiz')], ['клиент', () => WS.ui.clientCard('c_anna')],
+      ['клиент·EN', () => WS.ui.clientCard('c_partner')],
+    ];
+    cases.forEach(([name, open]) => {
+      open();
+      const el = doc.querySelector('#app .view .deal-brief');
+      const t = el ? el.textContent.trim() : '';
+      check('brief ' + name + ' · справка есть', t.length > 40, t.slice(0, 40));
+      // Счётчик — не содержание: «пройдено 2 из 5 контрольных точек» агенту не сообщает ничего.
+      check('brief ' + name + ' · без счётчиков «N из M»', !/\d+\s+из\s+\d+/.test(t) && !/контрольных точек/.test(t), t.slice(0, 80));
+      // Связный текст: от трёх до семи предложений, каждое закрыто точкой.
+      const sent = t.split(/(?<=[.!?])\s+/).filter((x) => x.trim());
+      check('brief ' + name + ' · от трёх до семи предложений', sent.length >= 3 && sent.length <= 7, String(sent.length));
+      // Аббревиатура не должна строчиться шаблоном: «MOU» не становится «mOU».
+      check('brief ' + name + ' · аббревиатуры целы', !/[a-zа-я][A-ZА-Я]{2,}/.test(t), t.slice(0, 80));
+      // Двойной союз от вложенных перечислений: «A и B и C».
+      check('brief ' + name + ' · нет сдвоенного «и»', !/ и [^.]{0,40} и /.test(t), t.slice(0, 90));
+    });
+    // Область справки равна области карточки: справка клиента не называет стадию его сделки.
+    WS.ui.clientCard('c_anna');
+    const ct = doc.querySelector('#app .view .deal-brief').textContent;
+    const stageWords = Object.keys(WS.fixtures.STAGE_LABELS || {}).map((k) => WS.fixtures.STAGE_LABELS[k]);
+    const leaked = stageWords.filter((w) => w && w.length > 4 && ct.indexOf('«' + w + '»') >= 0);
+    check('brief клиент · не пересказывает стадию сделки', leaked.length === 0, leaked.join(' '));
+  }
+
   // ---- one deal is one contract: every lot in it sits in the same development ----
   {
     const objById = {};

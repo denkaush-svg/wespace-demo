@@ -1879,7 +1879,7 @@
       let line = 'За это время — ' + (n === 1 ? 'одна сделка' : n + ' ' + plural(n, 'сделка', 'сделки', 'сделок'));
       if (dir.services.length) line += ' по ' + joinRu(dir.services.map(datService));
       if (dir.types.length) line += ' ' + joinRu(dir.types.map(genType));
-      if (dir.ready.length === 1) line += ' в статусе «' + dir.ready[0] + '»';
+
       if (won.length) line += ', ' + (won.length === 1 ? 'одна доведена' : won.length + ' доведены') + ' до конца';
       if (dir.offered) {
         line += '; из ' + dir.offered + ' ' + plural(dir.offered, 'показанного объекта', 'показанных объектов', 'показанных объектов');
@@ -1895,16 +1895,18 @@
     const today = [];
     const areas = realAreas(c);
     if (areas.length) today.push('Смотрит ' + joinRu(areas));
-    if (active.length) {
-      // With several deals open, naming one stage would claim the others are there too; the one
-      // that matters is the furthest along.
-      const a0 = active.slice().sort((x, y) => dealStageIdx(y) - dealStageIdx(x))[0];
-      const stage = funnelSteps(a0).cols[funnelSteps(a0).idx];
-      today.push(active.length === 1
-        ? 'сейчас в работе одна сделка на стадии «' + stage + '», ведёт ' + agentName(a0.agent)
-        : 'сейчас в работе ' + active.length + ' ' + plural(active.length, 'сделка', 'сделки', 'сделок') +
-          ', самая продвинутая — на стадии «' + stage + '»');
-    } else if (dir.deals.length) today.push('открытых сделок сейчас нет');
+    // Что человек ищет сейчас — это его свойство. Стадия его сделки — свойство сделки, и у неё
+    // есть своя карточка: называть её здесь значит говорить за соседний экран.
+    const openReq = (D().requests || []).filter((r) => r.clientId === c.id);
+    const wants = [];
+    openReq.forEach((r) => {
+      if (r.goal) wants.push(lowerFirst(r.goal));
+      if (r.budget) wants.push('до ' + WS.AED(r.budget));
+      if (r.horizon) wants.push('срок ' + r.horizon);
+    });
+    if (wants.length) today.push('ищет: ' + wants.slice(0, 3).join(', '));
+    else if (active.length) today.push('в работе ' + active.length + ' ' + plural(active.length, 'направление', 'направления', 'направлений'));
+    else if (dir.deals.length) today.push('сейчас ничего не ищет');
     if (today.length) out.push(capFirst(today.join('; ')) + '.');
 
     // 3. How this person decides. Interpretation, not a dump of the portrait fields.
@@ -2846,58 +2848,89 @@
   // a sentence assembled from the deal's own records: where we stand · what is already settled ·
   // what is holding it up · whose move it is. Every clause is dropped when its data is absent, so a
   // brand-new deal yields two honest sentences instead of a skeleton full of dashes.
+  // Родительская заявка объясняет, зачем сделка существует: что человек искал и на каких условиях.
+  // Без этой строки карточка отвечает «как идёт», но не отвечает «о чём это».
+  function dealRequestSummary(d) {
+    const r = d.requestId ? requestById(d.requestId) : null;
+    if (!r) return '';
+    const parts = [];
+    if (r.goal) parts.push(lowerFirst(r.goal));
+    if (r.budget) parts.push('бюджет ' + WS.AED(r.budget));
+    // Районы уже перечислены между собой — вкладывать один joinRu в другой значит получить «A и B и C».
+    if ((r.areas || []).length) parts.push(r.areas.slice(0, 3).join(' · '));
+    if (r.horizon) parts.push(/\d|мес|нед|дн/i.test(r.horizon) ? 'срок ' + r.horizon : lowerFirst(r.horizon));
+    if (!parts.length) return '';
+    return 'Запрос' + (r.createdAt ? ' от ' + r.createdAt : '') + ': ' + parts.join(', ') + '.';
+  }
+  // Что сделал клиент сам — последняя его запись в ленте сделки, заявки или контакта. Агенту важно
+  // не только, что сделали мы, но и шевелится ли человек на той стороне.
+  function dealLastClientMove(d) {
+    const list = clientMoves(d).filter((e) => !(e.ord > NOW_ORD))
+      .slice().sort((a, b) => (a.ord || 0) - (b.ord || 0));
+    return list[list.length - 1] || null;
+  }
   function dealBriefSentences(d) {
-    const s = funnelSteps(d);
     const c = D().clients.find((x) => x.id === d.clientId) || {};
     const out = [];
-
-    // 1. How long and whose — the stage itself is named by the step line directly above.
-    const days = d.stageDays || 0;
-    let stand = 'Ведёт ' + agentName(d.agent);
-    if (d.createdAt) stand += ', сделка заведена ' + d.createdAt;
-    if (days > 0) stand += '; на текущем шаге ' + days + '-й день';
-    out.push(stand + '.');
-
-    // 2. What is already settled — money, paper, inventory, control points.
-    const settled = [];
-    const gp = gateProgress(d);
-    if (gp.total) settled.push('пройдено ' + gp.done + ' из ' + gp.total + ' контрольных точек');
-    const dep = d.deposit;
-    if (dep && dep.paid) settled.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' внесён' + (dep.at ? ' ' + dep.at : ''));
-    const kpN = dealKpObjects(d).length;
-    if (kpN) settled.push('КП на ' + kpN + ' ' + plural(kpN, 'объект', 'объекта', 'объектов') + ' отправлено');
     const lots = dealLots(d);
-    if (lots.length === 1) settled.push('выбран ' + lots[0].name.split(',')[0]);
-    else if (lots.length > 1) settled.push('в пакете ' + lots.length + ' ' + plural(lots.length, 'лот', 'лота', 'лотов'));
-    if (d.partnerAgent) settled.push('в сделке участвует партнёр ' + agentName(d.partnerAgent));
-    if (settled.length) out.push(capFirst(joinRu(settled)) + '.');
+    const what = lots.length === 1 ? lots[0].name.split(',')[0]
+      : (lots.length > 1 ? lots.length + ' ' + plural(lots.length, 'лот', 'лота', 'лотов') + ' в ' + (lots[0].project || lots[0].area) : (d.objectType || 'объект'));
 
-    // 3. What is holding it up.
-    const risks = [];
-    const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
-    if (nextGate && GATES[nextGate]) risks.push('не закрыт гейт «' + GATES[nextGate].label + '»');
-    if (/просроч/i.test(d.nextDue || '')) risks.push('касание просрочено');
-    const cf = (D().conflicts || {})[d.id];
-    if (cf) risks.push('по полю «' + cf.field + '» расходятся два источника');
-    if (c.consent === false) risks.push('от клиента нет согласия на связь');
-    if (dep && !dep.paid) risks.push(depKind(dep) + ' ' + WS.AED(dep.amount) + ' ещё не внесён');
-    const openTasks = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done').length;
-    if (openTasks) risks.push('по клиенту ' + plural(openTasks, 'висит', 'висят', 'висят') + ' ' + openTasks + ' ' + plural(openTasks, 'задача', 'задачи', 'задач'));
-    if (risks.length && !dealClosed(d)) out.push('Мешает: ' + joinRu(risks) + '.');
+    // 1. Предмет: что продаём, кому и кто ведёт. Имя стоит после тире, в именительном: подставить
+    // его в «для …» шаблон не может — падежа он не знает.
+    out.push((d.dealType || 'Сделка') + ': ' + what + '.' +
+      (c.name ? ' Клиент — ' + c.name + (d.agent ? ', ведёт ' + agentName(d.agent) : '') + '.' : ''));
 
-    // 4. Whose move. The agent's name goes after a dash rather than into a case-inflected phrase —
-    // "Ход за Марина Волкова" is the kind of un-Russian line a template produces.
+    // 2. Запрос, из которого сделка выросла.
+    const req = dealRequestSummary(d);
+    if (req) out.push(req);
+
+    // 3. Последний существенный факт — деньги, бумага или выбор. Один, самый поздний по смыслу.
+    const dep = d.deposit;
+    const drafts = docsFor((x) => x.deal === d.id && x.status === 'draft');
+    if (dealClosed(d) && dealWon(d)) out.push('Сделка закрыта успехом, комиссия зафиксирована.');
+    else if (dep && dep.paid) out.push('Внесено: ' + depKind(dep) + ' — ' + WS.AED(dep.amount) + (dep.at ? ', ' + dep.at : '') + '.');
+    // Если документ уже у клиента, он и есть последний факт — фраза про полученный расчёт лишняя.
+    else if (dealKpObjects(d).length && !drafts.length) out.push('Клиент получил расчёт и условия сделки.');
+    else if (lots.length && !drafts.length) out.push('Объект выбран, готовим документы.');
+
+    // 4. Чего ждём и что сделал клиент.
     if (!dealClosed(d)) {
-      const step = nbaActions(d).doIt[0] || 'Созвониться с клиентом и назначить дату';
-      // `nextDue` holds either a date («сегодня 16:00») or an overdue marker («просрочено (касание)»);
-      // only the former makes sense after the word «срок», and the latter is already in «Мешает».
-      const due = /просроч/i.test(d.nextDue || '') ? '' : (d.nextDue ? ', срок ' + d.nextDue : '');
-      out.push('Следующий шаг — ' + lowerFirst(step) + due + '.');
-    } else {
-      out.push('Сделка закрыта, комиссия зафиксирована — остаётся запросить отзыв у клиента.');
+      // Срок присоединяется к ожиданию: два отдельных предложения об одном и том же удлиняют справку,
+      // не добавляя смысла.
+      const dueTxt = (!/просроч/i.test(d.nextDue || '') && d.nextDue) ? d.nextDue : '';
+      if (drafts.length) out.push(drafts[0].title.split('—')[0].trim() + ' у клиента — ждём подписания' +
+        (dueTxt ? ', следующее касание ' + dueTxt : '') + '.');
+      const mv = dealLastClientMove(d);
+      if (mv && mv.at) {
+        // Реплика клиента приводится как есть, но без служебного префикса и без своей точки:
+        // предложение уже заканчивается нашей.
+        const txt = (mv.text || '')
+          .replace(/^(Голосовое|Входящее|Исходящее|Сообщение|Заметка)\s*:\s*/i, '')
+          .replace(/^(Звонок|Созвон)\s*[\d:]+\s*[—-]\s*/i, '')
+          .replace(/[.\s]+$/, '');
+        if (txt) out.push('Последнее от клиента, ' + mv.at.split('·')[0].trim() + ': ' + lowerFirstWord(txt) + '.');
+      }
+      if (!drafts.length && dueTxt) out.push('Следующее касание — ' + dueTxt + '.');
+    }
+
+    // 5. Что мешает — одна причина, самая дорогая. Счётчики сюда не попадают.
+    if (!dealClosed(d)) {
+      const cf = (D().conflicts || {})[d.id];
+      const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
+      const overdue = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done' && t.when === 'overdue').length;
+      let block = '';
+      if (c.consent === false) block = 'от клиента нет согласия на связь — адресные отправки заблокированы';
+      else if (/просроч/i.test(d.nextDue || '')) block = 'касание просрочено';
+      else if (dep && !dep.paid) block = 'не внесён задаток — ' + depKind(dep) + ', ' + WS.AED(dep.amount);
+      else if (cf) block = 'по полю «' + cf.field + '» расходятся два источника, нужно подтверждение клиента';
+      else if (nextGate && GATES[nextGate]) block = 'не закрыт шаг «' + GATES[nextGate].label + '»';
+      else if (overdue) block = overdue + ' ' + plural(overdue, 'задача просрочена', 'задачи просрочены', 'задач просрочены');
+      if (block) out.push('Мешает: ' + block + '.');
     }
     return out;
   }
+
   // Deposit kind reads as a label ("EOI", "Бронирование (booking)") — lowercasing it mangles the
   // acronym, so only the first letter of a word-form is dropped.
   function depKind(dep) {
@@ -2912,6 +2945,13 @@
   }
   function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
   function lowerFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+  // Строчить первую букву аббревиатуры нельзя: «MOU согласован» превращалось в «mOU согласован».
+  function lowerFirstWord(s) {
+    if (!s) return s;
+    const w = String(s).split(/\s/)[0].replace(/[^A-Za-zА-Яа-яЁё]/g, '');
+    if (w.length >= 2 && w === w.toUpperCase()) return s;
+    return lowerFirst(s);
+  }
   // Russian enumeration: «a, b и c» — a bare " · " list would read as a table, not as a sentence.
   function joinRu(list) {
     if (list.length <= 1) return list[0] || '';
@@ -2929,7 +2969,7 @@
       dealChipRow(d) +
       cxStack([
         [cxCol([dealStatusBrief(d), dealKeyCard(d), dealNextStepCard(d)]),
-         cxCol([dealClientCard(d), dealClientMovesCard(d), dealRecentCard(d)])],
+         cxCol([dealClientCard(d), dealRecentCard(d)])],
         dealLotsBlock(d),
       ]);
   }
