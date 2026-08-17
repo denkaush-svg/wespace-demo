@@ -449,7 +449,7 @@
       '<div class="insight-a"><button class="btn sm" ' + it[4] + '>' + I('arrowRight') + it[3] + '</button></div></div>').join('') + '</div>';
   }
   function insightsBlock() {
-    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0;display:flex;align-items:center;gap:8px">Инсайты <span class="badge demo">' + I('sparkle') + 'второй мозг · демо</span></div>' +
+    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0;display:flex;align-items:center;gap:8px">Инсайты <span class="badge ai-b">' + I('sparkle') + 'собрано AI</span></div>' +
       '<button class="btn sm" data-nav="concierge">' + I('chat') + 'Спросить Консьержа</button></div>' + insightCards();
   }
   function canonMetrics() {
@@ -590,7 +590,6 @@
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
-      '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button></div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
       pulseMyGoals() +
@@ -1112,16 +1111,23 @@
     if (q) list = list.filter((p) => contactHaystack(p.c).indexOf(q) >= 0);
     return list.filter((p) => matchContactsFilters(p.c));
   }
+  // Строка списка клиентов. Кнопка «Сделка» и стадия отсюда убраны: список клиентов — это
+  // клиентская книга, а не второй вид воронки. Сделки агент смотрит в сделках; здесь ему нужно
+  // найти человека — по тому, что он ищет, как решает и когда с ним говорили.
   function contactRow(p) {
-    const k = kycOf(p.c);
-    const deal = (D().deals || []).find((d) => d.clientId === p.id);
-    const dealBtn = deal ? '<button class="btn sm ghost" data-deal="' + deal.id + '">' + I('briefcase') + 'Сделка</button>' : '';
+    const c = p.c;
+    const k = kycOf(c);
+    const last = lastTouchOf(p.id);
+    const openReq = (D().requests || []).filter((r) => r.clientId === p.id && ['closed', 'lost'].indexOf(reqStage(r)) < 0).length;
+    const sub = [p.role || '', (c.areas || []).slice(0, 2).join(' · '),
+      p.budget ? 'до ' + WS.AED(p.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
     const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
+      (openReq ? '<span class="badge acc">' + I('mail') + openReq + ' ' + plural(openReq, 'заявка', 'заявки', 'заявок') + '</span>' : '') +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
-      (p.c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>') + dealBtn;
+      (c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>');
     return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
       '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
-      '<div class="m">' + (p.role || '') + (p.budget ? ' · ' + WS.AED(p.budget) : '') + '</div></div>' +
+      '<div class="m">' + sub + '</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
   }
   function contactsFilterCount() {
@@ -1473,8 +1479,10 @@
       const k = kycOf(c);
       const consent = c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>';
       const isNew = c._new ? '<span class="badge acc">' + I('sparkle') + 'новое</span>' : '';
+      const last = lastTouchOf(c.id);
       return '<div class="feed-row' + (c._new ? ' is-new' : '') + '" data-client="' + c.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
-        '<div class="ft"><div class="t">' + priorityChip(c.id) + c.name + '</div><div class="m">' + c.goal + ' · ' + (c.budget ? WS.AED(c.budget) : '—') + '</div></div>' +
+        '<div class="ft"><div class="t">' + priorityChip(c.id) + c.name + '</div><div class="m">' +
+        [c.goal, (c.areas || []).slice(0, 2).join(' · '), c.budget ? 'до ' + WS.AED(c.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ') + '</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center">' + isNew + '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' + consent + I('arrowRight') + '</div></div>';
     }).join('');
     return '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Контакты · ' + D().clients.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' + companiesBlock();
@@ -2035,22 +2043,23 @@
       !(c.psych && c.psych.filled) ? ['users', 'Заполнить портрет', 'data-act="psychForm" data-cid="' + c.id + '"', ''] : null,
     ];
   }
+  // Полоса операций на карточке КЛИЕНТА говорит о человеке и о работе с ним: кто ведёт, когда
+  // следующее касание, как он решает. Стадия и сумма текущей сделки отсюда убраны намеренно —
+  // это свойство сделки, у неё своя карточка, и клиент к одной своей сделке не сводится.
   function clientOps(c) {
-    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
-    const deal = deals.find((d) => !dealClosed(d)) || deals[0];
-    const owner = deal ? agentName(deal.agent) : 'не назначен';
-    // Stages come from the deal's own funnel now; the old four-key map returned undefined for
-    // everything except «work», and the strip printed it.
-    const stage = deal ? (dealWon(deal) ? 'Сделка закрыта' : (deal.stage === 'lost' ? 'Сделка проиграна' : stageLabel(deal.stage))) : 'Без активной сделки';
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const owner = reqs.length ? agentName(reqs[0].assignee) : 'не назначен';
     const nextTask = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done')
       .sort((a, b) => (a.when === 'overdue' ? -1 : b.when === 'overdue' ? 1 : 0))[0];
     const nextC = nextTask ? ((nextTask.when === 'overdue' ? 'просрочено · ' : '') + nextTask.due) : null;
+    const p = c.psych || {};
+    const overdue = (D().tasks || []).some((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue');
     return opsStrip([
       ['users', 'Ответственный', owner],
-      ['target', 'Стадия', stage],
-      deal ? ['briefcase', 'Активная сделка', dealActionWord(deal) + ' · ' + WS.AED(deal.amount)] : null,
+      ['target', 'Приоритет', ((D().clientSignals || {})[c.id] || {}).priority || '—'],
+      p.decision ? ['sparkle', 'Решение', p.decision] : ['sparkle', 'Портрет', 'не заполнен'],
       nextC ? ['clock', 'Следующий контакт', nextC] : null,
-    ], deal && deal.hot ? 'hot' : undefined);
+    ], overdue ? 'hot' : undefined);
   }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
@@ -2879,16 +2888,34 @@
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Суть сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';
   }
+  // Подпись под именем в блоке связи. Ровно то, чего нет на странице, где этот блок стоит:
+  // на каком языке говорить, каким каналом и когда с человеком связывались в последний раз.
+  // Условия и стадия сюда не попадают — они и есть содержание самой страницы.
+  function contactMeta(c) {
+    const last = lastTouchOf(c.id);
+    return [c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
+      last ? 'последнее касание — ' + last : ''].filter(Boolean).join(' · ');
+  }
+  // Последнее касание по всем лентам клиента — заявкам, сделкам и его собственной.
+  function lastTouchOf(cid) {
+    let best = null;
+    const take = (list) => (list || []).forEach((e) => {
+      if (e && e.ord != null && (!best || e.ord > best.ord)) best = e;
+    });
+    take((D().contactTimeline || {})[cid]);
+    (D().requests || []).filter((r) => r.clientId === cid).forEach((r) => take((D().requestTimeline || {})[r.id]));
+    (D().deals || []).filter((d) => d.clientId === cid).forEach((d) => take((D().dealTimeline || {})[d.id]));
+    return best ? String(best.at || '').split('·')[0].trim() : '';
+  }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
   function dealClientCard(d, threadId) {
     const c = D().clients.find((x) => x.id === d.clientId);
     if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан к сделке</div>');
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
-    const meta = [c.goal, c.budget ? 'бюджет ' + WS.AED(c.budget) : '', c.horizon ? 'срок ' + c.horizon : ''].filter(Boolean).join(' · ');
     const head = '<div class="dcli-head"><div class="dcli-av">' + init + '</div>' +
       '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
-      '<div class="dcli-meta">' + meta + '</div></div></div>';
+      '<div class="dcli-meta">' + contactMeta(c) + '</div></div></div>';
     const chans = '<div class="dcli-chans">' + ['phone', 'whatsapp', 'telegram', 'email'].map((ch) =>
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
@@ -3308,7 +3335,7 @@
     if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан</div>');
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
-    const meta = [r.goal, r.budget ? 'бюджет ' + WS.AED(r.budget) : '', r.horizon ? 'срок ' + r.horizon : ''].filter(Boolean).join(' · ');
+    const meta = contactMeta(c);
     // Тред заявки, а не первой попавшейся сделки клиента: у клиента их может быть несколько,
     // и «первая найденная» — это молча выбранный не тот разговор.
     const tid = 'request:' + r.id;

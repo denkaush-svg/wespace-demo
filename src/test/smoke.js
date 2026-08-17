@@ -1290,6 +1290,68 @@ setTimeout(async () => {
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
   }
 
+  // ---- клиент — это человек, а не его текущая сделка ----
+  // Правило чинилось трижды и трижды возвращалось в новом месте: то в полосе операций, то в
+  // подписи под именем, то в строке списка. Проверка держит его целиком, а не по одному месту:
+  // ни одна клиентская поверхность не называет стадию сделки и не показывает её сумму.
+  //
+  // Вкладка «Сделки» на карточке клиента — исключение по назначению: агент открыл её именно
+  // затем, чтобы увидеть сделки. Всё остальное о человеке.
+  {
+    const SL = WS.fixtures.STAGE_LABELS || {};
+    const stageWords = Object.keys(SL).map((k) => SL[k]).filter((w) => w && w.length > 5);
+    const dealMoney = (dd().deals || []).map((d) => WS.AED(d.amount || 0));
+    const hit = (txt, words) => words.filter((w) => txt.indexOf(w) >= 0);
+
+    const bad = [];
+    (dd().clients || []).forEach((c) => {
+      ['overview', 'profile', 'kyc', 'history'].forEach((tab) => {
+        WS.ui.clientCard(c.id);
+        WS.ui.setEntityTab('client', c.id, tab);
+        const t = (doc.querySelector('#app .view') || {}).textContent || '';
+        hit(t, stageWords).forEach((w) => bad.push(c.id + '/' + tab + ': стадия «' + w + '»'));
+      });
+    });
+    check('клиент · карточка не называет стадию сделки', bad.length === 0, bad.slice(0, 4).join(' | '));
+
+    // Список клиентов — клиентская книга, а не второй вид воронки.
+    WS.store.clientsTab = 'contacts'; WS.router.go('clients');
+    const list = (doc.querySelector('#app .view') || {}).textContent || '';
+    const listHtml = (doc.querySelector('#app .view') || {}).innerHTML || '';
+    check('список клиентов · без стадий сделок', hit(list, stageWords).length === 0, hit(list, stageWords).join(' '));
+    check('список клиентов · без кнопки «Сделка»', listHtml.indexOf('>Сделка<') < 0 && !/data-deal=/.test(listHtml));
+    // Взамен — то, по чему клиента ищут: что он ищет, где, на сколько и когда с ним говорили.
+    check('список клиентов · показывает районы поиска',
+      (dd().clients || []).some((c) => (c.areas || []).length && list.indexOf(c.areas[0]) >= 0));
+    check('список клиентов · показывает последнее касание', /касание/.test(list));
+
+    // Блок связи внутри сделки и заявки — про связь, а не про условия страницы, на которой стоит.
+    const metaBad = [];
+    (dd().deals || []).forEach((d) => {
+      WS.ui.dealCard(d.id);
+      const m = doc.querySelector('#app .view .dcli-meta');
+      const t = m ? m.textContent : '';
+      hit(t, stageWords.concat(dealMoney)).forEach((w) => metaBad.push(d.id + ': «' + w + '»'));
+    });
+    (dd().requests || []).forEach((r) => {
+      WS.ui.requestCard(r.id);
+      const m = doc.querySelector('#app .view .dcli-meta');
+      const t = m ? m.textContent : '';
+      hit(t, stageWords.concat(dealMoney)).forEach((w) => metaBad.push(r.id + ': «' + w + '»'));
+    });
+    check('блок связи · не пересказывает страницу, на которой стоит', metaBad.length === 0, metaBad.slice(0, 4).join(' | '));
+    WS.ui.dealCard('d_anna');
+    const meta = (doc.querySelector('#app .view .dcli-meta') || {}).textContent || '';
+    check('блок связи · говорит, как связаться и когда говорили',
+      /язык/.test(meta) && /касание/.test(meta), meta);
+
+    // Корень дефекта был в самих данных: у клиента в поле «цель» стояло состояние сделки.
+    const leaked = (dd().clients || []).filter((c) =>
+      /договор|сделк|бронирован|подписан/i.test(c.goal || '') || /сделк/i.test(c.horizon || ''));
+    check('данные · цель клиента описывает поиск, а не сделку', leaked.length === 0,
+      leaked.map((c) => c.id + ': «' + c.goal + '» / «' + c.horizon + '»').join(' | '));
+  }
+
   // ---- что нашёл сторонний ревьюер: пять дыр, каждая без своей проверки ----
   {
     // Проигрыш освобождает лот. Иначе объект вычеркнут из работы навсегда: договор не состоялся,
