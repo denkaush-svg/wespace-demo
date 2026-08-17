@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:02</title>
+  <title>WESPACE · сборка 19:05</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:02';
+    window.WS_BUILD='19:05';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -624,6 +624,10 @@ button { font-family: inherit; cursor: pointer; }
 .cm-m { font-size: 11px; color: var(--faint); margin-top: 2px; }
 .cm-empty { display: flex; gap: 9px; font-size: 12px; color: var(--mut); line-height: 1.45; }
 .cm-empty svg { width: 15px; height: 15px; flex: none; color: var(--faint); margin-top: 1px; }
+/* Почему стадия заявки не нажимается — объясняется один раз, под самой лентой. */
+.req-stage-why { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding-top: 11px;
+  border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.5; color: var(--mut); }
+.req-stage-why svg { width: 14px; height: 14px; flex: none; color: var(--acc); margin-top: 1px; }
 .qa-bar { display: flex; flex-wrap: wrap; gap: 7px; padding: 2px 0 8px; margin: 2px 0 2px; }
 .qa-act { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
   padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
@@ -8516,8 +8520,71 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
   }
+  // ============================================================================================
+  // Стадия заявки ВЫЧИСЛЯЕТСЯ из её собственных фактов, а не проставляется руками.
+  //
+  // Именно проставленная руками стадия и дала дефект, ради которого затевалась вся модель: сделка
+  // Анны стояла на «Показе», хотя показ прошёл неделей раньше внутри заявки. У вычисленной стадии
+  // соврать не выйдет — у каждой есть объективное условие входа, и оно проверяется по данным.
+  //
+  // Агент двигает не стадию, а границу: он отмечает объекты, по которым условия согласованы.
+  // Всё остальное на этой ленте — следствие того, что уже произошло.
+  // ============================================================================================
+  function reqSideKey(r) {
+    const t = (r.dealType || '') + ' ' + (r.interest || '') + ' ' + (r.goal || '');
+    if (r.partnerAgent || /партнёр|партнер|co-brok/i.test(t)) return 'partner';
+    if (/эксклюзив|управлен|собственник|сдать|реализовать|листинг/i.test(t)) return 'owner';
+    return 'buyer';
+  }
+  // Подпись стадии — строка либо словарь по стороне сделки: у покупателя «направлен подбор»,
+  // у собственника «направлено КП». Стадия одна, слово разное.
+  function reqStageLabel(k, r) {
+    const v = (WS.REQ_STAGE_LABELS || {})[k];
+    if (!v) return k;
+    if (typeof v === 'string') return v;
+    return v[reqSideKey(r)] || v.any || k;
+  }
+  function reqStage(r) {
+    if (/отказ|проигр|потерян/i.test(r.leadStatus || '')) return 'lost';
+    const off = r.offered || [];
+    const deals = dealsOfRequest(r.id);
+    const inDeal = {};
+    deals.forEach((d) => ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) inDeal[id] = 1; }));
+    // Заявка закрыта, когда в подборке не осталось объектов в работе: каждый либо ушёл в сделку,
+    // либо отклонён клиентом. Пока хоть один открыт — заявка живёт, даже если сделки уже идут.
+    const open = off.filter((o) => o.state !== 'rejected' && !inDeal[o.id]);
+    if (deals.length && off.length && !open.length) return 'closed';
+    if (deals.length || (r.kp && r.kp.formed && off.some((o) => o.state === 'selected'))) return 'talks';
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    if (tl.some((e) => e.ch === 'meet')) return 'meet';
+    if (off.length || (r.kp && r.kp.formed)) return 'offer';
+    if (r.budget && (r.areas || []).length) return 'qual';
+    return 'new';
+  }
+  function reqStagePath() { return (WS.REQ_STAGES || []).filter((k) => k !== 'lost'); }
+  function reqStepper(r) {
+    const cur = reqStage(r), path = reqStagePath(), lost = cur === 'lost';
+    const idx = lost ? -1 : path.indexOf(cur);
+    // Шаги нарисованы, но не нажимаются: стадия — следствие фактов, и «переставить» её нельзя.
+    const steps = path.map((k, i) => {
+      const cls = lost ? 'todo' : (i < idx ? 'done' : (i === idx ? 'cur' : 'todo'));
+      const inner = (!lost && i < idx) ? I('check') : String(i + 1);
+      return '<div class="dx-step ' + cls + '"><span class="d">' + inner + '</span><span class="l">' + reqStageLabel(k, r) + '</span></div>';
+    }).join('');
+    return '<div class="dx-stepper' + (path.length > 7 ? ' long' : '') + '">' + steps + '</div>' +
+      (lost ? '<div class="dx-lost">' + I('x') + 'Клиент отказался</div>' : '');
+  }
+  function reqStepperSection(r) {
+    const cur = reqStage(r), path = reqStagePath();
+    const idx = path.indexOf(cur);
+    const cap = cur === 'lost' ? 'Отказ' : 'Шаг ' + (idx + 1) + ' из ' + path.length + ' · ' + reqStageLabel(cur, r);
+    const why = '<div class="req-stage-why">' + I('sparkle') +
+      '<span>Стадия выводится из фактов заявки — подборки, состоявшихся встреч и дочерних сделок. Руками её не двигают: агент отмечает объекты, по которым согласованы условия.</span></div>';
+    return dxSec('trend', 'Ход заявки', '<span class="dx-step-cap">' + cap + '</span>', reqStepper(r) + why);
+  }
   function requestState(r) {
-    return '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
+    return reqStepperSection(r) +
+      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       cxStack([
         [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
         reqOffersStatusBlock(r),

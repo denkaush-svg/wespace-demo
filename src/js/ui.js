@@ -3224,8 +3224,71 @@
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
   }
+  // ============================================================================================
+  // Стадия заявки ВЫЧИСЛЯЕТСЯ из её собственных фактов, а не проставляется руками.
+  //
+  // Именно проставленная руками стадия и дала дефект, ради которого затевалась вся модель: сделка
+  // Анны стояла на «Показе», хотя показ прошёл неделей раньше внутри заявки. У вычисленной стадии
+  // соврать не выйдет — у каждой есть объективное условие входа, и оно проверяется по данным.
+  //
+  // Агент двигает не стадию, а границу: он отмечает объекты, по которым условия согласованы.
+  // Всё остальное на этой ленте — следствие того, что уже произошло.
+  // ============================================================================================
+  function reqSideKey(r) {
+    const t = (r.dealType || '') + ' ' + (r.interest || '') + ' ' + (r.goal || '');
+    if (r.partnerAgent || /партнёр|партнер|co-brok/i.test(t)) return 'partner';
+    if (/эксклюзив|управлен|собственник|сдать|реализовать|листинг/i.test(t)) return 'owner';
+    return 'buyer';
+  }
+  // Подпись стадии — строка либо словарь по стороне сделки: у покупателя «направлен подбор»,
+  // у собственника «направлено КП». Стадия одна, слово разное.
+  function reqStageLabel(k, r) {
+    const v = (WS.REQ_STAGE_LABELS || {})[k];
+    if (!v) return k;
+    if (typeof v === 'string') return v;
+    return v[reqSideKey(r)] || v.any || k;
+  }
+  function reqStage(r) {
+    if (/отказ|проигр|потерян/i.test(r.leadStatus || '')) return 'lost';
+    const off = r.offered || [];
+    const deals = dealsOfRequest(r.id);
+    const inDeal = {};
+    deals.forEach((d) => ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) inDeal[id] = 1; }));
+    // Заявка закрыта, когда в подборке не осталось объектов в работе: каждый либо ушёл в сделку,
+    // либо отклонён клиентом. Пока хоть один открыт — заявка живёт, даже если сделки уже идут.
+    const open = off.filter((o) => o.state !== 'rejected' && !inDeal[o.id]);
+    if (deals.length && off.length && !open.length) return 'closed';
+    if (deals.length || (r.kp && r.kp.formed && off.some((o) => o.state === 'selected'))) return 'talks';
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    if (tl.some((e) => e.ch === 'meet')) return 'meet';
+    if (off.length || (r.kp && r.kp.formed)) return 'offer';
+    if (r.budget && (r.areas || []).length) return 'qual';
+    return 'new';
+  }
+  function reqStagePath() { return (WS.REQ_STAGES || []).filter((k) => k !== 'lost'); }
+  function reqStepper(r) {
+    const cur = reqStage(r), path = reqStagePath(), lost = cur === 'lost';
+    const idx = lost ? -1 : path.indexOf(cur);
+    // Шаги нарисованы, но не нажимаются: стадия — следствие фактов, и «переставить» её нельзя.
+    const steps = path.map((k, i) => {
+      const cls = lost ? 'todo' : (i < idx ? 'done' : (i === idx ? 'cur' : 'todo'));
+      const inner = (!lost && i < idx) ? I('check') : String(i + 1);
+      return '<div class="dx-step ' + cls + '"><span class="d">' + inner + '</span><span class="l">' + reqStageLabel(k, r) + '</span></div>';
+    }).join('');
+    return '<div class="dx-stepper' + (path.length > 7 ? ' long' : '') + '">' + steps + '</div>' +
+      (lost ? '<div class="dx-lost">' + I('x') + 'Клиент отказался</div>' : '');
+  }
+  function reqStepperSection(r) {
+    const cur = reqStage(r), path = reqStagePath();
+    const idx = path.indexOf(cur);
+    const cap = cur === 'lost' ? 'Отказ' : 'Шаг ' + (idx + 1) + ' из ' + path.length + ' · ' + reqStageLabel(cur, r);
+    const why = '<div class="req-stage-why">' + I('sparkle') +
+      '<span>Стадия выводится из фактов заявки — подборки, состоявшихся встреч и дочерних сделок. Руками её не двигают: агент отмечает объекты, по которым согласованы условия.</span></div>';
+    return dxSec('trend', 'Ход заявки', '<span class="dx-step-cap">' + cap + '</span>', reqStepper(r) + why);
+  }
   function requestState(r) {
-    return '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
+    return reqStepperSection(r) +
+      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       cxStack([
         [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
         reqOffersStatusBlock(r),

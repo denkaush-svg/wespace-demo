@@ -889,6 +889,36 @@ setTimeout(async () => {
       (WS.FUNNELS || []).every((f) => !!CK[ck(f.k, 'оффплан')] && !!CK[ck(f.k, 'готовый')]));
   }
 
+  // ---- the request's stage is computed from its own facts, so it cannot lie ----
+  {
+    const path = (WS.REQ_STAGES || []).filter((k) => k !== 'lost');
+    (dd().requests || []).forEach((r) => {
+      WS.ui.requestCard(r.id);
+      const view = doc.querySelector('#app .view');
+      const body = view.textContent;
+      check('req ' + r.id + ' · лента заявки нарисована', body.indexOf('Ход заявки') >= 0);
+      // Стадия — следствие фактов, поэтому шаг не нажимается: кнопки и обработчика у него нет.
+      const steps = [].slice.call(view.querySelectorAll('.dx-stepper .dx-step'));
+      check('req ' + r.id + ' · шагов столько же, сколько в воронке', steps.length === path.length,
+        steps.length + ' против ' + path.length);
+      check('req ' + r.id + ' · стадию заявки нельзя переставить кликом',
+        steps.every((el) => el.tagName !== 'BUTTON' && !el.getAttribute('data-stage')));
+      check('req ' + r.id + ' · ровно один текущий шаг',
+        view.querySelectorAll('.dx-stepper .dx-step.cur').length === 1);
+    });
+    // Заявка Виктора: квартира ушла в бронь, оба офиса — в портфель, в подборке пусто → закрыта.
+    WS.ui.requestCard('r_viktor');
+    check('req · заявка закрывается, когда подборка исчерпана',
+      /Шаг 6 из 6 · Закрыта/.test(doc.querySelector('#app .view').textContent),
+      doc.querySelector('#app .view .dx-step-cap') ? doc.querySelector('#app .view .dx-step-cap').textContent : '');
+    // Заявка Анны: Creekline в сделке, Palm Court отклонён, Bayline ещё открыт → заявка жива.
+    WS.ui.requestCard('r_anna');
+    const capA = doc.querySelector('#app .view .dx-step-cap').textContent;
+    check('req · заявка с открытым объектом не закрыта', !/Закрыта/.test(capA), capA);
+    // Подпись стадии зависит от стороны сделки, а не от услуги.
+    check('req · покупателю подбор, а не КП', /Направлен подбор/.test(doc.querySelector('#app .view').textContent));
+  }
+
   // ---- one deal is one contract: every lot in it sits in the same development ----
   {
     const objById = {};
