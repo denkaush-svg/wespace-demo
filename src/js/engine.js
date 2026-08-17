@@ -35,6 +35,10 @@
     'lead:sarah': { label: 'Sarah Mansour · ночной лид', icon: 'moon' },
     'lead:cold': { label: 'Холодный лид', icon: 'flame' },
     'general': { label: 'Общий', icon: 'sparkle' },
+    'object:o_bayline_av': { label: 'Bayline 1603 · проверка', icon: 'building' },
+    'contact:c_partner': { label: 'Karim Aziz · подбор', icon: 'users' },
+    'request:r_viktor': { label: 'Виктор Орлов · заявка', icon: 'mail' },
+    'deal:d_rentbiz': { label: 'Портфель DIFC · сделка', icon: 'briefcase' },
   };
   function threadMeta(id) { return THREAD_META[id] || { label: id, icon: 'chat' }; }
   function ensureThread(id) {
@@ -56,14 +60,56 @@
   function markSeen(id) { const t = engine.threads[id]; if (t) t.seen = t.items.length; }
   // Seed the night-lead conversation so the Concierge opens with a real unread thread
   // (mirrors fixtures.inbox night lead — not fabricated).
+  // Панель диалогов не должна открываться пустой: агент приходит в Консьержа с историей, а не с
+  // чистым листом, и по ней надо иметь возможность походить. Всё, что здесь засеяно, опирается на
+  // те же фикстуры, что и карточки, — выдуманных сущностей в переписке нет.
+  const SEED = [
+    { id: 'lead:sarah', at: '02:14', unread: 1, items: [
+      ['user', 'Sarah Mansour · @wa · 02:14', 'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?'],
+    ] },
+    { id: 'deal:d_anna', at: '09:34', items: [
+      ['user', 'Марина Волкова · 09:30', 'Собери бриф к звонку с Анной — что напомнить и о чём не говорить.'],
+      ['ai', 'Консьерж · 09:34', 'Анна ждёт график первого платежа: просила его 14 мая и с тех пор к теме не возвращалась. ' +
+        'Показ Creekline прошёл 9 мая, объект она выбрала 11-го. Не начинайте с доходности — она её уже посчитала; ' +
+        'начните с графика и срока внесения EOI. Тон по делу, с расчётами, без давления.'],
+    ] },
+    { id: 'deal:d_viktor', at: 'вчера', items: [
+      ['user', 'Марина Волкова · вчера', 'Что нужно к Oqood по брони Bayline?'],
+      ['ai', 'Консьерж · вчера', 'Бронирование 97 500 AED внесено 12 мая, MOU согласован. Для Oqood не хватает подтверждения дохода ' +
+        'от Emirates NBD — банк запросил его 13 мая, задача на вас. Черновик договора бронирования у клиента с 13 мая, подписи пока нет.'],
+    ] },
+    { id: 'object:o_bayline_av', at: 'вчера', unread: 1, items: [
+      ['user', 'Омар Рахман · вчера', 'Bayline 1603 ещё в продаже? Клиент спрашивает.'],
+      ['ai', 'Консьерж · вчера', 'Проверка доступности от 2 апреля — устарела, прошло больше месяца. Trakheesi по объекту в процессе, ' +
+        'до его получения объект нельзя публиковать как листинг. Прежде чем обещать показ, сверьтесь с застройщиком.'],
+    ] },
+    { id: 'contact:c_partner', at: '09:12', items: [
+      ['user', 'Лина Хассан · 09:00', 'Karim просит резиденцию в Downtown до 2,6 млн. У нас там есть что-нибудь?'],
+      ['ai', 'Консьерж · 09:12', 'В Downtown своего инвентаря нет ни одного объекта. Ближе всего по остальным критериям — ' +
+        'Park Terrace в JVC, но район не тот, что он просил. Разумнее запросить объект у клубного партнёра: ' +
+        'соглашение брокеров по этой сделке уже в черновике.'],
+    ] },
+    { id: 'request:r_viktor', at: '05 мая', items: [
+      ['user', 'Марина Волкова · 05 мая', 'Собери КП по портфелю DIFC и квартире Bayline.'],
+      ['ai', 'Консьерж · 05 мая', 'КП собрано на три объекта: Bayline 1603 и два смежных офиса в DIFC Gate District. ' +
+        'Офисы уходят одним договором — они в одном комплексе; Bayline оформляется отдельно, это другой проект. ' +
+        'Расчёт доходности и график платежей внутри.'],
+    ] },
+    { id: 'general', at: 'сегодня', items: [
+      ['user', 'Марина Волкова · сегодня', 'Что просрочено на этой неделе?'],
+      ['ai', 'Консьерж · сегодня', 'Одно касание просрочено: КП Игорю Лебедеву обещали 12 мая и не отправили. ' +
+        'По остальным сделкам сроки в пределах; ближайший — показ Creekline сегодня в 16:00.'],
+    ] },
+  ];
   function seedThreads() {
-    const t = ensureThread('lead:sarah');
-    if (!t.items.length) {
-      t.items.push(item(msg('user', 'Sarah Mansour · ' + chanIcon('whatsapp') + ' · 02:14',
-        'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?')));
-      t.updatedAt = '02:14';
-      t.seen = 0; // → unread = 1
-    }
+    SEED.forEach((sd) => {
+      const t = ensureThread(sd.id);
+      if (t.items.length) return;
+      sd.items.forEach((m) => t.items.push(item(msg(m[0], m[1].replace('@wa', chanIcon('whatsapp')), esc(m[2])))));
+      t.updatedAt = sd.at;
+      // Непрочитанным остаётся ровно то, чего агент ещё не открывал.
+      t.seen = sd.unread ? Math.max(0, t.items.length - sd.unread) : t.items.length;
+    });
   }
 
   // Proactive push (event layer): message lands in a thread the agent didn't open →

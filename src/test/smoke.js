@@ -978,6 +978,25 @@ setTimeout(async () => {
     check('brief клиент · не пересказывает стадию сделки', leaked.length === 0, leaked.join(' '));
   }
 
+  // ---- панель диалогов Консьержа открывается с историей, а не с пустым листом ----
+  {
+    // main.js делает то же самое на загрузке, когда сохранённых диалогов нет.
+    WS.engine.seedThreads();
+    const list = (WS.engine.threadList() || []).filter((t) => String(t.id).indexOf('probe') !== 0);
+    check('concierge · диалогов засеяно не меньше пяти', list.length >= 5, String(list.length));
+    check('concierge · в каждом диалоге есть сообщения', list.every((t) => (t.items || []).length > 0));
+    check('concierge · есть непрочитанные', list.some((t) => t.unread > 0));
+    // Разделы панели строятся по типу сущности: пустая группа — признак несуществующего вида.
+    const kinds = {};
+    list.forEach((t) => { kinds[String(t.id).split(':')[0]] = 1; });
+    check('concierge · диалоги разных видов', Object.keys(kinds).length >= 4, Object.keys(kinds).join(' '));
+    // Сценарные плашки под полем ввода убраны — к Консьержу подключается живая модель.
+    WS.storeApi.setView('concierge');
+    const view = doc.querySelector('#app');
+    check('concierge · под полем ввода нет сценарных плашек',
+      !view.querySelector('.qa-row [data-scn]'), 'есть');
+  }
+
   // ---- «Что предложить»: подбор не обещает того, чего нет ----
   {
     const objById = {}; (dd().objects || []).forEach((o) => { objById[o.id] = o; });
