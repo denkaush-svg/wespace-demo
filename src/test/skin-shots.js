@@ -23,7 +23,7 @@ const SCREENS = [
   { name: 'clients', run: async (p) => { await p.evaluate(() => { window.WS.store.clientsTab = 'contacts'; window.WS.router.go('clients'); }); } },
   { name: 'objects', run: async (p) => { await p.evaluate(() => window.WS.router.go('objects')); } },
   { name: 'concierge', run: async (p) => { await p.evaluate(() => window.WS.router.go('concierge')); } },
-  { name: 'deal-card', run: async (p) => { await p.evaluate(() => window.WS.ui.dealCard('d_lease')); } },
+  { name: 'deal-card', run: async (p) => { await p.evaluate(() => window.WS.ui.dealCard('d_viktor')); } },
   { name: 'analytics', run: async (p) => { await p.evaluate(() => window.WS.router.go('analytics')); } },
   { name: 'valuation', run: async (p) => { await p.evaluate(() => window.WS.router.go('valuation')); } },
 ];

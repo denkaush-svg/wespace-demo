@@ -81,7 +81,7 @@
           ],
           effects: [
             { op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'КП отправлено',
-              kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_bayline'] } } },
+              kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_baycentral'] } } },
             { op: 'setObject', id: 'o_bayline', patch: { flagged: true } },
             { op: 'removeTask', id: 't_g1_pick' },
             { op: 'addTask', task: { id: 't_g2_follow', clientId: 'c_anna', title: 'Напоминание после КП — Анна', due: 'завтра', when: 'tomorrow', kind: 'touch', scenario: 'G3', why: 'КП отправлено, ждём реакции по трём объектам' } },
@@ -104,7 +104,7 @@
           note: 'Значения до/после. Отклонённые поля не применяются; после — доступен полный откат пакета.',
           fields: [
             { k: 'Результат показа', now: 'Creekline 1208 подошёл', src: 'заметка' },
-            { k: 'Выбор клиента', was: 'сравнивает Creekline и Bayline', now: 'Creekline 1208', src: 'заметка' },
+            { k: 'Выбор клиента', was: 'сравнивает Creekline и Bay Central', now: 'Creekline 1208', src: 'заметка' },
             { k: 'Возражение', now: 'Первый платёж', src: 'заметка' },
             { k: 'Стадия заявки', was: 'Показ', now: 'Переговоры', src: 'правило' },
             { k: 'Следующий шаг', now: 'Звонок с графиком платежей', src: 'заметка' },
@@ -118,7 +118,7 @@
                 { op: 'updateRequest', id: 'r_anna', patch: { offered: [
                   { id: 'o_creekline', state: 'selected' },
                   { id: 'o_jvcpark', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
-                  { id: 'o_bayline', state: 'offered' },
+                  { id: 'o_baycentral', state: 'offered' },
                 ] } }],
             3: [{ op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'В переговорах', temperature: 'hot',
                   note: 'После показа Creekline 1208: объект подтверждён, возражение по первому платежу.' } }],

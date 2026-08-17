@@ -330,7 +330,7 @@ setTimeout(async () => {
     check('headless entry carries the requested type', e && e.ch === 'call' && e.kind === 'raw', JSON.stringify(e && e.ch));
     check('headless entry lands newest', e && e.ord >= N.d * 10000 + N.h * 100 + N.mi, 'ord=' + (e && e.ord));
 
-    const back = WS.ui.addEventEntry('deal', 'd_igor', { type: 'meet', text: 'АГЕНТ: встреча позавчера', when: { daysAgo: 2, h: 15, mi: 30 } });
+    const back = WS.ui.addEventEntry('deal', 'd_viktor', { type: 'meet', text: 'АГЕНТ: встреча позавчера', when: { daysAgo: 2, h: 15, mi: 30 } });
     check('headless back-dating works', back && back.ord === (N.d - 2) * 10000 + 1530, 'ord=' + (back && back.ord));
 
     const co = WS.ui.addEventEntry('company', 'co_meydan', { type: 'note', text: 'АГЕНТ: заметка по компании' });
@@ -507,11 +507,9 @@ setTimeout(async () => {
         WS.ui.dealCommission(dPort) === byLot, WS.ui.dealCommission(dPort) + ' vs ' + byLot);
     }
     // Сделка без объекта не должна падать — у неё берётся ставка по умолчанию.
-    const dNoObj = dealBy('d_karim');
-    if (dNoObj) {
-      check('commission · сделка без объекта берёт ставку по умолчанию',
-        WS.ui.dealCommission(dNoObj) === Math.round(dNoObj.amount * 2 / 100), String(WS.ui.dealCommission(dNoObj)));
-    }
+    const dNoObj = Object.assign({}, dealBy('d_anna'), { objectId: null, lots: [] });
+    check('commission · сделка без объекта берёт ставку по умолчанию',
+      WS.ui.dealCommission(dNoObj) === Math.round(dNoObj.amount * 2 / 100), String(WS.ui.dealCommission(dNoObj)));
 
     // ---- every agent referenced by a deal is a real person ----
     check('roster · every deal agent resolves to a named person',
@@ -901,6 +899,60 @@ setTimeout(async () => {
     const CK = WS.fixtures.CONTRACT_KINDS || {};
     check('model · выведенный вид договора есть в справочнике',
       (WS.FUNNELS || []).every((f) => !!CK[ck(f.k, 'оффплан')] && !!CK[ck(f.k, 'готовый')]));
+  }
+
+  // ---- каждая сделка выросла из заявки, и ни одна не стоит на пресейл-шаге ----
+  // Раньше пресейл и договорная работа лежали в одном списке стадий, и одиннадцать записей
+  // назывались сделками, хотя по семи из них не было согласовано ничего. Проверки держат
+  // границу: сделка = согласованные условия, шаги = вид договора, всё остальное — заявка.
+  {
+    const orphan = (dd().deals || []).filter((d) => !d.requestId ||
+      !(dd().requests || []).some((r) => r.id === d.requestId));
+    check('данные · у каждой сделки есть родительская заявка', orphan.length === 0,
+      orphan.map((d) => d.id).join(' '));
+
+    const DS = WS.DEAL_STEPS || {}, ck = WS.contractKindFor;
+    const off = (dd().deals || []).filter((d) => (DS[ck(d.funnel, d.readiness)] || []).indexOf(d.stage) < 0);
+    check('данные · сделка стоит на шаге своего договора, не на пресейл-стадии', off.length === 0,
+      off.map((d) => d.id + ':' + d.stage).join(' '));
+
+    const noClient = (dd().requests || []).filter((r) => !(dd().clients || []).some((c) => c.id === r.clientId));
+    check('данные · у каждой заявки есть клиент', noClient.length === 0, noClient.map((r) => r.id).join(' '));
+
+    const noFunnel = (dd().requests || []).filter((r) => !(WS.FUNNELS || []).some((f) => f.k === r.funnel));
+    check('данные · каждая заявка называет услугу, которой станет', noFunnel.length === 0,
+      noFunnel.map((r) => r.id + ':' + r.funnel).join(' '));
+
+    const mute = (dd().requests || []).filter((r) => !((dd().requestTimeline || {})[r.id] || []).length);
+    check('данные · у каждой заявки есть история', mute.length === 0, mute.map((r) => r.id).join(' '));
+
+    // Расхождение фактов висит на записи, которая этим полем владеет. Ключ, ни во что не
+    // попадающий, — это карточка расхождения, которую никто никогда не увидит.
+    const cf = Object.keys(dd().conflicts || {}).filter((id) =>
+      !(dd().deals || []).some((d) => d.id === id) && !(dd().requests || []).some((r) => r.id === id));
+    check('данные · расхождение привязано к существующей записи', cf.length === 0, cf.join(' '));
+
+    // Один объект — одна живая сделка. Две сделки на один лот означают, что его продали дважды.
+    const taken = {}; const dbl = [];
+    (dd().deals || []).forEach((d) => {
+      if (d.stage === 'lost') return;
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((oid) => {
+        if (!oid) return;
+        if (taken[oid]) dbl.push(oid + ': ' + taken[oid] + ' и ' + d.id); else taken[oid] = d.id;
+      });
+    });
+    check('данные · один объект не уходит в две сделки сразу', dbl.length === 0, dbl.join(' | '));
+
+    // И его не предлагают дальше по другим заявкам как свободный.
+    const resold = [];
+    (dd().requests || []).forEach((r) => (r.offered || []).forEach((o) => {
+      if (o.state === 'rejected') return;
+      const holder = taken[o.id];
+      if (holder && !(dd().deals || []).some((d) => d.id === holder && d.requestId === r.id)) {
+        resold.push(r.id + ' предлагает ' + o.id + ', занятый сделкой ' + holder);
+      }
+    }));
+    check('данные · занятый сделкой объект не предлагают другой заявке', resold.length === 0, resold.join(' | '));
   }
 
   // ---- the request's stage is computed from its own facts, so it cannot lie ----

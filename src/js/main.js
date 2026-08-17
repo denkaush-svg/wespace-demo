@@ -184,7 +184,17 @@
     if (d.cgatt) { const p = d.cgatt.split('~~'); store.cgCtx = store.cgCtx || []; store.cgCtx.push({ icon: p[0], label: p[1], att: true }); store.cgMenu = null; return api.emit(); }
     if (d.cgdepth) { store.cgDepth = d.cgdepth; return api.emit(); }
     if (d.dfconfirm) { const p = d.dfconfirm.split(':'); const dl = store.data.deals.find((x) => x.id === p[0]); if (dl) { dl.prov = dl.prov || {}; dl.prov[p[1]] = 'confirmed'; } api.toast('Поле подтверждено', 'ok'); return WS.ui.dealCard(p[0]); }
-    if (d.conflict) { const p = d.conflict.split(':'); const cf = (store.data.conflicts || {})[p[0]]; if (cf) { cf.chosen = p[1]; const dl = store.data.deals.find((x) => x.id === p[0]); const v = cf[p[1] + 'v']; if (dl && v) dl.amount = v; } api.toast('Значение выбрано; альтернатива сохранена', 'ok'); return WS.ui.dealCard(p[0]); }
+    // Расхождение живёт и на сделке (сумма), и на заявке (бюджет) — запись выбирается по id,
+    // а не по предположению, что это всегда сделка.
+    if (d.conflict) {
+      const p = d.conflict.split(':');
+      const cf = (store.data.conflicts || {})[p[0]];
+      const dl = store.data.deals.find((x) => x.id === p[0]);
+      const rq = (store.data.requests || []).find((x) => x.id === p[0]);
+      if (cf) { cf.chosen = p[1]; const v = cf[p[1] + 'v']; if (v && dl) dl.amount = v; else if (v && rq) rq.budget = v; }
+      api.save(); api.toast('Значение выбрано; альтернатива сохранена', 'ok');
+      return rq && !dl ? WS.ui.requestCard(p[0]) : WS.ui.dealCard(p[0]);
+    }
     if (d.notedel) { const p = d.notedel.split(':'); const arr = (store.data.dealTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.dealCard(p[0]); }
     if (d.cnotedel) { const p = d.cnotedel.split(':'); const arr = (store.data.contactTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.clientCard(p[0]); }
     if (d.conotedel) { const p = d.conotedel.split(':'); const arr = (store.data.companyTimeline || {})[p[0]]; if (arr) arr.splice(+p[1], 1); api.save(); api.toast('Заметка удалена'); return WS.ui.companyCard(p[0]); }

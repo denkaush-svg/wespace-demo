@@ -3230,8 +3230,9 @@
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
     const meta = [r.goal, r.budget ? 'бюджет ' + WS.AED(r.budget) : '', r.horizon ? 'срок ' + r.horizon : ''].filter(Boolean).join(' · ');
-    const dealForC = D().deals.find((d) => d.clientId === c.id);
-    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    // Тред заявки, а не первой попавшейся сделки клиента: у клиента их может быть несколько,
+    // и «первая найденная» — это молча выбранный не тот разговор.
+    const tid = 'request:' + r.id;
     const head = '<div class="dcli-head"><div class="dcli-av">' + init + '</div>' +
       '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
       '<div class="dcli-meta">' + meta + '</div></div></div>';
@@ -3413,6 +3414,9 @@
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       cxStack([
         [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
+        // Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны
+        // не сошлись, сделки нет. Раньше карточка расхождения висела на сделке, где бюджета уже нет.
+        conflictBlock(r),
         reqOffersStatusBlock(r),
         reqSecondaryRow(r),
       ]);
@@ -3439,8 +3443,7 @@
   function requestSpec(id) {
     const r = requestById(id); if (!r) return null;
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const dealForC = D().deals.find((d) => d.clientId === r.clientId);
-    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    const tid = 'request:' + r.id;
     return {
       type: 'request', id: id, title: 'Заявка · ' + r.title,
       hero: requestHero2(r),
@@ -4960,7 +4963,7 @@
         clientId: i.clientId, objectId: objOfClient(i.clientId),
         title: (cn(i.clientId) || 'Клиент') + ' — входящее', sub: (i.channel || 'сообщение') + ' · ' + (i.text || '').slice(0, 42), open: { nav: 'concierge' } });
     });
-    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: objOfClient('c_overdue'), title: 'Отправлено КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { deal: 'd_igor' } });
+    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: objOfClient('c_overdue'), title: 'Обещано КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { request: 'r_igor' } });
     push({ id: 'cm_assign_omar', type: 'задача', when: 'сегодня', dir: 'in', clientId: 'c_docs', objectId: objOfClient('c_docs'), title: 'Подготовить документы к сделке Виктора', sub: 'от: Омар Рахман (руководитель)', open: { deal: 'd_viktor' } });
     return acts;
   }
@@ -4971,6 +4974,7 @@
     const openBtn = a.open.event ? '<button class="btn sm" data-event="' + a.open.event + '">' + I('pencil') + 'Открыть</button>'
       : a.open.scn ? '<button class="btn sm primary" data-scn="' + a.open.scn + '">' + I('arrowRight') + 'Действие</button>'
       : a.open.deal ? '<button class="btn sm" data-deal="' + a.open.deal + '">' + I('eye') + 'Сделка</button>'
+      : a.open.request ? '<button class="btn sm" data-request="' + a.open.request + '">' + I('eye') + 'Заявка</button>'
       : a.open.client ? '<button class="btn sm" data-client="' + a.open.client + '">' + I('eye') + 'К записи</button>'
       : '<button class="btn sm" data-nav="' + (a.open.nav || 'concierge') + '">' + I('arrowRight') + 'Открыть</button>';
     return '<div class="radar-row" data-actrow="' + a.id + '"><div class="sev"></div><div class="icon-tile ' + tone + '">' + I(ic) + '</div>' +
@@ -5077,7 +5081,7 @@
       { open: 'doc:formA',   title: 'Form A — договор с собственником',   status: 'ready',                                          object: 'o_creekline', sub: 'RERA · листинг объекта' },
       { open: 'doc:booking', title: 'Договор бронирования',               status: 'draft',    deal: 'd_viktor', client: 'c_docs',    object: 'o_bayline',   sub: 'бронь · S4' },
       { open: 'doc:oqood',   title: 'Форма Oqood (регистрация off-plan)', status: 'external', deal: 'd_viktor', client: 'c_docs',    object: 'o_bayline',   sub: 'DLD · внешний шаг' },
-      { open: 'doc:formI',   title: 'Соглашение брокеров (Form I)',       status: 'draft',    deal: 'd_karim',  client: 'c_partner',                        sub: 'co-broking · S6' },
+      { open: 'doc:formI',   title: 'Соглашение брокеров (Form I)',       status: 'draft',    request: 'r_karim', client: 'c_partner',                      sub: 'co-broking · S6' },
       { open: 's13_pkg',     title: 'Клубный пакет (адресная рассылка)',  status: 'ready',                                          object: 'o_palmcourt', sub: 'эксклюзив клуба · S13' },
     ];
   }
@@ -5088,6 +5092,7 @@
   function docLinks(d) {
     const chips = [];
     if (d.deal) { const dl = D().deals.find((x) => x.id === d.deal); chips.push('<span class="badge">' + I('briefcase') + 'сделка: ' + (dl ? dl.title : d.deal) + '</span>'); }
+    if (d.request) { const rq = (D().requests || []).find((x) => x.id === d.request); chips.push('<span class="badge">' + I('mail') + 'заявка: ' + (rq ? rq.title : d.request) + '</span>'); }
     if (d.object) { const o = D().objects.find((x) => x.id === d.object); chips.push('<span class="badge">' + I('building') + 'объект: ' + (o ? o.name.split(',')[0] : d.object) + '</span>'); }
     if (d.client) { const c = D().clients.find((x) => x.id === d.client); chips.push('<span class="badge">' + I('users') + 'контакт: ' + (c ? c.name : d.client) + '</span>'); }
     return chips.length ? '<div class="prov" style="margin-top:4px">' + chips.join('') + '</div>' : '';

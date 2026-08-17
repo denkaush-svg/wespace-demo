@@ -22,14 +22,14 @@
   // ---------- threads (messenger model: one conversation per deal/object/lead) ----------
   const THREAD_MAP = {
     G1: 'deal:d_anna', G2: 'deal:d_anna', G3: 'deal:d_anna', S3: 'deal:d_anna', S8: 'deal:d_anna',
-    S4: 'deal:d_viktor', S6: 'deal:d_karim',
+    S4: 'deal:d_viktor', S6: 'request:r_karim',
     S2: 'object:new', S10: 'object:new', S9: 'object:o_bayline',
     S14: 'lead:sarah', S15: 'lead:cold', S13: 'general', S1: 'general',
   };
   const THREAD_META = {
     'deal:d_anna': { label: 'Анна Петрова · сделка', icon: 'users' },
     'deal:d_viktor': { label: 'Виктор Орлов · документ', icon: 'users' },
-    'deal:d_karim': { label: 'Karim Aziz · партнёр', icon: 'users' },
+    'request:r_karim': { label: 'Karim Aziz · партнёр', icon: 'users' },
     'object:new': { label: 'Новый объект · карточка', icon: 'building' },
     'object:o_bayline': { label: 'Bayline Terraces · доступность', icon: 'building' },
     'lead:sarah': { label: 'Sarah Mansour · ночной лид', icon: 'moon' },
