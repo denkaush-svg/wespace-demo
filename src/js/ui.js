@@ -3553,27 +3553,85 @@
     r.kp = { formed: true, at: 'сегодня', objectIds: sel };
     WS.storeApi.save(); WS.storeApi.toast('КП собрано из выбранного (' + sel.length + ')', 'ok'); WS.storeApi.emit();
   }
+  // Одна сделка заканчивается одним договором. Несколько лотов в одном комплексе одного продавца
+  // проходят одним договором и остаются лотами внутри сделки; другой комплекс — другой договор,
+  // другой такт подписания и другая сделка. Ключ группы — комплекс и продавец: башня или корпус
+  // («Creekline Residences · Tower B») договор не делит, поэтому в ключ идёт часть до разделителя.
+  function contractGroupKey(o) {
+    const dev = String(o.project || o.name || '').split('·')[0].trim();
+    return dev + ' | ' + (o.developer || '—');
+  }
+  function groupName(o) { return String(o.project || o.name || '').split('·')[0].trim(); }
+  function objReadiness(o) { return /off-?plan|оффплан/i.test(o.segment || '') ? 'оффплан' : 'готовый'; }
   function reqCreateDeal(reqId) {
     const r = requestById(reqId); if (!r) return;
     const sel = reqSelectedFree(r);
     if (!sel.length) { WS.storeApi.toast('Сначала отметьте объекты, которые выбрал клиент'); return; }
     const objs = sel.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    if (!objs.length) { WS.storeApi.toast('Выбранные объекты не найдены в инвентаре'); return; }
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const amount = objs.reduce((s, o) => s + (o.price || 0), 0);
-    const nid = 'd_' + r.id.replace(/^r_/, '') + '_' + ((D().deals || []).length + 1);
-    // Immutable snapshot of the КП the deal was created from — objects AND terms frozen at creation,
-    // so later edits to the request or the deal never rewrite this historical document. The request
-    // keeps its live r.kp (can be re-formed).
-    const kpSnapshot = { objectIds: sel.slice(), at: 'сегодня', version: 1,
-      terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
-    D().deals.push({ id: nid, clientId: r.clientId, companyId: null,
-      title: (c.name || 'Клиент') + ' · ' + (objs[0] ? objs[0].name.split(',')[0] : 'сделка'),
-      funnel: 'sale', stage: 'work', stageDays: 0, amount: amount, hot: false,
-      goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source, objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
-      requestId: r.id, lots: sel, objectId: sel[0], consideredProjects: objs.map((o) => o.name), kpSnapshot: kpSnapshot, prov: {} });
+    const fk = r.funnel || 'sale';
+
+    const groups = [];
+    objs.forEach((o) => {
+      const k = contractGroupKey(o);
+      let g = groups.find((x) => x.k === k);
+      if (!g) { g = { k: k, name: groupName(o), objs: [] }; groups.push(g); }
+      g.objs.push(o);
+    });
+
+    // Всё собирается до записи: половина созданных сделок хуже, чем ни одной, — заявка
+    // осталась бы с частью лотов в договорной работе и без следа, почему остальные не ушли.
+    const taken = {};
+    (D().deals || []).forEach((d) => { taken[d.id] = 1; });
+    const drafts = groups.map((g, gi) => {
+      const lots = g.objs.map((o) => o.id);
+      const readiness = objReadiness(g.objs[0]);
+      const steps = (WS.DEAL_STEPS || {})[WS.contractKindFor(fk, readiness)] || ['prep'];
+      const base = 'd_' + r.id.replace(/^r_/, '') + (groups.length > 1 ? '_' + (gi + 1) : '');
+      let nid = base, n = 1;
+      while (taken[nid]) nid = base + '_' + (++n);
+      taken[nid] = 1;
+      // Снимок КП, из которого выросла сделка: объекты и условия заморожены на момент создания,
+      // чтобы позднейшие правки заявки не переписывали исторический документ.
+      const kpSnapshot = { objectIds: lots.slice(), at: 'сегодня', version: 1,
+        terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
+      return {
+        deal: { id: nid, clientId: r.clientId, companyId: null,
+          title: (c.name || 'Клиент') + ' · ' + g.name,
+          sub: g.name + (lots.length > 1 ? ' · лотов: ' + lots.length : ''),
+          funnel: fk, readiness: readiness, side: r.side || null,
+          stage: steps[0], stageDays: 0, amount: g.objs.reduce((s, o) => s + (o.price || 0), 0), hot: false,
+          createdAt: 'сегодня', updated: 'только что', tags: [],
+          goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source,
+          objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
+          requestId: r.id, lots: lots, objectId: lots[0],
+          consideredProjects: [g.name], kpSnapshot: kpSnapshot, prov: {} },
+        entry: { ch: 'crm', by: 'Система', at: 'только что', ord: 999,
+          text: 'Условия согласованы по «' + g.name + '» — сделка создана из заявки «' + r.title + '»' +
+            (lots.length > 1 ? ' · лотов в одном договоре: ' + lots.length : '') },
+      };
+    });
+
     D().dealTimeline = D().dealTimeline || {};
-    D().dealTimeline[nid] = [{ ch: 'crm', by: 'Система', at: 'только что', ord: 999, text: 'Сделка создана из заявки «' + r.title + '» · подписан документ о намерениях · лотов: ' + sel.length }];
-    WS.storeApi.save(); WS.storeApi.toast('Сделка создана из заявки · лотов: ' + sel.length, 'ok'); dealCard(nid);
+    drafts.forEach((d) => { D().deals.push(d.deal); D().dealTimeline[d.deal.id] = [d.entry]; });
+    // Переход — событие заявки: именно она разошлась на договоры, и её история должна это помнить.
+    D().requestTimeline = D().requestTimeline || {};
+    (D().requestTimeline[r.id] = D().requestTimeline[r.id] || []).push({
+      ch: 'system', kind: 'ai', by: 'Консьерж', at: 'только что', ord: 999,
+      text: drafts.length === 1
+        ? 'Условия согласованы по «' + groups[0].name + '» — заведена сделка.'
+        : 'Условия согласованы по ' + drafts.length + ' комплексам — заведено сделок: ' + drafts.length +
+          ' (' + groups.map((g) => g.name).join(', ') + '), по одному договору на каждый.',
+    });
+    WS.storeApi.save();
+    if (drafts.length === 1) {
+      WS.storeApi.toast('Сделка создана' + (drafts[0].deal.lots.length > 1 ? ' · лотов в договоре: ' + drafts[0].deal.lots.length : ''), 'ok');
+      dealCard(drafts[0].deal.id);
+    } else {
+      WS.storeApi.toast('Комплексов разных — ' + drafts.length + ', значит и договоров столько же: сделок создано ' + drafts.length, 'ok');
+      requestCard(r.id);
+    }
   }
   // ---- Request Ключевые условия edit (D) + КП document (E) + parent-request breadcrumb (F) ----
   const REQ_ENUMS = {

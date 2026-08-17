@@ -1286,6 +1286,67 @@ setTimeout(async () => {
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
   }
 
+  // ---- переход: один комплекс — один договор — одна сделка ----
+  // Кнопка «создать сделку» делала одну сделку из всего выбранного, чем бы оно ни было: две
+  // квартиры в разных ЖК от разных застройщиков попадали под один договор, которого не бывает.
+  {
+    const D2 = () => WS.store.data;
+    const revert = JSON.parse(JSON.stringify({ deals: D2().deals, reqs: D2().requests,
+      dtl: D2().dealTimeline, rtl: D2().requestTimeline }));
+
+    // Два комплекса от разных продавцов в одной заявке → две сделки, каждая со своим договором.
+    const r = D2().requests.find((x) => x.id === 'r_lease');
+    r.offered = [{ id: 'o_baycentral', state: 'selected' }, { id: 'o_jvcpark', state: 'selected' }];
+    r.funnel = 'sale';
+    const before = D2().deals.length;
+    WS.ui.reqCreateDeal('r_lease');
+    const made = D2().deals.filter((d) => d.requestId === 'r_lease');
+    check('переход · разные комплексы разошлись по сделкам', made.length === 2,
+      made.length + ' (создано ' + (D2().deals.length - before) + ')');
+    check('переход · в каждой сделке лоты одного комплекса',
+      made.every((d) => {
+        const projs = (d.lots || []).map((id) => (D2().objects.find((o) => o.id === id) || {}).project || '');
+        return new Set(projs.map((p) => p.split('·')[0].trim())).size === 1;
+      }), made.map((d) => (d.lots || []).join('+')).join(' | '));
+    check('переход · сделка стартует с первого шага своего договора',
+      made.every((d) => {
+        const steps = (WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || [];
+        return steps[0] === d.stage;
+      }), made.map((d) => d.stage + '/' + d.readiness).join(' '));
+    check('переход · услуга наследуется от заявки', made.every((d) => d.funnel === 'sale'));
+    check('переход · у каждой новой сделки есть история',
+      made.every((d) => ((D2().dealTimeline || {})[d.id] || []).length > 0));
+    check('переход · заявка помнит, что разошлась на договоры',
+      ((D2().requestTimeline || {})['r_lease'] || []).some((e) => /Условия согласованы/.test(e.text || '')));
+
+    // Повторное нажатие ничего не удваивает: занятые сделкой лоты в выборку уже не попадают.
+    const n2 = D2().deals.length;
+    WS.ui.reqCreateDeal('r_lease');
+    check('переход · повторный переход не создаёт дублей', D2().deals.length === n2,
+      D2().deals.length + ' против ' + n2);
+
+    // Два лота в ОДНОМ комплексе — это один договор и одна сделка с двумя лотами.
+    D2().deals = JSON.parse(JSON.stringify(revert.deals));
+    D2().requests = JSON.parse(JSON.stringify(revert.reqs));
+    D2().dealTimeline = JSON.parse(JSON.stringify(revert.dtl));
+    D2().requestTimeline = JSON.parse(JSON.stringify(revert.rtl));
+    const r2 = D2().requests.find((x) => x.id === 'r_lease');
+    r2.offered = [{ id: 'o_difc_a', state: 'selected' }, { id: 'o_difc_b', state: 'selected' }];
+    r2.funnel = 'sale';
+    // Освободим офисы от портфельной сделки, чтобы они снова были доступны к переходу.
+    D2().deals = D2().deals.filter((d) => d.id !== 'd_rentbiz');
+    WS.ui.reqCreateDeal('r_lease');
+    const one = D2().deals.filter((d) => d.requestId === 'r_lease');
+    check('переход · один комплекс остаётся одной сделкой', one.length === 1, String(one.length));
+    check('переход · оба лота внутри одного договора',
+      one.length === 1 && (one[0].lots || []).length === 2, JSON.stringify(one[0] && one[0].lots));
+
+    D2().deals = JSON.parse(JSON.stringify(revert.deals));
+    D2().requests = JSON.parse(JSON.stringify(revert.reqs));
+    D2().dealTimeline = JSON.parse(JSON.stringify(revert.dtl));
+    D2().requestTimeline = JSON.parse(JSON.stringify(revert.rtl));
+  }
+
   // ---- Консьерж не делает вид, что умеет двигать стадию заявки ----
   {
     const r = WS.agent.ask('переведи сделку Анны в показ');
