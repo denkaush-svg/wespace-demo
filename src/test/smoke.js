@@ -845,7 +845,10 @@ setTimeout(async () => {
     const RS = WS.REQ_STAGES || [], RL = WS.REQ_STAGE_LABELS || {}, DS = WS.DEAL_STEPS || {};
     // Одна воронка заявки на все услуги — список стадий существует ровно один.
     check('model · воронка заявки одна и терминальна', RS.length > 3 &&
-      RS.indexOf('agreed') > RS.indexOf('talks') && RS[RS.length - 1] === 'lost', RS.join(' '));
+      RS.indexOf('closed') > RS.indexOf('talks') && RS[RS.length - 1] === 'lost', RS.join(' '));
+    // Граница — событие по группе лотов. Стадия «согласовано» на заявке лгала бы при частичном
+    // переходе: один ЖК уже в сделке, по другому ещё переговоры.
+    check('model · согласование не стадия заявки', RS.indexOf('agreed') < 0, RS.join(' '));
     check('model · у каждой стадии заявки есть подпись', RS.every((k) => !!RL[k]),
       RS.filter((k) => !RL[k]).join(' '));
     // Услуги расходятся подписью, а не набором стадий: там, где расхождение есть, оно по стороне.
