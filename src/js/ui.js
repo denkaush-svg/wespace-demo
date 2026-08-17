@@ -2044,6 +2044,7 @@
       (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : '') +
       (clientPrefProfile(c) ? '<div class="pref-observed">' + clientPrefProfile(c) + '</div>' : ''));
     const sig = dxSec('target', 'Сигналы и приоритет', prio, '<div class="sig-wide">' + signalsInner(c) + '</div>');
+    const offer = clientOfferBlock(c);
     // Deal-level actions («подобрать объекты», «расчёт и КП», «назначить показ») belong to a deal
     // and already live on the deal card and in the page header; on the client they invited an agent
     // to act on a transaction from a screen that does not know which transaction.
@@ -2054,9 +2055,98 @@
     return cxStack([
       [conciergeClientHandover(c), contactBlock(c)],
       [key, psychSummary(c)],
-      sig,
+      [offer, sig],
       contactFeedBlock(c, 5),
     ]);
+  }
+  // Критерии подбора, выведенные из заявок клиента: бюджет — самый крупный из запрошенных,
+  // районы — все, которые он называл. Руками агент выставил бы то же самое.
+  function clientMatchModel(c) {
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const m = initMatch(c);
+    const budgets = reqs.map((r) => r.budget).filter(Boolean);
+    if (budgets.length) m.max = Math.max.apply(null, budgets);
+    else if (c.budget) m.max = c.budget;
+    const areas = [];
+    reqs.forEach((r) => (r.areas || []).forEach((a) => { if (areas.indexOf(a) < 0) areas.push(a); }));
+    (c.areas || []).forEach((a) => { if (areas.indexOf(a) < 0) areas.push(a); });
+    m.psych = !!(c.psych && c.psych.filled);
+    // Что человек вообще ищет — жильё или коммерцию. Предлагать инвестору в квартиры офисный блок
+    // значит показать, что подбор считает проценты, но не читает запрос.
+    const kinds = reqs.map((r) => (r.objectType || '') + ' ' + (r.goal || '') + ' ' + (r.dealType || ''))
+      .concat((D().deals || []).filter((d) => d.clientId === c.id).map((d) => d.objectType || ''))
+      .concat([(c.types || []).join(' '), c.goal || '']).join(' ');
+    return { m: m, areas: areas, commercial: /офис|габ|коммерч|fit-?out/i.test(kinds) };
+  }
+  // Объекты, которые этому человеку уже показывали, — в любой его заявке и в любом состоянии.
+  function clientSeenObjects(c) {
+    const seen = {};
+    (D().requests || []).filter((r) => r.clientId === c.id)
+      .forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = o.state || 'offered'; }));
+    (D().deals || []).filter((d) => d.clientId === c.id)
+      .forEach((d) => ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) seen[id] = 'deal'; }));
+    return seen;
+  }
+  // Объект, который уже стоит в чьей-то живой сделке, предлагать нельзя никому: он занят, и
+  // предложить его — значит пообещать то, чего нет.
+  function objectsInLiveDeals() {
+    const taken = {};
+    (D().deals || []).forEach((d) => {
+      if (d.stage === 'lost') return;
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) taken[id] = d.id; });
+    });
+    return taken;
+  }
+  function clientOffers(c) {
+    const mm = clientMatchModel(c);
+    const seen = clientSeenObjects(c);
+    const taken = objectsInLiveDeals();
+    return (D().objects || [])
+      // Жёсткие отсечки — то, что не обсуждается: чужой класс объекта и цена выше бюджета.
+      // Всё остальное решает счёт.
+      .filter((o) => !seen[o.id] && !taken[o.id])
+      .filter((o) => /офис|габ/i.test(o.br || '') === !!mm.commercial)
+      .filter((o) => !mm.m.max || o.price <= mm.m.max * 1.05)
+      .map((o) => {
+        // Район не сужает выборку жёстко: объект вне названных районов может выиграть по остальному,
+        // и тогда агенту важнее увидеть его, чем не увидеть.
+        const inArea = !mm.areas.length || mm.areas.indexOf(o.area) >= 0;
+        const r = matchScore(o, Object.assign({}, mm.m, { area: 'all' }), c);
+        return { o: o, pct: r.pct - (inArea ? 0 : 12), good: r.good, bad: r.bad, inArea: inArea };
+      })
+      .filter((x) => x.pct >= 55)
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 3);
+  }
+  function clientOfferBlock(c) {
+    const list = clientOffers(c);
+    const seenN = Object.keys(clientSeenObjects(c)).length;
+    if (!list.length) {
+      const why = seenN
+        ? 'Всё, что подходит под запрос, клиенту уже показывали. Новое появится, когда пополнится инвентарь или изменятся критерии.'
+        : 'Под этот запрос в инвентаре пока ничего нет — уточните бюджет или район, либо запросите объект у клубного партнёра.';
+      return dxSec('building', 'Что предложить', '', '<div class="cm-empty">' + I('search') + why + '</div>');
+    }
+    const rows = list.map((x) => {
+      const o = x.o;
+      const why = x.good.slice(0, 3).join(', ') || 'подходит по основным критериям';
+      // Оговорки называются вслух: район не тот, что просили, или проверка доступности устарела.
+      // Подбор, который молчит о своих натяжках, агент перестаёт читать после первой осечки.
+      const notes = [];
+      if (!x.inArea) notes.push('не тот район, что просил клиент');
+      if (o.verified !== 'verified') notes.push('проверка доступности устарела');
+      if (x.bad.length) notes.push(x.bad[0]);
+      const warn = notes.length ? '<div class="of-warn">' + I('warn') + notes[0] + '</div>' : '';
+      return '<div class="of-row" data-obj="' + o.id + '">' +
+        '<span class="of-pct' + (x.pct >= 75 ? ' hi' : '') + '">' + x.pct + '%</span>' +
+        '<div class="of-b"><div class="of-t">' + o.name + '</div>' +
+        '<div class="of-m">' + o.area + ' · ' + WS.AED(o.price) + ' · ' + o.br + '</div>' +
+        '<div class="of-why">' + capFirst(why) + '</div>' + warn + '</div>' +
+        '<button class="btn xs" data-shortlist="' + o.id + '">' + I('star') + 'В подборку</button></div>';
+    }).join('');
+    return dxSec('building', 'Что предложить', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<div class="of-list">' + rows + '</div>' +
+      '<div class="of-foot">' + I('sparkle') + 'Отобрано по бюджету, районам и профилю решений; уже показанное исключено.</div>');
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;

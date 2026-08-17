@@ -978,6 +978,43 @@ setTimeout(async () => {
     check('brief клиент · не пересказывает стадию сделки', leaked.length === 0, leaked.join(' '));
   }
 
+  // ---- «Что предложить»: подбор не обещает того, чего нет ----
+  {
+    const objById = {}; (dd().objects || []).forEach((o) => { objById[o.id] = o; });
+    const taken = {};
+    (dd().deals || []).forEach((d) => { if (d.stage === 'lost') return;
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) taken[id] = d.id; }); });
+    (dd().clients || []).forEach((c) => {
+      WS.ui.clientCard(c.id);
+      const sec = [].slice.call(doc.querySelectorAll('#app .view .dx-sec'))
+        .find((e) => /Что предложить/.test(e.textContent));
+      check('offer ' + c.id + ' · блок есть', !!sec);
+      if (!sec) return;
+      const rows = [].slice.call(sec.querySelectorAll('.of-row'));
+      // Занятый объект нельзя предложить никому: он уже в чьей-то живой сделке.
+      const busy = rows.map((r) => r.getAttribute('data-obj')).filter((id) => taken[id]);
+      check('offer ' + c.id + ' · не предлагает занятое', busy.length === 0, busy.join(' '));
+      // Показанное этому клиенту — тоже не предложение: он его уже видел.
+      const seen = {};
+      (dd().requests || []).filter((r) => r.clientId === c.id)
+        .forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = 1; }));
+      const again = rows.map((r) => r.getAttribute('data-obj')).filter((id) => seen[id]);
+      check('offer ' + c.id + ' · не предлагает показанное дважды', again.length === 0, again.join(' '));
+      // Цена выше бюджета — не предложение, а трата внимания.
+      const reqs = (dd().requests || []).filter((r) => r.clientId === c.id).map((r) => r.budget).filter(Boolean);
+      const cap = reqs.length ? Math.max.apply(null, reqs) : 0;
+      const over = cap ? rows.map((r) => objById[r.getAttribute('data-obj')])
+        .filter((o) => o && o.price > cap * 1.05).map((o) => o.id) : [];
+      check('offer ' + c.id + ' · не предлагает вне бюджета', over.length === 0, over.join(' '));
+      // У каждой строки есть причина: процент без объяснения — это не подбор, а лотерея.
+      check('offer ' + c.id + ' · у каждого предложения есть причина',
+        rows.every((r) => r.querySelector('.of-why') && r.querySelector('.of-why').textContent.trim().length > 8));
+      // Пусто — тоже ответ, но он должен быть объяснён.
+      if (!rows.length) check('offer ' + c.id + ' · пустой блок объясняет почему',
+        /уже показывали|ничего нет/.test(sec.textContent));
+    });
+  }
+
   // ---- one deal is one contract: every lot in it sits in the same development ----
   {
     const objById = {};
