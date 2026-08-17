@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 19:48</title>
+  <title>WESPACE · сборка 20:07</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='19:48';
+    window.WS_BUILD='20:07';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2243,7 +2243,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   overflow:hidden; background-color:var(--surface); background-size:cover; background-position:center right;
   box-shadow:0 1px 2px rgba(17,17,17,.04), 0 6px 20px rgba(17,17,17,.05); }
 .wh__c{ position:relative; z-index:1; max-width:640px; }
-.wh__t{ margin:0; font-family:var(--font-disp); font-weight:500; font-size:clamp(30px,4.4vw,50px);
+.wh__t{ margin:0; font-family:var(--font-name); font-weight:500; font-size:clamp(30px,4.4vw,50px);
   line-height:.9; letter-spacing:.012em; text-transform:uppercase; color:var(--ink); }
 .wh__p{ margin-top:8px; max-width:560px; color:var(--mut); font-size:12.5px; line-height:1.45; }
 .wh__eye{ display:flex; align-items:center; gap:7px; margin-bottom:8px; font-size:11px; font-weight:700;
@@ -6786,7 +6786,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (deals.length) {
       const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
       const open = deals.filter((d) => !dealClosed(d));
-      let vol = 'Через компанию идёт ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
+      let vol = 'Через компанию ' + plural(deals.length, 'идёт', 'идут', 'идёт') + ' ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
         ' на ' + WS.AED(total);
       if (open.length) {
         const stages = joinRu(Array.from(new Set(open.map((d) => '«' + funnelSteps(d).cols[funnelSteps(d).idx] + '»'))));
@@ -7194,7 +7194,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const n = dir.deals.length;
       let line = 'За это время — ' + (n === 1 ? 'одна сделка' : n + ' ' + plural(n, 'сделка', 'сделки', 'сделок'));
       if (dir.services.length) line += ' по ' + joinRu(dir.services.map(datService));
-      if (dir.types.length) line += ' ' + joinRu(dir.types.map(genType));
+      // Одна услуга — можно назвать, что именно; несколько — перечисление типов начинает
+      // приписывать каждый тип каждой услуге, чего в данных нет.
+      if (dir.services.length === 1 && dir.types.length) line += ' ' + joinRu(dir.types.map(genType));
 
       if (won.length) line += ', ' + (won.length === 1 ? 'одна доведена' : won.length + ' доведены') + ' до конца';
       if (dir.offered) {
@@ -7218,7 +7220,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openReq.forEach((r) => {
       if (r.goal) wants.push(lowerFirst(r.goal));
       if (r.budget) wants.push('до ' + WS.AED(r.budget));
-      if (r.horizon) wants.push('срок ' + r.horizon);
+      if (r.horizon) wants.push(/\d|мес|нед|дн/i.test(r.horizon) ? 'срок ' + r.horizon : lowerFirst(r.horizon));
     });
     if (wants.length) today.push('ищет: ' + wants.slice(0, 3).join(', '));
     else if (active.length) today.push('в работе ' + active.length + ' ' + plural(active.length, 'направление', 'направления', 'направлений'));
@@ -8204,7 +8206,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // 3. Последний существенный факт — деньги, бумага или выбор. Один, самый поздний по смыслу.
     const dep = d.deposit;
     const drafts = docsFor((x) => x.deal === d.id && x.status === 'draft');
-    if (dealClosed(d) && dealWon(d)) out.push('Сделка закрыта успехом, комиссия зафиксирована.');
+    if (dealClosed(d) && dealWon(d)) out.push('Сделка успешно закрыта, комиссия зафиксирована.');
     else if (dep && dep.paid) out.push('Внесено: ' + depKind(dep) + ' — ' + WS.AED(dep.amount) + (dep.at ? ', ' + dep.at : '') + '.');
     // Если документ уже у клиента, он и есть последний факт — фраза про полученный расчёт лишняя.
     else if (dealKpObjects(d).length && !drafts.length) out.push('Клиент получил расчёт и условия сделки.');
@@ -9557,7 +9559,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       if (o.handover) terms.push('сдача ' + o.handover);
       if (o.paymentPlan) terms.push('рассрочка ' + o.paymentPlan.replace(/\s*·\s*/g, ' / '));
     } else {
-      terms.push('готовый' + (o.occupancy ? ', ' + lowerFirst(o.occupancy) : ''));
+      terms.push('готовый' + (o.occupancy ? ', заселение — ' + lowerFirst(o.occupancy) : ''));
       if (o.serviceCharge) terms.push('service charge ' + o.serviceCharge);
     }
     // «и» binds two things of a kind; a status and a service charge are not that, so a ready
@@ -9611,7 +9613,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const out = [];
     if (o.usp) out.push(['star', 'Чего нет у соседних юнитов', o.usp]);
     if (gap != null && gap <= -2) out.push(['money', 'На ' + Math.abs(gap) + '% дешевле района',
-      WS.AED(pm) + ' за м² против ' + WS.AED(mk.perM2) + ' — средней цены сделок по ' + o.area + ' за 12 месяцев.']);
+      WS.AED(pm) + ' за м² против средней по ' + o.area + ' — ' + WS.AED(mk.perM2) + ' за 12 месяцев.']);
     if (mk && y != null && y >= mk.yieldTypical) out.push(['wallet', 'Доходность выше типичной по району',
       ru(y) + '% против ' + ru(mk.yieldTypical) + '% по ' + o.area + '. Считано по одной модели, цифры сравнимы.']);
     if (mk && mk.priceYoY >= 8) out.push(['trend', 'Район прибавил ' + mk.priceYoY + '% за год',
@@ -9623,7 +9625,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!off && /vacant|свободн/i.test(o.occupancy || '')) out.push(['clock', 'Доход с первого месяца',
       'Юнит свободен — заезд арендатора не ждёт окончания чужого договора.']);
     if (a.metro) out.push(['compass', 'Метро в пешей доступности',
-      'Для арендатора без машины район остаётся в выборке — это шире спрос при пересдаче.']);
+      'Район остаётся в выборке у арендатора без машины — это расширяет круг желающих при пересдаче.']);
     if (mk && mk.dom <= 40) out.push(['handshake', 'Из района выходят быстро',
       'Средний срок экспозиции ' + mk.dom + ' дней. Аргумент для того, кто боится «застрять в бетоне».']);
     return out.slice(0, 5);
@@ -9637,7 +9639,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
     const out = [];
     if (o.verified !== 'verified' || o.trakheesi !== 'ok') out.push(['Он вообще ещё продаётся?',
-      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до него объект нельзя публиковать как листинг' : '') +
+      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до его получения объект нельзя публиковать как листинг' : '') +
       '. Сверьте с застройщиком до показа, это одна задача.']);
     if (off) out.push(['Плачу сейчас — получаю когда?',
       (o.handover ? 'Ключи ' + o.handover + '. ' : '') + 'До сдачи платежи идут частями по графику' +
@@ -12143,7 +12145,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '; подписан ' + k.signedAt + (age ? ', ' + age : '') + '.');
     const now = st.cur.map((m) => lowerFirst(m.label));
     out.push(now.length
-      ? 'Сейчас: ' + now.join('; ') + '. Пройдено ' + st.done + ' из ' + st.total + ' вех.'
+      ? 'Сейчас: ' + now.join('; ') + '.'
       : 'Все вехи пройдены — договор можно закрывать.');
     const late = (k.schedule || []).find((x) => x.state === 'overdue');
     const due = (k.schedule || []).find((x) => x.state === 'due');

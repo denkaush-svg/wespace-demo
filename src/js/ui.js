@@ -1470,7 +1470,7 @@
     if (deals.length) {
       const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
       const open = deals.filter((d) => !dealClosed(d));
-      let vol = 'Через компанию идёт ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
+      let vol = 'Через компанию ' + plural(deals.length, 'идёт', 'идут', 'идёт') + ' ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
         ' на ' + WS.AED(total);
       if (open.length) {
         const stages = joinRu(Array.from(new Set(open.map((d) => '«' + funnelSteps(d).cols[funnelSteps(d).idx] + '»'))));
@@ -1878,7 +1878,9 @@
       const n = dir.deals.length;
       let line = 'За это время — ' + (n === 1 ? 'одна сделка' : n + ' ' + plural(n, 'сделка', 'сделки', 'сделок'));
       if (dir.services.length) line += ' по ' + joinRu(dir.services.map(datService));
-      if (dir.types.length) line += ' ' + joinRu(dir.types.map(genType));
+      // Одна услуга — можно назвать, что именно; несколько — перечисление типов начинает
+      // приписывать каждый тип каждой услуге, чего в данных нет.
+      if (dir.services.length === 1 && dir.types.length) line += ' ' + joinRu(dir.types.map(genType));
 
       if (won.length) line += ', ' + (won.length === 1 ? 'одна доведена' : won.length + ' доведены') + ' до конца';
       if (dir.offered) {
@@ -1902,7 +1904,7 @@
     openReq.forEach((r) => {
       if (r.goal) wants.push(lowerFirst(r.goal));
       if (r.budget) wants.push('до ' + WS.AED(r.budget));
-      if (r.horizon) wants.push('срок ' + r.horizon);
+      if (r.horizon) wants.push(/\d|мес|нед|дн/i.test(r.horizon) ? 'срок ' + r.horizon : lowerFirst(r.horizon));
     });
     if (wants.length) today.push('ищет: ' + wants.slice(0, 3).join(', '));
     else if (active.length) today.push('в работе ' + active.length + ' ' + plural(active.length, 'направление', 'направления', 'направлений'));
@@ -2888,7 +2890,7 @@
     // 3. Последний существенный факт — деньги, бумага или выбор. Один, самый поздний по смыслу.
     const dep = d.deposit;
     const drafts = docsFor((x) => x.deal === d.id && x.status === 'draft');
-    if (dealClosed(d) && dealWon(d)) out.push('Сделка закрыта успехом, комиссия зафиксирована.');
+    if (dealClosed(d) && dealWon(d)) out.push('Сделка успешно закрыта, комиссия зафиксирована.');
     else if (dep && dep.paid) out.push('Внесено: ' + depKind(dep) + ' — ' + WS.AED(dep.amount) + (dep.at ? ', ' + dep.at : '') + '.');
     // Если документ уже у клиента, он и есть последний факт — фраза про полученный расчёт лишняя.
     else if (dealKpObjects(d).length && !drafts.length) out.push('Клиент получил расчёт и условия сделки.');
@@ -4241,7 +4243,7 @@
       if (o.handover) terms.push('сдача ' + o.handover);
       if (o.paymentPlan) terms.push('рассрочка ' + o.paymentPlan.replace(/\s*·\s*/g, ' / '));
     } else {
-      terms.push('готовый' + (o.occupancy ? ', ' + lowerFirst(o.occupancy) : ''));
+      terms.push('готовый' + (o.occupancy ? ', заселение — ' + lowerFirst(o.occupancy) : ''));
       if (o.serviceCharge) terms.push('service charge ' + o.serviceCharge);
     }
     // «и» binds two things of a kind; a status and a service charge are not that, so a ready
@@ -4295,7 +4297,7 @@
     const out = [];
     if (o.usp) out.push(['star', 'Чего нет у соседних юнитов', o.usp]);
     if (gap != null && gap <= -2) out.push(['money', 'На ' + Math.abs(gap) + '% дешевле района',
-      WS.AED(pm) + ' за м² против ' + WS.AED(mk.perM2) + ' — средней цены сделок по ' + o.area + ' за 12 месяцев.']);
+      WS.AED(pm) + ' за м² против средней по ' + o.area + ' — ' + WS.AED(mk.perM2) + ' за 12 месяцев.']);
     if (mk && y != null && y >= mk.yieldTypical) out.push(['wallet', 'Доходность выше типичной по району',
       ru(y) + '% против ' + ru(mk.yieldTypical) + '% по ' + o.area + '. Считано по одной модели, цифры сравнимы.']);
     if (mk && mk.priceYoY >= 8) out.push(['trend', 'Район прибавил ' + mk.priceYoY + '% за год',
@@ -4307,7 +4309,7 @@
     if (!off && /vacant|свободн/i.test(o.occupancy || '')) out.push(['clock', 'Доход с первого месяца',
       'Юнит свободен — заезд арендатора не ждёт окончания чужого договора.']);
     if (a.metro) out.push(['compass', 'Метро в пешей доступности',
-      'Для арендатора без машины район остаётся в выборке — это шире спрос при пересдаче.']);
+      'Район остаётся в выборке у арендатора без машины — это расширяет круг желающих при пересдаче.']);
     if (mk && mk.dom <= 40) out.push(['handshake', 'Из района выходят быстро',
       'Средний срок экспозиции ' + mk.dom + ' дней. Аргумент для того, кто боится «застрять в бетоне».']);
     return out.slice(0, 5);
@@ -4321,7 +4323,7 @@
     const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
     const out = [];
     if (o.verified !== 'verified' || o.trakheesi !== 'ok') out.push(['Он вообще ещё продаётся?',
-      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до него объект нельзя публиковать как листинг' : '') +
+      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до его получения объект нельзя публиковать как листинг' : '') +
       '. Сверьте с застройщиком до показа, это одна задача.']);
     if (off) out.push(['Плачу сейчас — получаю когда?',
       (o.handover ? 'Ключи ' + o.handover + '. ' : '') + 'До сдачи платежи идут частями по графику' +
@@ -6827,7 +6829,7 @@
       '; подписан ' + k.signedAt + (age ? ', ' + age : '') + '.');
     const now = st.cur.map((m) => lowerFirst(m.label));
     out.push(now.length
-      ? 'Сейчас: ' + now.join('; ') + '. Пройдено ' + st.done + ' из ' + st.total + ' вех.'
+      ? 'Сейчас: ' + now.join('; ') + '.'
       : 'Все вехи пройдены — договор можно закрывать.');
     const late = (k.schedule || []).find((x) => x.state === 'overdue');
     const due = (k.schedule || []).find((x) => x.state === 'due');
