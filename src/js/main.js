@@ -325,7 +325,8 @@
       case 'conciergeSearchClear': store.conciergeSearch = ''; api.emit(); break;
       case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
       case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
-      case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' }; api.emit(); break;
+      case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' }; api.emit(); break;
+      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
       case 'endTour': store.tour = { active: false, scenarioId: null, stepIndex: 0 }; api.emit(); break;

@@ -410,12 +410,17 @@ setTimeout(async () => {
     // ---- a guarded field needs explicit confirmation ----
     const stageWas = dealBy('d_anna').stage;
     const revB = WS.store.dataRevision;
-    const r5 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'work' } }]);
+    const r5 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'book' } }]);
     check('apply · guarded field refused without confirmation', !!r5 && r5.ok === false && r5.code === 'needs_confirmation', JSON.stringify(r5));
     check('apply · unconfirmed guarded write changes nothing', dealBy('d_anna').stage === stageWas);
     check('apply · unconfirmed guarded write leaves revision alone', WS.store.dataRevision === revB);
-    const r6 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'work' } }], { confirmed: true });
-    check('apply · guarded field applies once confirmed', !!r6 && r6.ok === true && dealBy('d_anna').stage === 'work', JSON.stringify(r6));
+    const r6 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'book' } }], { confirmed: true });
+    check('apply · guarded field applies once confirmed', !!r6 && r6.ok === true && dealBy('d_anna').stage === 'book', JSON.stringify(r6));
+    // Тот же запрет действует и через патч: назвать поле «stage» — не способ обойти договор.
+    const r5b = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'exec' } }], { confirmed: true });
+    check('apply · шаг вне договора отклонён и в патче', !!r5b && r5b.ok === false && /договор/.test(r5b.error || ''), JSON.stringify(r5b));
+    check('apply · отклонённый патч не сдвинул сделку', dealBy('d_anna').stage === 'book');
+    sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'prep' } }], { confirmed: true });
     check('apply · guarded patch reported as tier=guarded', !!r6 && r6.tier === 'guarded', r6 && r6.tier);
 
     // ---- a batch is all-or-nothing ----
@@ -646,7 +651,7 @@ setTimeout(async () => {
 
     // ---- a guarded change still needs the confirmation, through the agent too ----
     const dealStageWas = dealBy('d_anna').stage;
-    const p2 = AG.ask('переведи сделку Анны в стадию подготовка');
+    const p2 = AG.ask('переведи сделку Анны Инвест-квартира в стадию подготовка');
     check('agent · a stage change is proposed, not applied', !!p2 && p2.kind === 'proposal' && dealBy('d_anna').stage === dealStageWas);
     check('agent · the proposal is marked as needing confirmation', p2.tier === 'guarded', 'tier=' + (p2 && p2.tier));
     AG.confirm(p2.id);
@@ -1075,9 +1080,12 @@ setTimeout(async () => {
         .forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = 1; }));
       const again = rows.map((r) => r.getAttribute('data-obj')).filter((id) => seen[id]);
       check('offer ' + c.id + ' · не предлагает показанное дважды', again.length === 0, again.join(' '));
-      // Цена выше бюджета — не предложение, а трата внимания.
-      const reqs = (dd().requests || []).filter((r) => r.clientId === c.id).map((r) => r.budget).filter(Boolean);
-      const cap = reqs.length ? Math.max.apply(null, reqs) : 0;
+      // Цена выше бюджета — не предложение, а трата внимания. Потолок считается по запросам
+      // на покупку: бюджет аренды — ставка за год, и в одной шкале с ценой объекта его нет.
+      const BUY = ['sale', 'cross', 'consult', 'exclusive'];
+      const reqs = (dd().requests || []).filter((r) => r.clientId === c.id && BUY.indexOf(r.funnel || 'sale') >= 0)
+        .map((r) => r.budget).filter(Boolean);
+      const cap = reqs.length ? Math.max.apply(null, reqs) : (c.budget || 0);
       const over = cap ? rows.map((r) => objById[r.getAttribute('data-obj')])
         .filter((o) => o && o.price > cap * 1.05).map((o) => o.id) : [];
       check('offer ' + c.id + ' · не предлагает вне бюджета', over.length === 0, over.join(' '));
@@ -1290,6 +1298,63 @@ setTimeout(async () => {
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
   }
 
+  // ---- каждая услуга показана живым примером, и фильтры по ней что-то находят ----
+  {
+    const svc = (WS.FUNNELS || []).map((f) => f.k);
+    const empty = svc.filter((k) => !(dd().deals || []).some((d) => (d.funnel || 'sale') === k));
+    check('данные · у каждой услуги есть хотя бы одна сделка', empty.length === 0, empty.join(' '));
+    // Услуги без нашего инвентаря — управление, эксклюзив, кросс, консалтинг — должны быть
+    // представлены и сделкой без объекта: объект там принадлежит клиенту или партнёру.
+    check('данные · есть сделка без объекта', (dd().deals || []).some((d) => !d.objectId && !(d.lots || []).length));
+
+    // Фильтр, под который нет ни одной записи, — мёртвый пункт меню.
+    WS.store.role = 'manager'; WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const dead = [];
+    ['dealObjType', 'dealReadiness', 'dealAgent'].forEach((id) => {
+      const el = doc.getElementById(id);
+      if (!el) { dead.push(id + ': нет фильтра'); return; }
+      [].slice.call(el.options).forEach((o) => {
+        if (o.value === 'all') return;
+        const n = (dd().deals || []).filter((d) =>
+          (id === 'dealObjType' ? d.objectType : id === 'dealReadiness' ? d.readiness : d.agent) === o.value).length;
+        if (!n) dead.push(id + ':' + o.value);
+      });
+    });
+    check('фильтры сделок · каждый вариант что-то находит', dead.length === 0, dead.join(' '));
+    check('фильтры сделок · есть выбор по типу объекта, готовности и агенту',
+      !!doc.getElementById('dealObjType') && !!doc.getElementById('dealReadiness') && !!doc.getElementById('dealAgent'));
+    WS.store.role = 'agent';
+
+    // Фильтры клиентов — по тому, чем клиента ищут, а не только по AI-профилю.
+    WS.store.clientsTab = 'contacts'; WS.store.contactsFiltersOpen = true; WS.router.go('clients');
+    ['cfArea', 'cfBudget', 'cfState', 'cfConsent'].forEach((id) =>
+      check('фильтры клиентов · есть ' + id, !!doc.getElementById(id)));
+    // И каждый из них действительно сужает список, а не только рисуется.
+    const all = WS.ui.contactsSearchList().length;
+    WS.store.contactsFilters = Object.assign({}, WS.store.contactsFilters, { budget: 'lo' });
+    const lo = WS.ui.contactsSearchList();
+    check('фильтры клиентов · бюджет сужает список', lo.length > 0 && lo.length < all, lo.length + ' из ' + all);
+    check('фильтры клиентов · в выборке только этот бюджет',
+      lo.every((p) => (p.c.budget || 0) < 1500000), lo.map((p) => p.c.budget).join(' '));
+    WS.store.contactsFilters = Object.assign({}, WS.store.contactsFilters, { budget: 'all', state: 'open' });
+    const open = WS.ui.contactsSearchList();
+    check('фильтры клиентов · состояние работы сужает список', open.length > 0 && open.length < all, open.length + ' из ' + all);
+    WS.store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' };
+
+    // «Что предложить» наполнено у каждого клиента, у кого есть свободный подходящий инвентарь.
+    const bare = [];
+    (dd().clients || []).forEach((c) => {
+      if (!WS.ui.clientOffers(c).length) bare.push(c.id);
+    });
+    check('подборка · клиенту всегда есть что предложить', bare.length === 0, bare.join(' '));
+
+    // Бюджет аренды — ставка за год; в одной шкале с ценой объекта его нет.
+    const sarah = (dd().clients || []).find((c) => c.id === 'c_night');
+    check('подборка · арендная ставка не становится потолком покупки',
+      WS.ui.clientOffers(sarah).every((x) => x.o.price > 200000),
+      WS.ui.clientOffers(sarah).map((x) => x.o.price).join(' '));
+  }
+
   // ---- клиент — это человек, а не его текущая сделка ----
   // Правило чинилось трижды и трижды возвращалось в новом месте: то в полосе операций, то в
   // подписи под именем, то в строке списка. Проверка держит его целиком, а не по одному месту:
@@ -1429,7 +1494,7 @@ setTimeout(async () => {
       /Назовите, о какой речь/.test(r.text || '') && /2 сделки/.test(r.text || ''), (r.text || '').slice(-140));
 
     // У клиента с одной сделкой поведение прежнее — уточнять там нечего.
-    const one = WS.agent.ask('переведи сделку Анны Петровой в бронирование');
+    const one = WS.agent.ask('переведи сделку Дмитрия Соколова в подписание');
     check('консьерж · одна открытая сделка выбирается без вопросов', one.kind === 'proposal', one.kind);
   }
 

@@ -1058,6 +1058,33 @@
         if (val === 'values') { if (!p.values || p.values.indexOf(sub) < 0) return false; }
       }
     }
+    // Район поиска — первое, чем агент сужает книгу: клиент помнится районом, а не портретом.
+    if (st.area && st.area !== 'all') {
+      const areas = (c.areas || []).concat(
+        (D().requests || []).filter((r) => r.clientId === c.id).reduce((a, r) => a.concat(r.areas || []), []));
+      if (areas.indexOf(st.area) < 0) return false;
+    }
+    // Бюджет — вилка, а не точное число: клиента ищут «примерно до двух миллионов».
+    if (st.budget && st.budget !== 'all') {
+      const b = c.budget || 0;
+      const band = st.budget === 'lo' ? (b > 0 && b < 1500000)
+        : st.budget === 'mid' ? (b >= 1500000 && b < 3000000)
+        : (b >= 3000000);
+      if (!band) return false;
+    }
+    // Состояние работы: открытая заявка, всё закрыто, или человек, с которым мы ещё не начали.
+    if (st.state && st.state !== 'all') {
+      const rs = (D().requests || []).filter((r) => r.clientId === c.id);
+      const open = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0).length;
+      if (st.state === 'open' && !open) return false;
+      if (st.state === 'done' && (open || !rs.length)) return false;
+      if (st.state === 'none' && rs.length) return false;
+    }
+    // Согласие на связь: без него адресная отправка заблокирована, и это первый фильтр перед
+    // любой рассылкой — иначе агент соберёт список, по которому нельзя написать.
+    if (st.consent && st.consent !== 'all') {
+      if (st.consent === 'yes' ? c.consent !== true : c.consent === true) return false;
+    }
     // Object filter
     if (st.object && st.object !== 'all') {
       const hasObj = (D().deals || []).some((d) => d.clientId === c.id &&
@@ -1130,9 +1157,10 @@
       '<div class="m">' + sub + '</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
   }
+  const CONTACT_FILTER_KEYS = ['priority', 'psych', 'object', 'area', 'budget', 'state', 'consent'];
   function contactsFilterCount() {
     const f = S().contactsFilters || {};
-    return ['priority', 'psych', 'object'].filter((k) => f[k] && f[k] !== 'all').length;
+    return CONTACT_FILTER_KEYS.filter((k) => f[k] && f[k] !== 'all').length;
   }
   // "Nothing found" must say what was searched and offer the way back out.
   function listEmptyState(q, hasFilters, clearAct) {
@@ -1178,10 +1206,24 @@
         .concat(PSYCH_OPTS.risk.map((r) => ['risk:' + r, r]))
         .concat(PSYCH_OPTS.values.map((v) => ['values:' + v, 'важно: ' + v]));
       const objOpts = [['all', 'Любой объект']].concat((D().objects || []).map((o) => [o.id, o.name.split(',')[0]]));
+      // Районы собираются из данных, а не пишутся списком: район, которого нет ни у кого, —
+      // это пункт меню, который всегда даёт пустой экран.
+      const areaSet = [];
+      (D().clients || []).forEach((c) => (c.areas || []).forEach((a) => { if (areaSet.indexOf(a) < 0) areaSet.push(a); }));
+      (D().requests || []).forEach((r) => (r.areas || []).forEach((a) => { if (areaSet.indexOf(a) < 0) areaSet.push(a); }));
+      const areaOpts = [['all', 'Любой район']].concat(areaSet.sort().map((a) => [a, a]));
+      const budgetOpts = [['all', 'Любой бюджет'], ['lo', 'до 1,5 млн'], ['mid', '1,5–3 млн'], ['hi', 'от 3 млн']];
+      const stateOpts = [['all', 'Любое состояние'], ['open', 'есть открытая заявка'],
+        ['done', 'всё закрыто'], ['none', 'заявок ещё не было']];
+      const consentOpts = [['all', 'Согласие — неважно'], ['yes', 'есть согласие на связь'], ['no', 'нет согласия']];
       panel = '<div class="list-filters">' +
+        '<label class="lf-fld"><span>Район поиска</span>' + miniSel('cfArea', f.area || 'all', areaOpts) + '</label>' +
+        '<label class="lf-fld"><span>Бюджет</span>' + miniSel('cfBudget', f.budget || 'all', budgetOpts) + '</label>' +
+        '<label class="lf-fld"><span>Состояние работы</span>' + miniSel('cfState', f.state || 'all', stateOpts) + '</label>' +
+        '<label class="lf-fld"><span>Связь</span>' + miniSel('cfConsent', f.consent || 'all', consentOpts) + '</label>' +
         '<label class="lf-fld"><span>Портрет клиента</span>' + miniSel('cfPsych', f.psych || 'all', psychOpts) + '</label>' +
         '<label class="lf-fld"><span>Смотрел объект</span>' + miniSel('cfObject', f.object || 'all', objOpts) + '</label>' +
-        '<div class="lf-hint">Фильтры складываются с поиском. Поиск по клиенту идёт строкой — имя, телефон, компания.</div></div>';
+        '<div class="lf-hint">Фильтры складываются с поиском. Поиск по клиенту идёт строкой — имя, телефон, цель, район, компания.</div></div>';
     }
 
     const note = cur === 'transferred'
@@ -1230,10 +1272,17 @@
   function dealExtraPred(d) {
     const from = parseInt(S().dealBudFrom, 10) || 0, to = parseInt(S().dealBudTo, 10) || 0, src = S().dealSrc || 'all';
     if (src !== 'all' && d.source !== src) return false;
+    if ((S().dealObjType || 'all') !== 'all' && d.objectType !== S().dealObjType) return false;
+    if ((S().dealReadiness || 'all') !== 'all' && d.readiness !== S().dealReadiness) return false;
+    if ((S().dealAgent || 'all') !== 'all' && d.agent !== S().dealAgent) return false;
     const a = d.amount || 0;
     if (from && a < from) return false;
     if (to && a > to) return false;
     return true;
+  }
+  function dealFilterCount() {
+    return ['dealSrc', 'dealObjType', 'dealReadiness', 'dealAgent']
+      .filter((k) => S()[k] && S()[k] !== 'all').length + ((S().dealBudFrom || S().dealBudTo) ? 1 : 0);
   }
   function dealFilterBar() {
     const src = S().dealSrc || 'all';
@@ -1246,7 +1295,21 @@
     const srcs = Array.from(new Set((D().deals || []).map((d) => d.source).filter(Boolean)));
     const srcChips = chip(src === 'all', 'data-dealsrc="all"', 'Все источники') +
       srcs.map((s) => chip(src === s, 'data-dealsrc="' + s + '"', s)).join('');
-    return '<div class="qa-row deal-filters">' + budget + '<span class="df-sep"></span>' + srcChips + '</div>';
+    // Значения собираются из самих сделок: пункт, под который нет ни одной, — мёртвый выбор.
+    const uniq = (f) => Array.from(new Set((D().deals || []).map(f).filter(Boolean)));
+    const selOf = (id, cur, opts) => '<label class="lf-fld lf-inline"><span>' + opts[0][2] + '</span>' +
+      miniSel(id, cur, opts.map((o) => [o[0], o[1]])) + '</label>';
+    const objTypes = [['all', 'Любой тип', 'Тип объекта']].concat(uniq((d) => d.objectType).sort().map((t) => [t, t, '']));
+    const readiness = [['all', 'Любая', 'Готовность']].concat(uniq((d) => d.readiness).sort().map((t) => [t, t, '']));
+    const agents = [['all', 'Все агенты', 'Агент']].concat(uniq((d) => d.agent).map((a) => [a, agentName(a), '']));
+    const isMgr = S().role === 'manager';
+    return '<div class="qa-row deal-filters">' + budget + '<span class="df-sep"></span>' + srcChips + '</div>' +
+      '<div class="qa-row deal-filters deal-filters-2">' +
+      selOf('dealObjType', S().dealObjType || 'all', objTypes) +
+      selOf('dealReadiness', S().dealReadiness || 'all', readiness) +
+      (isMgr ? selOf('dealAgent', S().dealAgent || 'all', agents) : '') +
+      (dealFilterCount() ? '<button class="view-clear" data-act="clearDealFilters">' + I('x') + 'сбросить · ' + dealFilterCount() + '</button>' : '') +
+      '</div>';
   }
   function agentName(id) { const u = D().users; for (const k in u) { if (u[k].id === id) return u[k].name; } const m = TEAM.find((x) => x.id === id); return m ? m.name : (id || '—'); }
   function dealObject(d) { return d.objectId ? D().objects.find((o) => o.id === d.objectId) : null; }
@@ -2145,7 +2208,12 @@
   function clientMatchModel(c) {
     const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
     const m = initMatch(c);
-    const budgets = reqs.map((r) => r.budget).filter(Boolean);
+    // Потолок берётся только из запросов на покупку. Бюджет аренды — это ставка за год, и
+    // сравнивать её с ценой объекта нельзя: у клиента, который снимает за 95 тысяч и покупает
+    // за полтора миллиона, потолком становилось 95 тысяч, и подобрать было нечего.
+    const buyFunnels = ['sale', 'cross', 'consult', 'exclusive'];
+    const budgets = reqs.filter((r) => buyFunnels.indexOf(r.funnel || 'sale') >= 0)
+      .map((r) => r.budget).filter(Boolean);
     if (budgets.length) m.max = Math.max.apply(null, budgets);
     else if (c.budget) m.max = c.budget;
     const areas = [];
@@ -2195,7 +2263,10 @@
         const r = matchScore(o, Object.assign({}, mm.m, { area: 'all' }), c);
         return { o: o, pct: r.pct - (inArea ? 0 : 12), good: r.good, bad: r.bad, inArea: inArea };
       })
-      .filter((x) => x.pct >= 55)
+      // Порог отсекает совсем чужое, но не оставляет блок пустым при живом инвентаре: слабое
+      // совпадение полезнее пустого экрана — агент сам решит, звонить с ним или нет, а помечено
+      // оно честно. Пусто здесь означает ровно одно: свободного подходящего инвентаря нет.
+      .filter((x) => x.pct >= 40)
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 3);
   }
@@ -2210,6 +2281,7 @@
     }
     const rows = list.map((x) => {
       const o = x.o;
+      const weak = x.pct < 55 ? '<span class="badge">' + I('warn') + 'слабое совпадение</span>' : '';
       const why = x.good.slice(0, 3).join(', ') || 'подходит по основным критериям';
       // Оговорки называются вслух: район не тот, что просили, или проверка доступности устарела.
       // Подбор, который молчит о своих натяжках, агент перестаёт читать после первой осечки.
@@ -2221,7 +2293,7 @@
       return '<div class="of-row" data-obj="' + o.id + '">' +
         '<span class="of-pct' + (x.pct >= 75 ? ' hi' : '') + '">' + x.pct + '%</span>' +
         '<div class="of-b"><div class="of-t">' + o.name + '</div>' +
-        '<div class="of-m">' + o.area + ' · ' + WS.AED(o.price) + ' · ' + o.br + '</div>' +
+        '<div class="of-m">' + o.area + ' · ' + WS.AED(o.price) + ' · ' + o.br + ' ' + weak + '</div>' +
         '<div class="of-why">' + capFirst(why) + '</div>' + warn + '</div>' +
         '<button class="btn xs" data-shortlist="' + o.id + '">' + I('star') + 'В подборку</button></div>';
     }).join('');
@@ -3493,7 +3565,10 @@
     // Заявка закрыта, когда в подборке не осталось объектов в работе: каждый либо ушёл в сделку,
     // либо отклонён клиентом. Пока хоть один открыт — заявка живёт, даже если сделки уже идут.
     const open = off.filter((o) => o.state !== 'rejected' && !inDeal[o.id]);
-    if (deals.length && off.length && !open.length) return 'closed';
+    // Заявка закрыта, когда из неё вышли сделки и открытого больше нет. Требование «был хотя бы
+    // один предложенный объект» держало услуги без инвентаря — управление, эксклюзив, консалтинг —
+    // вечно в переговорах: предлагать там нечего, договор при этом подписан.
+    if (deals.length && !open.length) return 'closed';
     if (deals.length || (r.kp && r.kp.formed && off.some((o) => o.state === 'selected'))) return 'talks';
     const tl = (D().requestTimeline || {})[r.id] || [];
     if (tl.some((e) => e.ch === 'meet')) return 'meet';
@@ -4331,8 +4406,13 @@
       const el = document.getElementById(id);
       if (el) el.addEventListener('change', (e) => apply(e.target.value));
     };
-    sel('cfPsych', (v) => { S().contactsFilters = Object.assign({}, S().contactsFilters, { psych: v }); WS.storeApi.emit(); });
-    sel('cfObject', (v) => { S().contactsFilters = Object.assign({}, S().contactsFilters, { object: v }); WS.storeApi.emit(); });
+    // Каждый фильтр списка клиентов пишет в своё поле — по одной строке на измерение, чтобы
+    // добавленный фильтр без обработчика (селект, который ничего не делает) было видно сразу.
+    [['cfPsych', 'psych'], ['cfObject', 'object'], ['cfArea', 'area'],
+     ['cfBudget', 'budget'], ['cfState', 'state'], ['cfConsent', 'consent']].forEach((p) =>
+      sel(p[0], (v) => { const patch = {}; patch[p[1]] = v; S().contactsFilters = Object.assign({}, S().contactsFilters, patch); WS.storeApi.emit(); }));
+    ['dealObjType', 'dealReadiness', 'dealAgent'].forEach((k) =>
+      sel(k, (v) => { S()[k] = v; WS.storeApi.emit(); }));
     sel('cofClient', (v) => { S().companiesFilters = Object.assign({}, S().companiesFilters, { client: v }); WS.storeApi.emit(); });
   }
   function bindObjects() {
@@ -7382,7 +7462,7 @@
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope, reqStage, boardFits, reqOfferStatus, reqSelectedFree, clampStage,
+    docsOfDeal, docsOfRequest, docScope, reqStage, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

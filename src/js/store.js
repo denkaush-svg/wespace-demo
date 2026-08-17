@@ -4,7 +4,7 @@
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 21; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something.
+  const SCHEMA = 22; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -26,7 +26,8 @@
     shortlist: [], podborClient: 'c_anna', match: null, matchClient: null,
     docSearch: '', docTab: 'all', calType: 'all', calDir: 'all', calObj: 'all', calClient: 'all', calWeek: 0, calDay: -1,
     contactsSearch: '', companiesSearch: '', conciergeSearch: '',
-    contactsFilters: { priority: 'all', psych: 'all', object: 'all' },
+    contactsFilters: { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' },
+    dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all',
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
@@ -372,18 +373,21 @@
     const rec = coll.find((x) => x.id === o.id);
     if (!rec) return fail('not_found', at + 'нет записи ' + o.id + ' в ' + spec.coll, { collection: spec.coll, id: o.id });
 
-    if (spec.kind === 'stage') {
-      if (!o.stage) return fail('bad_value', at + 'не указана стадия');
-      // Stages belong to a funnel. The spoken vocabulary is global, so «переведи в выполнение работ»
-      // would otherwise park a Продажа deal on a stage that funnel has no column for — the deal
-      // vanishes from the board with nothing to say where it went.
+    // Шаг принадлежит договору, а не разговору. Проверка стоит на ОБОИХ путях записи: своя
+    // операция `dealStage` и поле `stage` внутри `updateDeal` — иначе достаточно назвать её
+    // патчем, чтобы поставить сделку на шаг, которого в её договоре нет, и доска потеряет карточку.
+    function stageRefusal(stage) {
       const kind = WS.contractKindFor ? WS.contractKindFor(rec.funnel || 'sale', rec.readiness) : '';
       const allowed = (WS.DEAL_STEPS || {})[kind] || [];
-      if (allowed.length && allowed.indexOf(o.stage) < 0) {
-        const label = ((WS.fixtures.CONTRACT_KINDS || {})[kind] || {}).label || kind;
-        return fail('bad_value', at + 'в договоре «' + label + '» нет такого шага',
-          { stage: o.stage, available: allowed });
-      }
+      if (!allowed.length || allowed.indexOf(stage) >= 0) return null;
+      const label = ((WS.fixtures.CONTRACT_KINDS || {})[kind] || {}).label || kind;
+      return fail('bad_value', at + 'в договоре «' + label + '» нет такого шага',
+        { stage: stage, available: allowed });
+    }
+    if (spec.kind === 'stage') {
+      if (!o.stage) return fail('bad_value', at + 'не указана стадия');
+      const bad = stageRefusal(o.stage);
+      if (bad) return bad;
       return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };
     }
 
@@ -391,6 +395,10 @@
     if (!patch || typeof patch !== 'object') return fail('bad_patch', at + 'нет полей для изменения');
     const keys = Object.keys(patch);
     if (!keys.length) return fail('bad_patch', at + 'пустой набор полей');
+    if (spec.coll === 'deals' && patch.stage) {
+      const bad = stageRefusal(patch.stage);
+      if (bad) return bad;
+    }
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
     for (let k = 0; k < keys.length; k++) {
