@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Воронки и стадии сделок: что меняется на демо-стенде</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+  /* ============================================================
+     Voshod-Lite — screen HTML stylesheet for md2html
+     Derived from voshod-brand/tokens.css + voshod-document.css.
+     Target: pandoc HTML5 output, viewed in browser, max 880px column.
+     Not for client deliverables — those go through Voshod PDF kit.
+     ============================================================ */
+
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Regular.ttf');
+    font-weight:400;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Medium.ttf');
+    font-weight:500;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Bold.ttf');
+    font-weight:700;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-ExtraBold.ttf');
+    font-weight:800;font-style:normal;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Regular.ttf');
+    font-weight:400;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Medium.ttf');
+    font-weight:500;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Bold.ttf');
+    font-weight:700;font-display:swap;}
+
+  :root{
+    --ink:#111112;
+    --paper:#EEEEEE; --paper2:#F8F8F8; --paper3:#FFFFFF;
+    --green:#33B76E; --green-soft:#D5EDDF; --green-deep:#20402A;
+    --red:#D84520; --red-soft:#FBE3DC;
+    --amber-soft:#FAEFCC;
+    --line:#D9D9D9;
+    --mute:#6E6E6E;
+    --maxw:880px;
+  }
+
+  *{box-sizing:border-box;}
+  html{background:var(--paper);}
+  body{margin:0 auto;max-width:var(--maxw);padding:42px 32px 64px;
+    background:var(--paper);color:var(--ink);
+    font-family:'Manrope',-apple-system,system-ui,sans-serif;
+    font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  main,.md2html-main{max-width:var(--maxw);margin:0 auto;}
+
+  /* ---- pandoc title block ---- */
+  header#title-block-header{border-bottom:1px solid var(--line);
+    padding-bottom:18px;margin-bottom:28px;}
+  header h1.title{font-weight:700;font-size:32px;line-height:1.1;
+    letter-spacing:-.02em;margin:0;}
+  header .subtitle{font-size:15px;color:var(--mute);margin-top:6px;}
+  header p.author,header p.date{font-family:'JBMono';font-weight:500;
+    font-size:11px;letter-spacing:.10em;text-transform:uppercase;
+    color:var(--mute);margin:6px 0 0;}
+
+  /* ---- TOC ---- */
+  nav#TOC{background:var(--paper2);border:1px solid var(--line);
+    border-radius:8px;padding:14px 18px;margin:0 0 32px;font-size:13.5px;}
+  nav#TOC::before{content:'СОДЕРЖАНИЕ';display:block;
+    font-family:'JBMono';font-weight:500;font-size:10px;
+    letter-spacing:.14em;color:var(--mute);margin-bottom:8px;}
+  nav#TOC ul{list-style:none;padding-left:0;margin:0;}
+  nav#TOC ul ul{padding-left:14px;margin-top:4px;}
+  nav#TOC li{margin:3px 0;padding-left:0;}
+  nav#TOC li::before{content:none;}
+  nav#TOC a{color:var(--ink);text-decoration:none;}
+  nav#TOC a:hover{color:var(--green-deep);text-decoration:underline;}
+
+  /* ---- headings ---- */
+  h1,h2,h3,h4,h5,h6{font-weight:700;letter-spacing:-.015em;
+    color:var(--ink);line-height:1.2;margin:32px 0 12px;}
+  h1{font-size:26px;}
+  h2{font-size:21px;display:flex;align-items:center;gap:10px;
+    padding-bottom:8px;border-bottom:1px solid var(--line);}
+  h2::before{content:'';display:inline-block;width:8px;height:8px;
+    background:var(--green);transform:rotate(45deg);flex:none;}
+  h3{font-size:17px;}
+  h4{font-size:13px;color:var(--mute);font-weight:500;
+    text-transform:uppercase;letter-spacing:.08em;
+    font-family:'JBMono';margin-top:22px;}
+  h5,h6{font-size:14px;}
+  h1:first-child,h2:first-child,h3:first-child{margin-top:0;}
+
+  /* ---- paragraphs / inline ---- */
+  p{margin:0 0 12px;}
+  a{color:var(--green-deep);text-decoration:underline;
+    text-decoration-color:var(--green);text-underline-offset:2px;}
+  a:hover{color:var(--green);}
+  strong{font-weight:700;color:var(--ink);}
+  em{font-style:italic;}
+  hr{border:0;border-top:1px solid var(--line);margin:28px 0;}
+
+  /* ---- lists ---- */
+  ul,ol{margin:0 0 14px;padding-left:0;list-style:none;}
+  ul>li,ol>li{position:relative;padding-left:22px;margin:5px 0;}
+  ul>li::before{content:'';position:absolute;left:4px;top:9px;
+    width:6px;height:6px;background:var(--green);transform:rotate(45deg);}
+  ol{counter-reset:ol;}
+  ol>li{counter-increment:ol;}
+  ol>li::before{content:counter(ol)'.';position:absolute;left:0;top:0;
+    font-family:'JBMono';font-weight:700;font-size:12.5px;
+    color:var(--green-deep);min-width:18px;}
+  li>ul,li>ol{margin:5px 0 2px;}
+
+  /* ---- task list ---- */
+  ul.task-list>li{padding-left:26px;}
+  ul.task-list>li::before{content:none;}
+  ul.task-list input[type=checkbox]{position:absolute;left:0;top:6px;
+    accent-color:var(--green);width:14px;height:14px;}
+
+  /* ---- blockquote / callout ---- */
+  blockquote{background:var(--paper3);border-left:3px solid var(--green);
+    padding:12px 16px;margin:14px 0 18px;color:#3a3a3b;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);border-radius:0 4px 4px 0;}
+  blockquote p:last-child{margin-bottom:0;}
+
+  /* ---- executive summary (pandoc fenced div ::: exec-summary) ---- */
+  .exec-summary{background:var(--green-soft);border:1px solid var(--green);
+    border-radius:10px;padding:20px 24px 18px;margin:0 0 30px;}
+  .exec-summary::before{content:'РЕЗЮМЕ ДЛЯ РУКОВОДИТЕЛЯ';display:block;
+    font-family:'JBMono';font-weight:700;font-size:10px;letter-spacing:.14em;
+    color:var(--green-deep);margin-bottom:12px;}
+  .exec-summary>:first-of-type{margin-top:0;}
+  .exec-summary>:last-child{margin-bottom:0;}
+  .exec-summary p,.exec-summary li{color:#20402A;}
+  .exec-summary strong{color:var(--ink);}
+
+  /* ---- decision / fork block (pandoc fenced div ::: fork) ---- */
+  .fork{background:var(--paper3);border:1px solid var(--line);
+    border-left:4px solid var(--red);border-radius:0 8px 8px 0;
+    padding:16px 20px 12px;margin:16px 0 20px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .fork::before{content:'РАЗВИЛКА';display:block;
+    font-family:'JBMono';font-weight:700;font-size:10px;letter-spacing:.14em;
+    color:var(--red);margin-bottom:10px;}
+  .fork.resolved{border-left-color:var(--green);}
+  .fork.resolved::before{content:'РЕШЕНО';color:var(--green-deep);}
+  .fork>:first-of-type{margin-top:0;}
+  .fork>:last-child{margin-bottom:0;}
+  /* label the four required parts when authored as **Риск:** / **Критичность:** / **Рекомендация:** / **Критерии:** */
+  .fork p>strong:first-child{color:var(--ink);font-family:'JBMono';
+    font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;}
+
+  /* ---- code ---- */
+  code{font-family:'JBMono';font-weight:500;font-size:13px;
+    background:var(--paper3);border:1px solid var(--line);
+    padding:1px 6px;border-radius:3px;color:var(--ink);}
+  pre{background:var(--ink);color:var(--paper);padding:14px 18px;
+    border-radius:8px;overflow-x:auto;margin:14px 0 18px;
+    font-family:'JBMono';font-size:12.5px;line-height:1.5;}
+  pre code{background:transparent;border:0;padding:0;
+    color:var(--paper);font-size:inherit;font-weight:400;}
+
+  /* ---- tables ---- */
+  table{border-collapse:separate;border-spacing:0;width:100%;
+    margin:14px 0 22px;background:var(--paper3);border-radius:8px;
+    overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);
+    font-size:13.5px;}
+  thead th{background:var(--ink);color:var(--paper);
+    font-family:'JBMono';font-weight:500;font-size:11px;
+    letter-spacing:.10em;text-transform:uppercase;text-align:left;
+    padding:11px 14px;border:0;}
+  tbody td{padding:10px 14px;border-top:1px solid var(--line);
+    vertical-align:top;}
+  tbody tr:first-child td{border-top:0;}
+  tbody tr:hover{background:var(--paper2);}
+
+  /* table cell color modifiers — use raw HTML <td class="pos"> in MD */
+  td.pos,th.pos{background:var(--green-soft);color:var(--green-deep);}
+  td.neg,th.neg{background:var(--red-soft);color:var(--red);}
+  td.warn,th.warn{background:var(--amber-soft);color:#7a5a0c;}
+  td.mute,th.mute{color:var(--mute);}
+
+  /* ---- details/summary (collapsible) ---- */
+  details{background:var(--paper3);border:1px solid var(--line);
+    border-radius:6px;padding:10px 14px;margin:10px 0 14px;}
+  details>summary{font-weight:700;cursor:pointer;list-style:none;
+    display:flex;align-items:center;gap:10px;color:var(--ink);}
+  details>summary::-webkit-details-marker{display:none;}
+  details>summary::before{content:'\25B8';color:var(--green);
+    font-size:11px;transition:transform .15s ease;}
+  details[open]>summary::before{transform:rotate(90deg);}
+  details>:not(summary){margin-top:10px;}
+
+  /* ---- images ---- */
+  img{max-width:100%;height:auto;border-radius:4px;
+    display:block;margin:12px 0;}
+
+  /* ---- inline tags / chips (raw HTML <span class="tag">) ---- */
+  .tag{display:inline-block;font-family:'JBMono';font-weight:500;
+    font-size:11px;letter-spacing:.04em;
+    background:var(--green-soft);color:var(--green-deep);
+    padding:2px 8px;border-radius:3px;margin:0 2px;
+    vertical-align:1px;}
+  .tag.neg{background:var(--red-soft);color:var(--red);}
+  .tag.warn{background:var(--amber-soft);color:#7a5a0c;}
+  .tag.mute{background:var(--paper2);color:var(--mute);border:1px solid var(--line);}
+
+  /* ---- meta footer (injected by md2html.sh) ---- */
+  .md2html-footer{margin:48px 0 0;
+    padding:14px 0 0;border-top:1px solid var(--line);
+    font-family:'JBMono';font-weight:500;font-size:10px;
+    letter-spacing:.10em;text-transform:uppercase;color:var(--mute);
+    display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+  .md2html-footer .brand{color:var(--green);}
+
+  /* ---- mobile ---- */
+  @media (max-width:640px){
+    /* the padding lives on body, so trimming main alone left 64px of the screen
+       spent on margins */
+    body{padding:24px 16px 48px;font-size:14.5px;}
+    main,.md2html-main{padding:0;font-size:14.5px;}
+    h1{font-size:23px;} h2{font-size:18px;} h3{font-size:16px;}
+    /* A table of four or five columns has a min-content width well past 390px,
+       and a width:100% table does not shrink below it — it pushes the whole page
+       sideways instead, which is what a reader sees as "the file is broken". The
+       table keeps its shape and scrolls on its own. */
+    table{display:block;width:max-content;max-width:100%;
+      overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:12.5px;}
+    thead th,tbody td{padding:8px 10px;}
+    th,td{overflow-wrap:break-word;}
+    pre{font-size:11.5px;}
+    nav#TOC{font-size:13px;padding:12px 14px;}
+    .md2html-footer{font-size:11px;gap:10px;}
+  }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Воронки и стадии сделок: что меняется на
+демо-стенде</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#воронки-и-стадии-сделок-что-меняется-на-демо-стенде"
+id="toc-воронки-и-стадии-сделок-что-меняется-на-демо-стенде">Воронки и
+стадии сделок: что меняется на демо-стенде</a>
+<ul>
+<li><a href="#коротко" id="toc-коротко">Коротко</a></li>
+<li><a href="#1-что-на-стенде-сейчас" id="toc-1-что-на-стенде-сейчас">1.
+Что на стенде сейчас</a></li>
+<li><a href="#2-слой-1--шесть-воронок-по-сервису"
+id="toc-2-слой-1--шесть-воронок-по-сервису">2. Слой 1 — шесть воронок по
+сервису</a></li>
+<li><a href="#3-слой-2--гейты-в-карточке"
+id="toc-3-слой-2--гейты-в-карточке">3. Слой 2 — гейты в
+карточке</a></li>
+<li><a href="#4-что-появляется-в-карточке-сделки"
+id="toc-4-что-появляется-в-карточке-сделки">4. Что появляется в карточке
+сделки</a></li>
+<li><a href="#5-договор-как-отдельный-объект"
+id="toc-5-договор-как-отдельный-объект">5. Договор как отдельный
+объект</a></li>
+<li><a href="#6-миграция-демо-данных-семь-сделок-стенда"
+id="toc-6-миграция-демо-данных-семь-сделок-стенда">6. Миграция
+демо-данных: семь сделок стенда</a></li>
+<li><a href="#7-как-это-выглядит-на-доске"
+id="toc-7-как-это-выглядит-на-доске">7. Как это выглядит на
+доске</a></li>
+<li><a href="#8-что-придётся-тронуть-в-коде-и-чем-рискуем"
+id="toc-8-что-придётся-тронуть-в-коде-и-чем-рискуем">8. Что придётся
+тронуть в коде и чем рискуем</a></li>
+<li><a href="#9-развилки" id="toc-9-развилки">9. Развилки</a></li>
+<li><a href="#10-откуда-что-взято" id="toc-10-откуда-что-взято">10.
+Откуда что взято</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="воронки-и-стадии-сделок-что-меняется-на-демо-стенде">Воронки и
+стадии сделок: что меняется на демо-стенде</h1>
+<p>Dubai · 14 августа 2026</p>
+<blockquote>
+<p><strong>Статус: сделано.</strong> Документ писался как превью до
+правки; после решения принципала по двум развилкам всё описанное ниже
+внесено в демо-стенд — воронки и стадии, слой гейтов, договоры с
+комиссией и клиентским регистром. Тесты 302/302, кросс-проверка Codex
+пройдена. Что осталось за рамками — в конце §8.</p>
+</blockquote>
+<hr />
+<h2 id="коротко">Коротко</h2>
+<p>Модель ТЕА и наш слой гейтов сведены в один каркас (файл
+<code>deal-workflows-additions-tea-format.xlsx</code>, лист «Воронки
+сделок»). Демо-стенд сейчас собран по другой логике и требует не
+косметики, а замены оси воронок и стадий.</p>
+<p><strong>Три изменения по сути:</strong></p>
+<ol type="1">
+<li><strong>Воронки становятся по сервису, а не по продукту.</strong>
+Сейчас на стенде шесть воронок — «Продажа · off-plan», «Продажа ·
+готовое», «Аренда», «Fit-out», «Готовый арендный бизнес», «Передано
+партнёру». Это ровно то деление, от которого ТЕА отказывается: «не нужно
+делать множество воронок, например, офисы оффплан, офисы готовые, ГАБы».
+Вместо них — <strong>Продажа · Аренда · Управление арендой · Эксклюзив ·
+Кросс-продажи · Консалтинг</strong>, а тип объекта и готовность уезжают
+в поля карточки.</li>
+<li><strong>Стадии становятся настоящими.</strong> Сейчас стадий
+физически четыре (<code>new / work / docs / done</code>), а разные
+подписи колонок — это переименование одних и тех же четырёх под каждую
+воронку. У ТЕА в каждой воронке 8–10 своих стадий с явными «Успех» и
+«Проигрыш». Четырьмя ячейками это не изображается.</li>
+<li><strong>Под доской появляется слой гейтов.</strong> Oqood, NOC, Form
+F, Ejari, trustee, DLD 4%, KYC — не колонки и не воронки, а контрольные
+точки в карточке, которые зажигаются от полей: (готовность) × (вид
+сделки) × (тип оплаты).</li>
+</ol>
+<p><strong>Что это стоит:</strong> правка затрагивает 15+ мест в коде
+стенда, включая расчёт целей и плиток Пульса — там везде
+<code>stage === 'done'</code>, а «done» распадается на «Успех» и
+«Проигрыш». Оценка ниже, в §7.</p>
+<p><strong>Две главные развилки закрыты принципалом 14 августа:</strong>
+сделка закрывается на подписании, а не по факту получения комиссии;
+сопровождение — не стадия доски, а <strong>процесс внутри
+договора</strong>. Договор становится самостоятельным объектом со своими
+стадиями, статусами и обновляемой информацией — и часть этой информации
+в перспективе увидит сам клиент в личном кабинете. Модель договора — в
+§5. Оставшиеся развилки — в §9.</p>
+<hr />
+<h2 id="1-что-на-стенде-сейчас">1. Что на стенде сейчас</h2>
+<table>
+<thead>
+<tr>
+<th>Что</th>
+<th>Как устроено сейчас</th>
+<th>Почему не подходит</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ось воронок</td>
+<td>6 воронок по продукту: off-plan, готовое, аренда, fit-out, ГАБ,
+партнёр</td>
+<td>Прямо противоречит решению ТЕА: тип объекта — поле, а не
+воронка</td>
+</tr>
+<tr>
+<td>Стадии</td>
+<td>4 общие:
+<code>Новая заявка / В работе / Документы / Закрыта</code></td>
+<td>У каждой воронки свои 8–10 стадий; 4 колонки их не вмещают</td>
+</tr>
+<tr>
+<td>Подписи стадий</td>
+<td>Каждая воронка переименовывает те же 4 колонки</td>
+<td>Видимость разная, механика одна — сделка не может стоять на
+«Брони»</td>
+</tr>
+<tr>
+<td>Исход</td>
+<td>Одна стадия «Закрыта»</td>
+<td>Нужны раздельные «Успех» и «Проигрыш» — иначе не считается
+конверсия</td>
+</tr>
+<tr>
+<td>Гейты</td>
+<td>Нет. Есть цепочка документов из 4 шагов, привязанная к номеру
+стадии</td>
+<td>Дубайская специфика (Oqood, NOC, Form F, Ejari) на стенде не
+живёт</td>
+</tr>
+<tr>
+<td>Вид сделки</td>
+<td>Нет поля</td>
+<td>Именно оно задаёт набор гейтов: вторичка → Form F + trustee</td>
+</tr>
+<tr>
+<td>Комиссия</td>
+<td>Число в сделке</td>
+<td>Нужен статус получения: начислено → счёт → оплачено</td>
+</tr>
+</tbody>
+</table>
+<p>Отдельно: поле «Тип объекта» на стенде есть, но принимает только
+<code>off-plan / готовое</code>, а в одной сделке лежит одно значение. У
+ТЕА тип объекта (апартаменты, офис, ритейл, склад, ГАБ, земля) и
+готовность — <strong>два разных поля</strong>, и типов у инвестора может
+быть сразу несколько.</p>
+<hr />
+<h2 id="2-слой-1--шесть-воронок-по-сервису">2. Слой 1 — шесть воронок по
+сервису</h2>
+<p>Стадии приведены в формулировках ТЕА, без правки. Наши добавления
+вынесены в §3 и §8 и в стадии не вмешиваются.</p>
+<h3 id="продажа">Продажа</h3>
+<p>Ведём покупателя. Любой объект — жильё, коммерция, склад, ГАБ,
+земля.</p>
+<p><code>В работе → Направлен подбор → Показ → Переговоры → Подготовка к сделке → Бронь (EOI) → Подписание договора / Оплата → Регистрация → Успех: вознаграждение получено</code>
+· <code>Проигрыш</code> → <code>Сопровождение</code></p>
+<p>Что стоит за стадиями: «В работе» — клиент квалифицирован как
+покупатель, запрос снят. «Подготовка к сделке» — условия согласованы,
+юристы смотрят документы. «Бронь» — договор бронирования готов к
+подписанию. «Регистрация» — договор подписан и оплачен, документы
+переданы на регистрацию. «Сопровождение» возникает только после
+успеха.</p>
+<h3 id="аренда">Аренда</h3>
+<p>Ведём арендатора. То же, минус «Бронь»; регистрация — это Ejari.</p>
+<p><code>В работе → Направлен подбор → Показ → Переговоры → Подготовка к сделке → Подписание договора / Оплата → Регистрация → Успех</code>
+· <code>Проигрыш</code> → <code>Сопровождение</code></p>
+<h3 id="управление-арендой">Управление арендой</h3>
+<p>Ведём собственника, который сдаёт. Заканчивается не сделкой, а
+работами по договору.</p>
+<p><code>В работе → Направлено КП → Встреча / осмотр объекта → Переговоры → Подготовка к сделке → Подписание договора / Оплата → Успех: работы приняты</code>
+· <code>Проигрыш</code> → <code>Выполнение работ</code></p>
+<blockquote>
+<p>В исходном файле порядок «Переговоры» и «Встреча / осмотр»
+расходится: в строке стадий встреча идёт после переговоров, в
+расшифровке — до. Взят порядок из расшифровки. Уточнить (развилка
+3).</p>
+</blockquote>
+<h3 id="эксклюзив-мандат-на-объект">Эксклюзив (мандат на объект)</h3>
+<p>Ведём собственника-продавца. Успех — объект реализован.</p>
+<p><code>В работе → Направлено КП → Переговоры / встреча → Подготовка к сделке → Подписание договора → Выполнение работ → Успех: объект реализован</code>
+· <code>Проигрыш</code> → <code>Сопровождение</code></p>
+<h3 id="кросс-продажи">Кросс-продажи</h3>
+<p>Клиент плюс партнёр: ипотека, виза и ВНЖ, отделка, юристы, DD.
+Отдельных воронок под каждую услугу не заводим.</p>
+<p><code>В работе → Направлена заявка партнёру → Направлено КП партнёра → Переговоры → Подготовка к сделке → Подписание договора / Оплата → Успех: вознаграждение получено</code>
+· <code>Проигрыш</code></p>
+<h3 id="консалтинг">Консалтинг</h3>
+<p>Разовая услуга без передачи актива: отчёт, оценка, DD.</p>
+<p><code>В работе → Направлено КП → Переговоры → Подготовка к сделке → Подписание договора / Оплата → Выполнение работ → Успех: работы приняты</code>
+· <code>Проигрыш</code></p>
+<hr />
+<h2 id="3-слой-2--гейты-в-карточке">3. Слой 2 — гейты в карточке</h2>
+<p>Гейт — условие перехода или выплаты. Он живёт в карточке, а не
+колонкой на доске: воронок от него не прибавляется. Зажигается парой
+(готовность) × (вид сделки), плюс наложения по типу оплаты.</p>
+<table>
+<thead>
+<tr>
+<th>Сценарий</th>
+<th>Какие гейты зажигаются</th>
+<th>Где на доске</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Продажа · первичка / оффплан</td>
+<td>KYC · платёж на escrow · SPA · Oqood · DLD 4% · график платежей</td>
+<td>Подготовка → Регистрация</td>
+</tr>
+<tr>
+<td>Продажа · вторичка (перепродажа)</td>
+<td>KYC · проверка титула и доверенности · депозит-чек ~10% · Form F
+(MOU) · NOC (нет долгов по service charge) · снятие залога продавца ·
+trustee-перевод · DLD 4% · Title Deed</td>
+<td>Подготовка → Регистрация</td>
+</tr>
+<tr>
+<td>Продажа · переуступка</td>
+<td>NOC застройщика (порог оплаты по SPA) · баланс платежей · DLD 4% ·
+перерегистрация Oqood</td>
+<td>Подготовка → Регистрация</td>
+</tr>
+<tr>
+<td>Продажа · земля</td>
+<td>Разрешённое использование · GFA и этажность · обременения · NOC
+мастер-девелопера · DLD 4%</td>
+<td>Подготовка → Регистрация</td>
+</tr>
+<tr>
+<td>Продажа · ГАБ</td>
+<td>Проверка действующих договоров аренды · долги по service charge ·
+DLD 4%</td>
+<td>Подготовка → Регистрация</td>
+</tr>
+<tr>
+<td>Наложение: ипотека покупателя</td>
+<td>Предодобрение · оценка · Final Offer Letter · NOC банка</td>
+<td>Подготовка → Регистрация</td>
+</tr>
+<tr>
+<td>Аренда · жилая</td>
+<td>KYC · Ejari · депозит 5/10% (по договору)</td>
+<td>Регистрация</td>
+</tr>
+<tr>
+<td>Аренда · коммерческая</td>
+<td>KYC · Ejari · согласование отделки · break option</td>
+<td>Регистрация → Сопровождение</td>
+</tr>
+<tr>
+<td>Продление аренды</td>
+<td>Уведомление за 90 дней · RERA rental index · Ejari renewal</td>
+<td>Сопровождение</td>
+</tr>
+<tr>
+<td>Управление арендой</td>
+<td>Договор управления · доверенность по объёму услуг</td>
+<td>Подписание → Выполнение работ</td>
+</tr>
+<tr>
+<td>Эксклюзив</td>
+<td>Эксклюзивный мандат · Trakheesi (разрешение на рекламу)</td>
+<td>Подписание → Выполнение работ</td>
+</tr>
+<tr>
+<td>Кросс-продажи</td>
+<td>Подтверждение услуги партнёром · вознаграждение и split</td>
+<td>Подписание / Оплата</td>
+</tr>
+<tr>
+<td>Дарение и наследование</td>
+<td>Судебное решение (наследование) · оценка DLD · сбор 0,125% для
+близких родственников либо фиксированный</td>
+<td>Регистрация</td>
+</tr>
+</tbody>
+</table>
+<p>KYC и проверка источника средств — сквозной гейт до сделки во всех
+воронках, требование ОАЭ.</p>
+<p><strong>Глубина на стенде — волна 1:</strong> гейт = ручной чеклист и
+флаг, агент сам отмечает готовность («NOC получен» — галочка, «Oqood» —
+поле с датой). Загрузка документов и таймеры — волна 2, интеграции с DLD
+и Ejari — волна 3. На демо-стенде показываем волну 1 и один пример волны
+2, чтобы был виден замысел.</p>
+<hr />
+<h2 id="4-что-появляется-в-карточке-сделки">4. Что появляется в карточке
+сделки</h2>
+<table>
+<thead>
+<tr>
+<th>Поле или блок</th>
+<th>Значения</th>
+<th>Зачем</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Вид сделки / перехода права</strong> — новое</td>
+<td>первичка · вторичка-перепродажа · переуступка · дарение ·
+наследование</td>
+<td>Главный переключатель гейтов</td>
+</tr>
+<tr>
+<td><strong>Готовность</strong> — уточняется</td>
+<td>оффплан · готовый</td>
+<td>Земля и ГАБ — всегда «готовый»</td>
+</tr>
+<tr>
+<td><strong>Тип объекта</strong> — расширяется</td>
+<td>апартаменты · вилла · офис · ритейл · склад · ГАБ · земля; можно
+несколько</td>
+<td>Заменяет отдельные воронки; у инвестора часто несколько сразу</td>
+</tr>
+<tr>
+<td><strong>Сторона клиента</strong> — новое</td>
+<td>покупатель · арендатор · собственник</td>
+<td>Подсказывает воронку: собственник → Управление или Эксклюзив</td>
+</tr>
+<tr>
+<td><strong>Тип оплаты</strong> — уточняется</td>
+<td>наличные · ипотека покупателя · рассрочка · ипотека продавца</td>
+<td>Ипотека накладывает свои гейты</td>
+</tr>
+<tr>
+<td><strong>Блок гейтов</strong> — новый</td>
+<td>чеклист из §3, собирается по полям</td>
+<td>Видно, где встали деньги и сроки</td>
+</tr>
+<tr>
+<td><strong>Комиссия</strong> — новое состояние</td>
+<td>начислено → выставлен счёт → оплачено; split по co-broking; VAT</td>
+<td>Выплата отстаёт от передачи, часто частями</td>
+</tr>
+<tr>
+<td><strong>Сопровождение</strong> — новое</td>
+<td>договор со своими вехами</td>
+<td>Оффплан тянется 3–5 лет, аренда — продлениями</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-договор-как-отдельный-объект">5. Договор как отдельный
+объект</h2>
+<p>Решение принципала: сделка заканчивается подписанием и передачей.
+Дальше начинается <strong>договор</strong> — собственный объект со своим
+жизненным циклом, который живёт месяцами и годами и обновляется
+независимо от доски сделок.</p>
+<p>Причина простая: сопровождение оффплана идёт 3–5 лет и состоит из
+платежей по графику, стройки, передачи ключей и получения Title Deed.
+Стадия доски такой процесс не выдерживает — сделка застревает в
+активных, пайплайн показывает уже отработанное, а руководитель не
+отличает работу от ожидания.</p>
+<h3 id="виды-договоров-и-их-вехи">Виды договоров и их вехи</h3>
+<table>
+<thead>
+<tr>
+<th>Договор</th>
+<th>Из какой сделки</th>
+<th>Вехи</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Купля-продажа · оффплан (SPA)</td>
+<td>Продажа · первичка, переуступка</td>
+<td>Договор активен → платежи по графику 10/25/75/100 → объект построен
+→ ключи переданы → Title Deed получен → закрыт</td>
+</tr>
+<tr>
+<td>Купля-продажа · вторичка</td>
+<td>Продажа · вторичка</td>
+<td>Переоформление в trustee → новый Title Deed → передача ключей →
+закрыт либо на управление</td>
+</tr>
+<tr>
+<td>Аренда жилая (Ejari)</td>
+<td>Аренда</td>
+<td>Активен → оплата по чекам → подготовка к продлению → продлён либо
+выезд и возврат депозита</td>
+</tr>
+<tr>
+<td>Аренда коммерческая</td>
+<td>Аренда · коммерция</td>
+<td>Активен → передан под отделку → сбор оплаты → пересмотр ставки или
+break → продление</td>
+</tr>
+<tr>
+<td>Управление</td>
+<td>Управление арендой</td>
+<td>Бессрочно: поиск арендатора → заселение → контроль оплат → продления
+→ отчётность собственнику</td>
+</tr>
+<tr>
+<td>Эксклюзивный мандат</td>
+<td>Эксклюзив</td>
+<td>Маркетинг → показы через сеть → найден покупатель → связанная сделка
+→ сопровождение собственника</td>
+</tr>
+<tr>
+<td>Услуга партнёра</td>
+<td>Кросс-продажи, Консалтинг</td>
+<td>Заявка партнёру → услуга оказана → вознаграждение получено</td>
+</tr>
+</tbody>
+</table>
+<h3 id="комиссия-со-статусом-получения">Комиссия со статусом
+получения</h3>
+<p>Комиссия становится отдельной записью со статусом: <strong>начислено
+→ выставлен счёт → оплачено</strong>, с плательщиком (клиент,
+застройщик, партнёр), долей при co-broking и НДС по статусу. Траншей
+может быть несколько — застройщик платит частями, и это нормальное
+состояние, а не просрочка. Сделка при этом уже закрыта успехом.</p>
+<h3 id="два-регистра-текста--внутренний-и-клиентский">Два регистра
+текста — внутренний и клиентский</h3>
+<p>Это закладываем сразу, полем, а не отдельным экраном. У каждой вехи
+договора две формулировки и признак видимости:</p>
+<table>
+<thead>
+<tr>
+<th>Внутри</th>
+<th>Клиенту</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NOC получен, ждём слот у trustee</td>
+<td>Документы у регистратора, ожидаем переоформление права</td>
+</tr>
+<tr>
+<td>Платёж 25% просрочен на 4 дня, напоминание отправлено</td>
+<td>Ожидается платёж по графику — этап 2 из 4</td>
+</tr>
+<tr>
+<td>Snag list передан застройщику, 11 замечаний</td>
+<td>Приёмка объекта: замечания переданы застройщику</td>
+</tr>
+</tbody>
+</table>
+<p>Если писать только внутренний текст, а клиентский собирать потом,
+придётся переписывать формулировки всех вех разом и заново решать, что
+клиенту показывать, — то есть проделать работу дважды. Поэтому
+клиентская строка появляется вместе с вехой.</p>
+<p><strong>На стенде</strong> это показываем предпросмотром «что видит
+клиент» прямо на карточке договора — без личного кабинета. Кабинет —
+следующий шаг: клиент открывает свой проект и видит, где он находится,
+без звонка агенту. Здесь же лежит вторая выгода: договор не даёт забыть
+клиента и держит канал для повторной сделки.</p>
+<hr />
+<h2 id="6-миграция-демо-данных-семь-сделок-стенда">6. Миграция
+демо-данных: семь сделок стенда</h2>
+<table>
+<thead>
+<tr>
+<th>Сделка</th>
+<th>Сейчас</th>
+<th>Станет</th>
+<th>Вид сделки · готовность</th>
+<th>Стадия после переноса</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Инвест-квартира до 2 млн (Анна Петрова)</td>
+<td>Продажа · off-plan → «Квалификация · показ»</td>
+<td><strong>Продажа</strong></td>
+<td>первичка · оффплан</td>
+<td>Показ</td>
+</tr>
+<tr>
+<td>Перепродажа Bayline (Игорь Лебедев)</td>
+<td>Продажа · готовое → «Оффер»</td>
+<td><strong>Продажа</strong></td>
+<td>вторичка · готовый</td>
+<td>В работе — КП обещано и просрочено</td>
+</tr>
+<tr>
+<td>Бронирование Bayline 1603 (Виктор)</td>
+<td>Продажа · off-plan → «Документы · MOU»</td>
+<td><strong>Продажа</strong></td>
+<td>первичка · оффплан</td>
+<td>Бронь (EOI)</td>
+</tr>
+<tr>
+<td>Резиденция в Downtown (Karim Aziz)</td>
+<td>Передано партнёру → «У партнёра»</td>
+<td><strong>Кросс-продажи</strong></td>
+<td>—</td>
+<td>Направлена заявка партнёру</td>
+</tr>
+<tr>
+<td>Аренда 1BR в JVC</td>
+<td>Аренда → «Заявка»</td>
+<td><strong>Аренда</strong></td>
+<td>— · готовый</td>
+<td>Направлен подбор</td>
+</tr>
+<tr>
+<td>Fit-out офиса в Business Bay</td>
+<td>Fit-out → «Смета»</td>
+<td><strong>Кросс-продажи</strong></td>
+<td>— · готовый</td>
+<td>Направлено КП партнёра</td>
+</tr>
+<tr>
+<td>ГАБ в DIFC (Омар Рахман)</td>
+<td>Готовый арендный бизнес → «Сделка»</td>
+<td><strong>Продажа</strong></td>
+<td>вторичка · готовый, тип объекта — ГАБ</td>
+<td>Подготовка к сделке</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Три воронки останутся пустыми:</strong> Управление арендой,
+Эксклюзив, Консалтинг. Пустая доска на демонстрации читается как
+недоделка, поэтому предлагаю досеять по одной сделке в каждую —
+собственник сдаёт офис в управление, мандат на виллу, оценка портфеля.
+Это данные, не механика; если не нужно — не сеем (развилка 5).</p>
+<hr />
+<h2 id="7-как-это-выглядит-на-доске">7. Как это выглядит на доске</h2>
+<p>Восемь-десять стадий в ряд не помещаются даже на ноутбуке, не говоря
+о телефоне. Три варианта:</p>
+<table>
+<thead>
+<tr>
+<th>Вариант</th>
+<th>Что даёт</th>
+<th>Чем платим</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Горизонтальная прокрутка доски</strong> (рекомендую)</td>
+<td>Канбан остаётся канбаном, все стадии на месте</td>
+<td>Правая часть за краем экрана; нужен указатель прокрутки</td>
+</tr>
+<tr>
+<td>Свернуть в «этапы» — 4 группы поверх 9 стадий</td>
+<td>Обзор влезает целиком</td>
+<td>Возвращает сегодняшнюю ложную простоту: сделка снова «где-то в
+документах»</td>
+</tr>
+<tr>
+<td>Список вместо доски на узком экране</td>
+<td>Честно работает на телефоне</td>
+<td>Две разные механики вместо одной</td>
+</tr>
+</tbody>
+</table>
+<p>Внутри карточки сделки степпер стадий уже есть и переживёт рост до
+девяти шагов — он переносится по строкам.</p>
+<hr />
+<h2 id="8-что-придётся-тронуть-в-коде-и-чем-рискуем">8. Что придётся
+тронуть в коде и чем рискуем</h2>
+<table>
+<thead>
+<tr>
+<th>Участок</th>
+<th>Что меняется</th>
+<th>Риск</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Описание воронок</td>
+<td>Ключи и подписи заменяются; у каждой воронки появляется свой список
+стадий</td>
+<td>Низкий — данные</td>
+</tr>
+<tr>
+<td>Доска</td>
+<td>Колонки строятся по стадиям выбранной воронки, а не по четырём
+общим</td>
+<td>Средний — верстка колонок и прокрутка</td>
+</tr>
+<tr>
+<td>Перенос сделки по стадиям</td>
+<td>Стрелки «назад / вперёд» ходят по стадиям своей воронки</td>
+<td>Средний — границы и терминальные стадии</td>
+</tr>
+<tr>
+<td>Подпись стадии</td>
+<td>Сейчас подпись берётся по одному коду стадии; станет нужна пара
+«воронка + стадия»</td>
+<td>Средний — около 8 мест вызова</td>
+</tr>
+<tr>
+<td><strong>Расчёт закрытых сделок</strong></td>
+<td><code>Закрыта</code> распадается на «Успех» и «Проигрыш»</td>
+<td><strong>Высокий</strong> — от этого считаются цели агента, комиссия
+отдела, воронка руководителя и аналитика; проигранные сделки не должны
+попасть в закрытые</td>
+</tr>
+<tr>
+<td>Цепочка документов</td>
+<td>Сейчас 4 шага по номеру стадии; заменяется блоком гейтов</td>
+<td>Средний — новый блок в карточке</td>
+</tr>
+<tr>
+<td>Форма создания сделки</td>
+<td>Список стадий и новые поля</td>
+<td>Низкий</td>
+</tr>
+<tr>
+<td><strong>Договоры</strong></td>
+<td>Новая сущность, свой раздел в навигации, карточка с вехами, комиссия
+со статусом, предпросмотр клиентского вида</td>
+<td><strong>Высокий</strong> — самый крупный из новых блоков, но
+изолированный: ничего существующего не ломает</td>
+</tr>
+<tr>
+<td>Демо-данные</td>
+<td>Перенос семи сделок, новые поля, договоры по закрытым сделкам,
+версия схемы</td>
+<td>Низкий, но обязательный: без поднятия версии схемы у тех, кто уже
+открывал стенд, останутся старые данные</td>
+</tr>
+</tbody>
+</table>
+<p>Порядок работ: сначала данные и справочник воронок, затем доска и
+перенос по стадиям, затем исход «Успех / Проигрыш» со всеми пересчётами,
+затем блок гейтов, затем договоры с комиссией и клиентским регистром.
+После каждого шага прогон тестов; сейчас их 267 и они зелёные.</p>
+<p>Выкатываем на промо и VPS двумя порциями: после воронок с исходами и
+после договоров. Промежуточное состояние наружу не показываем.</p>
+<h3 id="что-осталось-за-рамками">Что осталось за рамками</h3>
+<ul>
+<li><strong>Несколько типов объекта в одной сделке.</strong> У инвестора
+в карточке может стоять сразу апартаменты и офис — в исходном файле это
+названо прямо. Сейчас поле принимает одно значение: форма правки
+построена на выпадающих списках, и множественный выбор — отдельная
+работа по форме, а не строчка в данных. На гейты не влияет: их зажигают
+готовность и вид сделки.</li>
+<li><strong>Гейты второй и третьей волны.</strong> Загрузка документа к
+гейту, таймеры по срокам, подтягивание статуса из DLD и Ejari. Сейчас
+волна 1 — ручная отметка, и блок об этом говорит.</li>
+<li><strong>Личный кабинет клиента.</strong> На карточке договора есть
+вкладка «Что видит клиент» — предпросмотр того, что в кабинет пойдёт.
+Самого кабинета нет.</li>
+</ul>
+<hr />
+<h2 id="9-развилки">9. Развилки</h2>
+<h3 id="решено-принципалом-14-августа">Решено принципалом 14
+августа</h3>
+<p><strong>1. Момент закрытия сделки — наш вариант.</strong> Сделка
+закрывается на подписании и передаче. Комиссия ведётся отдельной записью
+со статусом получения. Сделка, по которой застройщик платит третий
+транш, считается закрытой и в активном пайплайне не висит.</p>
+<p><strong>2. Сопровождение — не стадия, а договор.</strong> Отдельный
+объект со своими стадиями, статусами и обновляемой информацией. Модель в
+§5. Дополнительно зафиксировано: часть информации по договору в
+перспективе видит сам клиент в личном кабинете — поэтому клиентская
+формулировка вехи закладывается сразу, а не дописывается потом.</p>
+<h3 id="открытые--решаю-сам-поправьте-при-несогласии">Открытые — решаю
+сам, поправьте при несогласии</h3>
+<p><strong>3. Управление арендой: порядок стадий.</strong> В исходном
+файле два разных ответа: в строке стадий встреча идёт после переговоров,
+в расшифровке — до. Беру порядок из расшифровки (встреча и осмотр раньше
+переговоров) — сначала смотрим объект, потом торгуемся об условиях.
+Уточнить у ТЕА на встрече.</p>
+<p><strong>4. Эксклюзив: где считать успех.</strong> Здесь решение 1
+меняет формулировку ТЕА, и это надо назвать вслух. У него успех
+эксклюзива — «объект реализован». По нашему правилу сделка закрывается,
+когда подписан договор с клиентом, поэтому успех эксклюзива —
+подписанный мандат, а «объект реализован» становится вехой
+договора-мандата и порождает связанную сделку Продажи или Аренды. Логика
+та же, точка счёта другая. Обсудить на встрече.</p>
+<p>То же правило применено к Управлению: успех — подписанный договор, а
+«выполнение работ» ушло в договор управления. У Консалтинга «Выполнение
+работ» осталось стадией — разовый отчёт не тянет за собой месяцы
+графика, ради которых заводится договор.</p>
+<p><strong>5. Досеиваю демо-данные</strong> в три пустые воронки —
+Управление, Эксклюзив, Консалтинг. По одной сделке в каждую: пустая
+доска на демонстрации читается как недоделка.</p>
+<p><strong>6. Доска при девяти стадиях — горизонтальная
+прокрутка.</strong> Свёртка в четыре этапа вернула бы сегодняшнюю ложную
+простоту, ради устранения которой всё и затевается.</p>
+<hr />
+<h2 id="10-откуда-что-взято">10. Откуда что взято</h2>
+<ul>
+<li><strong>Каркас воронок и стадий, формулировки</strong> — файл ТЕА
+<code>deal-workflows-additions-tea-format.xlsx</code>, лист «Воронки
+сделок», плюс голосовое по стадиям. Текст ТЕА не менялся.</li>
+<li><strong>Слой гейтов, вид сделки, комиссия-receivable,
+объект-договор</strong> — наши предложения, вынесены отдельной колонкой
+в том же файле и сведены в <code>deal-workflows-reference.xlsx</code>
+(v5.1).</li>
+<li><strong>Дубайская фактура</strong> — рабочая гипотеза: полевых
+интервью по Дубаю пока нет. Пороги и сроки (применимость NOC и Form F,
+срок Oqood, депозиты, уведомление за 90 дней, RERA index, сборы DLD)
+зависят от застройщика и зоны — подтверждаем у 3–5 агентов до
+внедрения.</li>
+<li><strong>Состояние стенда</strong> — прочитано из кода на 14 августа
+2026, ветка <code>feat/deal-card-and-request-model</code>.</li>
+</ul>
+<footer class="md2html-footer">
+  <span class="brand">VOS&#8217;HOD INTELLIGENCE &middot; md2html</span>
+  <span>auto-generated &middot; mirror of source .md &middot; do not edit by hand</span>
+</footer>
+<script type="module">
+  // Render Mermaid diagrams if any `.mermaid` blocks are present (harmless if none).
+  if (document.querySelector('pre.mermaid, div.mermaid')) {
+    // pandoc emits <pre class="mermaid"><code>…</code></pre>; unwrap <code> so Mermaid reads clean source.
+    document.querySelectorAll('pre.mermaid > code').forEach(function (c) {
+      c.parentElement.textContent = c.textContent;
+    });
+    import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')
+      .then(function (m) { m.default.initialize({ startOnLoad: true, securityLevel: 'loose' }); })
+      .catch(function () { /* offline: diagram stays as text, no breakage */ });
+  }
+</script>
+</body>
+</html>

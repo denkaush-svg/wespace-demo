@@ -4,7 +4,7 @@
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 13; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: market[] (районы Дубая с происхождением цифр).
+  const SCHEMA = 23; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -25,10 +25,18 @@
     objFilter: 'all', objSearch: '', objSort: 'default', objArea: 'all', objBr: 'all', objPrice: 'all',
     shortlist: [], podborClient: 'c_anna', match: null, matchClient: null,
     docSearch: '', docTab: 'all', calType: 'all', calDir: 'all', calObj: 'all', calClient: 'all', calWeek: 0, calDay: -1,
+    contactsSearch: '', companiesSearch: '', conciergeSearch: '',
+    contactsFilters: { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' },
+    dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all',
+    companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
-    capture: {}, dealFunnel: 'sale_offplan', dealsFilter: {}, savedView: null,
+    capture: {}, dealFunnel: 'sale', contractId: null, dealsFilter: {}, savedView: null,
+    // Where the user came from. A card opened from another card has to return to it, and the
+    // hard-coded «Назад к сделкам» on every card could only ever return to a list.
+    navStack: [], navHere: null,
     navHidden: ['tasks'],  // Задачи скрыты из бокового меню по умолчанию (вкл. в Настройках; доступ из Пульса «Все задачи»)
+    cgGroupCollapse: {},   // group collapse state: groupId -> boolean (true = collapsed)
     // event layer (rev.3)
     eventsPlayed: [], feedback: [], signals: [], dayStep: 0,
   };
@@ -57,10 +65,21 @@
       conflicts: clone(f.conflicts),
       attribution: clone(f.attribution),
       clientSignals: clone(f.clientSignals),
+      contracts: clone(f.contracts),
     };
   }
   // Funnel taxonomy is static config, not mutable state — expose it without cloning per reset.
   WS.FUNNELS = WS.fixtures.FUNNELS;
+  // Срез рынка по районам — такая же статическая конфигурация, как воронки: он не редактируется
+  // из интерфейса и не должен клонироваться на каждый сброс сцены.
+  WS.AREAS = WS.fixtures.AREAS;
+  // Стадии двух уровней — тоже статическая конфигурация: они не редактируются из интерфейса.
+  WS.REQ_STAGES = WS.fixtures.REQ_STAGES;
+  WS.REQ_STAGE_LABELS = WS.fixtures.REQ_STAGE_LABELS;
+  WS.REQ_SIDE = WS.fixtures.REQ_SIDE;
+  WS.DEAL_STEPS = WS.fixtures.DEAL_STEPS;
+  WS.REG_LABELS = WS.fixtures.REG_LABELS;
+  WS.contractKindFor = WS.fixtures.contractKindFor;
 
   function initStatuses() {
     const st = {};
@@ -144,10 +163,15 @@
     store.objSearch = ''; store.objSort = 'default'; store.objArea = 'all'; store.objBr = 'all'; store.objPrice = 'all';
     store.shortlist = []; store.podborClient = 'c_anna'; store.match = null; store.matchClient = null;
     store.docSearch = ''; store.docTab = 'all'; store.calType = 'all'; store.calDir = 'all'; store.calObj = 'all'; store.calClient = 'all'; store.calWeek = 0; store.calDay = -1;
+    store.contactsSearch = ''; store.companiesSearch = ''; store.conciergeSearch = '';
+    store.contactsFilters = { priority: 'all', psych: 'all', object: 'all' };
+    store.cgGroupCollapse = {};
+    store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
-    store.capture = {}; store.dealFunnel = 'sale_offplan'; store.dealsFilter = {}; store.savedView = null;
+    store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
+    store.navStack = []; store.navHere = null;
     store.incompatible = false;
     // UI-state added this cycle — return to defaults on reset so the stand starts clean.
     store.navHidden = ['tasks']; store.setMenuOpen = false;
@@ -189,6 +213,7 @@
     if (store.tour && store.tour.scenarioId === id) store.tour = { active: false, scenarioId: null, stepIndex: 0 };
     sceneEffects(id).forEach((e) => {
       if (e.op === 'updateDeal' || e.op === 'dealStage') restoreEntity('deals', e.id);
+      else if (e.op === 'updateRequest') restoreEntity('requests', e.id);
       else if (e.op === 'updateClient') restoreEntity('clients', e.id);
       else if (e.op === 'setObject') restoreEntity('objects', e.id);
       else if (e.op === 'addTask') store.data.tasks = store.data.tasks.filter((t) => t.id !== e.task.id);
@@ -217,6 +242,12 @@
       } else if (e.op === 'dealStage') {
         const dl = d.deals.find((x) => x.id === e.id);
         if (dl) dl.stage = e.stage;
+      } else if (e.op === 'updateRequest') {
+        // Пресейл живёт на заявке, а не на сделке: сценарии, которые раньше двигали стадию
+        // сделки на «в работе», записывают факт сюда. Стадии здесь нет намеренно — она
+        // вычисляется из фактов (см. reqStage), и присвоить её нечем.
+        const r = (d.requests || []).find((x) => x.id === e.id);
+        if (r) Object.assign(r, e.patch);
       } else if (e.op === 'updateClient') {
         const c = d.clients.find((x) => x.id === e.id);
         if (c) Object.assign(c, e.patch);
@@ -225,6 +256,8 @@
         if (o) Object.assign(o, e.patch);
       } else if (e.op === 'addObject') {
         if (!d.objects.some((o) => o.id === e.obj.id)) d.objects.unshift(e.obj);
+      } else if (e.op === 'addRequest') {
+        if (!d.requests.some((x) => x.id === e.obj.id)) d.requests.unshift(e.obj);
       } else if (e.op === 'addDeal') {
         if (!d.deals.some((x) => x.id === e.obj.id)) d.deals.unshift(e.obj);
       } else if (e.op === 'addClient') {
@@ -262,7 +295,7 @@
   const WRITABLE = {
     deals: {
       safe: ['tags', 'sub', 'title', 'updated', 'note', 'nextStep', 'consideredProjects'],
-      guarded: ['stage', 'amount', 'hot', 'funnel', 'dealType', 'objectType', 'goal', 'paymentForm',
+      guarded: ['stage', 'amount', 'hot', 'funnel', 'dealType', 'objectType', 'readiness', 'saleKind', 'side', 'goal', 'paymentForm',
         'vat', 'source', 'agent', 'partnerAgent', 'companyId', 'stageDays', 'contacts'],
     },
     clients: {
@@ -278,17 +311,18 @@
       safe: ['title', 'due', 'kind', 'assignee'],
       guarded: ['status', 'when'],
     },
-    // Заявка — верх воронки. Заметка и параметры поиска правятся сразу;
-    // всё, чем лид оценивается и кому принадлежит, требует подтверждения.
-    // offered/kp сюда не входят: их меняет ход сделки, а не реплика в чате.
+    // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
+    // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
     requests: {
-      safe: ['note', 'areas', 'horizon', 'bedrooms', 'goal', 'nextContact'],
-      guarded: ['leadStatus', 'temperature', 'assignee', 'budget', 'paymentForm', 'funding', 'source', 'title'],
+      safe: ['note', 'title', 'nextContact', 'temperature', 'horizon', 'bedrooms', 'goal', 'areas'],
+      guarded: ['budget', 'leadStatus', 'assignee', 'offered', 'kp', 'interest', 'paymentForm',
+        'dealType', 'objectType', 'funding', 'vat', 'source', 'partnerAgent'],
     },
   };
 
   const OP_SPEC = {
     updateDeal: { coll: 'deals', kind: 'patch' },
+    updateRequest: { coll: 'requests', kind: 'patch' },
     updateClient: { coll: 'clients', kind: 'patch' },
     updateObject: { coll: 'objects', kind: 'patch' },
     setObject: { coll: 'objects', kind: 'patch' },   // alias: scenario effects use this name
@@ -422,15 +456,21 @@
     const rec = coll.find((x) => x.id === o.id);
     if (!rec) return fail('not_found', at + 'нет записи ' + o.id + ' в ' + spec.coll, { collection: spec.coll, id: o.id });
 
+    // Шаг принадлежит договору, а не разговору. Проверка стоит на ОБОИХ путях записи: своя
+    // операция `dealStage` и поле `stage` внутри `updateDeal` — иначе достаточно назвать её
+    // патчем, чтобы поставить сделку на шаг, которого в её договоре нет, и доска потеряет карточку.
+    function stageRefusal(stage) {
+      const kind = WS.contractKindFor ? WS.contractKindFor(rec.funnel || 'sale', rec.readiness) : '';
+      const allowed = (WS.DEAL_STEPS || {})[kind] || [];
+      if (!allowed.length || allowed.indexOf(stage) >= 0) return null;
+      const label = ((WS.fixtures.CONTRACT_KINDS || {})[kind] || {}).label || kind;
+      return fail('bad_value', at + 'в договоре «' + label + '» нет такого шага',
+        { stage: stage, available: allowed });
+    }
     if (spec.kind === 'stage') {
       if (!o.stage) return fail('bad_value', at + 'не указана стадия');
-      // A stage the board has no column for takes the deal off the board. The
-      // contract named four codes; nothing was checking that the answer used
-      // one of them.
-      const stages = (WS.ui && WS.ui.STAGE_CODES) || ['new', 'work', 'docs', 'done'];
-      if (stages.indexOf(o.stage) < 0) {
-        return fail('bad_value', at + 'нет такой стадии «' + o.stage + '»', { stages: stages });
-      }
+      const bad = stageRefusal(o.stage);
+      if (bad) return bad;
       return { ok: true, tier: 'guarded',
         summary: recordRu(spec.coll, rec) + ' · стадия: ' + stageRu(rec.stage) + ' → ' + stageRu(o.stage),
         run: () => { rec.stage = o.stage; } };
@@ -440,6 +480,10 @@
     if (!patch || typeof patch !== 'object') return fail('bad_patch', at + 'нет полей для изменения');
     const keys = Object.keys(patch);
     if (!keys.length) return fail('bad_patch', at + 'пустой набор полей');
+    if (spec.coll === 'deals' && patch.stage) {
+      const bad = stageRefusal(patch.stage);
+      if (bad) return bad;
+    }
     const badPatchRef = refError(patch, at);
     if (badPatchRef) return badPatchRef;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
@@ -529,6 +573,13 @@
     store.dataRevision++; save(); emit();
   }
 
+  // A hand edit is a data change like any other. Writing through save() alone left dataRevision
+  // untouched, so a Concierge proposal built before the edit still matched `expectedRevision` and
+  // stayed confirmable — the stale-proposal guard silently stopped guarding.
+  //  saves without redrawing — for a write made while a person is typing in the
+  // surface, where a re-render would replace the node under their cursor.
+  function touch(opts) { store.dataRevision++; save(); if (!opts || opts.render !== false) emit(); }
+
   function addTask(task) {
     const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
@@ -554,6 +605,6 @@
   WS.store = store;
   WS.storeApi = {
     boot, subscribe, emit, save, resetAll, resetScene,
-    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, updateEvent, toast, clockLabel, clone,
+    setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});

@@ -37,14 +37,15 @@
           fields: [ { k: 'Канал', now: 'WhatsApp · согласие есть', src: 'профиль' },
                     { k: 'Текст', now: 'Приняла запрос, сегодня пришлю 3 варианта…', src: 'черновик' } ],
           branch: { label: 'WhatsApp недоступен', text: 'Резерв: email, копирование текста или ручная отправка — пакет не теряется.' } },
-        { type: 'result', title: 'Заявка создана', artifact: { id: 'client:c_anna', label: 'Открыть заявку Анны' }, events: [
+        { type: 'result', title: 'Заявка создана', artifact: { id: 'request:r_anna', label: 'Открыть заявку Анны' }, events: [
             'Создана заявка Анны Петровой',
             'Клиент обновлён, расшифровка сохранена',
             'Ответ отправлен (delivered)',
             'Создана задача: подбор сегодня',
           ],
           effects: [
-            { op: 'updateDeal', id: 'd_anna', patch: { tags: ['Заявка', 'ответ отправлен'], sub: 'Инвест. квартира · до 2,0 млн AED · срок 1–3 мес' } },
+            { op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'Квалифицирован', horizon: '1–3 месяца',
+              note: 'Голосовое из WhatsApp: инвест-квартира до 2 млн, Business Bay и Creek Harbour.' } },
             { op: 'updateClient', id: 'c_anna', patch: { horizon: '1–3 месяца' } },
             { op: 'clearInbox', id: 'in_anna_vn' },
             { op: 'addTask', task: { id: 't_g1_pick', clientId: 'c_anna', title: 'Подобрать Анне 3 объекта', due: 'сегодня', when: 'today', kind: 'touch', scenario: 'G2', why: 'Заявка создана из голосового, обещан подбор сегодня' } },
@@ -73,13 +74,14 @@
           ],
           branch: { label: 'Объект с истёкшей проверкой', text: 'Bayline исключается из пакета или уходит в S9. Ошибка канала не уничтожает материалы.' } },
         { type: 'result', title: 'Пакет отправлен', artifact: { id: 'kp', label: 'Открыть КП' }, events: [
-            'Подборка сохранена в сделке',
+            'Подборка сохранена в заявке',
             'PDF и Excel доступны для просмотра/скачивания',
             'Сообщение: delivered',
             'Создано напоминание о следующем касании',
           ],
           effects: [
-            { op: 'updateDeal', id: 'd_anna', patch: { stage: 'work', tags: ['КП отправлено', 'подборка ×3'], package: true, shortlist: 3 } },
+            { op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'КП отправлено',
+              kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_baycentral'] } } },
             { op: 'setObject', id: 'o_bayline', patch: { flagged: true } },
             { op: 'removeTask', id: 't_g1_pick' },
             { op: 'addTask', task: { id: 't_g2_follow', clientId: 'c_anna', title: 'Напоминание после КП — Анна', due: 'завтра', when: 'tomorrow', kind: 'touch', scenario: 'G3', why: 'КП отправлено, ждём реакции по трём объектам' } },
@@ -89,35 +91,42 @@
     },
     {
       id: 'G3', code: 'G3', group: 'golden', durationMinutes: 3,
-      title: 'Итог показа → обновлённая сделка',
-      value: 'Полевая голосовая заметка превращается в подтверждённое обновление сделки.',
+      title: 'Итог показа → обновлённая заявка',
+      value: 'Полевая голосовая заметка превращается в подтверждённое обновление заявки.',
       affects: ['Клиенты и сделки', 'Пульс'],
       related: ['S5'], snapshot: 'anna_postshow',
       flow: [
         { type: 'user', channel: 'voice', text: 'Заметка после показа Анны' },
         { type: 'process', label: 'Разбираю заметку', kind: 'voice',
-          steps: ['Расшифровка 0:31', 'Определяю клиента, сделку и объекты', 'Извлекаю результат показа'] },
-        { type: 'ai', text: 'Заметка: второй объект (Palm Court) понравился, смущает первый платёж, нужен уточнённый график и звонок завтра после обеда.' },
-        { type: 'preview', title: 'Изменения по сделке', level: 'A3',
+          steps: ['Расшифровка 0:31', 'Определяю клиента, заявку и объекты', 'Извлекаю результат показа'] },
+        { type: 'ai', text: 'Заметка: после показа клиент выбрал Creekline 1208, смущает первый платёж, нужен уточнённый график рассрочки и звонок завтра после обеда.' },
+        { type: 'preview', title: 'Изменения по заявке', level: 'A3',
           note: 'Значения до/после. Отклонённые поля не применяются; после — доступен полный откат пакета.',
           fields: [
-            { k: 'Результат показа', now: 'Понравился Palm Court 704', src: 'заметка' },
-            { k: 'Предпочтительный объект', was: 'Creekline 1208', now: 'Palm Court 704', src: 'заметка' },
+            { k: 'Результат показа', now: 'Creekline 1208 подошёл', src: 'заметка' },
+            { k: 'Выбор клиента', was: 'сравнивает Creekline и Bay Central', now: 'Creekline 1208', src: 'заметка' },
             { k: 'Возражение', now: 'Первый платёж', src: 'заметка' },
-            { k: 'Статус сделки', was: 'Подбор', now: 'Переговоры', src: 'правило' },
+            { k: 'Стадия заявки', was: 'Показ', now: 'Переговоры', src: 'правило' },
             { k: 'Следующий шаг', now: 'Звонок с графиком платежей', src: 'заметка' },
             { k: 'Срок задачи', now: 'завтра, после обеда', src: 'заметка' },
           ],
           // per-field effects: rejecting a field skips exactly its change (spec §18.5)
+          // Стадию заявки никто не присваивает: она следует из выбора клиента (поле 1) и
+          // собранного КП. Поле 3 записывает не стадию, а то, чем она подтверждается.
           fieldEffects: {
-            1: [{ op: 'updateClient', id: 'c_anna', patch: { preferred: 'Palm Court Residence 704' } }],
-            3: [{ op: 'dealStage', id: 'd_anna', stage: 'work' },
-                { op: 'updateDeal', id: 'd_anna', patch: { tags: ['Переговоры', 'Palm Court 704'], sub: 'Palm Court 704 · возражение: первый платёж' } }],
-            5: [{ op: 'addTask', task: { id: 't_g3_call', clientId: 'c_anna', title: 'Звонок Анне — график платежей', due: 'завтра, после обеда', when: 'tomorrow', kind: 'call', scenario: null, why: 'После показа: понравился Palm Court, возражение по первому платежу' } }],
+            1: [{ op: 'updateClient', id: 'c_anna', patch: { preferred: 'Creekline Residences, Unit 1208' } },
+                { op: 'updateRequest', id: 'r_anna', patch: { offered: [
+                  { id: 'o_creekline', state: 'selected' },
+                  { id: 'o_jvcpark', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
+                  { id: 'o_baycentral', state: 'offered' },
+                ] } }],
+            3: [{ op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'В переговорах', temperature: 'hot',
+                  note: 'После показа Creekline 1208: объект подтверждён, возражение по первому платежу.' } }],
+            5: [{ op: 'addTask', task: { id: 't_g3_call', clientId: 'c_anna', title: 'Звонок Анне — график платежей', due: 'завтра, после обеда', when: 'tomorrow', kind: 'call', scenario: null, why: 'После показа: выбран Creekline, возражение по первому платежу' } }],
           },
-          branch: { label: 'Две подходящие сделки', text: 'Если у клиента 2 активные сделки — Консьерж задаёт уточняющий вопрос и ничего не записывает.' } },
-        { type: 'result', title: 'Сделка обновлена', rollback: true, artifact: { id: 'client:c_anna', label: 'Открыть обновлённую сделку' }, events: [
-            'Обновлена сделка Анны (Переговоры)',
+          branch: { label: 'Две подходящие заявки', text: 'Если у клиента 2 открытые заявки — Консьерж задаёт уточняющий вопрос и ничего не записывает.' } },
+        { type: 'result', title: 'Заявка обновлена', rollback: true, artifact: { id: 'request:r_anna', label: 'Открыть обновлённую заявку' }, events: [
+            'Обновлена заявка Анны (Переговоры)',
             'Готово сообщение с графиком платежей',
             'Создана задача на звонок (завтра)',
             'Пакет в истории — доступен полный откат',

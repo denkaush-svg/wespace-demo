@@ -96,6 +96,11 @@
         id: x.id, название: x.title, сумма: x.amount,
         стадия: (WS.ui.stageLabel ? WS.ui.stageLabel(x.stage) : x.stage), стадия_код: x.stage,
         воронка: x.dealType || x.funnel, ответственный: x.agent,
+        // Which steps this deal may actually be moved to. The board is no
+        // longer four columns for everyone — the steps follow from the contract
+        // the deal ends in, so without them a proposal to move it is a guess,
+        // and the store refuses the guess after the person has read it.
+        шаги: (WS.ui.dealSteps ? WS.ui.dealSteps(x) : []).map((k) => ({ код: k, шаг: WS.ui.stageLabel(k) })),
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, лоты: x.lots || null,
         заявка: x.requestId || null, горячая: !!x.hot,
         срок_шага: x.nextDue || null, дней_на_стадии: x.stageDays,
@@ -114,6 +119,11 @@
       // видел ни воронку лида, ни то, что клиенту уже отправили.
       заявки: take('requests', (r) => ({
         id: r.id, что: r.title || r.goal, контакт: r.clientId, канал: r.channel, создана: r.createdAt,
+        // The request has no stage of its own: it is computed from what has
+        // been offered, chosen and sent. Sending the facts without the reading
+        // the screens show meant the model described a funnel position the
+        // broker could not see anywhere.
+        стадия: WS.ui.reqStageLabel ? WS.ui.reqStageLabel(WS.ui.reqStage(r), r) : null,
         статус: r.leadStatus, температура: r.temperature, ответственный: r.assignee,
         следующий_контакт: r.nextContact, бюджет: r.budget, районы: r.areas,
         спален: r.bedrooms, срок: r.horizon, оплата: r.paymentForm, финансирование: r.funding,

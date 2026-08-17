@@ -44,9 +44,9 @@ const VIEWPORTS = [
     await page.screenshot({ path: OUT + '/' + vp.name + '-contact-history.png', fullPage: true }); shots++;
 
     // A deal that had NO timeline before the fix
-    await page.evaluate(() => window.WS.ui.dealCard('d_lease'));
+    await page.evaluate(() => window.WS.ui.dealCard('d_viktor'));
     await new Promise((r) => setTimeout(r, 400));
-    await page.evaluate(() => window.WS.ui.setEntityTab('deal', 'd_lease', 'history'));
+    await page.evaluate(() => window.WS.ui.setEntityTab('deal', 'd_viktor', 'history'));
     await new Promise((r) => setTimeout(r, 400));
     const dealRows = await page.evaluate(() => document.querySelectorAll('.tl-row').length);
     await page.screenshot({ path: OUT + '/' + vp.name + '-deal-lease-history.png', fullPage: true }); shots++;

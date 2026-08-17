@@ -194,6 +194,23 @@ button { font-family: inherit; cursor: pointer; }
 .meter { height: 7px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin-top: 12px; }
 .meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc), var(--acc-2)); border-radius: 999px; }
 
+/* goals (personal targets) */
+/* Goal progress — one row shared by the Pulse block and the profile editor. */
+.goal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.goal-tile { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 13px 15px 12px; min-width: 0; }
+.goal-label { font-size: 12px; color: var(--mut); line-height: 1.3; }
+.goal-num { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; margin-top: 4px; }
+.goal-num i { font-style: normal; font-size: 12px; font-weight: 500; color: var(--faint); letter-spacing: 0; }
+.goal-tile .meter { margin-top: 9px; }
+.goal-meter.is-behind i { background: var(--warn, #c98a3a); }
+.goal-foot { display: flex; align-items: baseline; gap: 9px; margin-top: 7px; font-size: 11.5px; color: var(--mut); }
+.goal-pct { font-weight: 800; color: var(--acc-deep); font-size: 12.5px; }
+.goal-pace { display: flex; align-items: center; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 11px; color: var(--mut); line-height: 1.3; }
+.goal-pace svg { width: 13px; height: 13px; flex: none; color: var(--ok); }
+.goal-pace.is-behind { color: var(--stop); }
+.goal-pace.is-behind svg { color: var(--stop); }
+.goal-acts { display: flex; gap: 6px; margin-left: auto; }
+
 /* attention feed (single inbox) */
 .feed { margin-top: 12px; display: flex; flex-direction: column; }
 .feed-row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--hair); transition: .14s var(--ease); }
@@ -377,8 +394,182 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    KANBAN (deals)
    ============================================================ */
+/* Contract milestones and commission tranches share one row shape: a state icon, a line of text
+   and when it happened. Done recedes, «сейчас» is the only accented row, waiting is faint — the
+   list has to answer «где мы» at a glance without reading every line. */
+.ms-list { display: flex; flex-direction: column; }
+.ms-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.ms-row:last-child { border-bottom: 0; }
+.ms-i { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surface-2); color: var(--faint); margin-top: 1px; }
+.ms-i svg { width: 12px; height: 12px; }
+.ms-row.done .ms-i { background: var(--acc); color: #fff; }
+.ms-row.now .ms-i { background: var(--acc-soft); color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.ms-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ms-l { font-size: 13px; color: var(--ink); }
+.ms-row.now .ms-l { font-weight: 800; color: var(--acc-ink); }
+.ms-row.wait .ms-l { color: var(--mut); }
+.ms-a { font-size: 11.5px; color: var(--faint); }
+/* Gate layer — a manual checklist grouped by the stage each condition belongs to. Rows are wide
+   targets because they are toggled, and the hint carries the meaning: «NOC» alone tells an agent
+   who has not done a resale in Dubai nothing at all. */
+.gates { display: flex; flex-direction: column; gap: 14px; }
+.gate-group { display: flex; flex-direction: column; gap: 6px; }
+.gate-gh { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--faint); padding: 0 2px; }
+.gate-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s, 10px);
+  padding: 10px 12px; cursor: pointer; min-height: 44px; }
+.gate-row:hover { border-color: var(--acc-line); }
+.gate-row.on { background: var(--acc-soft); border-color: var(--acc-line); }
+.gate-box { flex: none; width: 18px; height: 18px; margin-top: 1px; border-radius: 5px;
+  border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+.gate-row.on .gate-box { background: var(--acc); border-color: var(--acc); color: #fff; }
+.gate-box svg { width: 12px; height: 12px; }
+.gate-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gate-l { font-size: 13px; font-weight: 700; color: var(--ink); }
+.gate-row.on .gate-l { color: var(--acc-ink); }
+.gate-h { font-size: 11.5px; color: var(--mut); line-height: 1.35; }
+.gate-foot { font-size: 11.5px; color: var(--faint); line-height: 1.4; margin-top: 12px; }
+/* Quick actions — one bar, always directly under the card's title, identical on every entity.
+   Scrollable rather than wrapping: a bar that grows to three rows moves everything below it and
+   stops being a fixed landmark, which is the whole point of having one. */
+/* Four control cut-offs instead of fourteen stage boxes: each is wide enough to carry the money,
+   the stage split inside it and the condition that has to be true to pass it. */
+.funnel-bands { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.funnel-bands .fn-cell { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); }
+.funnel-bands .fn-cell-end { background: var(--surface); }
+.funnel-bands .fn-n { font-size: 26px; font-weight: 800; line-height: 1.1; color: var(--ink); }
+.funnel-bands .fn-l { font-size: 13px; font-weight: 700; color: var(--ink); }
+.funnel-bands .fn-v { font-size: 12.5px; color: var(--acc-ink); font-weight: 600; }
+.funnel-bands .fn-in { font-size: 11.5px; color: var(--mut); margin-top: 4px; line-height: 1.35; }
+.funnel-bands .fn-gate { font-size: 11px; color: var(--faint); margin-top: 6px;
+  padding-top: 6px; border-top: 1px solid var(--line); line-height: 1.3; }
+/* Search over an open listbox, not a collapsed menu: with a long reference list the useful state
+   is «I typed three letters and I can see the matches», which a <select> alone cannot show. */
+.fld-pick { position: relative; }
+.fld-pick .pick-q { width: 100%; margin-bottom: 6px; }
+/* The app sets a fixed height on selects for the single-line case; a listbox needs its rows. */
+.fld-pick select { width: 100%; height: auto; min-height: 132px; padding: 4px; border-radius: var(--r-s, 10px); overflow-y: auto; }
+.fld-pick select option { padding: 7px 8px; border-radius: 6px; font-size: 13px; }
+.fld-pick .pick-n { display: block; font-size: 11px; color: var(--faint); margin-top: 5px; }
+/* Observed choices sit under the declared parameters inside one preference block, divided rather
+   than repeated as a second section with the same heading. */
+.pref-observed { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+/* Чем продавать: тезис + цифра под ним. */
+.sp-list { display: flex; flex-direction: column; gap: 12px; }
+.sp-row { display: flex; gap: 10px; align-items: flex-start; }
+.sp-ic { display: inline-flex; width: 27px; height: 27px; border-radius: 9px; background: var(--acc-soft);
+  color: var(--acc); align-items: center; justify-content: center; flex: none; }
+.sp-ic svg { width: 15px; height: 15px; }
+.sp-t { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.sp-d { font-size: 12px; color: var(--mut); line-height: 1.5; margin-top: 3px; text-wrap: pretty; }
+/* Что спросят: реплика клиента и готовый ответ. */
+.oq-list { display: flex; flex-direction: column; gap: 11px; }
+.oq-row { border-left: 2px solid var(--acc-line); padding-left: 11px; }
+.oq-q { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.oq-q svg { width: 14px; height: 14px; flex: none; color: var(--acc); margin-top: 2px; }
+.oq-a { font-size: 12px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; text-wrap: pretty; }
+/* Район: срез рынка под картой. */
+.mkt-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+.mkt-c { background: var(--surface); padding: 9px 10px; min-width: 0; }
+.mkt-v { font-size: 14px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; white-space: nowrap; }
+.mkt-l { font-size: 10.5px; color: var(--mut); margin-top: 2px; }
+.mkt-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.mkt-r { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; line-height: 1.5; color: var(--mut); }
+.mkt-r svg { width: 15px; height: 15px; flex: none; color: var(--acc); margin-top: 1px; }
+.mkt-r.off svg { color: #c99a2e; }
+.mkt-r b { display: block; font-size: 12px; color: var(--ink); font-weight: 700; margin-bottom: 1px; }
+@media (max-width: 900px) { .mkt-chips { grid-template-columns: 1fr 1fr; } }
+.obj-fit { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+.obj-fit b { color: var(--ink); font-weight: 700; }
+/* What the client did — same row grammar as the event feed, but only their own moves. */
+.cm-list { display: flex; flex-direction: column; gap: 9px; }
+.cm-row { display: flex; gap: 10px; align-items: flex-start; }
+.cm-ic { display: inline-flex; width: 26px; height: 26px; border-radius: 8px; background: var(--acc-soft); color: var(--acc); align-items: center; justify-content: center; flex: none; }
+.cm-ic svg { width: 14px; height: 14px; }
+.cm-b { min-width: 0; }
+.cm-t { font-size: 12.5px; color: var(--ink); line-height: 1.4; }
+.cm-m { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.cm-empty { display: flex; gap: 9px; font-size: 12px; color: var(--mut); line-height: 1.45; }
+.cm-empty svg { width: 15px; height: 15px; flex: none; color: var(--faint); margin-top: 1px; }
+/* Почему стадия заявки не нажимается — объясняется один раз, под самой лентой. */
+/* Лента шагов без заголовка: сама цепочка и есть заголовок. */
+.dx-sec-bare { padding-top: 16px; }
+.dx-sec-bare .dx-stepper { margin-top: 0; }
+.deal-filters-2 { margin-top: 8px; gap: 10px; align-items: flex-end; }
+.lf-inline { min-width: 0; flex: 0 1 190px; }
+/* Порог доски. Тот же, что BOARD_MIN в ui.js: если они разъедутся, появится полоса ширины,
+   где доска отрисована, но не видна, — и агент решит, что сделки пропали. */
+@media (max-width: 899.98px) { .kanban { display: none; } }
+/* Две конверсии рядом, каждая со своим знаменателем. */
+.cv-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
+  margin: 10px 0 2px; padding: 11px 13px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface-2); }
+.cv-cell { flex: none; min-width: 128px; }
+.cv-n { font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.cv-l { font-size: 12px; font-weight: 700; color: var(--mut); margin-top: 3px; }
+.cv-d { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.cv-note { flex: 1 1 240px; min-width: 0; display: flex; gap: 7px; align-items: flex-start;
+  font-size: 11.5px; color: var(--faint); line-height: 1.45; text-wrap: pretty; }
+.cv-note svg { width: 13px; height: 13px; flex: none; color: var(--acc); margin-top: 1px; }
+/* Унаследованный документ: откуда он пришёл, рядом с названием. */
+.doc-from { margin-left: 7px; font-weight: 600; }
+.doc-from svg { width: 11px; height: 11px; }
+/* Что предложить — подборка под клиента: процент, объект и причина в одну строку. */
+.of-list { display: flex; flex-direction: column; gap: 10px; }
+.of-row { display: flex; gap: 11px; align-items: flex-start; cursor: pointer; }
+.of-pct { flex: none; min-width: 42px; height: 26px; border-radius: 8px; background: var(--line);
+  color: var(--mut); display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; }
+.of-pct.hi { background: var(--acc-soft); color: var(--acc-ink); }
+.of-b { min-width: 0; flex: 1; }
+.of-t { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.of-m { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+.of-why { font-size: 12px; color: var(--mut); line-height: 1.45; margin-top: 3px; text-wrap: pretty; }
+.of-warn { display: flex; gap: 5px; align-items: flex-start; font-size: 11.5px; color: #a97a20; margin-top: 3px; }
+.of-warn svg { width: 13px; height: 13px; flex: none; margin-top: 1px; }
+.of-foot { display: flex; gap: 7px; align-items: flex-start; margin-top: 11px; padding-top: 10px;
+  border-top: 1px solid var(--line); font-size: 11.5px; color: var(--faint); line-height: 1.45; }
+.of-foot svg { width: 13px; height: 13px; flex: none; color: var(--acc); margin-top: 1px; }
+.req-stage-why { display: flex; gap: 8px; align-items: flex-start; margin-top: 11px; padding-top: 10px;
+  border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.5; color: var(--mut); }
+.req-stage-why svg { width: 14px; height: 14px; flex: none; color: var(--acc); margin-top: 1px; }
+.qa-bar { display: flex; flex-wrap: wrap; gap: 7px; padding: 2px 0 8px; margin: 2px 0 2px; }
+.qa-act { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 34px;
+  padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.qa-act svg { width: 14px; height: 14px; flex: none; }
+.qa-act.on { border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc-ink); }
+.qa-act:hover { border-color: var(--acc-line); color: var(--acc); }
+.qa-act:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.qa-act.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
+.qa-act.primary:hover { color: #fff; filter: brightness(1.05); }
+.qa-act.danger:hover { border-color: var(--stop); color: var(--stop); }
+@media (prefers-reduced-motion: reduce) { .qa-act { transition: none; } }
+/* A contract's title is a fact, not a field — same line, no edit affordance. */
+.deal-title-text.is-static { cursor: default; border-color: transparent; background: none; }
+.kanban-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint);
+  margin: 0 0 8px 2px; }
+.kanban-hint svg { width: 13px; height: 13px; opacity: .7; }
 .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: 268px; gap: 14px; overflow-x: auto; padding-bottom: 12px; }
 .kcol { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; }
+/* Terminal columns read as outcomes, not as two more steps: a won column is the only green thing
+   on the board, a lost one recedes. Nine columns now scroll — .kanban already carries overflow-x. */
+.kcol-won { background: var(--ok-soft, var(--surface-2)); border-color: var(--ok-line, var(--line)); }
+.kcol-lost { opacity: .72; }
+.kcol-won .kh, .kcol-lost .kh { letter-spacing: .01em; }
+/* A deal that ended in a loss has no current step; the stepper greys out and states the exit once. */
+.dx-lost { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+  color: var(--stop); background: var(--stop-soft, transparent); border: 1px solid var(--stop);
+  border-radius: 999px; padding: 4px 12px; margin: -4px 0 12px; }
+/* Six-to-nine stages fit only if the labels give way; below eight steps nothing changes. */
+.dx-stepper.long .dx-step .l { font-size: 10.5px; max-width: 92px; margin-top: 6px; }
+.dx-stepper.long .dx-step .d { width: 26px; height: 26px; font-size: 11.5px; }
+.dx-stepper.long .dx-step::before { top: 12px; }
 .kcol .kh { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink); padding: 4px 6px 10px; }
 .kcol .kh .c { font-size: 11px; color: var(--mut); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 1px 8px; }
 .deal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px; margin-bottom: 9px; box-shadow: var(--shadow-sm); cursor: pointer; transition: .15s var(--ease); }
@@ -619,9 +810,29 @@ button { font-family: inherit; cursor: pointer; }
 .dx-sec-h { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 13.5px; margin-bottom: 13px; }
 .dx-sec-h .ic { width: 27px; height: 27px; border-radius: 8px; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; }
 .dx-sec-h .r { margin-left: auto; }
-.dx-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
-.dx-grid2 > .dx-sec { margin-top: 0; }
-@media (max-width: 640px) { .dx-grid2 { grid-template-columns: 1fr; } }
+/* Cards in a row share one height, and their bodies stretch to fill it — a ragged edge between
+   two half-width cards is what reads as a hole in the page. Pair blocks of similar weight and the
+   shared height costs nothing; pair a two-line card with a ten-row list and it will always look
+   wrong however it is aligned. */
+.view { padding-bottom: 76px; }
+.cx-stack { display: flex; flex-direction: column; gap: var(--card-gap); margin-top: var(--card-gap); }
+.cx-row { min-width: 0; }
+.cx-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--card-gap); align-items: stretch; }
+.cx-col { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; }
+/* Rows and columns carry their own gap; a sibling margin on top of it desynchronises the two
+   halves of a facing row by exactly one gap. */
+.cx-pair > .dx-sec, .cx-col > .dx-sec { display: flex; flex-direction: column; min-width: 0; margin-top: 0; }
+.cx-pair > .dx-sec > :last-child, .cx-col > .dx-sec > :last-child { flex: 1 1 auto; }
+.cx-col > .dx-sec:last-child { flex: 1 1 auto; }
+/* A spec sheet spreads its rows to fill the shared height, so extra height reads as comfortable
+   spacing rather than emptiness; a parameter grid must not — it would leave a band of nothing. */
+.cx-pair .dfields, .cx-col .dfields { flex: 1 1 auto; align-content: space-between; }
+/* A map can fill whatever height its neighbour sets — a paragraph cannot. So the map stretches
+   and the row is sized by the text, instead of leaving a band of nothing under the brief. */
+.cx-pair .obj-map { flex: 1 1 auto; display: flex; flex-direction: column; margin-top: 0; }
+.cx-pair .obj-map-canvas { flex: 1 1 auto; height: auto; min-height: 172px; max-height: 214px; overflow: hidden; }
+.cx-pair .obj-meta { align-content: start; row-gap: 16px; column-gap: 26px; }
+@media (max-width: 760px) { .cx-pair { grid-template-columns: 1fr; } }
 .dx-cbar-lbl { font-size: 11px; color: var(--mut); margin: 0 0 6px 2px; display: flex; align-items: center; gap: 6px; }
 .dx-cbar-lbl svg { width: 13px; height: 13px; color: var(--acc); }
 .dx-cbar { display: flex; align-items: center; gap: 11px; background: var(--acc-soft); border: 1px solid #F6D3BC; border-radius: 13px; padding: 11px 13px; cursor: pointer; }
@@ -792,6 +1003,10 @@ button { font-family: inherit; cursor: pointer; }
 .obj-toolbar .mini-sel { flex: 0 0 auto; }
 /* matching panel (подбор) + psych form */
 .match-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.match-grid .wide { grid-column: 1 / -1; }
+/* Grouped forms: the group heading needs air above it, or it collides with the field before. */
+.match-grid + .section-label, .form-grid + .section-label { margin-top: 16px; }
+.section-label + .match-grid, .section-label + .form-grid { margin-top: 6px; }
 .match-grid .fld { display: flex; flex-direction: column; gap: 5px; }
 .match-grid .fld > span { font-size: 12px; color: var(--mut); font-weight: 600; }
 .match-grid .fld input, .match-grid .fld select { height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
@@ -821,7 +1036,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .wsdoc-brand .wm { font-weight: 800; letter-spacing: .08em; font-size: 14px; }
 .wsdoc-brand .wm span { color: var(--acc); }
 .wsdoc-kick { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.6); }
-.wsdoc-title { font-family: var(--font-disp); font-weight: 800; font-size: 19px; letter-spacing: -.01em; }
+.wsdoc-title { font-family: var(--font-name); font-weight: 800; font-size: 19px; letter-spacing: -.01em; }
 .wsdoc-sub { font-size: 12px; color: rgba(255,255,255,.72); margin-top: 3px; }
 .wsdoc-body { padding: 18px 20px; }
 .wsdoc-body .section-label { margin: 14px 0 8px; }
@@ -938,6 +1153,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* "что изменилось" list */
 .chg-list { display: flex; flex-direction: column; gap: 6px; }
+.pt-list { display: flex; flex-direction: column; }
+/* Beside a taller neighbour the trait rows spread to fill, the way the spec sheets do — extra
+   height reads as spacing rather than as a block that ran out of content. */
+.cx-pair .pt-list { flex: 1 1 auto; justify-content: space-between; }
+.pt-row { display: flex; align-items: baseline; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.pt-row:last-child { border-bottom: 0; }
+.pt-ic { display: inline-flex; width: 22px; height: 22px; border-radius: 7px; background: var(--acc-soft); color: var(--acc); align-items: center; justify-content: center; flex: none; align-self: center; }
+.pt-ic svg { width: 13px; height: 13px; }
+.pt-k { color: var(--mut); width: 56px; flex: none; }
+.pt-v { color: var(--ink); font-weight: 600; flex: 1; min-width: 0; }
+.pt-vals { margin-top: 10px; }
+.pt-tips { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .chg-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
 .chg-row svg { width: 15px; height: 15px; color: var(--ok); flex: none; margin-top: 1px; }
 
@@ -1046,6 +1273,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dfields { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 4px; }
 .dfield { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .dfield:last-child { border-bottom: 0; }
+/* A full-width parameter list reads as a long thin column of pairs; two columns give it the same
+   height as the blocks it sits between. */
+.dfields.cols2 { grid-template-columns: 1fr 1fr; column-gap: 26px; }
+/* Two columns are for a full-width block. In half a row they leave 90px for a value like
+   «Business Bay, Dubai Creek Harbour, JVC», which then wraps into a ladder. */
+.cx-pair .dfields.cols2, .cx-col .dfields.cols2 { grid-template-columns: 1fr; }
+.dfields.cols2 .dfield:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+@media (max-width: 760px) { .dfields.cols2 { grid-template-columns: 1fr; } }
 .dfield .dk { color: var(--mut); flex: 0 0 auto; }
 .dfield .dv { color: var(--ink); font-weight: 600; text-align: right; flex: 1 1 auto; min-width: 0; }
 .prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }
@@ -1060,7 +1295,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   border: 1.5px solid var(--acc-line); border-radius: 12px; padding: 14px 16px; margin: 2px 0 6px; }
 .rh-main { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 /* Client name = the hero's dominant line (this is a client request). */
-.rh-client { font-size: 20px; font-weight: 800; color: var(--ink); font-family: var(--font-disp); letter-spacing: -.01em; line-height: 1.12; }
+.rh-client { font-size: 20px; font-weight: 800; color: var(--ink); font-family: var(--font-name); letter-spacing: -.01em; line-height: 1.12; }
 /* Object line = what the client wants, a quiet subline under the name. */
 .rh-obj { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); line-height: 1.35; margin-top: 6px; }
 .rh-obj svg { width: 15px; height: 15px; color: var(--acc-ink); flex: 0 0 auto; }
@@ -1200,6 +1435,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prio-B { background: var(--acc); }
 .prio-C { background: var(--mut); }
 .chg-row.off svg { color: #c99a2e; }
+/* Across the full width the signal list is five short lines with a lot of nothing to their right;
+   in two columns it fills the row it is given. */
+.sig-wide .chg-list { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 22px; }
+@media (max-width: 760px) { .sig-wide .chg-list { grid-template-columns: 1fr; } }
 
 /* Продвижение проектов — раздел главного меню */
 .promo-page { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(258px, 1fr); gap: 16px; align-items: start; }
@@ -1222,18 +1461,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cb-num { font-size: 21px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); }
 .cb-badges { margin-top: 11px; }
 .cb-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.cd-list { display: flex; flex-direction: column; gap: 2px; }
-.cd-row { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 9px; }
+.cd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 2px 10px; }
+.cd-row { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border-radius: 9px; min-width: 0; }
 .cd-row.on { background: var(--acc-soft); }
-.cd-ic { display: inline-flex; width: 30px; height: 30px; border-radius: 8px; background: var(--bg); color: var(--mut); align-items: center; justify-content: center; flex: none; }
+.cd-row.on { grid-column: 1 / -1; }
+.cd-ic { display: inline-flex; width: 26px; height: 26px; border-radius: 8px; background: var(--bg); color: var(--mut); align-items: center; justify-content: center; flex: none; }
 .cd-row.on .cd-ic { background: #fff; color: var(--acc-deep); }
 .cd-ic svg { width: 15px; height: 15px; }
-.cd-label { font-size: 12.5px; color: var(--mut); width: 92px; flex: none; }
-.cd-val { font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; }
+.cd-label { font-size: 12.5px; color: var(--mut); width: 74px; flex: none; }
+.cd-val { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cd-row.on .cd-val { color: var(--acc-deep); }
-.cd-primary { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: var(--acc-ink); background: #fff; border: 1px solid var(--acc-line); padding: 2px 8px; border-radius: 999px; flex: none; }
+.cd-primary { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--acc-ink); background: #fff; border: 1px solid var(--acc-line); padding: 2px 7px; border-radius: 999px; flex: none; white-space: nowrap; }
 .cd-primary svg { width: 11px; height: 11px; }
-.cd-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.cd-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 
 /* ---- Manager IA (P7): team roster · lead distribution · approvals ---- */
 .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 4px; }
@@ -1350,7 +1590,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .acc[open] > summary::after { content: '\2212'; }
 .acc-body { padding: 0 2px 14px; font-size: 13px; color: var(--mut); line-height: 1.5; max-width: 76ch; }
 .acc-terms { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; }
-.acc-term b { font-family: var(--font-disp); font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: -.01em; display: block; line-height: 1; }
+.acc-term b { font-family: var(--font-name); font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: -.01em; display: block; line-height: 1; }
 .acc-term span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 700; display: block; margin-top: 3px; }
 
 /* Reviews (services page) */
@@ -1391,17 +1631,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width: 820px) { .insights { grid-template-columns: 1fr; } }
 
 /* ===== Card heroes (client name / deal object / КП flagship) — object-hero family ===== */
-.chero { position: relative; border-radius: 14px; overflow: hidden; min-height: 236px; display: flex; margin-bottom: 16px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
+.chero { position: relative; border-radius: 14px; overflow: hidden; min-height: 126px; display: flex; margin-bottom: 16px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
 .chero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .chero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 55%, rgba(15,17,21,.14)); }
-.chero-content { position: relative; z-index: 2; display: flex; gap: 22px; align-items: center; padding: 24px 28px; flex: 1; }
-.chero-avatar { flex: 0 0 68px; width: 68px; height: 68px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 3px 10px rgba(0,0,0,.28); }
+.chero-content { position: relative; z-index: 2; display: flex; gap: 16px; align-items: center; padding: 16px 20px; flex: 1; }
+.chero-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-name); font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .chero-info { flex: 1; min-width: 0; }
-.chero-name { font-family: var(--font-disp); font-size: 30px; font-weight: 800; line-height: 1.1; margin: 0 0 14px; color: #fff; letter-spacing: -.02em; }
-.chero-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; max-width: 520px; }
-.chero-fact { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,.86); line-height: 1.35; }
-.chero-fact-icon { display: inline-flex; width: 14px; height: 14px; flex: none; }
-.chero-fact-icon svg { width: 14px; height: 14px; opacity: .85; }
+.chero-name { font-family: var(--font-name); font-size: 22px; font-weight: 800; line-height: 1.1; margin: 0 0 8px; color: #fff; letter-spacing: -.02em; }
+.chero-facts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; max-width: 100%; }
+.chero-fact { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,.86); line-height: 1.3; }
+.chero-fact-icon { display: inline-flex; width: 12px; height: 12px; flex: none; }
+.chero-fact-icon svg { width: 12px; height: 12px; opacity: .85; }
 
 .dhero-modal, .kp-hero-modal, .dhero-page { display: contents; }
 .dhero-page .osum { margin-bottom: 16px; }
@@ -1430,9 +1670,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .kp-hero-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 110px; margin-bottom: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; color: var(--mut); font-size: 13px; }
 .kp-hero-empty svg { width: 18px; height: 18px; opacity: .5; }
 @media (max-width: 720px) {
-  .chero-content { flex-direction: column; align-items: flex-start; gap: 14px; padding: 16px; }
-  .chero-name { font-size: 24px; }
-  .chero-facts { grid-template-columns: 1fr; }
+  .chero-content { flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 16px; }
+  .chero-name { font-size: 20px; }
+  .chero-facts { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
 .promo-msg { width: 100%; min-height: 96px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--surface); }
 .promo-creatives { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -1483,22 +1723,34 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     linear-gradient(135deg, #eef2f4, #e4ebef); }
 .obj-map-pin { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; background: var(--acc); transform: rotate(-45deg); display: grid; place-items: center; box-shadow: 0 5px 12px rgba(241,126,61,.42); }
 .obj-map-pin svg { transform: rotate(45deg); width: 17px; height: 17px; color: #fff; }
+/* Real map imagery: the tile crop is centred on the object, so the marker is centred too.
+   A halo ring makes the point readable over both the pale desert and the dense street grid. */
+.obj-map-canvas.has-img { display: block; padding: 0; background: #e9e4dc; }
+.obj-map-canvas.has-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.obj-map-marker { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; background: var(--acc); border: 3px solid #fff;
+  box-shadow: 0 0 0 1px rgba(20,30,40,.18), 0 4px 12px rgba(20,30,40,.35); }
+.obj-map-marker::after { content: ''; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
+  margin: -23px 0 0 -23px; border-radius: 50%; border: 1px solid var(--acc);
+  background: rgba(241,126,61,.13); }
+.obj-map-credit { position: absolute; right: 6px; bottom: 5px; font-size: 9.5px; color: #3d4550;
+  background: rgba(255,255,255,.78); padding: 1px 6px; border-radius: 4px; letter-spacing: .01em; }
 .obj-map-area { position: absolute; left: 12px; top: 12px; font-size: 11.5px; font-weight: 600; color: var(--ink); background: rgba(255,255,255,.82); padding: 3px 9px; border-radius: 999px; }
 .obj-map-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--surface); }
 .obj-map-foot .omf-t b { font-size: 13px; color: var(--ink); }
 .obj-map-foot .omf-t span { display: block; font-size: 11.5px; color: var(--mut); margin-top: 1px; }
 /* Object detail HERO pattern (photo on top, overlaid fields) */
-.ohero { position: relative; border-radius: 14px; overflow: hidden; min-height: 322px; display: flex; margin-bottom: 20px; }
+.ohero { position: relative; border-radius: 14px; overflow: hidden; min-height: 280px; display: flex; margin-bottom: 20px; }
 .ohero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .ohero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.86), rgba(15,17,21,.46) 54%, rgba(15,17,21,.10)); }
-.ohero-info { position: relative; z-index: 2; padding: 26px 28px; max-width: 540px; align-self: center; }
-.ohero-title { font-size: 26px; font-weight: 700; line-height: 1.14; margin: 0 0 9px; color: #fff; letter-spacing: -.01em; }
-.ohero-addr { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: rgba(255,255,255,.84); margin-bottom: 18px; }
-.ohero-addr svg { width: 14px; height: 14px; opacity: .8; }
+.ohero-info { position: relative; z-index: 2; padding: 22px 24px; max-width: 540px; align-self: center; }
+.ohero-title { font-size: 24px; font-weight: 700; line-height: 1.14; margin: 0 0 7px; color: #fff; letter-spacing: -.01em; }
+.ohero-addr { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255,255,255,.84); margin-bottom: 14px; }
+.ohero-addr svg { width: 13px; height: 13px; opacity: .8; }
 .ohero-meta { margin: 0; display: grid; gap: 0; }
-.ohero-meta > div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.2); }
-.ohero-meta dt { font-size: 13px; color: rgba(255,255,255,.78); margin: 0; }
-.ohero-meta dd { font-size: 13.5px; font-weight: 650; color: #fff; margin: 0; text-align: right; }
+.ohero-meta > div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.2); }
+.ohero-meta dt { font-size: 12px; color: rgba(255,255,255,.78); margin: 0; }
+.ohero-meta dd { font-size: 13px; font-weight: 650; color: #fff; margin: 0; text-align: right; }
 .ohero-src { position: absolute; top: 16px; left: 16px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: #fff; background: rgba(18,15,12,.52); padding: 4px 11px; border-radius: 999px; }
 .ohero-src svg { width: 13px; height: 13px; }
 .ohero-actions { position: absolute; top: 16px; right: 16px; z-index: 2; display: flex; flex-direction: column; gap: 8px; width: 196px; }
@@ -1515,6 +1767,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .ohero-cap svg { width: 12px; height: 12px; }
 /* Summary band under the hero: lead description + key metrics on an accent-tinted card (price emphasized) */
 .osum { border: 1px solid var(--acc-line); background: var(--acc-soft); border-radius: 14px; padding: 17px 20px 0; margin-bottom: 16px; }
+.osum-bare { padding-top: 4px; }
+.osum-bare .osum-metrics { border-top: 0; margin-top: 0; }
 .osum-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--acc-ink); margin-bottom: 7px; }
 .osum-lead { font-size: 15.5px; line-height: 1.6; color: var(--ink); max-width: 820px; margin: 0 0 2px; }
 .osum-metrics { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 15px; border-top: 1px solid var(--acc-line); }
@@ -1522,13 +1776,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .osum-m:first-child { padding-left: 0; border-left: none; }
 .osum-v { font-size: 20px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
 .osum-l { font-size: 12px; color: var(--mut); margin-top: 4px; }
-.osum-m--hero .osum-v { color: var(--acc-deep); font-size: 23px; }
-.osum-m--hero .osum-l { color: var(--acc-ink); font-weight: 600; }
 .odetail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; align-items: stretch; }
 .odetail-grid > .dx-sec { margin-top: 0; display: flex; flex-direction: column; }
-.odetail-grid .obj-meta { grid-template-columns: 1fr 1fr; row-gap: 15px; margin-top: 0; }
+.odetail-grid .obj-meta { grid-template-columns: 1fr 1fr; row-gap: 16px; column-gap: 30px; margin-top: 0; }
 .odetail-grid .obj-map { flex: 1; display: flex; flex-direction: column; margin-top: 0; }
 .odetail-grid .obj-map-canvas { flex: 1; height: auto; min-height: 172px; }
+.osum-m--hero .osum-v { color: var(--acc-deep); font-size: 23px; }
+.osum-m--hero .osum-l { color: var(--acc-ink); font-weight: 600; }
 @media (max-width: 820px) {
   .ohero { flex-direction: column; } .ohero-actions { position: static; width: auto; flex-direction: row; flex-wrap: wrap; margin: 14px; } .ohero-info { max-width: none; }
   .osum-metrics { grid-template-columns: 1fr 1fr; }
@@ -1566,28 +1820,31 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* ---- Deal card v2: the deal reads first; the object is demoted to a compact card ---- */
 /* Compact deal hero — same photo-backdrop family as .chero / .ohero, but short. */
-.dhero { position: relative; border-radius: var(--r); overflow: hidden; min-height: 116px; display: flex; margin-bottom: 12px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
+.dhero { position: relative; border-radius: var(--r); overflow: hidden; min-height: 104px; display: flex; margin-bottom: 12px; background: linear-gradient(135deg, #2a2d34, #3d3a34); }
 .dhero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .dhero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 58%, rgba(15,17,21,.16)); }
-.dhero-content { position: relative; z-index: 2; display: flex; gap: 14px; align-items: center; padding: 16px 20px; flex: 1; }
-.dhero-av { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.dhero-content { position: relative; z-index: 2; display: flex; gap: 12px; align-items: center; padding: 12px 16px; flex: 1; }
+.dhero-av { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-name); font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .dhero-info { flex: 1; min-width: 0; }
-.dhero-name { font-family: var(--font-disp); font-size: 21px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
-.dhero-sub { margin-top: 5px; font-size: 13px; color: rgba(255,255,255,.86); }
+.dhero-name { font-family: var(--font-name); font-size: 18px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
+.dhero-sub { margin-top: 3px; font-size: 12px; color: rgba(255,255,255,.86); }
+/* The deal's essence, edited in place. The label carries the affordance so the line below it can
+   stay plain text until touched; only the text node is focusable, so there is one tab stop. */
+.deal-title-edit { display: block; margin-bottom: 12px; }
+.deal-title-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
+.deal-title-lbl svg { width: 11px; height: 11px; }
+.deal-title-text { display: block; padding: 6px 10px; margin-left: -10px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--ink); cursor: text; outline: none; transition: background .18s var(--ease), border-color .18s var(--ease); }
+.deal-title-text:hover { background: var(--surface-2); border-color: var(--line); }
+.deal-title-text:focus { background: var(--surface); border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.deal-title-edit:hover .deal-title-lbl { color: var(--acc-ink); }
+/* Handover brief — prose, so it reads as sentences rather than as another field grid. */
+.deal-brief { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink); max-width: 74ch; text-wrap: pretty; }
 /* Narrow stepper directly under the hero. */
 .deal-stepper-compact { margin-bottom: 12px; }
 .deal-stepper-compact .dx-stepper { margin: 8px 0 2px; }
 .deal-stepper-compact .dx-step .d { width: 24px; height: 24px; font-size: 11px; }
 .deal-stepper-compact .dx-step .l { font-size: 10.5px; margin-top: 5px; max-width: 104px; }
 .deal-stepper-compact .dx-step::before { top: 11px; height: 2px; }
-/* Two facing cards under the hero: client contacts ↔ key params. */
-.deal-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; align-items: stretch; }
-.deal-top-cell { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.deal-top-cell > .dx-sec { min-width: 0; margin: 0; display: flex; flex-direction: column; }
-/* the shorter column's last card fills to the taller column's height → bottom borders align, no gray page gap */
-.deal-top-cell > .dx-sec:last-child { flex: 1 1 auto; }
-/* "Ключевое" spec-sheet spreads its rows to fill, so extra height reads as comfortable spacing, not emptiness */
-.deal-top .dfields { flex: 1 1 auto; align-content: space-between; }
 /* Request facing pair: cells sit at natural height (no equal-height stretch), so the
    key-conditions fields keep compact spacing instead of spreading to the taller right column. */
 /* Essence status line high on the deal card (no scroll to see what's happening now). */
@@ -1620,7 +1877,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dnb-ev-t { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
 .dnb-ev-m { font-size: 11px; color: var(--faint); margin-top: 1px; }
 .dnb-ev-empty { font-size: 12px; color: var(--faint); }
-@media (max-width: 760px) { .deal-top { grid-template-columns: 1fr; } .dhero-name { font-size: 19px; } .dhero-content { padding: 14px 16px; } }
+@media (max-width: 760px) { .dhero-name { font-size: 19px; } .dhero-content { padding: 14px 16px; } }
 .obj-mini { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: .15s var(--ease); }
 .obj-mini:hover { background: var(--surface-2); border-color: var(--line-2); }
 .obj-mini-ph { width: 64px; height: 48px; flex: 0 0 auto; border-radius: var(--r-xs); background: var(--acc-soft) center/cover no-repeat; display: grid; place-items: center; color: var(--faint); }
@@ -1640,7 +1897,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* --- Shared "now" cards: emphasized next-step + structured recent events (не серая каша) --- */
 .nstep-meta { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-end; }
-.nstep-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+.nstep-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-start; }
 .nstep-act { font-size: 14px; font-weight: 650; color: var(--ink); line-height: 1.4; }
 .nstep-why { font-size: 12px; color: var(--mut); margin-top: 5px; line-height: 1.4; }
 .nstep-owner, .nstep-due { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--mut); }
@@ -1660,7 +1917,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .reqo-kp-hint { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: var(--mut); line-height: 1.45; margin-bottom: 10px; }
 .reqo-kp-hint svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--acc-ink); margin-top: 1px; }
 .reqo-kp-acts { display: flex; gap: 7px; flex-wrap: wrap; }
-.req-secondary { margin-top: 12px; }
 /* Parent-request breadcrumb over deal/object detail */
 .page-crumb { margin-bottom: 10px; }
 /* Shared-history scope filter (заявка ↔ сделки ↔ контакт) */
@@ -1668,7 +1924,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* КП as a client-facing document (modal) */
 .kp-doc { font-size: 13px; }
 .kp-doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-.kp-doc-to { font-family: var(--font-disp); font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+.kp-doc-to { font-family: var(--font-name); font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
 .kp-doc-cli { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
 .kp-tblwrap { overflow-x: auto; }
 .kp-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -1694,3 +1950,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .docchain-row.wait .docchain-k { color: var(--mut); }
 .docchain-s { font-size: 11.5px; color: var(--mut); margin-top: 1px; }
 .docchain-row .badge { margin-left: auto; flex: 0 0 auto; }
+
+/* List search + filter bar — one shape across contacts, companies and the Concierge rail. */
+.obj-search input[type="search"]::-webkit-search-cancel-button { display: none; }
+.list-filters { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--acc-line); border-radius: var(--r); background: var(--acc-soft); }
+.lf-fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lf-fld.inline { flex-direction: row; align-items: center; gap: 8px; }
+.lf-fld > span { font-size: 11.5px; font-weight: 600; color: var(--mut); }
+.lf-hint { flex: 1 1 100%; font-size: 11px; color: var(--faint); }
+.cg-rail-search { flex: none; margin: 8px; padding: 4px 4px 4px 12px; border-radius: var(--r); box-shadow: none; }  /* the rail is a flex COLUMN — .obj-search's flex:1 would stretch the field down the whole panel */
+.cg-rail-search input { font-size: 13px; padding: 8px 0; }
+.cg-rail-search .ico svg { width: 15px; height: 15px; }

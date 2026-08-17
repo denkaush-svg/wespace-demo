@@ -18,6 +18,9 @@
     // Заявки → Сделки: the funnel entry sits next to deals (CRM convention: Pipedrive / HubSpot / amoCRM).
     { id: 'requests', label: 'Заявки', icon: 'mail', count: () => ((D().requests || []).length + (D().inbox || []).length) },
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
+    // Contracts sit next to deals because that is the handover: the deal ends at signing and the
+    // contract is what runs for the months or years after it.
+    { id: 'contracts', label: 'Договоры', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'clients', tab: 'contacts', label: 'Клиенты', icon: 'users', count: () => (D().clients || []).length },
     { id: 'objects', label: 'Объекты', icon: 'building', count: () => D().objects.length },
@@ -29,7 +32,7 @@
     { id: 'partners', label: 'Сеть', icon: 'handshake' },
     { id: 'companies', label: 'Компании', icon: 'building' },
     { id: 'shows', label: 'Календарь', icon: 'calendar' },
-    { id: 'promotion', label: 'Продвижение', icon: 'send' },
+    { id: 'promotion', label: 'Продвижение', icon: 'radar' },
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
     { id: 'services', label: 'Услуги', icon: 'grid' },
     { id: 'club', label: 'Клуб', icon: 'star' },
@@ -41,6 +44,9 @@
     { id: 'concierge', label: 'Консьерж', icon: 'sparkle' },
     { id: 'team', label: 'Команда', icon: 'users' },
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
+    // Contracts sit next to deals because that is the handover: the deal ends at signing and the
+    // contract is what runs for the months or years after it.
+    { id: 'contracts', label: 'Договоры', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).length },
     { id: 'approvals', label: 'Согласования', icon: 'check', count: () => MGR_APPROVALS.length - (S().apprDone || []).length },
@@ -145,10 +151,7 @@
   function cgDockWelcome() {
     return '<div class="cgdock-welcome">' + I('sparkle') +
       '<div class="cgdock-w-t">Чат с Консьержем</div>' +
-      '<div class="cgdock-w-m">Спросите что угодно, не покидая текущий раздел.</div>' +
-      '<div class="qa-row" style="justify-content:center;margin-top:12px">' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
-      '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button></div></div>';
+      '<div class="cgdock-w-m">Спросите что угодно, не покидая текущий раздел.</div></div>';
   }
   function renderDockMsgs() {
     const c = document.getElementById('cgdockmsgs'); if (!c) return;
@@ -195,34 +198,160 @@
   // It follows the rate on the linked object, because that is the rate shown on the
   // object card; a flat guess here is exactly the discrepancy a broker spots first.
   const DEFAULT_COMM_PCT = 2;
-  // A deal can carry several lots, and lots do not share a commission rate.
-  // Taking the first lot's rate for the whole contract produced a figure the
-  // stand then labelled as verified. Each lot is charged at its own rate, with
-  // the contract split across them by list price.
+  // Комиссия сделки. У сделки с несколькими лотами ставка у каждого своя, а брать ставку первого
+  // и умножать на всю сумму — это ровно та ошибка, которую брокер замечает первой. Считаем по лотам,
+  // и только если их цены не складываются в сумму сделки, возвращаемся к ставке ведущего объекта.
   function dealCommission(deal) {
     if (!deal) return 0;
     const objs = D().objects || [];
-    const rate = (o) => (o && o.commissionPct) || DEFAULT_COMM_PCT;
-    const ids = (deal.lots && deal.lots.length) ? deal.lots : (deal.objectId ? [deal.objectId] : []);
-    const lots = ids.map((id) => objs.find((o) => o.id === id)).filter(Boolean);
-    const amount = deal.amount || 0;
-    if (lots.length < 2) return Math.round(amount * rate(lots[0]) / 100);
-    const prices = lots.map((o) => Number(o.price) || 0);
-    const total = prices.reduce((s, p) => s + p, 0);
-    // No prices to split by — every lot weighs the same.
-    const share = (i) => (total > 0 ? prices[i] / total : 1 / lots.length);
-    return Math.round(lots.reduce((s, o, i) => s + amount * share(i) * rate(o) / 100, 0));
+    const byId = (id) => objs.find((o) => o.id === id);
+    const lots = (deal.lots && deal.lots.length) ? deal.lots.map(byId).filter(Boolean) : [];
+    if (lots.length > 1) {
+      const sum = lots.reduce((a, o) => a + (o.price || 0), 0);
+      if (sum && Math.abs(sum - (deal.amount || 0)) <= 1) {
+        return Math.round(lots.reduce((a, o) => a + (o.price || 0) * ((o.commissionPct || DEFAULT_COMM_PCT) / 100), 0));
+      }
+    }
+    const obj = byId(deal.objectId);
+    const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
+    return Math.round((deal.amount || 0) * pct / 100);
   }
 
   function computeMetrics() {
     const A = D().attribution || []; const deals = D().deals || [];
     const leads = A.reduce((s, x) => s + x.leads, 0);
     const won = A.reduce((s, x) => s + x.deals, 0);
-    const saleFunnels = ['sale_offplan', 'sale_ready', 'rental_biz', 'referral'];
-    const activeSales = deals.filter((d) => d.stage !== 'done' && saleFunnels.indexOf(d.funnel) >= 0);
+    // Every funnel earns a commission now — the old list named four product boards, which is the
+    // very distinction the service axis removed.
+    const activeSales = deals.filter((d) => !dealClosed(d));
     const expectedComm = Math.round(activeSales.reduce((s, d) => s + dealCommission(d), 0));
-    const closed = deals.filter((d) => d.stage === 'done');
+    const closed = deals.filter(dealWon);
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
+  }
+
+  // ---- Goal progress computation — per metric from demo data ----
+  // ---- Personal / team goals ----------------------------------------------------------------
+  // Progress is DERIVED from the demo's own records, never stored: a counter nothing updates would
+  // drift away from the board the moment a scenario moves a deal.
+  //
+  // Scope: an agent's goal counts that agent's own book; the manager's goals count the department,
+  // so the same component serves «моя цель» and «план отдела».
+  const GOAL_METRICS = {
+    commission: { label: 'Комиссия', unit: 'money', hint: 'закрытые сделки периода' },
+    deals: { label: 'Закрытые сделки', unit: 'count', word: ['сделка', 'сделки', 'сделок'], hint: 'стадия «закрыта»' },
+    pipeline: { label: 'Пайплайн в работе', unit: 'money', hint: 'сумма активных сделок' },
+    shows: { label: 'Показы', unit: 'count', word: ['показ', 'показа', 'показов'], hint: 'встречи на объектах' },
+    leads: { label: 'Клиенты в работе', unit: 'count', word: ['клиент', 'клиента', 'клиентов'], hint: 'закреплены за вами' },
+  };
+  // May in the demo week; a quarter is Apr–Jun, so a quarterly goal is 44 days in on 14 May.
+  const DAYS_IN_MONTH = 31;
+  const QUARTER_ELAPSED_BEFORE_MAY = 30;  // Q2 runs Apr–Jun, so on 14 May only April has elapsed
+  const DAYS_IN_QUARTER = 91;
+  function goalOwnerId(scope) {
+    const u = D().users[scope === 'team' ? 'manager' : S().role];
+    return u ? u.id : null;
+  }
+  function goalDeals(scope) {
+    const all = D().deals || [];
+    if (scope === 'team') return all;
+    const me = goalOwnerId(scope);
+    return all.filter((d) => d.agent === me);   // d.agent holds a user id (u_marina), not a role name
+  }
+  // The closed book for the period. For the whole department it is `attribution` (the agency's
+  // book by source); for one agent it is that agent's own `closedPeriod` — `attribution` carries no
+  // agent split, so slicing it per person would have reported the agency's history as Marina's.
+  // Either way, a deal that closes DURING the demo is added on top, so the figure moves on screen.
+  function closedBook(scope, period) {
+    const deals = goalDeals(scope);
+    const live = deals.filter(dealWon);
+    if (scope === 'team') {
+      const attr = D().attribution || [];
+      return {
+        commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + live.length,
+      };
+    }
+    const own = ((D().users[S().role] || {}).closedPeriod || {})[period === 'quarter' ? 'quarter' : 'month'] || { commission: 0, deals: 0 };
+    return {
+      commission: Math.round(own.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+      deals: own.deals + live.length,
+    };
+  }
+  function goalFact(goal, scope) {
+    const deals = goalDeals(scope);
+    if (goal.metric === 'commission') return closedBook(scope, goal.period).commission;
+    if (goal.metric === 'deals') return closedBook(scope, goal.period).deals;
+    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => !dealClosed(d)).reduce((s2, d) => s2 + (d.amount || 0), 0));
+    if (goal.metric === 'shows') {
+      // Events carry no owner, so a show counts as mine when its client is on one of my deals — and
+      // only once it has actually happened: a viewing booked for 16:00 is not a показ at 9:12.
+      const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
+      return (D().events || []).filter((e) => e.kind === 'show' && e.status !== 'canceled' &&
+        ordFromWhen(e.when, UNDATED_ORD) <= NOW_ORD && (scope === 'team' || mine[e.clientId])).length;
+    }
+    if (goal.metric === 'leads') {
+      if (scope === 'team') return (D().clients || []).length;
+      const mine = {}; deals.forEach((d) => { mine[d.clientId] = true; });
+      return (D().clients || []).filter((c) => mine[c.id]).length;
+    }
+    return 0;
+  }
+  function goalValue(metric, n) {
+    const m = GOAL_METRICS[metric] || {};
+    if (m.unit === 'money') return WS.AED(n);
+    return n + (m.word ? ' ' + plural(n, m.word[0], m.word[1], m.word[2]) : '');
+  }
+  function computeGoalProgress(goal, scope) {
+    const fact = goalFact(goal, scope);
+    const target = goal.target || 0;
+    const pct = target ? Math.round((fact / target) * 100) : 0;
+    const now = WS.fixtures.DEMO_NOW;
+    const elapsed = goal.period === 'quarter' ? (QUARTER_ELAPSED_BEFORE_MAY + now.d) : now.d;
+    const span = goal.period === 'quarter' ? DAYS_IN_QUARTER : DAYS_IN_MONTH;
+    const projected = elapsed > 0 ? Math.round(fact / elapsed * span) : 0;
+    const share = target ? Math.round(projected / target * 100) : 0;
+    // Days by which the current rate beats (or misses) the finish line.
+    const daysAhead = (fact && target) ? Math.round(span - (target / (fact / elapsed))) : 0;
+    let pace;
+    // Pace only means something for a metric that ACCUMULATES over the period. Pipeline is a stock —
+    // how much sits in work right now — so projecting it forward by a daily rate is nonsense.
+    const cumulative = goal.metric !== 'pipeline' && goal.metric !== 'leads';
+    if (!cumulative) pace = fact >= target ? 'план по загрузке держится' : 'до нормы не хватает ' + goalValue(goal.metric, target - fact);
+    else if (!target) pace = 'цель не задана';
+    else if (fact >= target) pace = 'цель закрыта';
+    else if (share >= 100) pace = 'идёте с опережением — на ' + Math.max(1, daysAhead) + ' ' + plural(Math.max(1, daysAhead), 'день', 'дня', 'дней') + ' раньше срока';
+    else pace = 'при текущем темпе — ' + share + '% к концу ' + (goal.period === 'quarter' ? 'квартала' : 'месяца');
+    return { fact: fact, target: target, pct: pct, remaining: Math.max(0, target - fact), pace: pace, behind: share < 100 && fact < target };
+  }
+  // One row, used by the agent's «Мои цели» and by the manager's «План отдела».
+  function goalRow(goal, scope) {
+    const p = computeGoalProgress(goal, scope);
+    const bar = Math.max(2, Math.min(100, p.pct));
+    return '<div class="goal-tile' + (p.behind ? ' is-behind' : '') + '">' +
+      '<div class="goal-label">' + escAttr(goal.label) + '</div>' +
+      '<div class="goal-num">' + goalValue(goal.metric, p.fact) + '<i> из ' + goalValue(goal.metric, p.target) + '</i></div>' +
+      '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
+      '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
+      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span></div>' +
+      '<div class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
+      '</div>';
+  }
+  function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
+  function pulseMyGoals() {
+    const goals = goalsOf(S().role);
+    const pinned = goals.filter((g) => g.pinned);
+    const head = '<div class="wq-head" style="margin-top:24px"><div class="section-label" style="margin:0">' +
+      (S().role === 'manager' ? 'План отдела' : 'Мои цели') + '</div>' +
+      '<button class="btn sm" data-nav="profile">' + I('target') + 'Настроить цели</button></div>';
+    if (!pinned.length) {
+      const why = goals.length
+        ? 'Ни одна цель не закреплена на Пульсе. Откройте профиль и отметьте те, за которыми хотите следить каждый день.'
+        : 'Цели ещё не заданы. Поставьте одну — комиссия за месяц, число сделок, показы — и Пульс будет считать прогресс сам, по вашим сделкам.';
+      return head + '<div class="card" style="padding:16px"><div style="font-size:12.5px;color:var(--mut);max-width:62ch">' + why + '</div>' +
+        '<button class="btn sm primary" data-act="addGoal" style="margin-top:10px">' + I('plus') + 'Поставить цель</button></div>';
+    }
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    return head + '<div class="goal-grid">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
   }
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
@@ -272,7 +401,7 @@
     const m = computeMetrics();
     // Goes through the query layer rather than filtering here, so the headline number
     // and the records a person can open behind it are produced by the same code path.
-    const ACTIVE = [{ field: 'stage', op: 'ne', value: 'done' }];
+    const ACTIVE = [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }];
     const qActive = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } });
     const qActiveSum = WS.query.run({ from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } });
     const active = qActive.rows;
@@ -307,7 +436,7 @@
     const tasks = D().tasks || []; const events = D().events || []; const deals = D().deals || [];
     const overdue = tasks.filter((t) => t.status !== 'done' && t.when === 'overdue').length;
     const shows = events.filter((e) => e.kind === 'show').length;
-    const closed = deals.filter((d) => d.stage === 'done').length;
+    const closed = deals.filter(dealWon).length;
     const hot = deals.filter((d) => d.hot).length;
     const row = (ic, tone, label, val, act) => '<button class="digest-row" ' + act + '><span class="di ' + tone + '">' + I(ic) + '</span><span class="dl">' + label + '</span><span class="dvv">' + val + '</span>' + I('arrowRight') + '</button>';
     return '<div class="section-label" style="margin-top:24px">Дайджест дня <span class="badge demo">' + I('lock') + 'демо</span></div>' +
@@ -334,7 +463,7 @@
       '<div class="insight-a"><button class="btn sm" ' + it[4] + '>' + I('arrowRight') + it[3] + '</button></div></div>').join('') + '</div>';
   }
   function insightsBlock() {
-    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0;display:flex;align-items:center;gap:8px">Инсайты <span class="badge demo">' + I('sparkle') + 'второй мозг · демо</span></div>' +
+    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0;display:flex;align-items:center;gap:8px">Инсайты <span class="badge ai-b">' + I('sparkle') + 'собрано AI</span></div>' +
       '<button class="btn sm" data-nav="concierge">' + I('chat') + 'Спросить Консьержа</button></div>' + insightCards();
   }
   function canonMetrics() {
@@ -361,9 +490,9 @@
       rows = list.map((t) => { const c = D().clients.find((x) => x.id === t.clientId) || {}; return '<div class="feed-row" data-client="' + t.clientId + '" style="cursor:pointer"><div class="fi i-stop">' + I('warn') + '</div><div class="ft"><div class="t">' + t.title + '</div><div class="m">' + (c.name || '') + ' · ' + t.due + '</div></div>' + I('arrowRight') + '</div>'; }).join('');
     } else {
       let list = deals;
-      if (kind === 'closed') { title = 'Закрытые сделки'; list = deals.filter((d) => d.stage === 'done'); }
+      if (kind === 'closed') { title = 'Успешные сделки'; list = deals.filter(dealWon); }
       else if (kind === 'hot') { title = 'Горячие сделки · SLA < 2 ч'; list = deals.filter((d) => d.hot); }
-      else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => d.stage !== 'done'); }
+      else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d)); }
       else if (kind.indexOf('src:') === 0) { const s = kind.slice(4); title = 'Сделки · источник «' + s + '»'; list = deals.filter((d) => d.source === s); }
       rows = list.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') + '</div></div>' + I('arrowRight') + '</div>').join('');
     }
@@ -399,7 +528,7 @@
   function viewStart() {
     const st = S();
     const a = D().analytics;
-    const _active = (D().deals || []).filter((x) => x.stage !== 'done');
+    const _active = (D().deals || []).filter((x) => !dealClosed(x));
     const _dealsActive = _active.length;
     const _pipeline = Math.round(_active.reduce((s2, x) => s2 + (x.amount || 0), 0) / 1e5) / 10;
     const hour = WS.fixtures.DEMO_NOW.h;
@@ -419,20 +548,12 @@
         heroViz('pulse', 'Пульс команды', greet + ', ' + firstName + '. Обзор отдела на смене — план, SLA, распределение и согласования.', { descBig: true }) +
         cgComposer('startPrompt', 'Спросите Консьержа по команде — «кто перегружен», «что нарушает SLA», «сводка за неделю»…', 'startSend', 'prompt-lead') +
         '<div class="qa-row" style="margin-top:16px">' + mgrQa + '</div>' +
+        pulseMyGoals() +
         mgrTiles() +
         canonMetrics() +
         '<div class="section-label" style="margin-top:28px">Команда и исключения</div>' + workQueueManager() +
       '</div>';
     }
-
-    const qa = [
-      { t: 'Разобрать голосовое', ic: 'mic', scn: 'G1' },
-      { t: 'Подобрать объект', ic: 'building', scn: 'G2' },
-      { t: 'Оценить доходность', ic: 'money', nav: 'calc' },
-      { t: 'Итог показа', ic: 'voice2', scn: 'G3' },
-      { t: 'Холодный лид', ic: 'flame', scn: 'S15' },
-      { t: 'Эффективность', ic: 'trend', nav: 'analytics' },
-    ].map((q) => '<button class="chip" data-' + (q.scn ? 'scn="' + q.scn : 'nav="' + q.nav) + '">' + I(q.ic) + q.t + '</button>').join('');
 
     const spark = a.sparks.map((v, i) => '<i class="' + (i === a.sparks.length - 1 ? 'on' : '') + '" style="height:' + (30 + v * 4) + '%"></i>').join('');
 
@@ -483,9 +604,9 @@
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
-      '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
+      pulseMyGoals() +
       '<div class="tiles dash" style="margin-top:20px">' + tiles + '</div>' +
       insightsBlock() + (isMgr ? canonMetrics() : '') +
       dayHint +
@@ -680,30 +801,126 @@
       '</section>' +
     '</div>';
   }
+  function conciergeThreads() {
+    const q = (S().conciergeSearch || '').toLowerCase().trim();
+    return (WS.engine.threadList() || []).slice()
+      .sort((a, b) => (b.unread || 0) - (a.unread || 0))
+      .filter((t) => matchConciergeThread(t, q));
+  }
+  // Determine which group a thread belongs to based on its id namespace
+  function getThreadGroup(threadId) {
+    if (threadId.startsWith('deal:')) return 'byDeal';
+    if (threadId.startsWith('request:')) return 'byRequest';
+    if (threadId.startsWith('contact:') || threadId.startsWith('lead:')) return 'byContact';
+    if (threadId.startsWith('object:')) return 'byObject';
+    if (threadId.startsWith('company:')) return 'byCompany';
+    return 'general';
+  }
+  // Human-readable group names
+  const THREAD_GROUPS = {
+    byContact: { label: 'По клиентам', icon: 'users' },
+    byDeal: { label: 'По сделкам', icon: 'briefcase' },
+    byRequest: { label: 'По заявкам', icon: 'mail' },
+    byObject: { label: 'По объектам', icon: 'building' },
+    byCompany: { label: 'По компаниям', icon: 'building' },
+    general: { label: 'Общее', icon: 'sparkle' },
+  };
   function conciergeRail(activeTid) {
-    const threads = WS.engine.threadList().slice().sort((a, b) => (b.unread || 0) - (a.unread || 0));
-    const rows = threads.map((t) => {
-      const on = t.id === activeTid ? ' is-active' : '';
-      const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
-      const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
-      const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
-      return '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + t.label + '" data-ticon="' + t.icon + '">' +
-        '<span class="fi i-acc">' + I(t.icon) + '</span>' +
-        '<span class="ft"><span class="t">' + t.label + time + '</span><span class="m">' + preview + '</span></span>' + unread + '</button>';
-    }).join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.</div></div>';
-    return '<div class="cg-rail-head"><span class="section-label" style="margin:0">Диалоги · ' + threads.length + '</span>' +
+    const q = S().conciergeSearch || '';
+    const threads = conciergeThreads();
+    const isSearch = q.length > 0;
+
+    const searchBox_ = searchBox('conciergeSearch', 'Поиск по диалогам…', q, 'cg-rail-search');
+
+    // Group threads and build structure
+    const groups = {};
+    ['byContact', 'byRequest', 'byDeal', 'byObject', 'byCompany', 'general'].forEach((g) => {
+      groups[g] = { threads: [], unread: 0 };
+    });
+
+    threads.forEach((t) => {
+      const group = getThreadGroup(t.id);
+      groups[group].threads.push(t);
+      groups[group].unread += (t.unread || 0);
+    });
+
+    // Render groups
+    const collapse = S().cgGroupCollapse || {};
+    const renderedGroups = [];
+
+    Object.keys(groups).forEach((groupId) => {
+      const group = groups[groupId];
+      if (!group.threads.length) return;
+
+      const groupInfo = THREAD_GROUPS[groupId];
+      const isCollapsed = collapse[groupId] && !isSearch;
+      const activeInGroup = group.threads.some((t) => t.id === activeTid);
+      const shouldExpand = activeInGroup || isSearch;
+      const actuallyCollapsed = isCollapsed && !shouldExpand;
+
+      let html = '<div class="cg-rail-group">' +
+        '<button class="cg-group-head' + (actuallyCollapsed ? ' is-collapsed' : '') + '" data-group-toggle="' + groupId + '">' +
+        '<span class="cg-group-expand">' + I(actuallyCollapsed ? 'chevRight' : 'chevDown') + '</span>' +
+        '<span class="cg-group-label">' + groupInfo.label + '</span>' +
+        '<span class="cg-group-count">' + group.threads.length;
+      if (group.unread) html += ' · <span class="unread-badge">' + group.unread + '</span>';
+      html += '</span></button>';
+
+      if (!actuallyCollapsed) {
+        group.threads.forEach((t) => {
+          const on = t.id === activeTid ? ' is-active' : '';
+          const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
+          const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
+          const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
+
+          // A deal thread and a client thread are a different perimeter but the same person. The
+          // deal row therefore carries the deal's own essence — the thread label already opens with
+          // the client's name, so repeating it would say nothing — plus a marker when that client
+          // ALSO has a client-level dialogue, which is the jump the client asked to make easy.
+          let sub = '';
+          if (groupId === 'byDeal') {
+            const deal = D().deals.find((d) => d.id === t.id.slice(5));
+            if (deal) {
+              const essence = (deal.title && deal.title !== (D().clients.find((c) => c.id === deal.clientId) || {}).name) ? deal.title : (deal.sub || '');
+              const alsoClient = threads.some((x) => x.id === 'contact:' + deal.clientId);
+              sub = '<span class="cg-sub">' + (essence ? escAttr(essence) : '') +
+                (alsoClient ? '<span class="cg-link" title="У этого клиента есть и диалог по клиенту">' + I('users') + 'есть диалог по клиенту</span>' : '') + '</span>';
+            }
+          }
+
+          html += '<button class="cg-rail-row' + on + (t.unread ? ' is-unread' : '') + '" data-thread="' + t.id + '" data-tlabel="' + escAttr(t.label) + '" data-ticon="' + t.icon + '">' +
+            '<span class="fi i-acc">' + I(t.icon) + '</span>' +
+            '<span class="ft"><span class="t">' + t.label + time + '</span>' + sub + '<span class="m">' + preview + '</span></span>' + unread + '</button>';
+        });
+      }
+
+      html += '</div>';
+      renderedGroups.push(html);
+    });
+
+    const rows = renderedGroups.join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>' + (q ? 'По запросу ничего не найдено' : 'Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.') + '</div></div>';
+
+    return '<div class="cg-rail-head"><span class="section-label cg-rail-count" style="margin:0">Диалоги · ' + threads.length + '</span>' +
       '<div class="cg-rail-head-btns"><button class="btn sm" data-act="newThread">' + I('plus') + 'Новый</button>' +
       '<button class="cg-rail-collapse" data-act="cgRailToggle" title="Свернуть диалоги">' + I('chevLeft') + '</button></div></div>' +
-      '<div class="cg-rail-list">' + rows + '</div>';
+      searchBox_ + '<div class="cg-rail-list">' + rows + '</div>';
+  }
+  // A keystroke in the rail search repaints the rail list only. A full store emit would remount the
+  // chat (see render() -> mountConcierge) and jump the transcript on every character.
+  function refreshCgRail() {
+    const list = document.querySelector('.cg-rail-list'); if (!list) return;
+    const active = WS.engine.activeThreadId();
+    const html = conciergeRail(active);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    list.innerHTML = (tmp.querySelector('.cg-rail-list') || { innerHTML: '' }).innerHTML;
+    const cnt = document.querySelector('.cg-rail-count');
+    if (cnt) cnt.textContent = 'Диалоги · ' + conciergeThreads().length;
   }
   function conciergeHomeMain(st) {
     return '<div class="cg-main-inner">' +
       heroViz('concierge', 'Консьерж', 'Опишите задачу — начнётся новый диалог. Голосом или текстом; вся история — слева.') +
       cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос — начнётся новый диалог…', 'cgSend', 'cg-hero') +
-      '<div class="qa-row" style="margin-top:14px"><button class="chip" data-scn="G1">' + I('mic') + 'Разобрать голосовое</button>' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
-      '<button class="chip" data-scn="S15">' + I('flame') + 'Холодный лид</button>' +
-      '<button class="chip" data-chain="golden">' + I('play') + 'Золотой тур</button></div>' +
       conciergeWorkshop(st) +
     '</div>';
   }
@@ -726,7 +943,7 @@
   }
   // "Новый диалог" — pick the entity the conversation is about.
   function openNewThread() {
-    const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + (c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
+    const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
@@ -806,10 +1023,7 @@
   }
   function conciergeThreadEmpty() {
     return '<div class="empty">' + I('sparkle') + '<div style="font-weight:700;color:var(--ink)">Начните диалог</div>' +
-      '<div style="margin-top:6px">Поручите задачу по этой сущности голосом или текстом — или запустите сценарий.</div>' +
-      '<div class="qa-row" style="justify-content:center;margin-top:16px">' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
-      '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button></div></div>';
+      '<div style="margin-top:6px">Поручите задачу по этой сущности голосом или текстом.</div></div>';
   }
 
   // ---------------- CLIENTS & DEALS ----------------
@@ -829,53 +1043,250 @@
     let body;
     if (tab === 'contacts') body = contactsPeople();
     else {
-      const dview = st.dealsView || (isMgr ? 'table' : 'kanban');
-      const vtoggle = '<div class="seg">' +
+      // Доска шириной в девять колонок на телефоне не доска, а горизонтальная лента, по которой
+      // невозможно вести работу. Ширина решает, а не роль: на узком экране остаётся список — он
+      // и есть та же воронка, просто читаемая. Сохранённый выбор доски узкий экран не переубеждает.
+      const dview = boardFits() ? (st.dealsView || (isMgr ? 'table' : 'kanban')) : 'table';
+      const vtoggle = boardFits() ? '<div class="seg">' +
         '<button class="' + (dview === 'kanban' ? 'on' : '') + '" data-act="dealsView" data-v="kanban">' + I('grid') + 'Канбан</button>' +
-        '<button class="' + (dview === 'table' ? 'on' : '') + '" data-act="dealsView" data-v="table">' + I('menu') + 'Таблица</button></div>';
+        '<button class="' + (dview === 'table' ? 'on' : '') + '" data-act="dealsView" data-v="table">' + I('menu') + 'Таблица</button></div>' : '';
       const funnelSwitch = dview === 'kanban' ? funnelSwitcher() : '';
       body = (isMgr ? dealsFunnel() : '') + '<div class="deals-toolbar">' + vtoggle + funnelSwitch + '</div>' + dealFilterBar() + (dview === 'table' ? dealsTable(isMgr) : kanbanDeals(isMgr));
     }
     return head(title, desc, actions) + body;
   }
+  // Порог доски написан один раз и читается обоими: CSS прячет её тем же условием, каким JS
+  // решает не отдавать. Два порога, разъехавшиеся на пиксель, дают полосу, где доска отрисована
+  // и невидима.
+  const BOARD_MIN = '(min-width: 900px)';
+  function boardFits() {
+    const w = (typeof window !== 'undefined') && window;
+    if (!w || !w.matchMedia) return true;
+    return w.matchMedia(BOARD_MIN).matches;
+  }
+  // ---- Search and filter helpers ----
+  // One search field for every list — same affordance, same shape, wherever a broker looks for
+  // something. `extraCls` lets a host (the Concierge rail) tighten the spacing without a second
+  // component.
+  function searchBox(inputId, placeholder, value, extraCls) {
+    const v = value || '';
+    return '<div class="prompt obj-search ' + (extraCls || '') + '"><span class="ico">' + I('search') + '</span>' +
+      '<input id="' + inputId + '" type="search" placeholder="' + escAttr(placeholder) + '" value="' + escAttr(v) + '" autocomplete="off">' +
+      (v ? '<button class="voice" data-act="' + inputId + 'Clear" title="Очистить">' + I('x') + '</button>' : '') + '</div>';
+  }
+  // Filter helpers
+  function matchContactsFilters(c) {
+    const st = S().contactsFilters || {};
+    // Priority filter
+    if (st.priority && st.priority !== 'all') {
+      const sig = (D().clientSignals || {})[c.id];
+      if (st.priority === 'none' ? sig && sig.priority : !sig || sig.priority !== st.priority) return false;
+    }
+    // Portrait filters
+    if (st.psych && st.psych !== 'all') {
+      if (st.psych === 'empty') { if (c.psych && c.psych.filled) return false; }
+      else {
+        const val = st.psych.split(':')[0];
+        const sub = st.psych.split(':')[1];
+        const p = c.psych || {};
+        if (val === 'decision' && p.decision !== sub) return false;
+        if (val === 'risk' && p.risk !== sub) return false;
+        if (val === 'values') { if (!p.values || p.values.indexOf(sub) < 0) return false; }
+      }
+    }
+    // Район поиска — первое, чем агент сужает книгу: клиент помнится районом, а не портретом.
+    if (st.area && st.area !== 'all') {
+      const areas = (c.areas || []).concat(
+        (D().requests || []).filter((r) => r.clientId === c.id).reduce((a, r) => a.concat(r.areas || []), []));
+      if (areas.indexOf(st.area) < 0) return false;
+    }
+    // Бюджет — вилка, а не точное число: клиента ищут «примерно до двух миллионов».
+    if (st.budget && st.budget !== 'all') {
+      const b = c.budget || 0;
+      const band = st.budget === 'lo' ? (b > 0 && b < 1500000)
+        : st.budget === 'mid' ? (b >= 1500000 && b < 3000000)
+        : (b >= 3000000);
+      if (!band) return false;
+    }
+    // Состояние работы: открытая заявка, всё закрыто, или человек, с которым мы ещё не начали.
+    if (st.state && st.state !== 'all') {
+      const rs = (D().requests || []).filter((r) => r.clientId === c.id);
+      const open = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0).length;
+      if (st.state === 'open' && !open) return false;
+      if (st.state === 'done' && (open || !rs.length)) return false;
+      if (st.state === 'none' && rs.length) return false;
+    }
+    // Согласие на связь: без него адресная отправка заблокирована, и это первый фильтр перед
+    // любой рассылкой — иначе агент соберёт список, по которому нельзя написать.
+    if (st.consent && st.consent !== 'all') {
+      if (st.consent === 'yes' ? c.consent !== true : c.consent === true) return false;
+    }
+    // Object filter
+    if (st.object && st.object !== 'all') {
+      const hasObj = (D().deals || []).some((d) => d.clientId === c.id &&
+                       (d.objectId === st.object || (d.lots || []).indexOf(st.object) >= 0)) ||
+                     (D().requests || []).some((r) => r.clientId === c.id &&
+                       (r.offered || []).some((o) => (o && o.id ? o.id : o) === st.object));
+      if (!hasObj) return false;
+    }
+    return true;
+  }
+
+  function matchCompaniesFilters(co) {
+    const st = S().companiesFilters || {};
+    if (st.client && st.client !== 'all') {
+      const hasCo = (D().deals || []).some((d) => d.companyId === co.id && d.clientId === st.client);
+      if (!hasCo) return false;
+    }
+    return true;
+  }
+
+  // Match threads by label + preview text for Concierge
+  function matchConciergeThread(t, query) {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const label = (t.label || '').toLowerCase();
+    const preview = (t.preview || '').toLowerCase();
+    return label.indexOf(q) >= 0 || preview.indexOf(q) >= 0;
+  }
+
   // Контакты = a people registry with TYPES. "Клиент" is one type; a contact may be a
   // partner, an intermediary, or a company contact. Resolves the deals/clients/contacts dilemma.
   const CONTACT_TYPES = [
     { k: 'all', t: 'Все' }, { k: 'client', t: 'Клиенты' }, { k: 'partner', t: 'Партнёры' },
     { k: 'intermediary', t: 'Посредники' }, { k: 'transferred', t: 'Замещение' },
   ];
+  // Text a broker would actually type into a contact search: the person, how to reach them, what
+  // they want, where, and the company they sit behind.
+  function contactHaystack(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const cos = deals.map((d) => (D().companies || []).find((x) => x.id === d.companyId)).filter(Boolean);
+    return [c.name, c.phone, c.goal, c.horizon, c.lang, (c.areas || []).join(' '),
+      clientContactVals(c).email, deals.map((d) => d.title).join(' '), cos.map((x) => x.name).join(' ')]
+      .filter(Boolean).join(' ').toLowerCase();
+  }
+  function contactsSearchList() {
+    const cur = S().contactType || 'all';
+    const q = (S().contactsSearch || '').trim().toLowerCase();
+    const cl = D().clients || [];
+    let list = cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
+    if (cur === 'transferred') list = list.filter((p) => p.transferred);
+    if (q) list = list.filter((p) => contactHaystack(p.c).indexOf(q) >= 0);
+    return list.filter((p) => matchContactsFilters(p.c));
+  }
+  // Строка списка клиентов. Кнопка «Сделка» и стадия отсюда убраны: список клиентов — это
+  // клиентская книга, а не второй вид воронки. Сделки агент смотрит в сделках; здесь ему нужно
+  // найти человека и понять, как с ним связаться.
+  function contactRow(p) {
+    const c = p.c;
+    const k = kycOf(c);
+    const last = lastTouchOf(p.id);
+    // Под именем — только то, чем человека находят и с чем к нему обращаются: телефон, язык,
+    // основной канал, когда говорили в последний раз. Что он ищет, в каком районе и на какую
+    // сумму — это запрос, а не свойство человека: оно живёт в заявке, а в книге клиентов
+    // работает фильтрами. Стадия, сумма и счётчик заявок убраны отсюда по той же причине.
+    const sub = [c.phone || '', c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
+      last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
+    const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
+      '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
+      (c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>');
+    return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
+      '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
+      '<div class="m">' + sub + '</div></div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
+  }
+  const CONTACT_FILTER_KEYS = ['priority', 'psych', 'object', 'area', 'budget', 'state', 'consent'];
+  function contactsFilterCount() {
+    const f = S().contactsFilters || {};
+    return CONTACT_FILTER_KEYS.filter((k) => f[k] && f[k] !== 'all').length;
+  }
+  // "Nothing found" must say what was searched and offer the way back out.
+  function listEmptyState(q, hasFilters, clearAct) {
+    const what = q ? 'по запросу «' + escAttr(q) + '»' : 'под выбранные фильтры';
+    return '<div class="empty" style="padding:24px 16px">' + I('search') +
+      '<div style="font-weight:700;color:var(--ink)">Ничего не нашлось ' + what + '</div>' +
+      '<div style="margin-top:4px">Попробуйте короче или другими словами' + (hasFilters ? ', либо снимите фильтры' : '') + '.</div>' +
+      '<div class="qa-row" style="justify-content:center;margin-top:12px"><button class="chip" data-act="' + clearAct + '">' + I('x') + 'Сбросить</button></div></div>';
+  }
+  function contactsListInner() {
+    const list = contactsSearchList();
+    if (!list.length) return listEmptyState((S().contactsSearch || '').trim(), contactsFilterCount() > 0, 'clearContactsFilters');
+    return '<div class="feed" style="padding:0 16px 8px">' + list.map(contactRow).join('') + '</div>';
+  }
+  function contactsCountLabel() {
+    return ((S().contactType === 'transferred') ? 'Замещение' : 'Клиенты') + ' · ' + contactsSearchList().length;
+  }
   function contactsPeople() {
     const cur = S().contactType || 'all';
-    const cl = D().clients || [];
-    let clients = cl.map((c, i) => ({ id: c.id, name: c.name, role: c.goal, budget: c.budget, c: c, transferred: i >= cl.length - 2 }));
-    if (cur === 'transferred') clients = clients.filter((p) => p.transferred);
+    const q = S().contactsSearch || '';
+    const f = S().contactsFilters || {};
+    const open = !!S().contactsFiltersOpen;
+    const n = contactsFilterCount();
+
     const FILTERS = [{ k: 'all', t: 'Все клиенты' }, { k: 'transferred', t: 'Замещение' }];
-    const rows = clients.map((p) => {
-      const k = kycOf(p.c);
-      const deal = (D().deals || []).find((d) => d.clientId === p.id);
-      const dealBtn = deal ? '<button class="btn sm ghost" data-deal="' + deal.id + '">' + I('briefcase') + 'Сделка</button>' : '';
-      const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
-        '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
-        (p.c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>') + dealBtn;
-      return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
-        '<div class="ft"><div class="t">' + priorityChip(p.id) + p.name + '</div>' +
-        '<div class="m">' + (p.role || '') + (p.budget ? ' · ' + WS.AED(p.budget) : '') + '</div></div>' +
-        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
-    }).join('');
-    const filter = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
-      (cur === ct.k ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + ct.t + '</button>').join('');
+    const on = ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"';
+    const typeChips = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
+      (cur === ct.k ? on : '') + '>' + ct.t + '</button>').join('');
+    const prio = ['all', 'A', 'B', 'C'].map((k) => '<button class="chip' + ((f.priority || 'all') === k ? '' : ' mut') +
+      '" data-contactfilter="priority:' + k + '"' + ((f.priority || 'all') === k ? on : '') + '>' +
+      (k === 'all' ? 'Любой приоритет' : 'Приоритет ' + k) + '</button>').join('');
+
+    // Portrait and object filters sit behind a disclosure so the default view stays calm; the toggle
+    // carries the count, so an applied filter is never invisible.
+    const toggle = '<button class="chip' + (n ? '' : ' mut') + '" data-act="contactsFiltersToggle"' + (n ? on : '') + '>' +
+      I('menu') + 'Фильтры' + (n ? ' · ' + n : '') + I(open ? 'chevUp' : 'chevDown') + '</button>';
+    const clear = (n || q) ? '<button class="view-clear" data-act="clearContactsFilters">' + I('x') + 'сбросить</button>' : '';
+
+    let panel = '';
+    if (open) {
+      const psychOpts = [['all', 'Любой портрет'], ['empty', 'портрет не заполнен']]
+        .concat(PSYCH_OPTS.decision.map((d) => ['decision:' + d, d]))
+        .concat(PSYCH_OPTS.risk.map((r) => ['risk:' + r, r]))
+        .concat(PSYCH_OPTS.values.map((v) => ['values:' + v, 'важно: ' + v]));
+      const objOpts = [['all', 'Любой объект']].concat((D().objects || []).map((o) => [o.id, o.name.split(',')[0]]));
+      // Районы собираются из данных, а не пишутся списком: район, которого нет ни у кого, —
+      // это пункт меню, который всегда даёт пустой экран.
+      const areaSet = [];
+      (D().clients || []).forEach((c) => (c.areas || []).forEach((a) => { if (areaSet.indexOf(a) < 0) areaSet.push(a); }));
+      (D().requests || []).forEach((r) => (r.areas || []).forEach((a) => { if (areaSet.indexOf(a) < 0) areaSet.push(a); }));
+      const areaOpts = [['all', 'Любой район']].concat(areaSet.sort().map((a) => [a, a]));
+      const budgetOpts = [['all', 'Любой бюджет'], ['lo', 'до 1,5 млн'], ['mid', '1,5–3 млн'], ['hi', 'от 3 млн']];
+      const stateOpts = [['all', 'Любое состояние'], ['open', 'есть открытая заявка'],
+        ['done', 'всё закрыто'], ['none', 'заявок ещё не было']];
+      const consentOpts = [['all', 'Согласие — неважно'], ['yes', 'есть согласие на связь'], ['no', 'нет согласия']];
+      panel = '<div class="list-filters">' +
+        '<label class="lf-fld"><span>Район поиска</span>' + miniSel('cfArea', f.area || 'all', areaOpts) + '</label>' +
+        '<label class="lf-fld"><span>Бюджет</span>' + miniSel('cfBudget', f.budget || 'all', budgetOpts) + '</label>' +
+        '<label class="lf-fld"><span>Состояние работы</span>' + miniSel('cfState', f.state || 'all', stateOpts) + '</label>' +
+        '<label class="lf-fld"><span>Связь</span>' + miniSel('cfConsent', f.consent || 'all', consentOpts) + '</label>' +
+        '<label class="lf-fld"><span>Портрет клиента</span>' + miniSel('cfPsych', f.psych || 'all', psychOpts) + '</label>' +
+        '<label class="lf-fld"><span>Смотрел объект</span>' + miniSel('cfObject', f.object || 'all', objOpts) + '</label>' +
+        '<div class="lf-hint">Фильтры складываются с поиском. Поиск по клиенту идёт строкой — имя, телефон, цель, район, компания.</div></div>';
+    }
+
     const note = cur === 'transferred'
       ? '<div class="ws-flag" style="margin:0 0 12px">' + I('users') + ' Клиенты, переданные вам от коллеги на время его отсутствия. Режим замещения включается в Настройках.</div>' : '';
-    return '<div class="qa-row" style="margin-bottom:14px">' + filter + '</div>' + note +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">' + (cur === 'transferred' ? 'Замещение' : 'Клиенты') + ' · ' + clients.length + '</div>' +
-      '<div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+
+    return '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
+      searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
+      '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + '</div>' + panel +
+      '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
+      '<div class="contacts-list">' + contactsListInner() + '</div></div>';
+  }
+  function refreshContacts() {
+    const box = document.querySelector('.contacts-list'); if (!box) return;
+    box.innerHTML = contactsListInner();
+    const cnt = document.querySelector('.contacts-count');
+    if (cnt) cnt.textContent = contactsCountLabel();
   }
   // R7: saved deterministic views — same query → same list. Applied on top of the funnel filter.
   const SAVED_VIEWS = [
-    { k: 'nocontact', label: 'Без движения сегодня', pred: (d) => d.stageDays >= 1 && d.stage !== 'done' },
-    { k: 'nonext', label: 'Без плана действий', pred: (d) => !d.hot && d.stage === 'new' },
-    { k: 'commissions', label: 'Ожидаемые комиссии', pred: (d) => ['sale_offplan', 'sale_ready', 'rental_biz'].indexOf(d.funnel) >= 0 && d.stage !== 'done' },
-    { k: 'nodocs', label: 'Без документов', pred: (d) => d.stage === 'new' || d.stage === 'work' },
+    { k: 'nocontact', label: 'Без движения сегодня', pred: (d) => d.stageDays >= 1 && !dealClosed(d) },
+    { k: 'nonext', label: 'Без плана действий', pred: (d) => !dealClosed(d) && !d.nextDue },
+    { k: 'commissions', label: 'Ожидаемые комиссии', pred: (d) => !dealClosed(d) && (d.amount || 0) > 0 },
+    // «Без документов» = договор ещё не подписан: подготовка и бронь. Дальше документ есть
+    // по определению шага, и вид, который ловил бы там пустоту, ловил бы ошибку данных, а не работу.
+    { k: 'nodocs', label: 'Без документов', pred: (d) => ['prep', 'book'].indexOf(d.stage) >= 0 },
     { k: 'stuck', label: 'Застряли в стадии', pred: (d) => d.stageDays >= 5 },
   ];
   function activeViewPred() { const v = SAVED_VIEWS.find((x) => x.k === S().savedView); return v ? v.pred : null; }
@@ -888,9 +1299,9 @@
   }
   // R2: funnel switcher — each funnel is the same 4-column board, columns relabeled as its milestones.
   function funnelSwitcher() {
-    const fk = S().dealFunnel || 'sale_offplan';
+    const fk = S().dealFunnel || 'sale';
     const btns = (WS.FUNNELS || []).map((f) => {
-      const n = D().deals.filter((d) => (d.funnel || 'sale_offplan') === f.k).length;
+      const n = D().deals.filter((d) => (d.funnel || 'sale') === f.k).length;
       return '<button class="fn-pill' + (f.k === fk ? ' on' : '') + '" data-funnel="' + f.k + '">' + f.label + '<span class="fn-n">' + n + '</span></button>';
     }).join('');
     return '<div class="funnel-switch">' + btns + '</div>';
@@ -899,10 +1310,17 @@
   function dealExtraPred(d) {
     const from = parseInt(S().dealBudFrom, 10) || 0, to = parseInt(S().dealBudTo, 10) || 0, src = S().dealSrc || 'all';
     if (src !== 'all' && d.source !== src) return false;
+    if ((S().dealObjType || 'all') !== 'all' && d.objectType !== S().dealObjType) return false;
+    if ((S().dealReadiness || 'all') !== 'all' && d.readiness !== S().dealReadiness) return false;
+    if ((S().dealAgent || 'all') !== 'all' && d.agent !== S().dealAgent) return false;
     const a = d.amount || 0;
     if (from && a < from) return false;
     if (to && a > to) return false;
     return true;
+  }
+  function dealFilterCount() {
+    return ['dealSrc', 'dealObjType', 'dealReadiness', 'dealAgent']
+      .filter((k) => S()[k] && S()[k] !== 'all').length + ((S().dealBudFrom || S().dealBudTo) ? 1 : 0);
   }
   function dealFilterBar() {
     const src = S().dealSrc || 'all';
@@ -915,7 +1333,21 @@
     const srcs = Array.from(new Set((D().deals || []).map((d) => d.source).filter(Boolean)));
     const srcChips = chip(src === 'all', 'data-dealsrc="all"', 'Все источники') +
       srcs.map((s) => chip(src === s, 'data-dealsrc="' + s + '"', s)).join('');
-    return '<div class="qa-row deal-filters">' + budget + '<span class="df-sep"></span>' + srcChips + '</div>';
+    // Значения собираются из самих сделок: пункт, под который нет ни одной, — мёртвый выбор.
+    const uniq = (f) => Array.from(new Set((D().deals || []).map(f).filter(Boolean)));
+    const selOf = (id, cur, opts) => '<label class="lf-fld lf-inline"><span>' + opts[0][2] + '</span>' +
+      miniSel(id, cur, opts.map((o) => [o[0], o[1]])) + '</label>';
+    const objTypes = [['all', 'Любой тип', 'Тип объекта']].concat(uniq((d) => d.objectType).sort().map((t) => [t, t, '']));
+    const readiness = [['all', 'Любая', 'Готовность']].concat(uniq((d) => d.readiness).sort().map((t) => [t, t, '']));
+    const agents = [['all', 'Все агенты', 'Агент']].concat(uniq((d) => d.agent).map((a) => [a, agentName(a), '']));
+    const isMgr = S().role === 'manager';
+    return '<div class="qa-row deal-filters">' + budget + '<span class="df-sep"></span>' + srcChips + '</div>' +
+      '<div class="qa-row deal-filters deal-filters-2">' +
+      selOf('dealObjType', S().dealObjType || 'all', objTypes) +
+      selOf('dealReadiness', S().dealReadiness || 'all', readiness) +
+      (isMgr ? selOf('dealAgent', S().dealAgent || 'all', agents) : '') +
+      (dealFilterCount() ? '<button class="view-clear" data-act="clearDealFilters">' + I('x') + 'сбросить · ' + dealFilterCount() + '</button>' : '') +
+      '</div>';
   }
   function agentName(id) { const u = D().users; for (const k in u) { if (u[k].id === id) return u[k].name; } const m = TEAM.find((x) => x.id === id); return m ? m.name : (id || '—'); }
   function dealObject(d) { return d.objectId ? D().objects.find((o) => o.id === d.objectId) : null; }
@@ -925,14 +1357,60 @@
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
     return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
-  // Consolidated funnel for the manager — deals of subordinate agents by stage (item 9).
+  // ============================================================================================
+  // Сводная воронка руководителя идёт по всей книге, а не по одним сделкам: половина работы
+  // живёт в заявках, и после разделения двух уровней первые два отсека остались бы пустыми —
+  // руководитель видел бы «ноль в первом контакте» при десяти заявках в работе.
+  //
+  // Отсеки заявок считаются по вычисленной стадии заявки, отсеки сделок — по шагу договора.
+  // Закрытая заявка не считается нигде: она уже представлена своими сделками, и учесть её ещё
+  // раз значило бы посчитать одну сделку дважды.
+  // ============================================================================================
+  const BOOK_BANDS = [
+    { k: 'intake', of: 'request', label: 'Заявки в работе', stages: ['new', 'qual'],
+      gate: 'Запрос снят, критерии известны' },
+    { k: 'engage', of: 'request', label: 'Предложение и переговоры', stages: ['offer', 'meet', 'talks'],
+      gate: 'Предложение отправлено, условия обсуждаются' },
+    { k: 'papers', of: 'deal', label: 'Договор и деньги', stages: ['prep', 'book', 'sign', 'reg', 'exec'],
+      gate: 'Подписание, оплата, регистрация' },
+    { k: 'result', of: 'deal', label: 'Исход', stages: ['won', 'lost'], gate: 'Успех или проигрыш' },
+  ];
+  function bandOf(stage) {
+    const b = BOOK_BANDS.find((x) => x.stages.indexOf(stage) >= 0);
+    return b ? b.k : 'intake';
+  }
+  // Consolidated funnel for the manager — the whole team's book, grouped into control cut-offs.
   function dealsFunnel() {
     const ds = D().deals;
-    const byStage = STAGES.map((s) => ({ s: s, list: ds.filter((d) => d.stage === s.k) }));
-    const totalVal = ds.reduce((a, d) => a + (d.amount || 0), 0);
-    const cells = byStage.map(({ s, list }) => {
-      const val = list.reduce((a, d) => a + (d.amount || 0), 0);
-      return '<div class="fn-cell"><div class="fn-n">' + list.length + '</div><div class="fn-l">' + s.label + '</div><div class="fn-v">' + (val ? WS.AED(val) : '—') + '</div></div>';
+    // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
+    // forecast — the exact confusion the won/lost split exists to remove.
+    const rs = D().requests || [];
+    const live = ds.filter((d) => !dealClosed(d));
+    const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
+    // Бюджет заявки — намерение клиента, сумма сделки — согласованная цифра. Складывать их в
+    // один пайплайн значит выдать надежду за прогноз, поэтому потенциал стоит отдельной строкой.
+    const openReqs = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0);
+    const potential = openReqs.reduce((a, r) => a + (r.budget || 0), 0);
+    const cells = BOOK_BANDS.map((b) => {
+      const isReq = b.of === 'request';
+      const list = isReq ? rs.filter((r) => b.stages.indexOf(reqStage(r)) >= 0)
+                         : ds.filter((d) => b.stages.indexOf(d.stage) >= 0);
+      const val = list.reduce((a, x) => a + (isReq ? (x.budget || 0) : (x.amount || 0)), 0);
+      // Внутри отсека разбивка по стадиям остаётся — она просто не заслуживает своих коробок.
+      const inner = b.k === 'result'
+        ? [list.filter(dealWon).length ? list.filter(dealWon).length + ' успех' : '',
+           list.filter((d) => d.stage === 'lost').length ? list.filter((d) => d.stage === 'lost').length + ' проигрыш' : '',
+           rs.filter((r) => reqStage(r) === 'lost').length ? rs.filter((r) => reqStage(r) === 'lost').length + ' отказ по заявке' : ''
+          ].filter(Boolean).join(' · ')
+        : b.stages.map((k) => ({ k: k, n: isReq ? list.filter((r) => reqStage(r) === k).length : list.filter((d) => d.stage === k).length }))
+            .filter((x) => x.n)
+            .map((x) => (isReq ? reqStageLabel(x.k, list.find((r) => reqStage(r) === x.k)) : stageLabel(x.k)) + ' ' + x.n).join(' · ');
+      return '<div class="fn-cell' + (b.k === 'result' ? ' fn-cell-end' : '') + '">' +
+        '<div class="fn-n">' + list.length + '</div>' +
+        '<div class="fn-l">' + b.label + '</div>' +
+        '<div class="fn-v">' + (val ? WS.AED(val) + (isReq ? ' · бюджет' : '') : '—') + '</div>' +
+        '<div class="fn-in">' + (inner || 'пусто') + '</div>' +
+        '<div class="fn-gate">' + b.gate + '</div></div>';
     }).join('');
     const byAgent = {};
     ds.forEach((d) => { const a = d.agent || 'u_none'; (byAgent[a] = byAgent[a] || []).push(d); });
@@ -942,29 +1420,91 @@
         '<div class="n">' + list.length + ' сдел. · ' + WS.AED(val) + (hot ? ' · <span style="color:var(--stop)">' + hot + ' ' + I('flame') + '</span>' : '') + '</div></div>';
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
-      '<div class="funnel">' + cells + '</div>' +
-      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн: ' + WS.AED(totalVal) + '</span><span class="badge">' + I('briefcase') + ds.length + ' сделок</span><span class="badge">' + I('users') + Object.keys(byAgent).length + ' агента</span></div>' +
+      '<div class="funnel funnel-bands">' + cells + '</div>' +
+      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн по сделкам: ' + WS.AED(totalVal) + '</span>' +
+      '<span class="badge">' + I('mail') + 'Потенциал заявок: ' + WS.AED(potential) + '</span>' +
+      '<span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span>' +
+      '<span class="badge">' + I('users') + Object.keys(byAgent).length + ' ' + plural(Object.keys(byAgent).length, 'агент', 'агента', 'агентов') + '</span></div>' +
+      conversionRow() +
       '<div class="section-label" style="margin-top:10px">По агентам</div><div class="workload">' + agentRows + '</div></div>';
   }
-  const STAGES = [{ k: 'new', label: 'Новая заявка' }, { k: 'work', label: 'В работе' }, { k: 'docs', label: 'Документы' }, { k: 'done', label: 'Закрыта' }];
-  function stageLabel(k) { const s = STAGES.find((x) => x.k === k); return s ? s.label : k; }
+  // ============================================================================================
+  // Две конверсии, и это ДВЕ РАЗНЫЕ величины. «Заявка → сделка» считается по заявкам: одна
+  // заявка даёт одно наблюдение, даже если из неё вышло три договора, — иначе клиент, купивший
+  // два лота в разных ЖК, поднимал бы конверсию вдвое, ничего не изменив в работе агента.
+  // «Сделка → успех» считается по сделкам: наблюдений столько, сколько договоров.
+  // Одним числом их не показать, поэтому и стоят рядом с явными знаменателями.
+  // ============================================================================================
+  function conversionRow() {
+    const rs = D().requests || [], ds = D().deals || [];
+    const settled = rs.filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) >= 0);
+    const converted = settled.filter((r) => ds.some((d) => d.requestId === r.id));
+    const closedDeals = ds.filter(dealClosed);
+    const wonDeals = closedDeals.filter(dealWon);
+    const pct = (a, b) => (b ? Math.round(a / b * 100) + '%' : '—');
+    const cell = (label, a, b, unit) =>
+      '<div class="cv-cell"><div class="cv-n">' + pct(a, b) + '</div>' +
+      '<div class="cv-l">' + label + '</div>' +
+      '<div class="cv-d">' + a + ' из ' + b + ' ' + unit + '</div></div>';
+    return '<div class="cv-row">' +
+      cell('Заявка → сделка', converted.length, settled.length, plural(settled.length, 'завершённой заявки', 'завершённых заявок', 'завершённых заявок')) +
+      cell('Сделка → успех', wonDeals.length, closedDeals.length, plural(closedDeals.length, 'закрытой сделки', 'закрытых сделок', 'закрытых сделок')) +
+      '<div class="cv-note">' + I('sparkle') + 'Считаются по-разному: заявка даёт одно наблюдение, сколько бы договоров из неё ни вышло; сделка — своё. Складывать их нельзя.</div></div>';
+  }
+  // Stages live in fixtures next to the funnels that order them. STAGES is the canonical SPINE —
+  // every stage any funnel uses, in the order work → … → won → lost. It is what cross-funnel views
+  // (the manager's consolidated funnel, the stage breakdown) group by; a single funnel's board uses
+  // its own subset instead.
+  const STAGE_LABELS = (WS.fixtures && WS.fixtures.STAGE_LABELS) || {};
+  const STAGES = Object.keys(STAGE_LABELS).map((k) => ({ k: k, label: STAGE_LABELS[k] }));
+  function stageLabel(k) { return STAGE_LABELS[k] || k; }
+  function funnelOf(d) {
+    return (WS.FUNNELS || []).find((x) => x.k === (d && d.funnel)) || (WS.FUNNELS || [])[0] || { k: '', label: '', stages: [] };
+  }
+  // Шаги сделки следуют из вида договора, которым она заканчивается, а не из воронки услуги:
+  // в воронке пресейл и договорная работа лежали одним списком, и сделка могла встать на «показ».
+  function dealSteps(d) {
+    const ck = WS.contractKindFor;
+    return (WS.DEAL_STEPS || {})[ck ? ck((d && d.funnel) || 'sale', d && d.readiness) : ''] || [];
+  }
+  // Колонки доски для услуги, у которой видов договора два (продажа: оффплан и вторичка), —
+  // объединение их шагов в порядке общего хребта. «Бронирование» стоит, пока в воронке есть хоть
+  // одна оффплан-сделка, и пустует, когда их нет; прятать колонку по составу доски значило бы
+  // менять её ширину при каждом переносе карточки.
+  function stepsForFunnel(fk) {
+    const DS = WS.DEAL_STEPS || {}, ck = WS.contractKindFor;
+    if (!ck) return [];
+    const seen = {};
+    [DS[ck(fk, 'оффплан')] || [], DS[ck(fk, 'готовый')] || []].forEach((a) => a.forEach((k) => { seen[k] = 1; }));
+    return STAGES.map((s) => s.k).filter((k) => seen[k]);
+  }
+  // The path a deal walks. «Проигрыш» is an exit, not a step, so it is off the path: the stepper
+  // draws a route, and a route with a dead end drawn as its last milestone reads as the goal.
+  function funnelPath(d) { return dealSteps(d).filter((k) => k !== 'lost'); }
+  // Terminal state. `closed` = off the board either way; `won` = business we actually earned on.
+  // Every money figure must use `dealWon`, every «в работе» figure `!dealClosed` — a lost deal
+  // counted as closed revenue is the single most expensive mistake this split can make.
+  function dealClosed(d) { return !!d && (d.stage === 'won' || d.stage === 'lost'); }
+  function dealWon(d) { return !!d && d.stage === 'won'; }
   function dealFireBadge() { return '<span class="deal-fire" title="Требует действия">' + I('flame') + '</span>'; }
   function kanbanDeals(isMgr) {
     // R2: board is scoped to the selected funnel; the 4 stage-columns are relabeled as
     // that funnel's milestone projection. Manual move (◀▶) still writes a stage event.
-    const fk = S().dealFunnel || 'sale_offplan';
-    const funnel = (WS.FUNNELS || []).find((x) => x.k === fk) || (WS.FUNNELS || [])[0];
+    const fk = S().dealFunnel || 'sale';
     const pred = activeViewPred();
-    const cols = STAGES.map((sg, si) => {
-      const colLabel = (funnel && funnel.cols[si]) || sg.label;
-      const ds = D().deals.filter((d) => d.stage === sg.k && (d.funnel || 'sale_offplan') === fk && (!pred || pred(d)) && dealExtraPred(d));
+    const stages = stepsForFunnel(fk);
+    const path = stages.filter((k) => k !== 'lost');
+    const cols = stages.map((sk) => {
+      const colLabel = stageLabel(sk);
+      const ds = D().deals.filter((d) => d.stage === sk && (d.funnel || 'sale') === fk && (!pred || pred(d)) && dealExtraPred(d));
       const cards = ds.map((d) => {
         const c = D().clients.find((x) => x.id === d.clientId) || {};
         const o = dealObject(d);
         const tags = (d.tags || []).map((t) => '<span class="badge">' + t + '</span>').join('');
         const consent = c.consent === false ? '<span class="badge stop">' + I('lock') + 'нет согласия</span>' : '';
         const agent = isMgr ? '<span class="badge info">' + I('users') + agentName(d.agent) + '</span>' : '';
-        const canPrev = si > 0, canNext = si < STAGES.length - 1;
+        const pi = path.indexOf(d.stage);
+        const canPrev = pi > 0, canNext = pi >= 0 && pi < path.length - 1;
         const move = '<div class="dmove">' +
           '<button class="kmv" data-dealmove="' + d.id + '" data-dir="prev" title="Назад по стадии"' + (canPrev ? '' : ' disabled') + '>' + I('chevLeft') + '</button>' +
           '<button class="kmv" data-dealmove="' + d.id + '" data-dir="next" title="Вперёд по стадии"' + (canNext ? '' : ' disabled') + '>' + I('chevRight') + '</button></div>';
@@ -974,9 +1514,15 @@
           '<div class="dm">' + (o ? o.name.split(',')[0] : d.sub) + ' · ' + WS.AED(d.amount || 0) + '</div>' +
           '<div class="dfoot"><div class="dtag">' + tags + consent + agent + '</div>' + move + '</div></div></div>';
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 6px">пусто</div>';
-      return '<div class="kcol"><div class="kh"><span>' + colLabel + '</span><span class="c">' + ds.length + '</span></div>' + cards + '</div>';
+      const term = sk === 'won' ? ' kcol-won' : (sk === 'lost' ? ' kcol-lost' : '');
+      return '<div class="kcol' + term + '"><div class="kh"><span>' + colLabel + '</span><span class="c">' + ds.length + '</span></div>' + cards + '</div>';
     }).join('');
-    return '<div class="kanban">' + cols + '</div>';
+    // Nine or ten columns do not fit any screen, so the board scrolls sideways. A scroller with no
+    // affordance reads as a board that ends where the viewport does — say how many stages there are.
+    const hint = stages.length > 4
+      ? '<div class="kanban-hint">' + I('arrowRight') + 'Шагов по договору — ' + stages.length + ' · доска прокручивается вбок</div>'
+      : '';
+    return hint + '<div class="kanban">' + cols + '</div>';
   }
   // Table view of deals (item 3): sortable-feeling list with object photo + client + amount (+agent for manager)
   function dealsTable(isMgr) {
@@ -1000,11 +1546,15 @@
   }
   function moveDealDir(id, dir) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
-    const i = STAGES.findIndex((s) => s.k === d.stage);
+    const path = funnelPath(d);
+    // A lost deal is not on the path. Stepping it back reopens it onto the last working stage,
+    // which is what «вернуть в работу» means; stepping it forward does nothing.
+    let i = path.indexOf(d.stage);
+    if (i < 0) i = d.stage === 'lost' ? path.length - 1 : 0;
     const ni = dir === 'next' ? i + 1 : i - 1;
-    if (ni < 0 || ni >= STAGES.length) return;
-    WS.storeApi.setDealStage(id, STAGES[ni].k);
-    WS.storeApi.toast('Сделка «' + d.title + '» → ' + STAGES[ni].label, 'ok');
+    if (ni < 0 || ni >= path.length) return;
+    WS.storeApi.setDealStage(id, path[ni]);
+    WS.storeApi.toast('Сделка «' + d.title + '» → ' + stageLabel(path[ni]), 'ok');
   }
   // demo KYC state per contact (physical person screening)
   function kycOf(c) {
@@ -1030,26 +1580,151 @@
       const k = kycOf(c);
       const consent = c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>';
       const isNew = c._new ? '<span class="badge acc">' + I('sparkle') + 'новое</span>' : '';
+      const last = lastTouchOf(c.id);
       return '<div class="feed-row' + (c._new ? ' is-new' : '') + '" data-client="' + c.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
-        '<div class="ft"><div class="t">' + priorityChip(c.id) + c.name + '</div><div class="m">' + c.goal + ' · ' + (c.budget ? WS.AED(c.budget) : '—') + '</div></div>' +
+        '<div class="ft"><div class="t">' + priorityChip(c.id) + c.name + '</div><div class="m">' +
+        [c.goal, (c.areas || []).slice(0, 2).join(' · '), c.budget ? 'до ' + WS.AED(c.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ') + '</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center">' + isNew + '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' + consent + I('arrowRight') + '</div></div>';
     }).join('');
     return '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Контакты · ' + D().clients.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' + companiesBlock();
   }
   // R5: Company entity (agency/developer/corp/fund) with KYC STATUS (not a rating).
+  function companyHaystack(co) {
+    const people = (co.people || []).map((x) => x.name + ' ' + x.role).join(' ');
+    return [co.name, co.kind, co.license, co.trn, co.address, co.commission, people].filter(Boolean).join(' ').toLowerCase();
+  }
+  function companiesSearchList() {
+    const q = (S().companiesSearch || '').trim().toLowerCase();
+    let cos = D().companies || [];
+    if (q) cos = cos.filter((co) => companyHaystack(co).indexOf(q) >= 0);
+    return cos.filter((co) => matchCompaniesFilters(co));
+  }
+  function companyRow(co) {
+    const linked = (D().deals || []).filter((d) => d.companyId === co.id).length;
+    const people = (co.people || []).length;
+    const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
+    const meta = co.kind + ' · сделок: ' + linked + (people ? ' · ' + people + ' ' + plural(people, 'контакт', 'контакта', 'контактов') : '');
+    return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div>' +
+      '<div class="ft"><div class="t">' + co.name + '</div><div class="m">' + meta + '</div></div>' + kyc + I('arrowRight') + '</div>';
+  }
+  function companiesListInner() {
+    const cos = companiesSearchList();
+    if (!cos.length) return listEmptyState((S().companiesSearch || '').trim(), (S().companiesFilters || {}).client !== 'all', 'clearCompaniesFilters');
+    return '<div class="feed" style="padding:0 16px 8px">' + cos.map(companyRow).join('') + '</div>';
+  }
   function companiesBlock() {
-    const cos = D().companies || [];
-    const rows = cos.map((co) => {
-      const linked = (D().deals || []).filter((d) => d.companyId === co.id).length;
-      const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
-      return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div>' +
-        '<div class="ft"><div class="t">' + co.name + '</div><div class="m">' + co.kind + ' · сделок: ' + linked + '</div></div>' + kyc + I('arrowRight') + '</div>';
-    }).join('');
-    return '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Компании · ' + cos.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>';
+    const q = S().companiesSearch || '';
+    const f = S().companiesFilters || {};
+    // Only clients that actually reach a company through a deal — an option that filters to nothing
+    // is a dead control.
+    const linkedClients = (D().clients || []).filter((c) => (D().deals || []).some((d) => d.clientId === c.id && d.companyId));
+    const clientOpts = [['all', 'Любой клиент']].concat(linkedClients.map((c) => [c.id, c.name]));
+    const clear = (q || (f.client && f.client !== 'all')) ? '<button class="view-clear" data-act="clearCompaniesFilters">' + I('x') + 'сбросить</button>' : '';
+    const bar = '<div class="qa-row" style="margin:10px 0 0;align-items:center">' +
+      '<label class="lf-fld inline"><span>Связана с клиентом</span>' + miniSel('cofClient', f.client || 'all', clientOpts) + '</label>' + clear + '</div>';
+    return searchBox('companiesSearch', 'Поиск: название, тип, лицензия, контактное лицо…', q) + bar +
+      '<div class="card" style="margin-top:12px"><div class="section-label companies-count" style="padding:12px 16px 4px">Компании · ' + companiesSearchList().length + '</div>' +
+      '<div class="companies-list">' + companiesListInner() + '</div></div>';
+  }
+  function refreshCompanies() {
+    const box = document.querySelector('.companies-list'); if (!box) return;
+    box.innerHTML = companiesListInner();
+    const cnt = document.querySelector('.companies-count');
+    if (cnt) cnt.textContent = 'Компании · ' + companiesSearchList().length;
   }
   // ---- Company card v2: same universal shell (static type → status chip, dx-sec tabs) ----
+  // Handover brief on the company card — the counterpart of clientBriefSentences: who this legal
+  // entity is · how much of our book runs through it · whom we actually talk to · on what terms ·
+  // what to watch. Clauses drop out when their data is absent, and no name lands in a slot that
+  // would require Russian declension.
+  function companyBriefSentences(co) {
+    const out = [];
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const people = co.people || [];
+
+    // 1. Who this is.
+    let who = co.name + ' — ' + lowerFirst(co.kind || 'контрагент');
+    if (co.license) who += ', ' + co.license;
+    out.push(who + '.' + (co.note ? ' ' + co.note : ''));
+
+    // 2. How much of our book runs through it.
+    if (deals.length) {
+      const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
+      const open = deals.filter((d) => !dealClosed(d));
+      let vol = 'Через компанию ' + plural(deals.length, 'идёт', 'идут', 'идёт') + ' ' + deals.length + ' ' + plural(deals.length, 'сделка', 'сделки', 'сделок') +
+        ' на ' + WS.AED(total);
+      if (open.length) {
+        const stages = joinRu(Array.from(new Set(open.map((d) => '«' + funnelSteps(d).cols[funnelSteps(d).idx] + '»'))));
+        vol += '; в работе ' + open.length + ' — ' + plural(open.length, 'стадия', 'стадии', 'стадии') + ' ' + stages;
+      }
+      out.push(vol + '.');
+    } else {
+      out.push('Сделок через компанию пока не было — контрагент заведён, история пустая.');
+    }
+
+    // 3. Whom we actually talk to.
+    if (people.length) {
+      const primary = people.find((p) => p.primary) || people[0];
+      const lpr = people.filter((p) => p.decision === 'ЛПР' && p !== primary);
+      let line = 'Основной контакт — ' + primary.name + ', ' + lowerFirst(primary.role);
+      if (lpr.length) line += '; решение принимает ' + joinRu(lpr.map((p) => p.name + ' (' + lowerFirst(p.role) + ')'));
+      const rest = people.length - 1 - lpr.length;
+      if (rest > 0) line += '; ещё ' + rest + ' ' + plural(rest, 'человек', 'человека', 'человек') + ' в контуре';
+      out.push(line + '.');
+    }
+
+    // 4. On what terms.
+    const terms = [];
+    if (co.commission) terms.push('комиссия — ' + lowerFirst(co.commission));
+    if (co.escrow) terms.push('расчёты через эскроу-счета DLD');
+    if (terms.length) out.push(capFirst(joinRu(terms)) + '.');
+
+    // 5. What to watch.
+    const watch = [];
+    if (co.kyc !== 'verified') watch.push('KYC ещё на проверке — до его завершения договор не подписываем');
+    if (!co.escrow && /застройщик/i.test(co.kind || '')) watch.push('эскроу-счёт не подтверждён');
+    if (!co.trn || co.trn === '—') watch.push('нет TRN — счёт с VAT не выставить');
+    if (watch.length) out.push('Внимание: ' + joinRu(watch) + '.');
+
+    return out;
+  }
+  function companyOps(co) {
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const activeDeal = deals.find((d) => !dealClosed(d));
+    const total = deals.reduce((s, d) => s + (d.amount || 0), 0);
+    const primary = (co.people || []).find((p) => p.primary) || (co.people || [])[0];
+    return opsStrip([
+      ['building', 'Тип', co.kind],
+      deals.length ? ['briefcase', 'Сделок в работе', String(deals.length)] : null,
+      total ? ['money', 'Суммарный объём', WS.AED(total)] : null,
+      primary ? ['users', 'Основной контакт', primary.name] : null,
+    ], null);
+  }
   function companyTabContent(co, tab) {
     const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    if (tab === 'people') {
+      const people = co.people || [];
+      if (!people.length) {
+        return dxSec('users', 'Люди компании', '',
+          '<div style="font-size:12.5px;color:var(--mut);padding:6px 0">Контактные лица не заведены. Добавьте их, чтобы вести переписку с тем, кто отвечает за свою часть сделки.</div>');
+      }
+      const rows = people.map((p, i) => {
+        const dec = ({ 'ЛПР': ['ok', 'target'], 'влияет': ['warn', 'star'] })[p.decision] || ['', 'check'];
+        const decision = '<span class="badge ' + dec[0] + '">' + I(dec[1]) + (p.decision || 'исполнитель') + '</span>';
+        const ch = chanMeta(p.channel || 'email');
+        const val = personChannelValue(p);
+        const star = p.primary ? '<span class="c-star" title="Основной контакт">' + I('star') + '</span>' : '';
+        const sub = [p.role, val].filter(Boolean).join(' · ');
+        const main = '<div class="dc-main"><div class="fi i-acc">' + I(ch[0]) + '</div>' +
+          '<div class="ft"><div class="t">' + p.name + star + '</div><div class="m">' + sub + '</div>' +
+          (p.note ? '<div class="m" style="color:var(--faint)">' + p.note + '</div>' : '') + '</div></div>';
+        const acts = '<div class="dc-acts">' + decision +
+          '<button class="btn sm" data-thread="company:' + co.id + ':' + i + '" data-tlabel="' + escAttr(p.name + ' · ' + co.name) + '" data-ticon="building">' + I('chat') + 'Написать</button></div>';
+        return '<div class="dc-row">' + main + acts + '</div>';
+      }).join('');
+      const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">ЛПР принимает решение, «влияет» — согласует свою часть, «исполнитель» — ведёт операционные шаги. Переписка ведётся с каждым отдельно и попадает в историю компании.</div>';
+      return dxSec('users', 'Люди компании · ' + people.length, '', '<div class="dc-list">' + rows + '</div>' + hint);
+    }
     if (tab === 'details') {
       const escrow = co.escrow ? '<span class="badge ok">' + I('shield') + 'Эскроу DLD</span>' : '';
       const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('check') + 'KYC пройден</span>' : '<span class="badge warn">' + I('clock') + 'KYC на проверке</span>';
@@ -1064,36 +1739,66 @@
     }
     if (tab === 'history') return companyFeedBlock(co);
     // overview
-    const key = dxSec('building', 'Реквизиты и статус', '', '<div class="dfields">' +
-      dfPair('Тип', co.kind) +
-      dfPair('Лицензия / ORN', co.license || '—') +
-      dfPair('TRN', co.trn || '—') +
-      dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
-      dfPair('Условия комиссии', co.commission) +
-      dfPair('Сделок', String(deals.length)) + '</div>' +
-      (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''));
-    const contact = dxSec('users', 'Контактное лицо', '', '<div class="dfields">' +
-      dfPair(co.contactPerson || 'Контакт', co.contactRole || '—') + dfPair('Телефон', co.phone) +
-      dfPair('Email', co.email) + dfPair('Адрес', co.address) + '</div>');
-    return '<div class="dx-grid2">' + key + contact + '</div>' +
-      '<div style="margin-top:14px">' + companyFeedBlock(co, 5) + '</div>';
+    return cxStack([
+      [dxSec('sparkle', 'Справка Консьержа', '', '<p class="deal-brief">' + companyBriefSentences(co).join(' ') + '</p>'),
+       dxSec('building', 'Реквизиты', '', '<div class="dfields">' +
+         dfPair('Тип', co.kind) +
+         dfPair('Лицензия / ORN', co.license || '—') +
+         dfPair('TRN', co.trn || '—') +
+         dfPair('Эскроу', co.escrow ? 'Эскроу-счета DLD' : 'нет') +
+         dfPair('Условия комиссии', co.commission) +
+         dfPair('Сделок', String(deals.length)) + '</div>' +
+         (co.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + co.note + '</div>' : ''))],
+      companyFeedBlock(co, 5),
+    ]);
   }
-  function companyCard(id) {
-    const co = (D().companies || []).find((x) => x.id === id); if (!co) return;
+  // Same band as the client hero — the markup contract is `.chero > img + scrim + content(avatar,
+  // info(name, facts))`; anything else lands unstyled on a dark gradient and reads as broken.
+  // A person's reachable value depends on the channel they prefer: messengers ride the phone number,
+  // mail rides the address. `p[p.channel]` silently produced an email under a WhatsApp icon.
+  function personChannelValue(p) {
+    const ch = p.channel || 'email';
+    if (ch === 'email') return p.email || p.phone || '';
+    return p.phone || p.email || '';
+  }
+  function companyHero(co) {
+    const bg = (WS.photos && (WS.photos.o_marina || WS.photos.o_interior)) || '';
+    const init = (co.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const people = (co.people || []).length;
+    const verified = co.kyc === 'verified';
+    const facts = [
+      ['building', co.kind || 'Компания'],
+      ['shield', co.license || 'лицензия не указана'],
+      [verified ? 'check' : 'clock', verified ? 'KYC пройден' : 'KYC на проверке'],
+      ['users', people ? people + ' ' + plural(people, 'контактное лицо', 'контактных лица', 'контактных лиц') : 'контактов нет'],
+    ];
+    const factsHtml = '<div class="chero-facts">' + facts.map((f) => '<div class="chero-fact"><span class="chero-fact-icon">' + I(f[0]) + '</span><span>' + f[1] + '</span></div>').join('') + '</div>';
+    return '<div class="chero">' + (bg ? '<img class="chero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="chero-scrim"></div>' +
+      '<div class="chero-content"><div class="chero-avatar">' + init + '</div>' +
+      '<div class="chero-info"><h1 class="chero-name">' + co.name + '</h1>' + factsHtml + '</div></div></div>';
+  }
+  function companySpec(id) {
+    const co = (D().companies || []).find((x) => x.id === id); if (!co) return null;
     const kyc = co.kyc === 'verified' ? { icon: 'check', label: 'KYC пройден', tone: 'ok' } : { icon: 'clock', label: 'KYC на проверке', tone: 'warn' };
-    const chips = [{ icon: 'building', label: co.kind, tone: 'acc' }, kyc];
-    if (co.escrow) chips.push({ icon: 'shield', label: 'Эскроу DLD', tone: 'ok' });
-    chips.push({ icon: 'lock', label: 'статус, не рейтинг', tone: 'demo' });
     const dealsCount = (D().deals || []).filter((d) => d.companyId === id).length;
-    entityCard({
-      type: 'company', id: id, title: co.name, status: statusChip(chips),
-      tabs: [['overview', 'Обзор'], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+    const peopleCount = (co.people || []).length;
+    const status = statusChip([kyc]);
+    return {
+      type: 'company', id: id, title: co.name,
+      hero: companyHero(co) + status,
+      acts: entityActionBar([
+        ['chat', 'Чат по компании', 'data-thread="company:' + co.id + '" data-tlabel="' + escAttr(co.name) + '" data-ticon="building"', 'primary'],
+        ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="company" data-coid="' + co.id + '"', ''],
+        ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
+      ]),
+      state: companyOps(co),
+      tabs: [['overview', 'Обзор'], ['people', 'Люди · ' + peopleCount], ['details', 'Реквизиты'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return companyTabContent(co, tab); },
       concierge: entityConcierge('Спросите Консьержа по компании — «история сделок», «условия комиссии», «собери досье»…', 'company:' + co.id, co.name + ' · компания', 'building'),
-      footer: '<button class="btn" data-act="closeModal">Закрыть</button>' +
-        '<button class="btn primary" data-thread="company:' + co.id + '" data-tlabel="' + co.name + ' · компания" data-ticon="building">' + I('chat') + 'Чат по компании</button>',
-    });
+    };
   }
+  function companyCard(id) { S().companyId = id; WS.router.go('companyDetail'); }
 
   // ---------------- PSYCH PROFILE (персонализация коммуникации) ----------------
   const PSYCH_OPTS = {
@@ -1119,7 +1824,7 @@
   function psychBlock(c) {
     const p = c.psych;
     if (!p || !p.filled) {
-      return '<div class="section-label" style="margin-top:16px">Персонализация коммуникации</div>' +
+      return '<div class="section-label" style="margin-top:16px">Портрет клиента</div>' +
         '<div class="psych-empty">' + I('sparkle') +
         '<div><div style="font-weight:700;color:var(--ink)">Профиль не заполнен</div>' +
         '<div style="font-size:12px;color:var(--mut);margin-top:2px">Параметры стиля общения помогут вести персонализированную коммуникацию в мессенджерах и соцсетях (за согласием клиента).</div></div>' +
@@ -1128,7 +1833,7 @@
     const chip = (ic, t) => t ? '<span class="badge">' + I(ic) + t + '</span>' : '';
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
     const tips = commTips(p).map((t) => '<div class="chg-row">' + I('check') + '<span>' + t + '</span></div>').join('');
-    return '<div class="section-label" style="margin-top:16px">Психологический профиль · персонализация</div>' +
+    return '<div class="section-label" style="margin-top:16px">Портрет клиента</div>' +
       '<div class="prov" style="margin-bottom:8px">' + chip('users', p.decision) + chip('flame', p.pace) + chip('shield', p.risk) + '</div>' +
       '<div class="prov" style="margin-bottom:8px">' + vals + '</div>' +
       row('Канал и тон', (p.channel || '') + (p.tone ? ' · ' + p.tone : '')) +
@@ -1229,59 +1934,237 @@
     agent: { phone: '+971 50 123 4417', whatsapp: '+971 50 123 4417', telegram: '@marina_dxb', instagram: '@marina.dubai.realty', email: 'marina@harbourkey.ae' },
     manager: { phone: '+971 50 447 2210', whatsapp: '+971 50 447 2210', telegram: '@omar_hk', instagram: '@omar.harbourkey', email: 'omar@harbourkey.ae' },
   };
-  // Contact info surfaced explicitly at the top of the client overview — proper vCard, all channels.
+  // Contact info surfaced explicitly at the top of the client overview — compact row of preferred + filled channels.
   function contactBlock(c) {
-    const dealForC = D().deals.find((x) => x.clientId === c.id);
-    const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const pref = prefChannel(c);
-    const prefLabel = chanMeta(pref)[1];
-    const consent = c.consent
-      ? '<span class="badge ok">' + I('check') + 'согласие (PDPL)</span>'
-      : '<span class="badge stop">' + I('lock') + 'нет согласия</span>';
-    const inner = contactVCard(clientContactVals(c), pref) +
-      '<div class="cd-foot"><div class="prov"><span class="badge">' + I('flame') + c.lang + '</span>' + consent + '</div>' +
-      '<button class="btn sm primary" data-thread="' + dealTid + '" data-tlabel="' + c.name + ' · сделка" data-ticon="users">' + I('chat') + 'Написать · ' + prefLabel + '</button></div>';
-    return dxSec('phone', 'Контактные данные', '', inner);
+    const vals = clientContactVals(c);
+    // Preferred channel first, then the ones that actually hold a value — an empty channel used to
+    // take a full row saying «—», which is how five contacts filled the whole fold.
+    const shown = [pref].concat(CONTACT_ORDER.filter((ch) => ch !== pref && vals[ch] && vals[ch] !== '—'));
+    const channels = shown.map((ch) => {
+      const m = chanMeta(ch);
+      const isPref = ch === pref;
+      return '<div class="cd-row' + (isPref ? ' on' : '') + '" title="' + escAttr(m[1]) + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
+        '<span class="cd-val">' + (vals[ch] || '—') + '</span>' +
+        (isPref ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
+    }).join('');
+    // Language, consent and «Написать» are all stated elsewhere on this screen — in the hero, in the
+    // status chips and in the action bar. What only this block holds are the numbers themselves.
+    return dxSec('phone', 'Контактные данные', '', '<div class="cd-list">' + channels + '</div>');
   }
-  // Психологический профиль — сводка на основной вкладке (полная версия — во вкладке «Персонализация»).
+  // Client portrait — the summary shown on the overview tab; the full version lives on its own tab.
   function psychSummary(c) {
     const p = c.psych;
     if (!p || !p.filled) {
-      return dxSec('sparkle', 'Психологический профиль', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
+      return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-act="psychForm" data-cid="' + c.id + '">' + I('plus') + 'Заполнить</button>',
         '<div style="font-size:12.5px;color:var(--mut)">Профиль стиля общения не заполнен — поможет вести персонализированную коммуникацию в мессенджерах и соцсетях.</div>');
     }
-    const chips = [p.decision, p.pace, p.risk].filter(Boolean).map((x) => '<span class="badge">' + x + '</span>').join('');
+    const flat = (t) => String(t || '').replace(/;\s*/g, ', ').trim();
+    const line = (ic, k, v) => v ? '<div class="pt-row"><span class="pt-ic">' + I(ic) + '</span>' +
+      '<span class="pt-k">' + k + '</span><span class="pt-v">' + v + '</span></div>' : '';
     const vals = (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('');
-    return dxSec('sparkle', 'Психологический профиль', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
-      '<div class="prov">' + chips + vals + '</div>' +
-      '<div style="font-size:12.5px;color:var(--mut);margin-top:8px">Канал и тон: ' + ((p.channel || '—') + (p.tone ? ' · ' + p.tone : '')) + '</div>');
+    const tips = commTips(p).slice(0, 2).map((t) => '<div class="chg-row">' + I('check') + '<span>' + t + '</span></div>').join('');
+    return dxSec('sparkle', 'Портрет клиента', '<button class="btn xs" data-etab="contact~' + c.id + '~profile">' + I('arrowRight') + 'Подробнее</button>',
+      '<div class="pt-list">' +
+        line('target', 'Решение', p.decision) +
+        line('clock', 'Темп', p.pace) +
+        line('shield', 'Риск', p.risk) +
+        line('chat', 'Канал', flat(p.channel)) +
+        line('pencil', 'Тон', flat(p.tone)) +
+      '</div>' +
+      (vals ? '<div class="prov pt-vals">' + vals + '</div>' : '') +
+      (tips ? '<div class="chg-list pt-tips">' + tips + '</div>' : ''));
   }
   // Client-level preference profile: aggregate this client's requests' offered ↔ selected/rejected.
   function clientPrefProfile(c) {
     const all = [];
     (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => all.push(o)));
     if (!all.length) return '';
-    return reqPrefProfile({ offered: all });
+    return prefProfileInner({ offered: all });
+  }
+  // Справка Консьержа — human handover brief for the next agent picking up this client.
+  // Handover brief on the client card — what one agent tells another before picking this client up.
+  // Every clause is built from the client's own records and disappears when the data is absent, so a
+  // bare new contact yields two honest sentences instead of a skeleton of dashes. Phrases are shaped
+  // to avoid Russian case agreement: a name never lands in a slot that would require declension.
+  // How long this person has been ours, counted from the oldest thing in their history.
+  function clientSince(c) {
+    const feed = contactFeedEntries(c).filter((e) => !(e.ord > NOW_ORD));
+    const first = feed.length ? feed[feed.length - 1] : null;
+    if (!first || !first.at) return null;
+    const at = String(first.at).split('·')[0].trim();
+    const days = (function () {
+      const m = /^(\d+)\s*([а-яё]*)/i.exec(at);
+      if (!m) return null;
+      const mi = RU_MONTHS.indexOf((m[2] || '').toLowerCase());
+      const mo = mi >= 0 ? mi + 1 : demoNow().mo;
+      return dayOfYear(demoNow().d, demoNow().mo) - dayOfYear(parseInt(m[1], 10), mo);
+    })();
+    return { at: at, days: days };
+  }
+  // What we have actually shown this client, across every deal and request — the thing no single
+  // card row can say. Services, property types and how the choosing has gone so far.
+  function clientDirections(c) {
+    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const services = Array.from(new Set(deals.map((d) => lowerFirst(d.dealType || '')).filter(Boolean)));
+    const types = Array.from(new Set(deals.map((d) => d.objectType).filter(Boolean)));
+    const ready = Array.from(new Set(deals.map((d) => d.readiness).filter(Boolean)));
+    let offered = 0, picked = 0, rejected = 0;
+    reqs.forEach((r) => (r.offered || []).forEach((o) => {
+      offered++;
+      if (o && o.state === 'selected') picked++;
+      if (o && o.state === 'rejected') rejected++;
+    }));
+    return { services: services, types: types, ready: ready, offered: offered, picked: picked, rejected: rejected, deals: deals, reqs: reqs };
+  }
+  const SERVICE_DAT = {
+    'продажа': 'продаже', 'аренда': 'аренде', 'управление арендой': 'управлению арендой',
+    'эксклюзив': 'эксклюзиву', 'кросс-продажи': 'кросс-продажам', 'консалтинг': 'консалтингу',
+  };
+  const TYPE_GEN = {
+    'апартаменты': 'апартаментов', 'вилла': 'вилл', 'офис': 'офисов', 'ритейл': 'ритейла',
+    'склад': 'складов', 'ГАБ': 'ГАБ', 'земля': 'земли',
+  };
+  function datService(t) { return SERVICE_DAT[String(t || '').toLowerCase()] || t; }
+  function genType(t) { return TYPE_GEN[t] || t; }
+  // A placeholder is not an area. «Дубай — район не указан» is the absence of an answer, and
+  // «Смотрит Дубай — район не указан» states it as a preference.
+  function realAreas(c) { return (c.areas || []).filter((a) => !/не указан/i.test(a)); }
+  function afterDash(t) {
+    const i = String(t || '').indexOf('—');
+    return i >= 0 ? String(t).slice(i + 1).trim() : String(t || '').trim();
+  }
+  // The client brief. Five sentences at most, and none of them restates a field the card already
+  // shows: it answers «кто это, что мы ему возили, как он решает и как с ним говорить».
+  function clientBriefSentences(c) {
+    const out = [];
+    const dir = clientDirections(c);
+    const active = dir.deals.filter((d) => !dealClosed(d));
+    const won = dir.deals.filter(dealWon);
+    const since = clientSince(c);
+
+    // 1. Since when, and through what door.
+    let intro = c.name;
+    if (since && since.days != null && since.days > 0) intro += ' с нами ' + since.days + ' ' + plural(since.days, 'день', 'дня', 'дней') + ', с ' + since.at;
+    else if (since) intro += ' заведён' + (since.at ? ' ' + since.at : '');
+    else intro += ' — только что в базе';
+    const src = (dir.deals[0] || {}).source || (dir.reqs[0] || {}).source;
+    if (src) intro += '; источник — ' + src;
+    out.push(intro + '.');
+
+    // 2. What we have been doing with them — the history, not the current row.
+    // 2. What we have done together — one clause, not a column of counts.
+    if (dir.deals.length || dir.offered) {
+      const n = dir.deals.length;
+      let line = 'За это время — ' + (n === 1 ? 'одна сделка' : n + ' ' + plural(n, 'сделка', 'сделки', 'сделок'));
+      if (dir.services.length) line += ' по ' + joinRu(dir.services.map(datService));
+      // Одна услуга — можно назвать, что именно; несколько — перечисление типов начинает
+      // приписывать каждый тип каждой услуге, чего в данных нет.
+      if (dir.services.length === 1 && dir.types.length) line += ' ' + joinRu(dir.types.map(genType));
+
+      if (won.length) line += ', ' + (won.length === 1 ? 'одна доведена' : won.length + ' доведены') + ' до конца';
+      if (dir.offered) {
+        line += '; из ' + dir.offered + ' ' + plural(dir.offered, 'показанного объекта', 'показанных объектов', 'показанных объектов');
+        line += dir.picked ? ' ' + plural(dir.picked, 'выбран', 'выбрано', 'выбрано') + ' ' + dir.picked : ' пока ничего не выбрано';
+        if (dir.rejected) line += ', ' + plural(dir.rejected, 'отклонён', 'отклонено', 'отклонено') + ' ' + dir.rejected;
+      }
+      out.push(line + '.');
+    } else {
+      out.push('Работа ещё не начиналась — ни заявок, ни сделок, только контакт в базе.');
+    }
+
+    // 3. Where they stand today, and what they habitually look at.
+    const today = [];
+    const areas = realAreas(c);
+    if (areas.length) today.push('Смотрит ' + joinRu(areas));
+    // Что человек ищет сейчас — это его свойство. Стадия его сделки — свойство сделки, и у неё
+    // есть своя карточка: называть её здесь значит говорить за соседний экран.
+    const openReq = (D().requests || []).filter((r) => r.clientId === c.id);
+    const wants = [];
+    openReq.forEach((r) => {
+      if (r.goal) wants.push(lowerFirst(r.goal));
+      if (r.budget) wants.push('до ' + WS.AED(r.budget));
+      if (r.horizon) wants.push(/\d|мес|нед|дн/i.test(r.horizon) ? 'срок ' + r.horizon : lowerFirst(r.horizon));
+    });
+    if (wants.length) today.push('ищет: ' + wants.slice(0, 3).join(', '));
+    else if (active.length) today.push('в работе ' + active.length + ' ' + plural(active.length, 'направление', 'направления', 'направлений'));
+    else if (dir.deals.length) today.push('сейчас ничего не ищет');
+    if (today.length) out.push(capFirst(today.join('; ')) + '.');
+
+    // 3. How this person decides. Interpretation, not a dump of the portrait fields.
+    const p = c.psych;
+    if (p && p.filled) {
+      const how = [];
+      if (p.decision) how.push(afterDash(p.decision));
+      if (p.pace) how.push(lowerFirst(afterDash(p.pace)));
+      if ((p.values || []).length) how.push('ценит ' + joinRu(p.values.map(lowerFirst)));
+      if ((p.triggers || []).length) how.push('решение держится на двух вещах: ' + joinRu(p.triggers.map(lowerFirst)));
+      if (how.length) out.push(capFirst(how.join(', ')) + '.');
+      // How to reach them, as an instruction — «писать туда, звонить тогда» — rather than three
+      // labelled fields read out in a row.
+      const flat = (t) => String(t || '').replace(/;\s*/g, ', ').trim();
+      const talk = [];
+      if (p.channel) talk.push('Писать — ' + flat(p.channel).split(',')[0].trim());
+      if (p.tone) talk.push('тон — ' + lowerFirst(flat(p.tone)));
+      if (p.bestTime) talk.push('звонить — ' + lowerFirst(flat(p.bestTime)));
+      if (talk.length) out.push(talk.join('; ') + '.');
+    } else if (active.length || dir.offered) {
+      out.push('Портрет не заполнен — стиль общения приходится угадывать по переписке.');
+    }
+
+    // 4. The one thing that would go wrong if nobody looked.
+    const watch = [];
+    if (c.consent === false) watch.push('нет согласия на связь — адресные отправки заблокированы');
+    const k = kycOf(c);
+    if (k.st === 'stop') watch.push('KYC не начат');
+    const overdue = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue').length;
+    if (overdue) watch.push(overdue + ' ' + plural(overdue, 'просроченная задача', 'просроченные задачи', 'просроченных задач'));
+    if (watch.length) out.push('Держать в голове: ' + joinRu(watch) + '.');
+    return out;
+  }
+  function conciergeClientHandover(c) {
+    const p = c.psych;
+    const tag = (p && p.filled) ? 'портрет + история' : 'по данным карточки';
+    return dxSec('sparkle', 'Справка Консьержа', '<span class="badge ai-b">' + I('sparkle') + tag + '</span>',
+      '<p class="deal-brief">' + clientBriefSentences(c).join(' ') + '</p>');
   }
   // Client-level lead ops (derived): owner from the active deal, lifecycle stage, next contact from tasks.
+  // Actions on the PERSON. Deal-level verbs stay on the deal, which knows which deal it is.
+  function clientActions(c) {
+    return [
+      ['briefcase', 'Создать сделку', 'data-act="newDeal" data-cid="' + c.id + '"', 'primary'],
+      ['building', 'Подобрать объекты', 'data-scn="G2"', ''],
+      ['chat', 'Написать', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users"', ''],
+      ['clock', 'Запланировать касание', 'data-act="newTask"', ''],
+      ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
+      // Was data-scn="S8" — a scripted demo run hard-wired to Анна's deal, which ran unchanged
+      // whichever client's card you opened. A bar that claims to act on THIS card must.
+      ['sparkle', 'Бриф к звонку', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + ' · бриф" data-ticon="sparkle"', ''],
+      !(c.psych && c.psych.filled) ? ['users', 'Заполнить портрет', 'data-act="psychForm" data-cid="' + c.id + '"', ''] : null,
+    ];
+  }
+  // Полоса операций на карточке КЛИЕНТА говорит о человеке и о работе с ним: кто ведёт, когда
+  // следующее касание, как он решает. Стадия и сумма текущей сделки отсюда убраны намеренно —
+  // это свойство сделки, у неё своя карточка, и клиент к одной своей сделке не сводится.
   function clientOps(c) {
-    const deals = (D().deals || []).filter((d) => d.clientId === c.id);
-    const deal = deals.find((d) => d.stage !== 'done') || deals[0];
-    const owner = deal ? agentName(deal.agent) : 'не назначен';
-    const stage = deal ? ({ new: 'Новый лид', work: 'В переговорах', docs: 'Документы', done: 'Закрыт' })[deal.stage] : 'Без активной сделки';
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const owner = reqs.length ? agentName(reqs[0].assignee) : 'не назначен';
     const nextTask = (D().tasks || []).filter((t) => t.clientId === c.id && t.status !== 'done')
       .sort((a, b) => (a.when === 'overdue' ? -1 : b.when === 'overdue' ? 1 : 0))[0];
     const nextC = nextTask ? ((nextTask.when === 'overdue' ? 'просрочено · ' : '') + nextTask.due) : null;
+    const p = c.psych || {};
+    const overdue = (D().tasks || []).some((t) => t.clientId === c.id && t.status !== 'done' && t.when === 'overdue');
     return opsStrip([
       ['users', 'Ответственный', owner],
-      ['target', 'Стадия', stage],
-      deal ? ['briefcase', 'Активная сделка', dealActionWord(deal) + ' · ' + WS.AED(deal.amount)] : null,
+      ['target', 'Приоритет', ((D().clientSignals || {})[c.id] || {}).priority || '—'],
+      p.decision ? ['sparkle', 'Решение', p.decision] : ['sparkle', 'Портрет', 'не заполнен'],
       nextC ? ['clock', 'Следующий контакт', nextC] : null,
-    ], deal && deal.hot ? 'hot' : undefined);
+    ], overdue ? 'hot' : undefined);
   }
   function clientTabContent(c, tab) {
     if (tab === 'profile') {
-      return dxSec('sparkle', 'Персонализация коммуникации', '', psychInner(c));
+      return dxSec('sparkle', 'Портрет клиента', '', psychInner(c));
     }
     if (tab === 'kyc') {
       const k = kycOf(c);
@@ -1301,8 +2184,12 @@
     if (tab === 'deals') {
       const ds = D().deals.filter((x) => x.clientId === c.id);
       const dealRows = ds.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + '</div></div>' + I('arrowRight') + '</div>').join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">связанных сделок нет</div>';
+      // A client's contracts belong on the client too: after a purchase the relationship IS the
+      // contract, and it is what a repeat deal grows out of.
+      const kRows = contractsOfClient(c.id).map(contractRow).join('');
       return dxSec('briefcase', 'Сделки контакта · ' + ds.length, '', '<div class="feed">' + dealRows + '</div>') +
-        '<div style="margin-top:14px">' + dxSec('doc', 'Документы по сделкам', '', docsRows(docsFor((x) => x.client === c.id), 'по этому контакту документов пока нет')) + '</div>';
+        (kRows ? '<div style="margin-top:14px">' + dxSec('doc', 'Договоры контакта', '', '<div class="feed">' + kRows + '</div>') + '</div>' : '') +
+        '<div style="margin-top:14px">' + dxSec('doc', 'Документы клиента', '', docsRows(docsFor((x) => x.client === c.id), 'по этому контакту документов пока нет')) + '</div>';
     }
     if (tab === 'history') {
       // Session action log (what the demo operator did) stays available under the event feed —
@@ -1314,27 +2201,143 @@
     // overview
     const s = (D().clientSignals || {})[c.id];
     const prio = s ? '<span class="prio prio-' + s.priority + '">' + s.priority + '</span>' : '';
-    const key = dxSec('users', 'Ключевое', '', '<div class="dfields">' +
-      dfPair('Цель', c.goal) + dfPair('Бюджет', c.budget ? WS.AED(c.budget) : '—') +
-      dfPair('Районы', (c.areas || []).join(', ')) + dfPair('Срок покупки', c.horizon) +
+    // What this client wants ACROSS everything we have run for them — derived from their own deal
+    // and request history, not copied from whichever деal happens to be first in the array. «Цель»
+    // was exactly that copy: a parameter of one заявка, printed as a property of the person.
+    const dir = clientDirections(c);
+    const rejectedNames = (function () {
+      const names = [];
+      (D().requests || []).filter((r) => r.clientId === c.id).forEach((r) => (r.offered || []).forEach((o) => {
+        if (o && o.state === 'rejected') {
+          const ob = (D().objects || []).find((x) => x.id === (o.id || o));
+          if (ob) names.push(ob.name.split(',')[0]);
+        }
+      }));
+      return names;
+    })();
+    const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields cols2">' +
+      (dir.types.length ? dfPair('Типы объектов', joinRu(dir.types)) : '') +
+      (dir.ready.length ? dfPair('Готовность', joinRu(dir.ready)) : '') +
+      (dir.services.length ? dfPair('Интересуют услуги', joinRu(dir.services)) : '') +
+      dfPair('Районы интереса', (c.areas || []).join(', ')) +
+      (c.lang ? dfPair('Язык', c.lang) : '') +
+      (rejectedNames.length ? dfPair('Отклонял', joinRu(rejectedNames)) : '') +
       (c.preferred ? dfPair('Предпочитает', c.preferred) : '') + '</div>' +
-      (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : ''));
-    const sig = dxSec('target', 'Сигналы и приоритет', prio, signalsInner(c));
-    const actions = dxSec('sparkle', 'Действия по сделке', '',
-      '<div class="qa-row">' +
-      '<button class="chip" data-act="newDeal" data-cid="' + c.id + '">' + I('briefcase') + 'Создать сделку</button>' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объекты</button>' +
-      '<button class="chip" data-nav="calc">' + I('money') + 'Расчёт и КП</button>' +
-      '<button class="chip" data-scn="S3">' + I('calendar') + 'Назначить показ</button>' +
-      '<button class="chip" data-scn="S6">' + I('handshake') + 'Подключить партнёра</button>' +
-      '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button>' +
-      '</div><div style="font-size:11px;color:var(--faint);margin-top:6px">Те же действия можно поручить Консьержу голосом или текстом.</div>');
-    const pref = clientPrefProfile(c);
-    return clientOps(c) + contactBlock(c) + '<div class="dx-grid2" style="margin-top:14px">' + key + sig + '</div>' +
-      '<div style="margin-top:14px">' + psychSummary(c) + '</div>' +
-      (pref ? '<div style="margin-top:14px">' + pref + '</div>' : '') +
-      '<div style="margin-top:14px">' + actions + '</div>' +
-      '<div style="margin-top:14px">' + contactFeedBlock(c, 5) + '</div>';
+      (c.note ? '<div style="margin-top:8px;font-size:12px;color:var(--mut)">' + c.note + '</div>' : '') +
+      (clientPrefProfile(c) ? '<div class="pref-observed">' + clientPrefProfile(c) + '</div>' : ''));
+    const sig = dxSec('target', 'Сигналы и приоритет', prio, '<div class="sig-wide">' + signalsInner(c) + '</div>');
+    const offer = clientOfferBlock(c);
+    // Deal-level actions («подобрать объекты», «расчёт и КП», «назначить показ») belong to a deal
+    // and already live on the deal card and in the page header; on the client they invited an agent
+    // to act on a transaction from a screen that does not know which transaction.
+
+    const actions = '';   // the bar under the hero carries them now — see clientActions()
+    // Two-column rows are for blocks of comparable weight. A feed is not one of them: it grows with
+    // the client's history and drags whatever sits beside it to the same height.
+    return cxStack([
+      [conciergeClientHandover(c), contactBlock(c)],
+      [key, psychSummary(c)],
+      [offer, sig],
+      contactFeedBlock(c, 5),
+    ]);
+  }
+  // Критерии подбора, выведенные из заявок клиента: бюджет — самый крупный из запрошенных,
+  // районы — все, которые он называл. Руками агент выставил бы то же самое.
+  function clientMatchModel(c) {
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    const m = initMatch(c);
+    // Потолок берётся только из запросов на покупку. Бюджет аренды — это ставка за год, и
+    // сравнивать её с ценой объекта нельзя: у клиента, который снимает за 95 тысяч и покупает
+    // за полтора миллиона, потолком становилось 95 тысяч, и подобрать было нечего.
+    const buyFunnels = ['sale', 'cross', 'consult', 'exclusive'];
+    const budgets = reqs.filter((r) => buyFunnels.indexOf(r.funnel || 'sale') >= 0)
+      .map((r) => r.budget).filter(Boolean);
+    if (budgets.length) m.max = Math.max.apply(null, budgets);
+    else if (c.budget) m.max = c.budget;
+    const areas = [];
+    reqs.forEach((r) => (r.areas || []).forEach((a) => { if (areas.indexOf(a) < 0) areas.push(a); }));
+    (c.areas || []).forEach((a) => { if (areas.indexOf(a) < 0) areas.push(a); });
+    m.psych = !!(c.psych && c.psych.filled);
+    // Что человек вообще ищет — жильё или коммерцию. Предлагать инвестору в квартиры офисный блок
+    // значит показать, что подбор считает проценты, но не читает запрос.
+    const kinds = reqs.map((r) => (r.objectType || '') + ' ' + (r.goal || '') + ' ' + (r.dealType || ''))
+      .concat((D().deals || []).filter((d) => d.clientId === c.id).map((d) => d.objectType || ''))
+      .concat([(c.types || []).join(' '), c.goal || '']).join(' ');
+    return { m: m, areas: areas, commercial: /офис|габ|коммерч|fit-?out/i.test(kinds) };
+  }
+  // Объекты, которые этому человеку уже показывали, — в любой его заявке и в любом состоянии.
+  function clientSeenObjects(c) {
+    const seen = {};
+    (D().requests || []).filter((r) => r.clientId === c.id)
+      .forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = o.state || 'offered'; }));
+    (D().deals || []).filter((d) => d.clientId === c.id)
+      .forEach((d) => ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) seen[id] = 'deal'; }));
+    return seen;
+  }
+  // Объект, который уже стоит в чьей-то живой сделке, предлагать нельзя никому: он занят, и
+  // предложить его — значит пообещать то, чего нет.
+  function objectsInLiveDeals() {
+    const taken = {};
+    (D().deals || []).forEach((d) => {
+      if (d.stage === 'lost') return;
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) taken[id] = d.id; });
+    });
+    return taken;
+  }
+  function clientOffers(c) {
+    const mm = clientMatchModel(c);
+    const seen = clientSeenObjects(c);
+    const taken = objectsInLiveDeals();
+    return (D().objects || [])
+      // Жёсткие отсечки — то, что не обсуждается: чужой класс объекта и цена выше бюджета.
+      // Всё остальное решает счёт.
+      .filter((o) => !seen[o.id] && !taken[o.id])
+      .filter((o) => /офис|габ/i.test(o.br || '') === !!mm.commercial)
+      .filter((o) => !mm.m.max || o.price <= mm.m.max * 1.05)
+      .map((o) => {
+        // Район не сужает выборку жёстко: объект вне названных районов может выиграть по остальному,
+        // и тогда агенту важнее увидеть его, чем не увидеть.
+        const inArea = !mm.areas.length || mm.areas.indexOf(o.area) >= 0;
+        const r = matchScore(o, Object.assign({}, mm.m, { area: 'all' }), c);
+        return { o: o, pct: r.pct - (inArea ? 0 : 12), good: r.good, bad: r.bad, inArea: inArea };
+      })
+      // Порог отсекает совсем чужое, но не оставляет блок пустым при живом инвентаре: слабое
+      // совпадение полезнее пустого экрана — агент сам решит, звонить с ним или нет, а помечено
+      // оно честно. Пусто здесь означает ровно одно: свободного подходящего инвентаря нет.
+      .filter((x) => x.pct >= 40)
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 3);
+  }
+  function clientOfferBlock(c) {
+    const list = clientOffers(c);
+    const seenN = Object.keys(clientSeenObjects(c)).length;
+    if (!list.length) {
+      const why = seenN
+        ? 'Всё, что подходит под запрос, клиенту уже показывали. Новое появится, когда пополнится инвентарь или изменятся критерии.'
+        : 'Под этот запрос в инвентаре пока ничего нет — уточните бюджет или район, либо запросите объект у клубного партнёра.';
+      return dxSec('building', 'Что предложить', '', '<div class="cm-empty">' + I('search') + why + '</div>');
+    }
+    const rows = list.map((x) => {
+      const o = x.o;
+      const weak = x.pct < 55 ? '<span class="badge">' + I('warn') + 'слабое совпадение</span>' : '';
+      const why = x.good.slice(0, 3).join(', ') || 'подходит по основным критериям';
+      // Оговорки называются вслух: район не тот, что просили, или проверка доступности устарела.
+      // Подбор, который молчит о своих натяжках, агент перестаёт читать после первой осечки.
+      const notes = [];
+      if (!x.inArea) notes.push('не тот район, что просил клиент');
+      if (o.verified !== 'verified') notes.push('проверка доступности устарела');
+      if (x.bad.length) notes.push(x.bad[0]);
+      const warn = notes.length ? '<div class="of-warn">' + I('warn') + notes[0] + '</div>' : '';
+      return '<div class="of-row" data-obj="' + o.id + '">' +
+        '<span class="of-pct' + (x.pct >= 75 ? ' hi' : '') + '">' + x.pct + '%</span>' +
+        '<div class="of-b"><div class="of-t">' + o.name + '</div>' +
+        '<div class="of-m">' + o.area + ' · ' + WS.AED(o.price) + ' · ' + o.br + ' ' + weak + '</div>' +
+        '<div class="of-why">' + capFirst(why) + '</div>' + warn + '</div>' +
+        '<button class="btn xs" data-shortlist="' + o.id + '">' + I('star') + 'В подборку</button></div>';
+    }).join('');
+    return dxSec('building', 'Что предложить', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<div class="of-list">' + rows + '</div>' +
+      '<div class="of-foot">' + I('sparkle') + 'Отобрано по бюджету, районам и профилю решений; уже показанное исключено.</div>');
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
@@ -1342,20 +2345,20 @@
     const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
     const k = kycOf(c);
     const dealsCount = D().deals.filter((x) => x.clientId === id).length;
-    const cm = chanMeta(prefChannel(c));
+    // KYC, the preferred channel and the language now live in the compact hero — repeating them as
+    // chips right underneath was the same fact stated twice. Only the consent flag, which the hero
+    // does not carry and which gates every outbound touch, stays.
     const status = statusChip([
-      { icon: 'shield', label: k.label, tone: k.st },
-      { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие есть' : 'Нет согласия', tone: c.consent ? 'ok' : 'stop' },
-      { icon: cm[0], label: cm[1] },
-      { icon: 'flame', label: c.lang },
+      { icon: c.consent ? 'check' : 'lock', label: c.consent ? 'Согласие на связь есть' : 'Нет согласия на связь', tone: c.consent ? 'ok' : 'stop' },
     ]);
     return {
-      type: 'contact', id: id, title: c.name, status: clientHero(c) + status,
-      tabs: [['overview', 'Обзор'], ['profile', 'Персонализация'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+      type: 'contact', id: id, title: c.name,
+      hero: clientHero(c) + status,
+      acts: entityActionBar(clientActions(c)),
+      state: clientOps(c),
+      tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
-      pageActs: '<button class="btn sm primary" data-act="newDeal" data-cid="' + id + '">' + I('briefcase') + 'Создать сделку</button>' +
-        '<button class="btn sm" data-scn="G2">' + I('building') + 'Подобрать объекты</button>',
     };
   }
   function clientCard(id) { S().clientId = id; WS.router.go('clientDetail'); }
@@ -1379,9 +2382,12 @@
     const co = (D().companies || []).find((x) => x.id === d.companyId);
     const p = d.prov || {};
     return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
+      dealField('Готовность', d.readiness, p.readiness, d.id + ':readiness') +
+      (d.saleKind ? dealField('Вид сделки', d.saleKind, p.saleKind, d.id + ':saleKind') : '') +
+      dealField('Сторона клиента', d.side, p.side, d.id + ':side') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
       dealField('Источник (из заявки)', d.source, p.source, d.id + ':source') +
-      dealField('Компания', co ? co.name + ' · ' + co.kind : '—', 'confirmed') +
+      dealField('Компания', co ? '<span data-company="' + co.id + '" style="cursor:pointer;border-bottom:1px solid var(--acc-line)">' + co.name + '</span> · ' + co.kind : '—', 'confirmed') +
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
   }
@@ -1444,7 +2450,10 @@
     const edit = del ? '<button class="tl-ic-btn" ' + del + ' title="Удалить заметку">' + I('x') + '</button>' : '';
     // The lock sits with the timestamp; the tag row carries only real labels, so it never
     // renders as a lone stray icon under the text.
-    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') +
+    // On a company feed the counterpart matters as much as the channel: «с кем именно говорили»
+    // is the difference between a conversation with the ЛПР and one with an operations manager.
+    const who = e._person ? '<span class="tl-src">' + I('users') + escAttr(e._person) + '</span>' : '';
+    const tags = (e.capture ? '<span class="cap-tag">' + I('mic') + 'запись</span>' : '') + who +
       (e.src ? '<span class="tl-src">' + I('briefcase') + escAttr(e.src) + '</span>' : '');
     return '<div class="evc ' + e.kind + '">' +
       '<div class="evc-top"><span class="evc-ic ' + s.cls + '">' + I(chIcon(e.ch)) + '</span>' +
@@ -1463,7 +2472,10 @@
     const tl = (D().dealTimeline || {})[d.id] || [];
     const cap = S().capture || {};
     const on = (d.id in cap) ? cap[d.id] : true;
-    const rows = feedSortDesc(tl.map((e, i) => ({ e: e, i: i })))
+    const born = dealCreationEntry(d);
+    const pairs = tl.map((e, i) => ({ e: e, i: i }));
+    if (born) pairs.push({ e: born, i: -1 });   // i = -1: synthetic, never a deletable note
+    const rows = feedSortDesc(pairs)
       .map((p) => tlRow(p.e, p.e.kind === 'note' ? 'data-notedel="' + d.id + ':' + p.i + '"' : ''))
       .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">пока нет истории по каналам</div>';
     const privacy = '<div class="cap-toggle"><span>' + I('lock') + 'Запись разговоров по сделке (A7)</span>' +
@@ -1510,7 +2522,11 @@
     const out = [];
     const isContact = kind === 'contact';
     const own = isContact ? (data.contactTimeline || {}) : (data.companyTimeline || {});
-    (own[ent.id] || []).forEach((e, i) => out.push(Object.assign({}, e, { _ci: i })));
+    const roster = (!isContact && ent.people) || [];
+    (own[ent.id] || []).forEach((e, i) => {
+      const per = (e.person != null && roster[e.person]) ? roster[e.person] : null;
+      out.push(Object.assign({}, e, { _ci: i }, per ? { _person: per.name + ' · ' + lowerFirst(per.role) } : {}));
+    });
     const deals = (data.deals || []).filter((d) => isContact ? d.clientId === ent.id : d.companyId === ent.id);
     deals.forEach((d) => {
       const lbl = isContact ? dealFeedLabel(d, ent) : (d.title || d.sub || 'сделка');
@@ -1574,9 +2590,45 @@
       '<div style="font-size:12px;color:var(--faint);padding:8px 0">по выбранному фильтру событий нет</div>';
     return '<div class="timeline">' + rows + '</div>';
   }
+  const RU_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function demoNow() { return (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, mo: 5 }; }
+  function dayOfYear(day, mo) { let n = day; for (let i = 0; i < (mo || 1) - 1; i++) n += MONTH_DAYS[i]; return n; }
+  // «18 апреля» → { day: 18, mo: 4 }. A date with no month named is read as the demo month.
+  function createdOn(d) {
+    if (!d || !d.createdAt) return null;
+    const m = /^(\d+)\s*([а-яё]*)/i.exec(d.createdAt);
+    if (!m) return null;
+    const mi = RU_MONTHS.indexOf((m[2] || '').toLowerCase());
+    return { day: parseInt(m[1], 10), mo: mi >= 0 ? mi + 1 : demoNow().mo };
+  }
+  function createdAgoLabel(d) {
+    const c = createdOn(d); if (!c) return null;
+    const now = demoNow();
+    const diff = dayOfYear(now.d, now.mo) - dayOfYear(c.day, c.mo);
+    if (diff <= 0) return 'сегодня';
+    if (diff === 1) return '1 дн. назад';
+    return diff + ' дн. назад';
+  }
+  // The deal's birth is a real event, but it lives on the deal record rather than in the timeline
+  // fixtures — so it is synthesised at render time and sorts to the bottom (oldest) of the ribbon.
+  function dealCreationEntry(d) {
+    if (!d.createdAt) return null;
+    const c = createdOn(d);
+    // Sort key is relative to the demo month, so an earlier month goes negative and stays oldest
+    // instead of being read as a day of the current one.
+    const rel = c ? (dayOfYear(c.day, c.mo) - dayOfYear(1, demoNow().mo) + 1) : 1;
+    return {
+      at: d.createdAt, ord: c ? ORD(rel, 0, 1) : 1,
+      ch: 'crm', kind: 'ai', by: 'Консьерж', t: 'Сделка заведена',
+      text: 'Сделка заведена в системе' + (d.requestId ? ' из заявки' : '') + '.',
+    };
+  }
   function dealLineageEntries(d) {
     const data = D();
     const out = [];
+    const born = dealCreationEntry(d);
+    if (born) out.push(Object.assign({}, born, { src: 'Сделка', _origin: { type: 'deal', id: d.id } }));
     ((data.dealTimeline || {})[d.id] || []).forEach((e) => out.push(Object.assign({}, e, { src: 'Сделка', _origin: { type: 'deal', id: d.id } })));
     if (d.requestId) {
       const r = requestById(d.requestId);
@@ -1695,27 +2747,70 @@
   }
   // Deal card = the DEAL (not the contact). Contacts are one click away.
   // ---- Deal card v2: tabbed shell + funnel-aware stage stepper + context Concierge ----
+  // Шаг регистрации называется по своему реестру: у оффплана Oqood, у вторички Title Deed,
+  // у аренды Ejari. Общее «Регистрация» не говорит агенту, куда именно он идёт и с чем.
+  function stepLabelFor(d, k) {
+    if (k !== 'reg') return stageLabel(k);
+    const ck = WS.contractKindFor;
+    return (WS.REG_LABELS || {})[ck ? ck((d && d.funnel) || 'sale', d && d.readiness) : ''] || stageLabel(k);
+  }
   function funnelSteps(d) {
-    const f = (WS.FUNNELS || []).find((x) => x.k === d.funnel);
-    const cols = (f && f.cols) || ['Новая заявка', 'В работе', 'Документы', 'Закрыта'];
-    const order = ['new', 'work', 'docs', 'done'];
+    const f = funnelOf(d);
+    const order = funnelPath(d);
     const idx = Math.max(0, order.indexOf(d.stage));
-    return { cols: cols, idx: idx, order: order, label: (f && f.label) || stageLabel(d.stage) };
+    return { cols: order.map((k) => stepLabelFor(d, k)), idx: idx, order: order, label: f.label || stageLabel(d.stage), lost: d.stage === 'lost' };
   }
   function dealStepper(d) {
     const s = funnelSteps(d);
+    // A lost deal has no current step on the path — showing one would claim progress it does not
+    // have. The route is drawn as history, and the exit is stated once, plainly.
     const steps = s.cols.map((c, i) => {
-      const cls = i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo');
-      const inner = i < s.idx ? I('check') : String(i + 1);
+      const cls = s.lost ? 'todo' : (i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo'));
+      const inner = (!s.lost && i < s.idx) ? I('check') : String(i + 1);
       return '<button class="dx-step ' + cls + '" data-dealstage="' + d.id + '" data-stage="' + s.order[i] + '"><span class="d">' + inner + '</span><span class="l">' + c + '</span></button>';
     }).join('');
-    return '<div class="dx-stepper">' + steps + '</div>';
+    const lostChip = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
+    return '<div class="dx-stepper' + (s.cols.length > 7 ? ' long' : '') + '">' + steps + '</div>' + lostChip;
   }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
-      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + d.title + '" data-ticon="briefcase">' +
+      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
       '<div class="w">W</div><div class="ph">Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
       '<div class="send">' + I('arrowRight') + '</div></div>';
+  }
+  function pickerField(id, label, optionsHtml, placeholder, cls) {
+    const n = (optionsHtml.match(/<option/g) || []).length;
+    // A listbox with rows does not auto-select its first option the way a collapsed select does,
+    // so without this the form submits with no client and no object at all.
+    const withSel = /selected/.test(optionsHtml) ? optionsHtml : optionsHtml.replace('<option', '<option selected', 1);
+    return '<label class="fld fld-pick' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span>' +
+      '<input class="pick-q" type="search" data-pick="' + id + '" placeholder="' + escAttr(placeholder || 'Начните вводить название…') + '" autocomplete="off">' +
+      '<select id="' + id + '" size="' + Math.min(6, Math.max(3, n)) + '">' + withSel + '</select>' +
+      '<span class="pick-n" id="' + id + '_n">' + n + ' ' + plural(n, 'запись', 'записи', 'записей') + '</span></label>';
+  }
+  // Rows of a card body. A string is a full-width row; a two-element array is a facing pair that
+  // degrades to full width when one half is missing.
+  function cxCol(blocks) {
+    const html = (blocks || []).filter(Boolean).join('');
+    return html ? '<div class="cx-col">' + html + '</div>' : '';
+  }
+  function cxStack(rows) {
+    const html = (rows || []).map((r) => {
+      if (!r) return '';
+      if (typeof r === 'string') return r.trim() ? '<div class="cx-row">' + r + '</div>' : '';
+      const a = (r[0] || '').trim(), b = (r[1] || '').trim();
+      if (!a && !b) return '';
+      if (!a || !b) return '<div class="cx-row">' + (a || b) + '</div>';
+      return '<div class="cx-row cx-pair">' + a + b + '</div>';
+    }).join('');
+    return '<div class="cx-stack">' + html + '</div>';
+  }
+  function entityActionBar(items) {
+    const list = (items || []).filter(Boolean);
+    if (!list.length) return '';
+    return '<div class="qa-bar" role="group" aria-label="Действия">' +
+      list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
+        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
   }
   function dxSec(icon, title, rightHtml, inner) {
     return '<div class="dx-sec"><div class="dx-sec-h"><span class="ic">' + I(icon) + '</span>' + title +
@@ -1749,18 +2844,43 @@
     WS._cardByType = WS._cardByType || {};
     WS._cardByType[spec.type] = spec;
     WS._card = spec;
-    return (spec.status || '') + tabBar +
+    return (spec.hero || spec.status || '') + (spec.acts || '') + (spec.state || '') + tabBar +
       '<div class="dx-tabbody" id="dxTabBody">' + spec.render(tab) + '</div>' +
       (spec.concierge ? '<div class="dx-concierge">' + spec.concierge + '</div>' : '');
   }
   function entityCard(spec) {
     openModal(spec.title, entityBody(spec), spec.footer, { wide: true, flexBody: true });
   }
-  // Full-page entity view (deal / client) — mirrors viewObjectDetail: back header + actions, then the tabbed body.
+  // What to call a screen in a «назад» button. Names beat screen types: «Назад · Анна Петрова»
+  // tells you what you will see; «Назад к клиентам» is where the code came from, not the user.
+  function routeName(r) {
+    if (!r) return '';
+    const short = (t) => { t = String(t || ''); return t.length > 30 ? t.slice(0, 29).trim() + '…' : t; };
+    const by = (arr, id) => (arr || []).find((x) => x.id === id) || null;
+    let x = null;
+    switch (r.view) {
+      case 'dealDetail': x = by(D().deals, r.id); return short(x ? x.title : 'сделка');
+      case 'clientDetail': x = by(D().clients, r.id); return short(x ? x.name : 'клиент');
+      case 'objectDetail': x = by(D().objects, r.id); return short(x ? x.name : 'объект');
+      case 'companyDetail': x = by(D().companies, r.id); return short(x ? x.name : 'компания');
+      case 'requestDetail': x = by(D().requests, r.id); return short(x ? x.title : 'заявка');
+      case 'contractDetail': x = by(D().contracts, r.id); return short(x ? 'договор ' + x.number : 'договор');
+      case 'clients': return r.tab === 'contacts' ? 'Клиенты' : 'Сделки';
+      default: break;
+    }
+    const nav = NAV.concat(NAV_MORE, NAV_MGR, NAV_MGR_MORE).find((n) => n.id === r.view);
+    return nav ? nav.label : r.view;
+  }
+  // The back button of any card: the previous screen when there is one, the owning list otherwise.
+  function backBtn(fallbackNav, fallbackTab, fallbackLabel) {
+    const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
+    if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
+    return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
+  // Full-page entity view. The header is the way back and nothing else: the verbs live in the
+  // action bar inside entityBody, which is the one place a card keeps them.
   function entityPage(spec, backNav, backTab, backLabel) {
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="' + backNav + '" data-tab="' + backTab + '">' + I('chevLeft') + backLabel + '</button>' +
-      (spec.pageActs ? '<div class="obj-page-acts">' + spec.pageActs + '</div>' : '') + '</div>';
-    return back + entityBody(spec);
+    return '<div class="obj-page-head">' + backBtn(backNav, backTab, backLabel) + '</div>' + entityBody(spec);
   }
   function setEntityTab(type, id, tab, srcEl) {
     WS.store.cardTabs = WS.store.cardTabs || {};
@@ -1785,8 +2905,11 @@
     if (tab === 'docs') {
       const kpN = dealKpObjects(d).length;
       const kpBtn = kpN ? '<button class="btn xs" data-act="openDealKp" data-deal="' + d.id + '">' + I('doc') + 'КП сделки · ' + kpN + '</button>' : '';
-      return docChainBlock(dealStageIdx(d), kpN > 0, kpBtn) + '<div style="height:14px"></div>' +
-        dxSec('doc', 'Документы сделки', '', docsRows(docsFor((x) => x.deal === d.id), 'по этой сделке документов пока нет'));
+      return cxStack([
+        gatesBlock(d),
+        kpN ? dxSec('doc', 'Коммерческое предложение', kpBtn, '<div class="gate-foot" style="margin-top:0">Собрано по ' + kpN + ' ' + plural(kpN, 'объекту', 'объектам', 'объектам') + '.</div>') : '',
+        dxSec('doc', 'Документы сделки', '', docsRows(docsOfDeal(d), 'по этой сделке документов пока нет')),
+      ]);
     }
     if (tab === 'history') return dealHistoryTab(d);
     if (tab === 'tasks') {
@@ -1797,12 +2920,18 @@
     // params (default) — deal-specific structural fields (key terms are already up in «Ключевое»),
     // the parent заявка, plus data conflicts / partner handoff (was the near-empty «Обзор» tab).
     const req = dealRequestBlock(d);
+    const kk = contractsOfDeal(d.id);
+    const kblock = kk.length ? dxSec('doc', 'Договор по сделке', '', kk.map(contractRow).join('') +
+      '<div class="gate-foot">Сделка закрыта на подписании. Всё, что идёт дальше — платежи, регистрация, продления — ведётся договором.</div>') : '';
     const cf = conflictBlock(d);
     const ho = d.partnerAgent ? handoffBlock(d) : '';
-    return (req ? req + '<div style="height:14px"></div>' : '') +
-      dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' + dealParamsExtra(d) + '</div>') +
-      (cf ? '<div style="height:14px"></div>' + cf : '') +
-      (ho ? '<div style="height:14px"></div>' + ho : '');
+    return cxStack([
+      req,
+      kblock,
+      dxSec('briefcase', 'Параметры сделки', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields cols2">' + dealParamsExtra(d) + '</div>'),
+      cf,
+      ho,
+    ]);
   }
   // Hero sections reuse the object-hero family (variant B: photo backdrop + dark scrim) at the top of
   // entity cards — client (name overlaid), deal (linked object), КП (flagship object).
@@ -1812,12 +2941,14 @@
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const kycIcon = k.st === 'ok' ? 'check' : (k.st === 'stop' ? 'lock' : 'clock');
     const cm = chanMeta(prefChannel(c));
+    const since = clientSince(c);
+    const nDeals = (D().deals || []).filter((x) => x.clientId === c.id).length;
     const facts = [
-      ['clock', c.horizon ? 'Срок: ' + c.horizon : 'Срок не задан'],
-      ['money', c.budget ? WS.AED(c.budget) : '—'],
+      since ? ['calendar', 'в работе с ' + since.at] : null,
+      nDeals ? ['briefcase', nDeals + ' ' + plural(nDeals, 'сделка', 'сделки', 'сделок')] : null,
       [kycIcon, k.label],
       [cm[0], cm[1]],
-    ];
+    ].filter(Boolean);
     const factsHtml = '<div class="chero-facts">' + facts.map((f) => '<div class="chero-fact"><span class="chero-fact-icon">' + I(f[0]) + '</span><span>' + f[1] + '</span></div>').join('') + '</div>';
     return '<div class="chero">' + (bg ? '<img class="chero-img" src="' + bg + '" alt="">' : '') +
       '<div class="chero-scrim"></div>' +
@@ -1827,8 +2958,8 @@
   // ---- Deal header v2: the DEAL reads first — a plain-language sentence, the client (callable),
   // and a "now" summary. The object is demoted to a compact card in the overview (dealLotsBlock).
   function dealActionWord(d) {
-    return ({ sale_offplan: 'Покупка', sale_ready: 'Покупка', rent: 'Аренда',
-      fitout: 'Fit-out', rental_biz: 'Доходный актив', referral: 'Передача партнёру' })[d.funnel] || 'Сделка';
+    return ({ sale: 'Покупка', rent: 'Аренда', manage: 'Управление', exclusive: 'Эксклюзив',
+      cross: 'Партнёрская услуга', consult: 'Консалтинг' })[d.funnel] || 'Сделка';
   }
   // A deal may hold several lots under one contract (Part B). Falls back to the single object.
   function dealLots(d) {
@@ -1837,7 +2968,9 @@
   }
   function dealLotsLabel(d) {
     const lots = dealLots(d);
-    if (!lots.length) return 'объект не выбран';
+    // On an owner-side service the object is the client's own asset and never comes out of our
+    // inventory, so «объект не выбран» reported a gap that does not exist.
+    if (!lots.length) return (d.funnel === 'manage' || d.funnel === 'exclusive') ? 'объект клиента' : 'объект не выбран';
     if (lots.length === 1) return lots[0].name;
     return lots.length + ' лота · ' + lots[0].name.split(',')[0] + ' +' + (lots.length - 1);
   }
@@ -1855,21 +2988,49 @@
       '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Без клиента') + '</div>' +
       '<div class="dhero-sub">' + sub + '</div></div></div></div>';
   }
+  // The deal's essence, editable in place: one tab stop, a real textbox role, and a label that
+  // says what the line is — a bare bold sentence under the hero reads as decoration, not a field.
+  function dealTitleEdit(d) {
+    // NOT data-deal: the delegated click handler navigates on that attribute, so clicking into the
+    // field re-opened the card, re-rendered it and took the focus away mid-keystroke.
+    return '<div class="deal-title-edit" data-titledeal="' + d.id + '">' +
+      '<span class="deal-title-lbl">' + I('pencil') + 'Суть сделки</span>' +
+      '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Суть сделки — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>';
+  }
+  // Подпись под именем в блоке связи. Ровно то, чего нет на странице, где этот блок стоит:
+  // на каком языке говорить, каким каналом и когда с человеком связывались в последний раз.
+  // Условия и стадия сюда не попадают — они и есть содержание самой страницы.
+  function contactMeta(c) {
+    const last = lastTouchOf(c.id);
+    return [c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
+      last ? 'последнее касание — ' + last : ''].filter(Boolean).join(' · ');
+  }
+  // Последнее касание по всем лентам клиента — заявкам, сделкам и его собственной.
+  function lastTouchOf(cid) {
+    let best = null;
+    const take = (list) => (list || []).forEach((e) => {
+      if (e && e.ord != null && (!best || e.ord > best.ord)) best = e;
+    });
+    take((D().contactTimeline || {})[cid]);
+    (D().requests || []).filter((r) => r.clientId === cid).forEach((r) => take((D().requestTimeline || {})[r.id]));
+    (D().deals || []).filter((d) => d.clientId === cid).forEach((d) => take((D().dealTimeline || {})[d.id]));
+    return best ? String(best.at || '').split('·')[0].trim() : '';
+  }
   // Client card (left of the facing pair) — call / write without hunting the contact card.
-  function dealClientCard(d) {
+  function dealClientCard(d, threadId) {
     const c = D().clients.find((x) => x.id === d.clientId);
     if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан к сделке</div>');
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
-    const meta = [c.goal, c.budget ? 'бюджет ' + WS.AED(c.budget) : '', c.horizon ? 'срок ' + c.horizon : ''].filter(Boolean).join(' · ');
     const head = '<div class="dcli-head"><div class="dcli-av">' + init + '</div>' +
       '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
-      '<div class="dcli-meta">' + meta + '</div></div></div>';
+      '<div class="dcli-meta">' + contactMeta(c) + '</div></div></div>';
     const chans = '<div class="dcli-chans">' + ['phone', 'whatsapp', 'telegram', 'email'].map((ch) =>
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name) + ' · сделка" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
+      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
       '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
@@ -1896,19 +3057,52 @@
     return dxSec('clock', 'Последние события', more, '<div class="dnb-hist">' + evs + '</div>');
   }
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
-  function dealChipRow(d) {
-    const s = funnelSteps(d);
+  // What an agent opens a deal to do. Ordered by how often it is the reason for opening it.
+  function dealActions(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
+    return [
+      ['chat', 'Чат по сделке', 'data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase"', 'primary'],
+      ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
+      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
+      ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', ''],
+      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
+      ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', ''],
+      c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
+    ];
+  }
+  function dealChipRow(d) {
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const createdDaysAgo = createdAgoLabel(d);
     return '<div class="dnb-chips">' +
-      '<span class="chip on">' + I('trend') + s.cols[s.idx] + '</span>' +
       '<span class="chip">' + I('clock') + (d.stageDays || 0) + ' дн. в стадии</span>' +
       (d.hot ? '<span class="chip">' + I('sparkle') + 'горячий клиент</span>' : '') +
-      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') + '</div>';
+      (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') +
+      (d.createdAt && createdDaysAgo ? '<span class="chip">' + I('calendar') + 'создана ' + d.createdAt + ' · ' + createdDaysAgo + '</span>' : '') + '</div>';
   }
   function dealNextStepCard(d) {
     const a = nbaActions(d);
     const over = /просроч/i.test(d.nextDue || '');
     return nextStepCard(agentName(d.agent), d.nextDue || '', over, a.doIt[0], a.why || '');
+  }
+  // Entries the client authored, across the deal, its заявка and the contact — the client's own
+  // moves, separated from ours. `by` is the author of a timeline entry; inbound raw channel capture
+  // counts too, since a voice message in WhatsApp is the client doing something.
+  function clientMoves(d) {
+    return dealLineageEntries(d).filter((e) => {
+      if (/просроч/i.test(e.text || '')) return false;
+      return /клиент/i.test(e.by || '') || (e.kind === 'raw' && /клиент/i.test(e.by || ''));
+    });
+  }
+  function dealClientMovesCard(d) {
+    const list = clientMoves(d).filter((e) => !(e.ord > NOW_ORD)).slice(0, 4);
+    const inner = list.length
+      ? '<div class="cm-list">' + list.map((e) => '<div class="cm-row">' +
+          '<span class="cm-ic">' + I(chanMeta(e.ch === 'note' ? 'phone' : (e.ch || 'phone'))[0]) + '</span>' +
+          '<div class="cm-b"><div class="cm-t">' + (e.text || '') + '</div>' +
+          '<div class="cm-m">' + (e.at || '') + (e.src ? ' · ' + e.src : '') + '</div></div></div>').join('') + '</div>'
+      : '<div class="cm-empty">' + I('clock') + 'Клиент пока ничего не делал сам — вся активность на нашей стороне. Это тоже сигнал: он либо не вовлечён, либо ждёт от нас ответа.</div>';
+    return dxSec('users', 'Что делал клиент', list.length ? '<span class="badge">' + list.length + ' из ' + clientMoves(d).length + '</span>' : '',
+      inner);
   }
   function dealRecentCard(d) {
     return recentEventsCard((D().dealTimeline || {})[d.id] || [], 'deal~' + d.id + '~history');
@@ -1941,7 +3135,12 @@
   function dealKeyCard(d) {
     const p = d.prov || {};
     const o0 = dealLots(d)[0];
-    const commPayer = ({ sale_offplan: 'застройщик', sale_ready: 'покупатель', rent: 'арендатор', rental_biz: 'покупатель' })[d.funnel] || 'по договору';
+    // Who pays us: on a primary sale the developer, on a resale the buyer, on a lease the tenant,
+    // on an owner-side service the owner, on a partner service the partner.
+    const commPayer = d.funnel === 'sale' ? (d.saleKind === 'первичка' ? 'застройщик' : 'покупатель')
+      : d.funnel === 'rent' ? 'арендатор'
+      : (d.funnel === 'manage' || d.funnel === 'exclusive') ? 'собственник'
+      : d.funnel === 'cross' ? 'партнёр' : 'по договору';
     const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) + ' · платит ' + commPayer : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
     const dep = depositLabel(d);
@@ -1950,30 +3149,137 @@
       dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
       (dep ? dealField('Задаток / EOI', dep, 'confirmed') : '') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal') +
-      dealField('Тип сделки', d.dealType, p.dealType) +
       dealField('Комиссия', comm, 'confirmed') +
       dealField('Co-broking', cobro, 'confirmed') + '</div>');
   }
-  // Essence status phrase — one short line high on the card, so "what's happening now" is
-  // visible without scrolling. Doc-oriented, keyed off the deal stage.
-  function dealStatusPhrase(d) {
-    return ({
-      new: 'квалифицируем клиента и готовим показ объектов.',
-      work: 'отправили предложение — ждём решение клиента.',
-      docs: 'готовим документы на подписание, ожидаем подписание клиентом.',
-      done: 'сделка закрыта, комиссия зафиксирована.',
-    })[d.stage] || ('стадия «' + funnelSteps(d).cols[funnelSteps(d).idx] + '».');
+  // Handover brief — what one agent tells another when passing a deal over. Four movements, each
+  // a sentence assembled from the deal's own records: where we stand · what is already settled ·
+  // what is holding it up · whose move it is. Every clause is dropped when its data is absent, so a
+  // brand-new deal yields two honest sentences instead of a skeleton full of dashes.
+  // Родительская заявка объясняет, зачем сделка существует: что человек искал и на каких условиях.
+  // Без этой строки карточка отвечает «как идёт», но не отвечает «о чём это».
+  function dealRequestSummary(d) {
+    const r = d.requestId ? requestById(d.requestId) : null;
+    if (!r) return '';
+    const parts = [];
+    if (r.goal) parts.push(lowerFirst(r.goal));
+    if (r.budget) parts.push('бюджет ' + WS.AED(r.budget));
+    // Районы уже перечислены между собой — вкладывать один joinRu в другой значит получить «A и B и C».
+    if ((r.areas || []).length) parts.push(r.areas.slice(0, 3).join(' · '));
+    if (r.horizon) parts.push(/\d|мес|нед|дн/i.test(r.horizon) ? 'срок ' + r.horizon : lowerFirst(r.horizon));
+    if (!parts.length) return '';
+    return 'Запрос' + (r.createdAt ? ' от ' + r.createdAt : '') + ': ' + parts.join(', ') + '.';
   }
-  // Header order (client feedback v2): compact hero → narrow stepper → one-line essence status →
+  // Что сделал клиент сам — последняя его запись в ленте сделки, заявки или контакта. Агенту важно
+  // не только, что сделали мы, но и шевелится ли человек на той стороне.
+  function dealLastClientMove(d) {
+    const list = clientMoves(d).filter((e) => !(e.ord > NOW_ORD))
+      .slice().sort((a, b) => (a.ord || 0) - (b.ord || 0));
+    return list[list.length - 1] || null;
+  }
+  function dealBriefSentences(d) {
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    const out = [];
+    const lots = dealLots(d);
+    const what = lots.length === 1 ? lots[0].name.split(',')[0]
+      : (lots.length > 1 ? lots.length + ' ' + plural(lots.length, 'лот', 'лота', 'лотов') + ' в ' + (lots[0].project || lots[0].area) : (d.objectType || 'объект'));
+
+    // 1. Предмет: что продаём, кому и кто ведёт. Имя стоит после тире, в именительном: подставить
+    // его в «для …» шаблон не может — падежа он не знает.
+    out.push((d.dealType || 'Сделка') + ': ' + what + '.' +
+      (c.name ? ' Клиент — ' + c.name + (d.agent ? ', ведёт ' + agentName(d.agent) : '') + '.' : ''));
+
+    // 2. Запрос, из которого сделка выросла.
+    const req = dealRequestSummary(d);
+    if (req) out.push(req);
+
+    // 3. Последний существенный факт — деньги, бумага или выбор. Один, самый поздний по смыслу.
+    const dep = d.deposit;
+    const drafts = docsFor((x) => x.deal === d.id && x.status === 'draft');
+    if (dealClosed(d) && dealWon(d)) out.push('Сделка успешно закрыта, комиссия зафиксирована.');
+    else if (dep && dep.paid) out.push('Внесено: ' + depKind(dep) + ' — ' + WS.AED(dep.amount) + (dep.at ? ', ' + dep.at : '') + '.');
+    // Если документ уже у клиента, он и есть последний факт — фраза про полученный расчёт лишняя.
+    else if (dealKpObjects(d).length && !drafts.length) out.push('Клиент получил расчёт и условия сделки.');
+    else if (lots.length && !drafts.length) out.push('Объект выбран, готовим документы.');
+
+    // 4. Чего ждём и что сделал клиент.
+    if (!dealClosed(d)) {
+      // Срок присоединяется к ожиданию: два отдельных предложения об одном и том же удлиняют справку,
+      // не добавляя смысла.
+      const dueTxt = (!/просроч/i.test(d.nextDue || '') && d.nextDue) ? d.nextDue : '';
+      if (drafts.length) out.push(drafts[0].title.split('—')[0].trim() + ' у клиента — ждём подписания' +
+        (dueTxt ? ', следующее касание ' + dueTxt : '') + '.');
+      const mv = dealLastClientMove(d);
+      if (mv && mv.at) {
+        // Реплика клиента приводится как есть, но без служебного префикса и без своей точки:
+        // предложение уже заканчивается нашей.
+        const txt = (mv.text || '')
+          .replace(/^(Голосовое|Входящее|Исходящее|Сообщение|Заметка)\s*:\s*/i, '')
+          .replace(/^(Звонок|Созвон)\s*[\d:]+\s*[—-]\s*/i, '')
+          .replace(/[.\s]+$/, '');
+        if (txt) out.push('Последнее от клиента, ' + mv.at.split('·')[0].trim() + ': ' + lowerFirstWord(txt) + '.');
+      }
+      if (!drafts.length && dueTxt) out.push('Следующее касание — ' + dueTxt + '.');
+    }
+
+    // 5. Что мешает — одна причина, самая дорогая. Счётчики сюда не попадают.
+    if (!dealClosed(d)) {
+      const cf = (D().conflicts || {})[d.id];
+      const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
+      const overdue = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done' && t.when === 'overdue').length;
+      let block = '';
+      if (c.consent === false) block = 'от клиента нет согласия на связь — адресные отправки заблокированы';
+      else if (/просроч/i.test(d.nextDue || '')) block = 'касание просрочено';
+      else if (dep && !dep.paid) block = 'не внесён задаток — ' + depKind(dep) + ', ' + WS.AED(dep.amount);
+      else if (cf) block = 'по полю «' + cf.field + '» расходятся два источника, нужно подтверждение клиента';
+      else if (nextGate && GATES[nextGate]) block = 'не закрыт шаг «' + GATES[nextGate].label + '»';
+      else if (overdue) block = overdue + ' ' + plural(overdue, 'задача просрочена', 'задачи просрочены', 'задач просрочены');
+      if (block) out.push('Мешает: ' + block + '.');
+    }
+    return out;
+  }
+
+  // Deposit kind reads as a label ("EOI", "Бронирование (booking)") — lowercasing it mangles the
+  // acronym, so only the first letter of a word-form is dropped.
+  function depKind(dep) {
+    const k = dep.kind || 'задаток';
+    return /^[A-ZА-Я]{2,}$/.test(k.split(' ')[0]) ? k : lowerFirst(k);
+  }
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+  function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+  function lowerFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+  // Строчить первую букву аббревиатуры нельзя: «MOU согласован» превращалось в «mOU согласован».
+  function lowerFirstWord(s) {
+    if (!s) return s;
+    const w = String(s).split(/\s/)[0].replace(/[^A-Za-zА-Яа-яЁё]/g, '');
+    if (w.length >= 2 && w === w.toUpperCase()) return s;
+    return lowerFirst(s);
+  }
+  // Russian enumeration: «a, b и c» — a bare " · " list would read as a table, not as a sentence.
+  function joinRu(list) {
+    if (list.length <= 1) return list[0] || '';
+    return list.slice(0, -1).join(', ') + ' и ' + list[list.length - 1];
+  }
+  function dealStatusBrief(d) {
+    return dxSec('sparkle', 'Справка по сделке', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<p class="deal-brief">' + dealBriefSentences(d).join(' ') + '</p>');
+  }
+  // Header order (client feedback v2): compact hero → inline-editable title → narrow stepper → one-line essence status →
   // facing cards (LEFT key params · RIGHT client contacts + objects) → "что сейчас" detail.
-  function dealHeader(d) {
-    return dealHero(d) +
-      '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
+  function dealHero2(d) { return dealHero(d) + dealTitleEdit(d); }
+  function dealState(d) {
+    return '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       dealChipRow(d) +
-      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + dealStatusPhrase(d) + '</span></div>' +
-      '<div class="deal-top"><div class="deal-top-cell">' + dealKeyCard(d) + dealNextStepCard(d) + '</div>' +
-      '<div class="deal-top-cell">' + dealClientCard(d) + dealRecentCard(d) + '</div></div>' +
-      dealLotsBlock(d);
+      cxStack([
+        [cxCol([dealStatusBrief(d), dealKeyCard(d), dealNextStepCard(d)]),
+         cxCol([dealClientCard(d), dealRecentCard(d)])],
+        dealLotsBlock(d),
+      ]);
   }
   function kpHero(flag) {
     if (!flag) return '<div class="kp-hero-empty">' + I('briefcase') + 'Не выбрано основное предложение</div>';
@@ -1984,21 +3290,19 @@
   // Deal-stage workflow lifted onto its own surface card so it reads as a distinct step-line,
   // not grey-on-grey. The whole path lives in the accent family (see .dx-step CSS).
   function dealStepperSection(d) {
-    const s = funnelSteps(d);
-    const cap = 'Шаг ' + (s.idx + 1) + ' из ' + s.cols.length + ' · ' + s.cols[s.idx];
-    return dxSec('trend', 'Этапы сделки', '<span class="dx-step-cap">' + cap + '</span>', dealStepper(d));
+    return '<div class="dx-sec dx-sec-bare">' + dealStepper(d) + '</div>';
   }
   function dealSpec(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return null;
     const c = D().clients.find((x) => x.id === d.clientId) || {};
     return {
       type: 'deal', id: id, title: d.title,
-      status: dealHeader(d),
+      hero: dealHero2(d),
+      acts: entityActionBar(dealActions(d)),
+      state: dealState(d),
       tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
-      concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, d.title, 'briefcase'),
-      pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
-        '<button class="btn sm primary" data-thread="deal:' + d.id + '" data-tlabel="' + d.title + '" data-ticon="briefcase">' + I('chat') + 'Чат по сделке</button>',
+      concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
   }
   function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
@@ -2071,7 +3375,7 @@
     const sel = off.filter((o) => o.state === 'selected').length;
     const rej = off.filter((o) => o.state === 'rejected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length && deals.every((d) => d.stage === 'done')) return { label: 'Закрыта', tone: 'ok', icon: 'check' };
+    if (deals.length && deals.every(dealClosed)) return { label: deals.every(dealWon) ? 'Успех' : 'Закрыта', tone: deals.every(dealWon) ? 'ok' : '', icon: deals.every(dealWon) ? 'check' : 'x' };
     if (deals.length) return { label: 'В работе', tone: 'acc', icon: 'briefcase' };
     if (r.kp && r.kp.formed) return { label: 'КП собрано', tone: 'info', icon: 'doc' };
     if (sel) return { label: 'Клиент выбрал', tone: 'warn', icon: 'target' };
@@ -2099,7 +3403,8 @@
     const off = r.offered || [];
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
-    if (deals.length && deals.every((d) => d.stage === 'done')) return 'сделка закрыта — комиссия зафиксирована.';
+    if (deals.length && deals.every(dealWon)) return 'сделка закрыта успешно — комиссия начислена, ведём договор.';
+    if (deals.length && deals.every(dealClosed)) return 'сделка проиграна — заявка закрыта.';
     if (deals.length) return 'ведём сделку — согласуем условия и готовим документы.';
     if (r.kp && r.kp.formed) return 'КП собрано — ждём решение клиента.';
     if (sel) return 'клиент выбрал ' + sel + ' из ' + off.length + ' — собираем КП.';
@@ -2111,7 +3416,8 @@
     const sel = off.filter((o) => o.state === 'selected').length;
     const deals = dealsOfRequest(r.id);
     if (deals.length) {
-      if (deals.every((d) => d.stage === 'done')) return 'Запросить отзыв и рекомендации у клиента';
+      if (deals.every(dealWon)) return 'Запросить отзыв и рекомендации у клиента';
+      if (deals.every(dealClosed)) return 'Разобрать причину проигрыша и вернуть клиента в работу';
       const fd = deals.slice().sort((a, b) => dealStageIdx(b) - dealStageIdx(a))[0];
       return nbaActions(fd).doIt[0]; // mirror the deal's concrete operational step
     }
@@ -2139,9 +3445,10 @@
     if (!c) return dxSec('users', 'Клиент · связь', '', '<div style="font-size:12px;color:var(--faint);padding:4px 0">клиент не привязан</div>');
     const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     const vals = clientContactVals(c);
-    const meta = [r.goal, r.budget ? 'бюджет ' + WS.AED(r.budget) : '', r.horizon ? 'срок ' + r.horizon : ''].filter(Boolean).join(' · ');
-    const dealForC = D().deals.find((d) => d.clientId === c.id);
-    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    const meta = contactMeta(c);
+    // Тред заявки, а не первой попавшейся сделки клиента: у клиента их может быть несколько,
+    // и «первая найденная» — это молча выбранный не тот разговор.
+    const tid = 'request:' + r.id;
     const head = '<div class="dcli-head"><div class="dcli-av">' + init + '</div>' +
       '<div class="dcli-body"><div class="dcli-name" data-client="' + c.id + '" style="cursor:pointer">' + c.name + '</div>' +
       '<div class="dcli-meta">' + meta + '</div></div></div>';
@@ -2158,7 +3465,10 @@
   function reqOfferStatus(r, off) {
     const dealObjIds = {};
     dealsOfRequest(r.id).forEach((d) => {
-      const done = d.stage === 'done';
+      // Проигранная сделка лот отпускает: договор не состоялся, объект снова свободен и его
+      // можно предложить заново. Держать его занятым значит вычеркнуть объект из работы навсегда.
+      if (d.stage === 'lost') return;
+      const done = dealWon(d);
       (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
     });
     if (dealObjIds[off.id]) return dealObjIds[off.id] === 'done' ? { label: 'Сделка закрыта', tone: 'ok', icon: 'check' } : { label: 'В сделке', tone: 'acc', icon: 'briefcase' };
@@ -2195,7 +3505,10 @@
   // can spawn several deals, so we key off free-selected, not "any deal exists").
   function reqSelectedFree(r) {
     const inDeal = {};
-    dealsOfRequest(r.id).forEach((d) => (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) inDeal[oid] = 1; }));
+    dealsOfRequest(r.id).forEach((d) => {
+      if (d.stage === 'lost') return;   // см. reqOfferStatus: проигрыш освобождает лот
+      (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) inDeal[oid] = 1; });
+    });
     return (r.offered || []).filter((o) => o.state === 'selected' && !inDeal[o.id]).map((o) => o.id);
   }
   function reqKpActions(r) {
@@ -2235,18 +3548,103 @@
     }).join('');
     return dxSec('briefcase', 'Сделки по заявке · ' + deals.length, '', '<div class="feed">' + dealRows + '</div>');
   }
-  function reqSecondaryBlocks(r) {
+  // Returns a cxStack ROW (a pair when both blocks exist), for the caller to place in its stack.
+  function reqSecondaryRow(r) {
     const parts = [reqPrefProfile(r), dealsOfRequest(r.id).length ? reqDealsBlock(r) : ''].filter(Boolean);
-    return parts.length ? '<div class="req-secondary">' + parts.join('') + '</div>' : '';
+    return parts.length === 2 ? parts : (parts[0] || '');
   }
-  function requestHeader(r) {
-    return requestHero(r) +
-      '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>' +
+  function requestHero2(r) {
+    return requestHero(r) + '<div style="margin:12px 0 2px">' + reqStatusChip(r) + '</div>';
+  }
+  // The заявка had no action bar at all — its verbs were scattered through the blocks, so «что
+  // можно сделать» had a different answer here than on every other card.
+  function requestActions(r) {
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    const sel = (r.offered || []).filter((o) => o.state === 'selected').length;
+    return [
+      ['plus', 'Добавить объект', 'data-act="reqAddObject" data-req="' + r.id + '"', 'primary'],
+      sel ? ['doc', 'Собрать КП · ' + sel, 'data-act="reqFormKp" data-req="' + r.id + '"', ''] : null,
+      sel ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
+      c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', ''] : null,
+      ['pencil', 'Изменить заявку', 'data-act="editRequest" data-req="' + r.id + '"', ''],
+      c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
+    ];
+  }
+  // ============================================================================================
+  // Стадия заявки ВЫЧИСЛЯЕТСЯ из её собственных фактов, а не проставляется руками.
+  //
+  // Именно проставленная руками стадия и дала дефект, ради которого затевалась вся модель: сделка
+  // Анны стояла на «Показе», хотя показ прошёл неделей раньше внутри заявки. У вычисленной стадии
+  // соврать не выйдет — у каждой есть объективное условие входа, и оно проверяется по данным.
+  //
+  // Агент двигает не стадию, а границу: он отмечает объекты, по которым условия согласованы.
+  // Всё остальное на этой ленте — следствие того, что уже произошло.
+  // ============================================================================================
+  function reqSideKey(r) {
+    const t = (r.dealType || '') + ' ' + (r.interest || '') + ' ' + (r.goal || '');
+    if (r.partnerAgent || /партнёр|партнер|co-brok/i.test(t)) return 'partner';
+    if (/эксклюзив|управлен|собственник|сдать|реализовать|листинг/i.test(t)) return 'owner';
+    return 'buyer';
+  }
+  // Подпись стадии — строка либо словарь по стороне сделки: у покупателя «направлен подбор»,
+  // у собственника «направлено КП». Стадия одна, слово разное.
+  function reqStageLabel(k, r) {
+    const v = (WS.REQ_STAGE_LABELS || {})[k];
+    if (!v) return k;
+    if (typeof v === 'string') return v;
+    return v[reqSideKey(r)] || v.any || k;
+  }
+  function reqStage(r) {
+    if (/отказ|проигр|потерян/i.test(r.leadStatus || '')) return 'lost';
+    const off = r.offered || [];
+    const deals = dealsOfRequest(r.id);
+    const inDeal = {};
+    deals.forEach((d) => ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) inDeal[id] = 1; }));
+    // Заявка закрыта, когда в подборке не осталось объектов в работе: каждый либо ушёл в сделку,
+    // либо отклонён клиентом. Пока хоть один открыт — заявка живёт, даже если сделки уже идут.
+    const open = off.filter((o) => o.state !== 'rejected' && !inDeal[o.id]);
+    // Заявка закрыта, когда из неё вышли сделки и открытого больше нет. Требование «был хотя бы
+    // один предложенный объект» держало услуги без инвентаря — управление, эксклюзив, консалтинг —
+    // вечно в переговорах: предлагать там нечего, договор при этом подписан.
+    if (deals.length && !open.length) return 'closed';
+    if (deals.length || (r.kp && r.kp.formed && off.some((o) => o.state === 'selected'))) return 'talks';
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    if (tl.some((e) => e.ch === 'meet')) return 'meet';
+    if (off.length || (r.kp && r.kp.formed)) return 'offer';
+    if (r.budget && (r.areas || []).length) return 'qual';
+    return 'new';
+  }
+  function reqStagePath() { return (WS.REQ_STAGES || []).filter((k) => k !== 'lost'); }
+  function reqStepper(r) {
+    const cur = reqStage(r), path = reqStagePath(), lost = cur === 'lost';
+    const idx = lost ? -1 : path.indexOf(cur);
+    // Шаги нарисованы, но не нажимаются: стадия — следствие фактов, и «переставить» её нельзя.
+    const steps = path.map((k, i) => {
+      const cls = lost ? 'todo' : (i < idx ? 'done' : (i === idx ? 'cur' : 'todo'));
+      const inner = (!lost && i < idx) ? I('check') : String(i + 1);
+      return '<div class="dx-step ' + cls + '"><span class="d">' + inner + '</span><span class="l">' + reqStageLabel(k, r) + '</span></div>';
+    }).join('');
+    return '<div class="dx-stepper' + (path.length > 7 ? ' long' : '') + '">' + steps + '</div>' +
+      (lost ? '<div class="dx-lost">' + I('x') + 'Клиент отказался</div>' : '');
+  }
+  function reqStepperSection(r) {
+    // Одна строка объяснения остаётся: шаги нарисованы, но не нажимаются, и без подсказки это
+    // читается как сломанный элемент, а не как осознанное решение.
+    const why = '<div class="req-stage-why">' + I('sparkle') +
+      '<span>Стадия выводится из фактов заявки. Агент отмечает объекты, по которым согласованы условия, — остальное следует само.</span></div>';
+    return '<div class="dx-sec dx-sec-bare">' + reqStepper(r) + why + '</div>';
+  }
+  function requestState(r) {
+    return reqStepperSection(r) +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
-      '<div class="deal-top"><div class="deal-top-cell">' + reqKeyCard(r) + reqNextStepCard(r) + '</div>' +
-      '<div class="deal-top-cell">' + reqClientCard(r) + reqRecentCard(r) + '</div></div>' +
-      reqOffersStatusBlock(r) +
-      reqSecondaryBlocks(r);
+      cxStack([
+        [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
+        // Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны
+        // не сошлись, сделки нет. Раньше карточка расхождения висела на сделке, где бюджета уже нет.
+        conflictBlock(r),
+        reqOffersStatusBlock(r),
+        reqSecondaryRow(r),
+      ]);
   }
   function requestTimelineInner(r) {
     const tl = (D().requestTimeline || {})[r.id] || [];
@@ -2264,22 +3662,22 @@
     if (tab === 'history') return requestHistoryTab(r);
     // docs — КП + документооборот КП→MOU→SPA→DLD (объекты, профиль, сделки — в основной части)
     const rDeals = dealsOfRequest(r.id);
-    const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(dealStageIdx)) : -1;
-    return reqKpBlock(r) + '<div style="height:14px"></div>' + docChainBlock(sidx, !!(r.kp && r.kp.formed), '');
+    const sidx = rDeals.length ? Math.max.apply(null, rDeals.map(docIdx)) : -1;
+    return cxStack([reqKpBlock(r), docChainBlock(sidx, !!(r.kp && r.kp.formed), ''),
+      dxSec('doc', 'Документы заявки', '', docsRows(docsOfRequest(r), 'по этой заявке документов пока нет'))]);
   }
   function requestSpec(id) {
     const r = requestById(id); if (!r) return null;
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const dealForC = D().deals.find((d) => d.clientId === r.clientId);
-    const tid = dealForC ? 'deal:' + dealForC.id : 'general';
+    const tid = 'request:' + r.id;
     return {
       type: 'request', id: id, title: 'Заявка · ' + r.title,
-      status: requestHeader(r),
+      hero: requestHero2(r),
+      acts: entityActionBar(requestActions(r)),
+      state: requestState(r),
       tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
-      pageActs: (c.id ? '<button class="btn sm" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
-        '<button class="btn sm primary" data-thread="' + tid + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail">' + I('chat') + 'Чат по заявке</button>',
     };
   }
   // Net yield for the КП preview — reuses the finance model; guarded so a compute miss never breaks render.
@@ -2306,7 +3704,7 @@
       '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
       '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
   }
-  function reqPrefProfile(r) {
+  function prefProfileInner(r) {
     const off = r.offered || [];
     const pick = (state) => off.filter((o) => o.state === state).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean);
     const sel = pick('selected'), rej = pick('rejected');
@@ -2316,12 +3714,15 @@
     const likeViews = uniq(sel.map((o) => o.attrs && o.attrs.view));
     const like = sel.length ? '<div class="pref-row"><span class="badge ok">' + I('check') + 'Заходит</span><span>' + [likeAreas.join(', '), likeViews.length ? 'вид: ' + likeViews.join(', ') : ''].filter(Boolean).join(' · ') + '</span></div>' : '';
     const rejl = rej.length ? '<div class="pref-row"><span class="badge stop">' + I('x') + 'Не заходит</span><span>' + rejAreas.join(', ') + '</span></div>' : '';
-    return dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>',
-      like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>');
+    return like + rejl + '<div style="font-size:11px;color:var(--faint);margin-top:6px">Складывается из «предложили ↔ выбрал / отклонил» — уточняет, что предлагать клиенту дальше и на что не тратить время.</div>';
+  }
+  function reqPrefProfile(r) {
+    const inner = prefProfileInner(r);
+    return inner ? dxSec('sparkle', 'Профиль предпочтений', '<span class="badge demo">' + I('lock') + 'из выбора клиента</span>', inner) : '';
   }
   function viewRequestDetail(id) {
     const spec = requestSpec(id);
-    if (!spec) return '<div class="obj-page-head"><button class="btn sm" data-nav="requests">' + I('chevLeft') + 'Назад к заявкам</button></div>' +
+    if (!spec) return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад к заявкам') + '</div>' +
       '<div style="padding:20px;color:var(--mut)">Заявка не найдена.</div>';
     return entityPage(spec, 'requests', '', 'Назад к заявкам');
   }
@@ -2354,27 +3755,88 @@
     r.kp = { formed: true, at: 'сегодня', objectIds: sel };
     WS.storeApi.save(); WS.storeApi.toast('КП собрано из выбранного (' + sel.length + ')', 'ok'); WS.storeApi.emit();
   }
+  // Одна сделка заканчивается одним договором. Несколько лотов в одном комплексе одного продавца
+  // проходят одним договором и остаются лотами внутри сделки; другой комплекс — другой договор,
+  // другой такт подписания и другая сделка. Ключ группы — комплекс и продавец: башня или корпус
+  // («Creekline Residences · Tower B») договор не делит, поэтому в ключ идёт часть до разделителя.
+  // Продавец, а не застройщик: во вторичке договор подписывает собственник, в аренде —
+  // арендодатель, и два юнита одного комплекса от разных собственников идут двумя договорами.
+  // Пока у объекта не заполнен `seller`, ключом остаётся застройщик — на оффплане это он и есть.
+  function contractGroupKey(o) {
+    const dev = String(o.project || o.name || '').split('·')[0].trim();
+    return dev + ' | ' + (o.seller || o.developer || '—');
+  }
+  function groupName(o) { return String(o.project || o.name || '').split('·')[0].trim(); }
+  function objReadiness(o) { return /off-?plan|оффплан/i.test(o.segment || '') ? 'оффплан' : 'готовый'; }
   function reqCreateDeal(reqId) {
     const r = requestById(reqId); if (!r) return;
     const sel = reqSelectedFree(r);
     if (!sel.length) { WS.storeApi.toast('Сначала отметьте объекты, которые выбрал клиент'); return; }
     const objs = sel.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    if (!objs.length) { WS.storeApi.toast('Выбранные объекты не найдены в инвентаре'); return; }
     const c = D().clients.find((x) => x.id === r.clientId) || {};
-    const amount = objs.reduce((s, o) => s + (o.price || 0), 0);
-    const nid = 'd_' + r.id.replace(/^r_/, '') + '_' + ((D().deals || []).length + 1);
-    // Immutable snapshot of the КП the deal was created from — objects AND terms frozen at creation,
-    // so later edits to the request or the deal never rewrite this historical document. The request
-    // keeps its live r.kp (can be re-formed).
-    const kpSnapshot = { objectIds: sel.slice(), at: 'сегодня', version: 1,
-      terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
-    D().deals.push({ id: nid, clientId: r.clientId, companyId: null,
-      title: (c.name || 'Клиент') + ' · ' + (objs[0] ? objs[0].name.split(',')[0] : 'сделка'),
-      funnel: 'sale_offplan', stage: 'new', stageDays: 0, amount: amount, hot: false,
-      goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source, objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
-      requestId: r.id, lots: sel, objectId: sel[0], consideredProjects: objs.map((o) => o.name), kpSnapshot: kpSnapshot, prov: {} });
+    const fk = r.funnel || 'sale';
+
+    const groups = [];
+    objs.forEach((o) => {
+      const k = contractGroupKey(o);
+      let g = groups.find((x) => x.k === k);
+      if (!g) { g = { k: k, name: groupName(o), objs: [] }; groups.push(g); }
+      g.objs.push(o);
+    });
+
+    // Всё собирается до записи: половина созданных сделок хуже, чем ни одной, — заявка
+    // осталась бы с частью лотов в договорной работе и без следа, почему остальные не ушли.
+    const taken = {};
+    (D().deals || []).forEach((d) => { taken[d.id] = 1; });
+    const drafts = groups.map((g, gi) => {
+      const lots = g.objs.map((o) => o.id);
+      const readiness = objReadiness(g.objs[0]);
+      const steps = (WS.DEAL_STEPS || {})[WS.contractKindFor(fk, readiness)] || ['prep'];
+      const base = 'd_' + r.id.replace(/^r_/, '') + (groups.length > 1 ? '_' + (gi + 1) : '');
+      let nid = base, n = 1;
+      while (taken[nid]) nid = base + '_' + (++n);
+      taken[nid] = 1;
+      // Снимок КП, из которого выросла сделка: объекты и условия заморожены на момент создания,
+      // чтобы позднейшие правки заявки не переписывали исторический документ.
+      const kpSnapshot = { objectIds: lots.slice(), at: 'сегодня', version: 1,
+        terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
+      return {
+        deal: { id: nid, clientId: r.clientId, companyId: null,
+          title: (c.name || 'Клиент') + ' · ' + g.name,
+          sub: g.name + (lots.length > 1 ? ' · лотов: ' + lots.length : ''),
+          funnel: fk, readiness: readiness, side: r.side || null,
+          stage: steps[0], stageDays: 0, amount: g.objs.reduce((s, o) => s + (o.price || 0), 0), hot: false,
+          createdAt: 'сегодня', updated: 'только что', tags: [],
+          goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source,
+          objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
+          requestId: r.id, lots: lots, objectId: lots[0],
+          consideredProjects: [g.name], kpSnapshot: kpSnapshot, prov: {} },
+        entry: { ch: 'crm', by: 'Система', at: 'только что', ord: 999,
+          text: 'Условия согласованы по «' + g.name + '» — сделка создана из заявки «' + r.title + '»' +
+            (lots.length > 1 ? ' · лотов в одном договоре: ' + lots.length : '') },
+      };
+    });
+
     D().dealTimeline = D().dealTimeline || {};
-    D().dealTimeline[nid] = [{ ch: 'crm', by: 'Система', at: 'только что', ord: 999, text: 'Сделка создана из заявки «' + r.title + '» · подписан документ о намерениях · лотов: ' + sel.length }];
-    WS.storeApi.save(); WS.storeApi.toast('Сделка создана из заявки · лотов: ' + sel.length, 'ok'); dealCard(nid);
+    drafts.forEach((d) => { D().deals.push(d.deal); D().dealTimeline[d.deal.id] = [d.entry]; });
+    // Переход — событие заявки: именно она разошлась на договоры, и её история должна это помнить.
+    D().requestTimeline = D().requestTimeline || {};
+    (D().requestTimeline[r.id] = D().requestTimeline[r.id] || []).push({
+      ch: 'system', kind: 'ai', by: 'Консьерж', at: 'только что', ord: 999,
+      text: drafts.length === 1
+        ? 'Условия согласованы по «' + groups[0].name + '» — заведена сделка.'
+        : 'Условия согласованы по ' + drafts.length + ' комплексам — заведено сделок: ' + drafts.length +
+          ' (' + groups.map((g) => g.name).join(', ') + '), по одному договору на каждый.',
+    });
+    WS.storeApi.save();
+    if (drafts.length === 1) {
+      WS.storeApi.toast('Сделка создана' + (drafts[0].deal.lots.length > 1 ? ' · лотов в договоре: ' + drafts[0].deal.lots.length : ''), 'ok');
+      dealCard(drafts[0].deal.id);
+    } else {
+      WS.storeApi.toast('Комплексов разных — ' + drafts.length + ', значит и договоров столько же: сделок создано ' + drafts.length, 'ok');
+      requestCard(r.id);
+    }
   }
   // ---- Request Ключевые условия edit (D) + КП document (E) + parent-request breadcrumb (F) ----
   const REQ_ENUMS = {
@@ -2455,13 +3917,120 @@
     const at = (d.kpSnapshot && d.kpSnapshot.at) || (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.at : 'при создании сделки');
     // Terms frozen in the snapshot; pre-baked demo deals (no snapshot) fall back to their live fields.
     const terms = (d.kpSnapshot && d.kpSnapshot.terms) || d;
-    openModal('КП сделки · ' + d.title,
+    openModal('КП сделки · ' + escAttr(d.title),
       kpDocBody(c.name || 'Клиент', 'КП сделки · зафиксировано ' + at, objs, terms,
         'Снимок КП на момент создания сделки — неизменяемый. Живое КП правится в заявке.'),
       '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
-  // Document pipeline of a deal: КП → MOU → SPA → DLD, statuses derived from the deal stage.
-  function dealStageIdx(d) { const m = { new: 0, work: 1, docs: 2, done: 3 }; return (d && m[d.stage] != null) ? m[d.stage] : 0; }
+  // ---- Layer 2: gates ----------------------------------------------------------------
+  // A gate is a condition for moving on or getting paid. It lives in the card, never as a column:
+  // the whole point of the service axis is that Dubai's procedure does not multiply boards. Which
+  // gates a deal has is decided by its FIELDS — (готовность) × (вид сделки) × (тип оплаты) — so a
+  // resale grows Form F and trustee while an off-plan grows escrow and Oqood, on the same board.
+  //
+  // Depth is wave 1: a gate is a manual checklist item an agent ticks. Wave 2 attaches the document
+  // and the deadline, wave 3 pulls the status from DLD/Ejari. Pretending otherwise here would be
+  // demoing an integration we do not have.
+  const GATE_STEPS = [['prep', 'Подготовка к сделке'], ['sign', 'Подписание / оплата'], ['reg', 'Регистрация'], ['exec', 'Выполнение работ']];
+  const GATES = {
+    kyc: { label: 'KYC и источник средств', at: 'prep', hint: 'Личность и UBO, санкции и PEP, источник средств, доверенность. Обязательно в ОАЭ до сделки.' },
+    title: { label: 'Проверка титула и доверенности', at: 'prep', hint: 'Кто собственник, есть ли обременения, действует ли POA.' },
+    charges: { label: 'Долги по service charge', at: 'prep', hint: 'Справка об отсутствии задолженности по взносам на содержание.' },
+    leases: { label: 'Проверка договоров аренды', at: 'prep', hint: 'Действующие договоры и их условия — у ГАБ покупают денежный поток.' },
+    deposit10: { label: 'Депозит-чек 10%', at: 'prep', hint: 'Практика вторички; фактический процент — по договору.' },
+    formf: { label: 'Form F (MOU)', at: 'prep', hint: 'Договор о намерениях вторички на портале DLD: покупатель, продавец, агент.' },
+    assignment_noc: { label: 'NOC на переуступку', at: 'prep', hint: 'Согласие застройщика; порог оплаты задаёт SPA.' },
+    preapproval: { label: 'Предодобрение банка', at: 'prep', hint: 'Первый шаг ипотеки покупателя.' },
+    valuation: { label: 'Оценка объекта', at: 'prep', hint: 'Оценка банком или DLD — для ипотеки и для дарения.' },
+    fol: { label: 'Final Offer Letter', at: 'prep', hint: 'Финальное письмо-оффер банка покупателя.' },
+    escrow: { label: 'Платёж на escrow', at: 'sign', hint: 'Деньги переведены на защищённый счёт проекта.' },
+    spa: { label: 'SPA', at: 'sign', hint: 'Договор купли-продажи с застройщиком.' },
+    rentdep: { label: 'Депозит по аренде', at: 'sign', hint: '5% без мебели, 10% с мебелью — рыночная практика; по договору.' },
+    fitout_ok: { label: 'Согласование отделки', at: 'sign', hint: 'Одобрение проекта собственником, УК или муниципалитетом.' },
+    mgmt: { label: 'Договор управления', at: 'sign', hint: 'Право вести объект и контролировать оплаты; объём полномочий — по доверенности.' },
+    mandate: { label: 'Эксклюзивный мандат', at: 'sign', hint: 'Договор с собственником на реализацию объекта.' },
+    trakheesi: { label: 'Trakheesi', at: 'sign', hint: 'Разрешение на рекламу листинга.' },
+    partner_ok: { label: 'Подтверждение партнёра', at: 'sign', hint: 'Партнёр подтвердил оказание услуги — от этого зависит вознаграждение.' },
+    oqood: { label: 'Oqood', at: 'reg', hint: 'Регистрация в промежуточном реестре DLD, в короткий срок после SPA.' },
+    noc: { label: 'NOC застройщика', at: 'reg', hint: 'Согласие на перевод и отсутствие долгов по service charge.' },
+    mortgage_release: { label: 'Снятие залога продавца', at: 'reg', hint: 'Банк продавца снимает залог перед переводом права.' },
+    trustee: { label: 'Trustee-перевод', at: 'reg', hint: 'Переоформление права в офисе регистрационного trustee DLD.' },
+    dld4: { label: 'Пошлина DLD 4%', at: 'reg', hint: 'Госпошлина за перевод плюс сборы trustee. Плательщик — по договору.' },
+    titledeed: { label: 'Title Deed', at: 'reg', hint: 'Итоговый документ о праве собственности.' },
+    ejari: { label: 'Ejari', at: 'reg', hint: 'Регистрация аренды в реестре DLD.' },
+    service_ok: { label: 'Приёмка работ клиентом', at: 'exec', hint: 'Отчёт принят, документы подписаны.' },
+  };
+  const COMMERCIAL_TYPES = ['офис', 'ритейл', 'склад', 'ГАБ'];
+  function gatesFor(d) {
+    if (!d) return [];
+    const out = ['kyc']; // every deal, every funnel — the UAE requirement is not funnel-specific
+    const kind = d.saleKind || '', pay = d.paymentForm || '';
+    if (d.funnel === 'sale') {
+      if (kind === 'вторичка') out.push('title', 'deposit10', 'formf', 'noc', 'mortgage_release', 'trustee', 'titledeed');
+      else if (kind === 'переуступка') out.push('assignment_noc', 'oqood');
+      else out.push('escrow', 'spa', 'oqood'); // первичка and anything off-plan
+      if (d.objectType === 'ГАБ') out.push('leases', 'charges');
+      if (d.objectType === 'земля') out.push('charges');
+      out.push('dld4');
+      if (/ипотек/i.test(pay)) out.push('preapproval', 'valuation', 'fol');
+    } else if (d.funnel === 'rent') {
+      out.push('rentdep', 'ejari');
+      if (COMMERCIAL_TYPES.indexOf(d.objectType) >= 0) out.push('fitout_ok');
+    } else if (d.funnel === 'manage') out.push('mgmt', 'charges');
+    else if (d.funnel === 'exclusive') out.push('mandate', 'trakheesi');
+    else if (d.funnel === 'cross') out.push('partner_ok');
+    else if (d.funnel === 'consult') out.push('service_ok');
+    return out.filter((k, i) => GATES[k] && out.indexOf(k) === i);
+  }
+  function gateDone(d, k) { return !!(d.gates && d.gates[k]); }
+  function gateProgress(d) {
+    const list = gatesFor(d);
+    return { done: list.filter((k) => gateDone(d, k)).length, total: list.length };
+  }
+  function gatesBlock(d) {
+    const list = gatesFor(d);
+    if (!list.length) return '';
+    const pr = gateProgress(d);
+    // Grouped by the stage the gate belongs to, so the block reads as the road ahead rather than a
+    // flat list of Dubai acronyms. A group with nothing in it for this deal is not drawn.
+    const groups = GATE_STEPS.map(([at, label]) => {
+      const rows = list.filter((k) => GATES[k].at === at).map((k) => {
+        const g = GATES[k], on = gateDone(d, k);
+        return '<button class="gate-row' + (on ? ' on' : '') + '" data-gate="' + d.id + '~' + k + '" title="Отметить вручную">' +
+          '<span class="gate-box">' + (on ? I('check') : '') + '</span>' +
+          '<span class="gate-t"><span class="gate-l">' + g.label + '</span>' +
+          '<span class="gate-h">' + g.hint + '</span></span></button>';
+      }).join('');
+      return rows ? '<div class="gate-group"><div class="gate-gh">' + label + '</div>' + rows + '</div>' : '';
+    }).join('');
+    const meter = '<span class="badge' + (pr.done === pr.total ? ' ok' : ' acc') + '">' + pr.done + ' из ' + pr.total + '</span>';
+    return dxSec('check', 'Контрольные точки', meter,
+      '<div class="gates">' + groups + '</div>' +
+      '<div class="gate-foot">Набор собран по полям карточки: ' +
+      [d.dealType, d.readiness, d.saleKind, d.objectType].filter(Boolean).join(' · ') +
+      '. Отмечается вручную — подключение к реестрам DLD и Ejari идёт следующей волной.</div>');
+  }
+  function toggleGate(key) {
+    const parts = String(key || '').split('~');
+    const d = D().deals.find((x) => x.id === parts[0]);
+    if (!d || !GATES[parts[1]]) return;
+    d.gates = Object.assign({}, d.gates);
+    d.gates[parts[1]] = !d.gates[parts[1]];
+    WS.storeApi.touch();
+    WS.storeApi.toast('«' + GATES[parts[1]].label + '» — ' + (d.gates[parts[1]] ? 'отмечено' : 'снята отметка'), 'ok');
+    setEntityTab('deal', d.id, 'docs');
+  }
+  // Document pipeline of a REQUEST: КП → MOU → SPA → DLD. Kept for the заявка card, where there is
+  // no deal yet to derive gates from; on a deal it is replaced by the gate block above.
+  // Position along the deal's own funnel — used to order deals by how far along they are.
+  function dealStageIdx(d) { const i = funnelPath(d).indexOf(d && d.stage); return i < 0 ? 0 : i; }
+  // The КП→MOU→SPA→DLD strip has four steps and the funnels now have six to nine, so the position
+  // is projected onto those four rather than read as an index. Replaced wholesale by the gate layer.
+  function docIdx(d) {
+    const path = funnelPath(d);
+    if (!path.length) return 0;
+    return Math.min(3, Math.round((dealStageIdx(d) / Math.max(1, path.length - 1)) * 3));
+  }
   function docChainStatuses(sidx, hasKp) {
     const defs = [['КП', 'Коммерческое предложение', 'Собрано'], ['MOU', 'Договор о намерениях', 'Подписан'],
       ['SPA', 'Договор купли-продажи', 'Подписан'], ['DLD', 'Регистрация в Земельном департаменте', 'Зарегистрирован']];
@@ -2499,35 +4068,182 @@
     return '<div class="page-crumb"><button class="btn sm ghost" data-request="' + r.id + '">' + I('chevLeft') + 'К заявке · ' + (c.name || r.title) + '</button></div>';
   }
   // R3 direct edit + confirm AI fields. Editable structural fields with Dubai enums.
+  // Every id a deal's owner can hold — TEAM plus whoever already owns one (u_omar runs the DIFC
+  // portfolio but is not on the agent roster). Without him the edit form reassigned his deal.
+  function dealAgentOptions(current) {
+    const ids = TEAM.map((a) => a.id);
+    (D().deals || []).forEach((d) => { if (d.agent && ids.indexOf(d.agent) < 0) ids.push(d.agent); });
+    if (current && ids.indexOf(current) < 0) ids.push(current);
+    return ids.map((id) => '<option value="' + id + '"' + (id === current ? ' selected' : '') + '>' + agentName(id) + '</option>').join('');
+  }
+  // «Тип сделки» IS the funnel; they were two fields that could disagree, and only one of them
+  // drove the board and the gates. Editing the type now moves the deal, and a stage the new funnel
+  // does not have is pulled back to one it does rather than leaving the deal on no board at all.
+  const FUNNEL_BY_TYPE = {
+    'Продажа': 'sale', 'Аренда': 'rent', 'Управление арендой': 'manage',
+    'Эксклюзив': 'exclusive', 'Кросс-продажи': 'cross', 'Консалтинг': 'consult',
+  };
+  function funnelForType(t) { return FUNNEL_BY_TYPE[t] || 'sale'; }
+  // Зажимать по услуге мало: у продажи два вида договора, и «Бронь (EOI)» с готовностью
+  // «готовый» давало вторичную сделку на шаге, которого в её договоре нет, — колонка доски и
+  // лента карточки после этого расходились.
+  function clampStage(funnelKey, stage, readiness) {
+    const ck = WS.contractKindFor;
+    const list = (readiness && ck) ? ((WS.DEAL_STEPS || {})[ck(funnelKey, readiness)] || []) : stepsForFunnel(funnelKey);
+    if (!list.length) return stage;
+    return list.indexOf(stage) >= 0 ? stage : list[0];
+  }
   const DEAL_ENUMS = {
-    dealType: ['Продажа · off-plan', 'Продажа · готовое', 'Аренда', 'Fit-out', 'Готовый арендный бизнес', 'Передано партнёру'],
-    objectType: ['off-plan', 'готовое', 'офис', 'ритейл', 'вилла', 'склад', 'земля'],
+    dealType: ['Продажа', 'Аренда', 'Управление арендой', 'Эксклюзив', 'Кросс-продажи', 'Консалтинг'],
+    // Readiness and the kind of transfer used to be smuggled into «тип объекта» («off-plan» sat in
+    // the same list as «офис»). They are separate questions, and it is their PAIR that decides which
+    // gates a deal has to pass — so they are separate fields.
+    objectType: ['апартаменты', 'вилла', 'офис', 'ритейл', 'склад', 'ГАБ', 'земля'],
+    readiness: ['оффплан', 'готовый'],
+    saleKind: ['', 'первичка', 'вторичка', 'переуступка', 'дарение', 'наследование'],
+    side: ['покупатель', 'арендатор', 'собственник'],
     paymentForm: ['100% оплата', 'Рассрочка от застройщика', 'Ипотека', 'Годовой чек', 'Поэтапно'],
     source: ['Property Finder', 'Bayut', 'Dubizzle', 'Instagram', 'Реферал', 'Клуб', 'Импорт'],
   };
   function openDealEdit(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
     const sel = (k, label) => '<label class="fld"><span>' + label + '</span><select id="df_' + k + '">' + DEAL_ENUMS[k].map((o) => '<option' + (o === d[k] ? ' selected' : '') + '>' + o + '</option>').join('') + '</select></label>';
+    const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '"' + (co.id === d.companyId ? ' selected' : '') + '>' + co.name + '</option>').join('');
+    const agentOpts = dealAgentOptions(d.agent);
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Прямое редактирование первоклассно. Сохранение помечает поля как «подтверждено человеком».</p>' +
       '<div class="match-grid">' +
       '<label class="fld"><span>Бюджет, AED</span><input id="df_amount" type="text" value="' + (d.amount || '') + '"></label>' +
-      sel('dealType', 'Тип сделки') + sel('objectType', 'Тип объекта') + sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
+      sel('dealType', 'Тип сделки') + sel('side', 'Сторона клиента') +
+      sel('objectType', 'Тип объекта') + sel('readiness', 'Готовность') + sel('saleKind', 'Вид сделки') +
+      sel('paymentForm', 'Форма оплаты') + sel('source', 'Источник') +
       '<label class="fld"><span>Цель</span><input id="df_goal" type="text" value="' + ((d.goal || '').replace(/"/g, '&quot;')) + '"></label>' +
+      pickerField('df_company', 'Компания', '<option value="">— без компании</option>' + companyOpts, 'Поиск по названию компании…') +
+      '<label class="fld"><span>Ответственный агент</span><select id="df_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="df_vat"' + (d.vat ? ' checked' : '') + '> Применяется VAT 5%</label>';
-    openModal('Параметры сделки · ' + d.title, body,
-      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>');
+    openModal('Параметры сделки · ' + escAttr(d.title), body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDeal" data-deal="' + id + '">' + I('check') + 'Сохранить</button>', { wide: true });
   }
   function saveDealEdit(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
     const g = (k) => { const el = document.getElementById('df_' + k); return el ? el.value : d[k]; };
     const amt = parseInt((g('amount') || '').toString().replace(/\D/g, ''), 10);
     d.amount = amt || d.amount;
-    ['dealType', 'objectType', 'paymentForm', 'source', 'goal'].forEach((k) => { d[k] = g(k); });
+    ['dealType', 'objectType', 'readiness', 'saleKind', 'side', 'paymentForm', 'source', 'goal', 'company', 'agent'].forEach((k) => {
+      const val = g(k);
+      if (k === 'company') d.companyId = val || null;
+      else if (k === 'agent') d.agent = val;
+      else d[k] = val;
+    });
+    // The service decides the board and the gate set, so it has to follow the field the agent
+    // actually edited. Leaving d.funnel behind kept a re-typed lease on the sale board.
+    const nf = funnelForType(d.dealType);
+    if (nf !== d.funnel) { d.funnel = nf; d.stage = clampStage(nf, d.stage); }
     d.vat = !!(document.getElementById('df_vat') || {}).checked;
-    d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' });
+    d.prov = Object.assign({}, d.prov, { budget: 'confirmed', paymentForm: 'confirmed', source: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed' });
+    WS.storeApi.touch();
     WS.storeApi.toast('Параметры сделки сохранены и подтверждены', 'ok');
     dealCard(id);
+  }
+
+  // ---- Goals edit (profile) ----
+  function openGoalEdit(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    const metricOpts = ['commission', 'deals', 'pipeline', 'shows', 'leads']
+      .map((m) => '<option value="' + m + '"' + (m === g.metric ? ' selected' : '') + '>' + ({ commission: 'Заработанная комиссия', deals: 'Закрытые сделки', pipeline: 'Сумма пайплайна', shows: 'Проведённые показы', leads: 'Новые клиенты' })[m] + '</option>').join('');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Цель на период. Прогресс считается автоматически из данных демо. Выводить на Пульс — показывает только закреплённые цели.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Цель</span><input id="gf_label" type="text" value="' + ((g.label || '').replace(/"/g, '&quot;')) + '"></label>' +
+      '<label class="fld"><span>Метрика</span><select id="gf_metric">' + metricOpts + '</select></label>' +
+      '<label class="fld"><span>Целевое значение</span><input id="gf_target" type="number" value="' + (g.target || '') + '"></label>' +
+      '<label class="fld"><span>Период</span><select id="gf_period"><option value="month"' + (g.period === 'month' ? ' selected' : '') + '>Месяц</option><option value="quarter"' + (g.period === 'quarter' ? ' selected' : '') + '>Квартал</option></select></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned"' + (g.pinned ? ' checked' : '') + '> Показывать в Пульсе</label>';
+    openModal('Редактировать цель · ' + escAttr(g.label), body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveGoal" data-goal="' + goalId + '">' + I('check') + 'Сохранить</button>');
+  }
+  function saveGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const g = goals.find((x) => x.id === goalId);
+    if (!g) return;
+    const gv = (k) => { const el = document.getElementById('gf_' + k); return el ? el.value : g[k]; };
+    const target = parseInt(gv('target'), 10);
+    if (!gv('label').trim() || !target) { WS.storeApi.toast('Укажите цель и значение', 'warn'); return; }
+    g.label = gv('label');
+    g.metric = gv('metric');
+    g.target = target;
+    g.period = gv('period');
+    g.pinned = !!(document.getElementById('gf_pinned') || {}).checked;
+    closeModal();
+    WS.storeApi.toast('Цель сохранена', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  function deleteGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const ix = goals.findIndex((x) => x.id === goalId);
+    if (ix >= 0) {
+      const g = goals[ix];
+      openModal('Удалить цель', '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Удалить цель «' + escAttr(g.label) + '»? Действие необратимо.</p>',
+        '<button class="btn" data-act="closeModal">Отмена</button><button class="btn danger" data-act="confirmDeleteGoal" data-goal="' + goalId + '">' + I('x') + 'Удалить</button>');
+    }
+  }
+  function confirmDeleteGoal(goalId) {
+    const u = D().users[S().role];
+    const goals = (u && u.goals) || [];
+    const ix = goals.findIndex((x) => x.id === goalId);
+    if (ix >= 0) {
+      goals.splice(ix, 1);
+      closeModal();
+      WS.storeApi.toast('Цель удалена', 'ok');
+      WS.storeApi.save(); WS.storeApi.emit();
+    }
+  }
+  function addGoal() {
+    const u = D().users[S().role];
+    if (!u.goals) u.goals = [];
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Добавить новую цель на период. Прогресс считается автоматически.</p>' +
+      '<div class="match-grid">' +
+      '<label class="fld"><span>Цель</span><input id="gf_label" type="text" placeholder="Например: Заработать 300 тыс. комиссии в мае"></label>' +
+      '<label class="fld"><span>Метрика</span><select id="gf_metric"><option value="commission">Заработанная комиссия</option><option value="deals">Закрытые сделки</option><option value="pipeline">Сумма пайплайна</option><option value="shows">Проведённые показы</option><option value="leads">Новые клиенты</option></select></label>' +
+      '<label class="fld"><span>Целевое значение</span><input id="gf_target" type="number" placeholder="Например: 300000"></label>' +
+      '<label class="fld"><span>Период</span><select id="gf_period"><option value="month">Месяц</option><option value="quarter">Квартал</option></select></label>' +
+      '</div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="gf_pinned" checked> Показывать в Пульсе</label>';
+    openModal('Добавить цель', body,
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createGoal">' + I('plus') + 'Создать</button>');
+  }
+  function createGoal() {
+    const u = D().users[S().role];
+    if (!u.goals) u.goals = [];
+    const gv = (k) => { const el = document.getElementById('gf_' + k); return el ? el.value : ''; };
+    const label = gv('label').trim();
+    const target = parseInt(gv('target'), 10);
+    if (!label || !target) { WS.storeApi.toast('Укажите цель и значение', 'warn'); return; }
+    u.goals.push({
+      id: 'g_' + Math.round(performance.now()),
+      metric: gv('metric'),
+      target: target,
+      period: gv('period'),
+      label: label,
+      pinned: !!(document.getElementById('gf_pinned') || {}).checked,
+    });
+    closeModal();
+    WS.storeApi.toast('Цель добавлена', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  // Pin / unpin decides what the Pulse carries — the client asked to configure exactly that.
+  function toggleGoalPin(goalId) {
+    const u = D().users[S().role];
+    const g = ((u && u.goals) || []).find((x) => x.id === goalId);
+    if (!g) return;
+    g.pinned = !g.pinned;
+    WS.storeApi.toast(g.pinned ? 'Цель выведена на Пульс' : 'Цель убрана с Пульса', 'ok');
+    WS.storeApi.save(); WS.storeApi.emit();
   }
   // Event types an agent can log by hand (IA §6.2 «Примечания / События»).
   // ch = channel icon bucket; kind 'note' stays editable, logged facts are immutable like channel raw.
@@ -2719,6 +4435,28 @@
       '<div class="obj-count section-label" style="margin-bottom:8px">Найдено: ' + objs.length + ' из ' + D().objects.length + '</div>' +
       '<div class="obj-list">' + cards + '</div>';
   }
+  // List search + filter controls repaint their own subtree, the way bindObjects/refreshObjects do.
+  function bindListSearch() {
+    const wire = (id, key, refresh) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', (e) => { S()[key] = e.target.value; refresh(); });
+    };
+    wire('contactsSearch', 'contactsSearch', refreshContacts);
+    wire('companiesSearch', 'companiesSearch', refreshCompanies);
+    wire('conciergeSearch', 'conciergeSearch', refreshCgRail);
+    const sel = (id, apply) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', (e) => apply(e.target.value));
+    };
+    // Каждый фильтр списка клиентов пишет в своё поле — по одной строке на измерение, чтобы
+    // добавленный фильтр без обработчика (селект, который ничего не делает) было видно сразу.
+    [['cfPsych', 'psych'], ['cfObject', 'object'], ['cfArea', 'area'],
+     ['cfBudget', 'budget'], ['cfState', 'state'], ['cfConsent', 'consent']].forEach((p) =>
+      sel(p[0], (v) => { const patch = {}; patch[p[1]] = v; S().contactsFilters = Object.assign({}, S().contactsFilters, patch); WS.storeApi.emit(); }));
+    ['dealObjType', 'dealReadiness', 'dealAgent'].forEach((k) =>
+      sel(k, (v) => { S()[k] = v; WS.storeApi.emit(); }));
+    sel('cofClient', (v) => { S().companiesFilters = Object.assign({}, S().companiesFilters, { client: v }); WS.storeApi.emit(); });
+  }
   function bindObjects() {
     const s = document.getElementById('objSearch');
     if (s) s.addEventListener('input', (e) => { S().objSearch = e.target.value; refreshObjects(); });
@@ -2837,12 +4575,204 @@
   // ---- Object card v3: rich presentation (photo gallery hero, price anchor, full meta) — parity with old grey CRM ----
   const OBJ_ATTR = {
     view: { city: 'Город', water: 'Вид на воду', garden: 'Сад', park: 'Парк' },
-    floor: { high: 'Высокий', mid: 'Средний', low: 'Низкий' },
     finish: { new: 'Свежая отделка', standard: 'Стандартная', 'shell&core': 'Shell & Core', shell: 'Shell & Core' },
     demand: { high: 'Высокий спрос', mid: 'Средний спрос', low: 'Низкий спрос' },
     prestige: { high: 'Премиум', mid: 'Средний', low: 'Эконом' },
   };
   function objAttr(o, k) { const v = o.attrs && o.attrs[k]; if (v == null || v === '') return '—'; const m = OBJ_ATTR[k]; return (m && m[v]) || v; }
+  // «Этаж: высокий» is an adjective in the place of a fact. The storey is a number; the band it
+  // falls into is kept separately, for filtering, and stated as a hint rather than as the value.
+  const VIEW_PHRASE = { city: 'на город', water: 'на воду', garden: 'в сад', park: 'на парк' };
+  function objFloor(o) {
+    const a = o.attrs || {};
+    if (typeof a.floor !== 'number') return '—';
+    return a.floor + (a.floors ? ' из ' + a.floors : '') + ' эт.';
+  }
+  const SQFT = 10.7639;              // м² → фт², чтобы читать service charge в тех же единицах, в каких он продаётся
+  function ru(n) { return String(n).replace('.', ','); }
+  function objIsOff(o) { return /off-plan|оффплан/i.test(o.segment || ''); }
+  function objPerM2(o) { return o.size ? Math.round(o.price / o.size) : null; }
+  function objMarket(o) { return (WS.AREAS || {})[o.area] || null; }
+  // Отклонение цены объекта от средней по району, в процентах. Знак несёт смысл: минус — аргумент,
+  // плюс — возражение, которое всё равно прозвучит, поэтому ответ на него готовится заранее.
+  function objPriceGap(o) {
+    const m = objMarket(o), pm = objPerM2(o);
+    if (!m || !pm || !m.perM2) return null;
+    return Math.round((pm / m.perM2 - 1) * 100);
+  }
+  // Service charge продаётся за фт² в год — клиент спрашивает, сколько это в год деньгами.
+  function objServiceYear(o) {
+    const m = /([\d.,]+)\s*AED\/\s*фт/.exec(o.serviceCharge || '');
+    if (!m || !o.size) return null;
+    return Math.round(parseFloat(m[1].replace(',', '.')) * o.size * SQFT);
+  }
+  // Net yield, guarded: the finance model can miss, and a card must not fall over because of it.
+  function objYieldPct(o) {
+    try { const y = objNetYield(o); return (typeof y === 'number' && isFinite(y)) ? Math.round(y * 1000) / 10 : null; }
+    catch (e) { return null; }
+  }
+  // ============================================================================================
+  // Справка по объекту — the one block that says what the rows cannot: what this thing IS as an
+  // offer, whom it suits and for what, and where it is weak. Same voice as the client brief:
+  // connected sentences built from the object's own fields, nothing invented.
+  // ============================================================================================
+  function objBriefParts(o) {
+    const a = o.attrs || {};
+    const out = [];
+    const off = objIsOff(o);
+
+    // 1. What it is, in one line: type, size, where, which floor, what you see out of the window.
+    let one = (o.br || 'объект') + ' ' + (o.size ? o.size + ' м² ' : '') + 'в районе ' + o.area;
+    if (typeof a.floor === 'number') one += ', ' + a.floor + '-й этаж';
+    const view = VIEW_PHRASE[(o.attrs || {}).view];
+    if (view) one += ', вид ' + view;
+    out.push(one + '.');
+
+    // 2. How it is sold — the thing that decides whether a buyer can even consider it.
+    const terms = [];
+    if (off) {
+      terms.push('оффплан' + (o.developer ? ' от ' + o.developer : ''));
+      if (o.handover) terms.push('сдача ' + o.handover);
+      if (o.paymentPlan) terms.push('рассрочка ' + o.paymentPlan.replace(/\s*·\s*/g, ' / '));
+    } else {
+      terms.push('готовый' + (o.occupancy ? ', заселение — ' + lowerFirst(o.occupancy) : ''));
+      if (o.serviceCharge) terms.push('service charge ' + o.serviceCharge);
+    }
+    // «и» binds two things of a kind; a status and a service charge are not that, so a ready
+    // object lists them, while an off-plan's terms genuinely read as one enumeration.
+    if (terms.length) out.push(capFirst(off ? joinRu(terms) : terms.join('; ')) + '.');
+
+    // 3. Комиссия — единственная цифра из денег, которой нет в полосе метрик над справкой.
+    const y = objYieldPct(o);
+    if (o.commissionPct) out.push('Комиссия агенту ' + ru(o.commissionPct) + '% — ' + WS.AED(Math.round(o.price * o.commissionPct / 100)) + '.');
+
+    // 4. Whom it suits — read off demand, prestige, yield and the payment terms.
+    const fit = [];
+    if (off) fit.push('инвестору, который готов ждать сдачи ради цены входа');
+    if (y && y >= 5) fit.push('покупателю под аренду');
+    if (a.prestige === 'high') fit.push('клиенту, которому важен адрес');
+    // «Въезжает сразу» верно только для свободного объекта: сданный занят арендатором до конца срока.
+    if (!off && a.finish === 'new' && /vacant|свободн/i.test(o.occupancy || '')) fit.push('тому, кто въезжает сразу');
+    if (!off && /сдан|аренд/i.test(o.occupancy || '')) fit.push('покупателю с горизонтом от двух лет — объект занят до конца договора');
+    
+
+    // 5. And where it does not fit. A brief that only sells is not a brief.
+    const against = [];
+    if (off) against.push('тем, кому нужен доход сейчас');
+    if (a.metro === false) against.push('тем, кто ездит на метро');
+    if (a.demand === 'mid' || a.demand === 'low') against.push('тем, кто рассчитывает на быструю перепродажу');
+    return { text: out, fit: fit, against: against };
+  }
+  function objBriefSentences(o) {
+    const b = objBriefParts(o);
+    return b.text.concat(b.fit.length ? ['Подходит ' + joinRu(b.fit) + '.'] : [],
+                         b.against.length ? ['Не подойдёт ' + joinRu(b.against) + '.'] : []);
+  }
+  function objBriefBlock(o) {
+    const b = objBriefParts(o);
+    const verdict = (b.fit.length || b.against.length)
+      ? '<div class="chg-list obj-fit">' +
+        (b.fit.length ? '<div class="chg-row">' + I('check') + '<span><b>Подходит</b> ' + joinRu(b.fit) + '</span></div>' : '') +
+        (b.against.length ? '<div class="chg-row off">' + I('warn') + '<span><b>Не подойдёт</b> ' + joinRu(b.against) + '</span></div>' : '') +
+        '</div>' : '';
+    return dxSec('sparkle', 'Справка по объекту', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<p class="deal-brief">' + b.text.join(' ') + '</p>' + verdict);
+  }
+  // ============================================================================================
+  // Чем продавать. Не список свойств — список утверждений, каждое с цифрой под ним: тезис агент
+  // произносит вслух, подпись — то, чем он его подтверждает, если клиент переспросит. Порядок —
+  // от того, что уникально для этого юнита, к общему по району.
+  // ============================================================================================
+  function objSellPoints(o) {
+    const a = o.attrs || {}, mk = objMarket(o), off = objIsOff(o);
+    const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
+    const out = [];
+    if (o.usp) out.push(['star', 'Чего нет у соседних юнитов', o.usp]);
+    if (gap != null && gap <= -2) out.push(['money', 'На ' + Math.abs(gap) + '% дешевле района',
+      WS.AED(pm) + ' за м² против средней по ' + o.area + ' — ' + WS.AED(mk.perM2) + ' за 12 месяцев.']);
+    if (mk && y != null && y >= mk.yieldTypical) out.push(['wallet', 'Доходность выше типичной по району',
+      ru(y) + '% против ' + ru(mk.yieldTypical) + '% по ' + o.area + '. Считано по одной модели, цифры сравнимы.']);
+    if (mk && mk.priceYoY >= 8) out.push(['trend', 'Район прибавил ' + mk.priceYoY + '% за год',
+      'Аренда за тот же период +' + mk.rentYoY + '%. ' + mk.driver]);
+    if (off && o.paymentPlan) out.push(['calc', 'Вход рассрочкой, а не всей суммой',
+      o.paymentPlan.replace(/\s*·\s*/g, ' · ') + (o.handover ? '. Ключи ' + o.handover + '.' : '.')]);
+    if (o.escrow) out.push(['shield', 'Деньги идут на эскроу, не застройщику',
+      o.escrow + '. Это первый ответ на «а если стройка встанет».']);
+    if (!off && /vacant|свободн/i.test(o.occupancy || '')) out.push(['clock', 'Доход с первого месяца',
+      'Юнит свободен — заезд арендатора не ждёт окончания чужого договора.']);
+    if (a.metro) out.push(['compass', 'Метро в пешей доступности',
+      'Район остаётся в выборке у арендатора без машины — это расширяет круг желающих при пересдаче.']);
+    if (mk && mk.dom <= 40) out.push(['handshake', 'Из района выходят быстро',
+      'Средний срок экспозиции ' + mk.dom + ' дней. Аргумент для того, кто боится «застрять в бетоне».']);
+    return out.slice(0, 5);
+  }
+  // ============================================================================================
+  // Что спросят. Возражение — это не риск объекта, а реплика, которая прозвучит в разговоре;
+  // ценность блока в том, что ответ уже посчитан и его не надо придумывать на трубке.
+  // ============================================================================================
+  function objObjections(o) {
+    const a = o.attrs || {}, mk = objMarket(o), off = objIsOff(o);
+    const pm = objPerM2(o), gap = objPriceGap(o), y = objYieldPct(o);
+    const out = [];
+    if (o.verified !== 'verified' || o.trakheesi !== 'ok') out.push(['Он вообще ещё продаётся?',
+      'Честно: проверка доступности от ' + o.checkedAt + ' устарела' + (o.trakheesi !== 'ok' ? ', Trakheesi ещё в процессе — до его получения объект нельзя публиковать как листинг' : '') +
+      '. Сверьте с застройщиком до показа, это одна задача.']);
+    if (off) out.push(['Плачу сейчас — получаю когда?',
+      (o.handover ? 'Ключи ' + o.handover + '. ' : '') + 'До сдачи платежи идут частями по графику' +
+      (o.escrow ? ', и не застройщику, а на эскроу-счёт: ' + o.escrow.replace(/^Escrow\s*/i, '') + '. Со счёта деньги уходят по мере готовности стройки' : '') + '.']);
+    if (gap != null && gap >= 2) out.push(['Почему дороже, чем в среднем по району?',
+      WS.AED(pm) + ' против ' + WS.AED(mk.perM2) + ' за м², это +' + gap + '%. Разница — ' +
+      (typeof a.floor === 'number' ? a.floor + '-й этаж' : 'этаж') + (VIEW_PHRASE[a.view] ? ' и вид ' + VIEW_PHRASE[a.view] : '') +
+      '. Сравнивать надо с юнитами того же уровня, а не со всем районом — средняя считает и первые этажи во двор.']);
+    if (gap != null && gap <= -2) out.push(['Дешевле рынка — что с ним не так?',
+      'Ничего: ' + (o.source === 'club' ? 'это клубный эксклюзив, цена не поднималась в торге между агентами' :
+        off ? 'это цена входа на этапе строительства, не готового жилья' : 'объект свободен, и собственник считает простой') +
+      (o.verified === 'verified' ? '. Доступность проверена ' + o.checkedAt : '') + '.']);
+    if (a.metro === false) out.push(['Как сюда добираться без метро?',
+      'Метро рядом нет — район автомобильный, и арендатор здесь такой же. ' + (mk ? mk.tenant : '') +
+      ' Для сдачи это скорее плюс: текучка ниже.']);
+    const sc = objServiceYear(o);
+    if (sc) out.push(['Сколько стоит содержание?',
+      o.serviceCharge + ' — при ' + o.size + ' м² это около ' + WS.AED(sc) + ' в год. В расчёте доходности заложен опекс ' +
+      WS.AED((D().refModel || {}).opexY1 || 0) + ', service charge внутри него.']);
+    if (mk && mk.dom >= 50) out.push(['А если передумаю — быстро выйду?',
+      'Средний срок экспозиции по ' + o.area + ' — ' + mk.dom + ' дней, дольше, чем в Business Bay. ' + mk.risk]);
+    return out.slice(0, 5);
+  }
+  // Район отдельным блоком под картой: карта отвечает «где», этот блок — «что с этим местом
+  // происходит», то есть на чём держится цена через три года.
+  function objAreaBlock(o) {
+    const mk = objMarket(o);
+    if (!mk) return '';
+    const chips = [
+      [WS.AED(mk.perM2), 'средняя за м²'],
+      ['+' + mk.priceYoY + '%', 'цена за год'],
+      ['+' + mk.rentYoY + '%', 'аренда за год'],
+      [mk.dom + ' дн.', 'срок экспозиции'],
+    ].map((c) => '<div class="mkt-c"><div class="mkt-v">' + c[0] + '</div><div class="mkt-l">' + c[1] + '</div></div>').join('');
+    const rows = [
+      ['users', 'Кто здесь снимает', mk.tenant],
+      ['trend', 'Что двигает район', mk.driver],
+      ['warn', 'На что смотреть', mk.risk],
+    ].map((r) => '<div class="mkt-r' + (r[0] === 'warn' ? ' off' : '') + '">' + I(r[0]) +
+      '<div><b>' + r[1] + '</b><span>' + r[2] + '</span></div></div>').join('');
+    return dxSec('trend', 'Район · ' + o.area, '<span class="badge demo">' + I('lock') + 'срез рынка — DEMO</span>',
+      '<div class="mkt-chips">' + chips + '</div><div class="mkt-rows">' + rows + '</div>');
+  }
+  function objSellBlock(o) {
+    const pts = objSellPoints(o);
+    if (!pts.length) return '';
+    return dxSec('target', 'Чем продавать', '<span class="badge">' + pts.length + '</span>',
+      '<div class="sp-list">' + pts.map((p) => '<div class="sp-row"><span class="sp-ic">' + I(p[0]) + '</span>' +
+        '<div><div class="sp-t">' + p[1] + '</div><div class="sp-d">' + p[2] + '</div></div></div>').join('') + '</div>');
+  }
+  function objObjectionBlock(o) {
+    const qs = objObjections(o);
+    if (!qs.length) return '';
+    return dxSec('help', 'Что спросят и что ответить', '<span class="badge">' + qs.length + '</span>',
+      '<div class="oq-list">' + qs.map((q) => '<div class="oq-row"><div class="oq-q">' + I('chat') + q[0] + '</div>' +
+        '<div class="oq-a">' + q[1] + '</div></div>').join('') + '</div>');
+  }
   function objCommission(o) {
     if (!o.commissionPct) return '';
     return '<span class="obj-comm">' + I('money') + 'Комиссия ' + o.commissionPct + '% · ' + WS.AED(Math.round(o.price * o.commissionPct / 100)) + '</span>';
@@ -2882,7 +4812,7 @@
   function objMeta(o) {
     const pairs = [
       ['Район', o.area], ['Адрес', o.address], ['Вид', objAttr(o, 'view')],
-      ['Этаж', objAttr(o, 'floor')], ['Отделка', objAttr(o, 'finish')], ['Спрос', objAttr(o, 'demand')],
+      ['Этаж', objFloor(o)], ['Отделка', objAttr(o, 'finish')], ['Спрос', objAttr(o, 'demand')],
       ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'],
       ['Готовность', o.availability === 'available' ? 'Доступен для показа' : 'Требует проверки'], ['Источник', o.sourceLabel],
     ];
@@ -2897,12 +4827,21 @@
       '</div>';
   }
   // Offline DEMO map — shows where the object sits (old CRM «Показать на карте»). No network/API on file://.
+  // Real OpenStreetMap imagery around the object's coordinates; the marker is dead centre of the
+  // frame by construction (see maps.js), so it needs no per-object offset. Falls back to the flat
+  // panel if an object has no map baked in.
   function objMap(o) {
-    return '<div class="obj-map">' +
-      '<div class="obj-map-canvas"><span class="obj-map-pin">' + I('building') + '</span>' +
-      '<span class="obj-map-area">' + o.area + '</span></div>' +
+    const img = (WS.maps || {})[o.id];
+    const canvas = img
+      ? '<div class="obj-map-canvas has-img"><img src="' + img + '" alt="Карта: ' + escAttr(o.area) + '" loading="lazy">' +
+        '<span class="obj-map-marker"></span>' +
+        '<span class="obj-map-area">' + o.area + '</span>' +
+        '<span class="obj-map-credit">© OpenStreetMap</span></div>'
+      : '<div class="obj-map-canvas"><span class="obj-map-pin">' + I('building') + '</span>' +
+        '<span class="obj-map-area">' + o.area + '</span></div>';
+    return '<div class="obj-map">' + canvas +
       '<div class="obj-map-foot"><div class="omf-t"><b>' + o.area + '</b><span>' + (o.address || '—') + '</span></div>' +
-      '<span class="badge demo">' + I('lock') + 'DEMO карта</span></div>' +
+      '<span class="badge demo">' + I('lock') + 'точка — район, DEMO</span></div>' +
       '</div>';
   }
   // Downloadable materials — distinct from the Документы tab (matches old CRM «КП · Сторис · Финмодель»).
@@ -2919,7 +4858,7 @@
     if (tab === 'specs') {
       return dxSec('building', 'Характеристики', '', '<div class="dfields">' +
         dfPair('Район', o.area) + dfPair('Адрес', o.address) + dfPair('Класс', o.br) + dfPair('Площадь', o.size + ' м²') +
-        dfPair('Цена за м²', perM2) + dfPair('Этаж', objAttr(o, 'floor')) + dfPair('Отделка', objAttr(o, 'finish')) +
+        dfPair('Цена за м²', perM2) + dfPair('Этаж', objFloor(o)) + dfPair('Отделка', objAttr(o, 'finish')) +
         dfPair('Вид', objAttr(o, 'view')) + dfPair('Спрос на рынке', objAttr(o, 'demand')) + dfPair('Престиж', objAttr(o, 'prestige')) +
         dfPair('Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—') + dfPair('Источник', o.sourceLabel) +
         dfPair('Доступность', o.availability === 'available' ? 'Доступен' : 'Требует проверки') + '</div>');
@@ -2978,7 +4917,6 @@
     if (o.developer) rows.push(['Застройщик', o.developer]);
     if (o.project) rows.push(['Проект · корпус', o.project]);
     if (isOff) {
-      if (o.handover) rows.push(['Срок сдачи (handover)', o.handover]);
       if (o.paymentPlan) rows.push(['План оплаты', o.paymentPlan]);
       if (o.escrow) rows.push(['Escrow (DLD)', o.escrow]);
     } else if (o.occupancy) {
@@ -3018,17 +4956,18 @@
   }
   // Summary band under the hero: lead description + key metrics on an accent-tinted card,
   // with the price emphasized — gives the block presence instead of bare numbers on the page bg.
-  function objSummary(o) {
+  function objSummary(o, opts) {
     const perM2 = o.size ? WS.AED(Math.round(o.price / o.size)) : '—';
+    const y = objYieldPct(o);
     const m = [
       [WS.AED(o.price), 'общая цена', true],
       [perM2, 'цена за м²', false],
       [o.size + ' м²', 'площадь', false],
-      [objAttr(o, 'floor'), 'этаж', false],
+      [y ? String(y).replace('.', ',') + '%' : objFloor(o), y ? 'доходность (расчёт)' : 'этаж', false],
     ];
-    return '<div class="osum">' +
-      '<div class="osum-eyebrow">Описание</div>' +
-      '<p class="osum-lead">' + (o.match || '—') + '</p>' +
+    const lead = (opts && opts.lead === false) ? '' :
+      '<div class="osum-eyebrow">Описание</div><p class="osum-lead">' + (o.match || '—') + '</p>';
+    return '<div class="osum' + (lead ? '' : ' osum-bare') + '">' + lead +
       '<div class="osum-metrics">' + m.map((c) =>
         '<div class="osum-m' + (c[2] ? ' osum-m--hero' : '') + '"><div class="osum-v">' + c[0] + '</div><div class="osum-l">' + c[1] + '</div></div>').join('') +
       '</div></div>';
@@ -3043,24 +4982,32 @@
     const o = D().objects.find((x) => x.id === id);
     if (!o) return viewObjects();
     const inSl = inShortlist(o.id);
-    const back = '<div class="obj-page-head"><button class="btn sm" data-nav="objects">' + I('chevLeft') + 'Назад к объектам</button>' +
-      '<div class="obj-page-acts">' +
-      '<button class="btn sm" data-valobj="' + o.id + '">' + I('calc') + 'Оценить</button>' +
-      '<button class="btn sm" data-shortlist="' + o.id + '"' + (inSl ? ' style="border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + I(inSl ? 'check' : 'star') + (inSl ? 'В подборке' : 'В подборку') + '</button>' +
-      '<button class="btn sm primary" data-thread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building">' + I('chat') + 'Чат по объекту</button>' +
-      '</div></div>';
+    const back = '<div class="obj-page-head">' + backBtn('objects', '', 'Назад к объектам') + '</div>';
+    const acts = entityActionBar([
+      ['chat', 'Чат по объекту', 'data-thread="object:' + o.id + '" data-tlabel="' + escAttr(o.name) + ' · объект" data-ticon="building"', 'primary'],
+      ['calc', 'Оценить', 'data-valobj="' + o.id + '"', ''],
+      [inSl ? 'check' : 'star', inSl ? 'В подборке' : 'В подборку', 'data-shortlist="' + o.id + '"', inSl ? 'on' : ''],
+      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="object" data-obj="' + o.id + '"', ''],
+    ]);
+    // Источник и сегмент уже сказаны в обложке; здесь только то, чего там нет.
     const paramsInner = '<div class="obj-meta">' + [
-      ['Вид', objAttr(o, 'view')], ['Отделка', objAttr(o, 'finish')], ['Спрос на рынке', objAttr(o, 'demand')],
-      ['Престиж', objAttr(o, 'prestige')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—'], ['Источник', o.sourceLabel],
+      ['Этаж', objFloor(o)], ['Вид из окон', objAttr(o, 'view')],
+      ['Отделка', objAttr(o, 'finish')], ['Метро', (o.attrs && o.attrs.metro) ? 'рядом' : 'нет рядом'],
+      ['Спрос на рынке', objAttr(o, 'demand')], ['Престиж адреса', objAttr(o, 'prestige')],
     ].map((p) => '<div><div class="omk">' + p[0] + '</div><div class="omv">' + p[1] + '</div></div>').join('') + '</div>';
-    const grid = '<div class="odetail-grid">' +
-      dxSec('grid', 'Параметры объекта', '', paramsInner) +
-      dxSec('compass', 'Расположение на карте', '', objMap(o)) + '</div>';
     const statuses = dxSec('shield', 'Официальные статусы', '', objStatusesInner(o));
     const docs = dxSec('doc', 'Документы по объекту', '', docsRows(docsFor((x) => x.object === o.id), 'по этому объекту документов пока нет'));
     const ctx = objDealContext(o);
-    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + objSummary(o) +
-      (ctx ? '<div style="margin-top:14px">' + ctx + '</div>' : '') + grid + statuses + docs;
+    return parentReqCrumb(objBackRequest(o.id)) + back + objHero(o) + acts + objSummary(o, { lead: false }) + cxStack([
+      // Слева — чем это продают, справа — где это и что с этим местом. Пары подобраны так, чтобы
+      // ответ стоял рядом со строкой, к которой он относится: «сколько стоит содержание» — против
+      // service charge в условиях сделки.
+      [cxCol([objBriefBlock(o), objSellBlock(o)]),
+       cxCol([dxSec('compass', 'Расположение на карте', '', objMap(o)), objAreaBlock(o)])],
+      [objObjectionBlock(o), ctx],
+      [dxSec('grid', 'Параметры объекта', '', paramsInner), statuses],
+      docs,
+    ]);
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
@@ -3076,6 +5023,11 @@
     if (!spec) return viewClients();
     return entityPage(spec, 'clients', 'contacts', 'Назад к клиентам');
   }
+  function viewCompanyDetail(id) {
+    const spec = companySpec(id);
+    if (!spec) return viewCompanies();
+    return entityPage(spec, 'companies', '', 'Назад к компаниям');
+  }
 
   // ---------------- ПОДБОР ПОД СДЕЛКУ (matching workspace) ----------------
   const TARGET_YIELD = 0.05; // implied investor target (net)
@@ -3083,10 +5035,10 @@
     const m = Object.assign(WS.storeApi.clone(D().refModel), { objectId: o.id, price: o.price });
     return WS.finance.compute(m).netYield;
   }
-  // ---------------- MATCHING (качественный + психологический подбор) ----------------
+  // ---------------- MATCHING (quality criteria + client-portrait fit) ----------------
   const QUAL = [
     { k: 'water', label: 'Вид на воду', test: (o) => o.attrs && o.attrs.view === 'water' },
-    { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floor === 'high' },
+    { k: 'highfloor', label: 'Высокий этаж', test: (o) => o.attrs && o.attrs.floorBand === 'high' },
     { k: 'newfinish', label: 'Свежая отделка', test: (o) => o.attrs && o.attrs.finish === 'new' },
     { k: 'demand', label: 'Высокий спрос', test: (o) => o.attrs && o.attrs.demand === 'high' },
     { k: 'metro', label: 'Рядом метро', test: (o) => o.attrs && o.attrs.metro },
@@ -3145,9 +5097,9 @@
       '<div class="arow" style="margin-top:10px"><div class="alabel"><label>Целевая доходность</label></div>' +
         '<div class="actl"><input type="range" id="m_yield" min="0.03" max="0.08" step="0.005" value="' + m.yield + '"><span class="av" id="av_m_yield">' + (Math.round(m.yield * 1000) / 10) + '%</span></div></div>' +
       '<div class="section-label" style="margin:12px 0 6px">Качественные критерии</div><div class="qa-row">' + qualChips + '</div>' +
-      '<div class="section-label" style="margin:12px 0 6px">Психологический мэтч</div><div class="qa-row">' + psychToggle +
-        (psychAvail ? '' : '<span class="badge">' + I('lock') + 'заполните профиль в карточке контакта</span>') + '</div>' +
-      (psychAvail ? '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + I('sparkle') + ' Профиль: <b>' + c.psych.decision + '</b> · важно: ' + (c.psych.values || []).join(', ') + '</div>' : '') +
+      '<div class="section-label" style="margin:12px 0 6px">Мэтч по портрету клиента</div><div class="qa-row">' + psychToggle +
+        (psychAvail ? '' : '<span class="badge">' + I('lock') + 'заполните портрет в карточке контакта</span>') + '</div>' +
+      (psychAvail ? '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">' + I('sparkle') + ' Портрет: <b>' + c.psych.decision + '</b> · важно: ' + (c.psych.values || []).join(', ') + '</div>' : '') +
       '</div>';
     const sl = S().shortlist || [];
     let base = sl.length ? D().objects.filter((o) => sl.indexOf(o.id) >= 0) : D().objects.slice();
@@ -3310,7 +5262,7 @@
         clientId: i.clientId, objectId: objOfClient(i.clientId),
         title: (cn(i.clientId) || 'Клиент') + ' — входящее', sub: (i.channel || 'сообщение') + ' · ' + (i.text || '').slice(0, 42), open: { nav: 'concierge' } });
     });
-    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: objOfClient('c_overdue'), title: 'Отправлено КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { deal: 'd_igor' } });
+    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: objOfClient('c_overdue'), title: 'Обещано КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { request: 'r_igor' } });
     push({ id: 'cm_assign_omar', type: 'задача', when: 'сегодня', dir: 'in', clientId: 'c_docs', objectId: objOfClient('c_docs'), title: 'Подготовить документы к сделке Виктора', sub: 'от: Омар Рахман (руководитель)', open: { deal: 'd_viktor' } });
     return acts;
   }
@@ -3321,6 +5273,7 @@
     const openBtn = a.open.event ? '<button class="btn sm" data-event="' + a.open.event + '">' + I('pencil') + 'Открыть</button>'
       : a.open.scn ? '<button class="btn sm primary" data-scn="' + a.open.scn + '">' + I('arrowRight') + 'Действие</button>'
       : a.open.deal ? '<button class="btn sm" data-deal="' + a.open.deal + '">' + I('eye') + 'Сделка</button>'
+      : a.open.request ? '<button class="btn sm" data-request="' + a.open.request + '">' + I('eye') + 'Заявка</button>'
       : a.open.client ? '<button class="btn sm" data-client="' + a.open.client + '">' + I('eye') + 'К записи</button>'
       : '<button class="btn sm" data-nav="' + (a.open.nav || 'concierge') + '">' + I('arrowRight') + 'Открыть</button>';
     return '<div class="radar-row" data-actrow="' + a.id + '"><div class="sev"></div><div class="icon-tile ' + tone + '">' + I(ic) + '</div>' +
@@ -3427,8 +5380,14 @@
       { open: 'doc:formA',   title: 'Form A — договор с собственником',   status: 'ready',                                          object: 'o_creekline', sub: 'RERA · листинг объекта' },
       { open: 'doc:booking', title: 'Договор бронирования',               status: 'draft',    deal: 'd_viktor', client: 'c_docs',    object: 'o_bayline',   sub: 'бронь · S4' },
       { open: 'doc:oqood',   title: 'Форма Oqood (регистрация off-plan)', status: 'external', deal: 'd_viktor', client: 'c_docs',    object: 'o_bayline',   sub: 'DLD · внешний шаг' },
-      { open: 'doc:formI',   title: 'Соглашение брокеров (Form I)',       status: 'draft',    deal: 'd_karim',  client: 'c_partner',                        sub: 'co-broking · S6' },
+      { open: 'doc:formI',   title: 'Соглашение брокеров (Form I)',       status: 'draft',    request: 'r_karim', client: 'c_partner',                      sub: 'co-broking · S6' },
       { open: 's13_pkg',     title: 'Клубный пакет (адресная рассылка)',  status: 'ready',                                          object: 'o_palmcourt', sub: 'эксклюзив клуба · S13' },
+      // Документы клиента. Собираются один раз — под заявку — и действуют по всем её сделкам:
+      // паспорт не переподписывают на каждый договор, и требовать его дважды значит не помнить.
+      { open: 'doc:passport', title: 'Паспорт и Emirates ID',               status: 'ready',    client: 'c_anna',    scope: 'client',       sub: 'KYC · удостоверение личности' },
+      { open: 'doc:funds',    title: 'Подтверждение источника средств',     status: 'ready',    client: 'c_anna',    scope: 'client',       sub: 'AML · выписка банка' },
+      { open: 'doc:passport', title: 'Паспорт и Emirates ID',               status: 'ready',    client: 'c_docs',    scope: 'client',       sub: 'KYC · удостоверение личности' },
+      { open: 'doc:funds',    title: 'Подтверждение источника средств',     status: 'draft',    client: 'c_docs',    scope: 'client',       sub: 'AML · запрошено банком' },
     ];
   }
   const DOC_ST = { ready: ['ok', 'check', 'готов'], draft: ['warn', 'clock', 'черновик'], external: ['info', 'link', 'внешний шаг'], phase: ['', 'clock', 'Фаза 3'] };
@@ -3438,6 +5397,7 @@
   function docLinks(d) {
     const chips = [];
     if (d.deal) { const dl = D().deals.find((x) => x.id === d.deal); chips.push('<span class="badge">' + I('briefcase') + 'сделка: ' + (dl ? dl.title : d.deal) + '</span>'); }
+    if (d.request) { const rq = (D().requests || []).find((x) => x.id === d.request); chips.push('<span class="badge">' + I('mail') + 'заявка: ' + (rq ? rq.title : d.request) + '</span>'); }
     if (d.object) { const o = D().objects.find((x) => x.id === d.object); chips.push('<span class="badge">' + I('building') + 'объект: ' + (o ? o.name.split(',')[0] : d.object) + '</span>'); }
     if (d.client) { const c = D().clients.find((x) => x.id === d.client); chips.push('<span class="badge">' + I('users') + 'контакт: ' + (c ? c.name : d.client) + '</span>'); }
     return chips.length ? '<div class="prov" style="margin-top:4px">' + chips.join('') + '</div>' : '';
@@ -3446,11 +5406,55 @@
     const s = DOC_ST[d.status] || DOC_ST.ready;
     const who = withWho && docClientName(d) ? docClientName(d) + ' · ' : '';
     const links = withWho ? docLinks(d) : ''; // show entity links only in the central Documents view
-    return '<div class="feed-row"><div class="fi i-acc">' + I('doc') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + who + (d.sub || '') + '</div>' + links + '</div>' +
+    // Унаследованный документ помечен источником: иначе он читается как собранный здесь, и агент
+    // не понимает, почему правка на этой карточке не обновила его в соседней.
+    const from = d.from ? '<span class="badge doc-from">' + I('arrowRight') + d.from + '</span>' : '';
+    return '<div class="feed-row"><div class="fi i-acc">' + I('doc') + '</div><div class="ft"><div class="t">' + d.title + from + '</div><div class="m">' + who + (d.sub || '') + '</div>' + links + '</div>' +
       '<span class="badge ' + s[0] + '">' + I(s[1]) + s[2] + '</span>' +
       '<button class="btn sm" data-artopen="' + d.open + '" style="margin-left:8px">' + I('eye') + 'Открыть</button></div>';
   }
   function docsFor(pred) { return docRegistry().filter(pred); }
+  // ============================================================================================
+  // Четыре области документа: объект, клиент, заявка, сделка. Область — это владелец, а не
+  // ссылка: у документа сделки в записи стоит и клиент, но принадлежит он сделке.
+  //
+  // Наследование идёт вниз по тому же пути, по которому шла работа: клиентские документы видны
+  // в каждой заявке и в каждой сделке этого клиента, документы заявки — во всех сделках, из неё
+  // выросших. Это и есть требование «переиспользовать собранное по клиенту»: агент не собирает
+  // паспорт заново на второй договор, а видит, что он уже есть.
+  // ============================================================================================
+  function docScope(x) {
+    return x.scope || (x.deal ? 'deal' : x.request ? 'request' : x.object ? 'object' : x.client ? 'client' : 'other');
+  }
+  const SCOPE_FROM = { client: 'по клиенту', request: 'из заявки', object: 'по объекту' };
+  // Документы сделки: свои плюс унаследованные — от заявки, из которой она выросла, и от клиента.
+  function docsOfDeal(d) {
+    if (!d) return [];
+    // Документы объекта — по КАЖДОМУ лоту: Trakheesi и Form A нужны на каждый юнит, который
+    // уходит по этому договору, и показать их только по головному объекту значит спрятать
+    // отсутствие разрешения по второму.
+    const lots = {};
+    ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) lots[id] = 1; });
+    return docRegistry().filter((x) => {
+      const sc = docScope(x);
+      if (sc === 'deal') return x.deal === d.id;
+      if (sc === 'request') return !!d.requestId && x.request === d.requestId;
+      if (sc === 'client') return x.client === d.clientId;
+      if (sc === 'object') return !!lots[x.object];
+      return false;
+    }).map((x) => Object.assign({}, x, { from: SCOPE_FROM[docScope(x)] || '' }));
+  }
+  // Документы заявки: свои плюс клиентские. Документы её сделок сюда не поднимаются — заявка
+  // не отвечает за договорную работу, и подтянуть их значило бы показать чужой этап как свой.
+  function docsOfRequest(r) {
+    if (!r) return [];
+    return docRegistry().filter((x) => {
+      const sc = docScope(x);
+      if (sc === 'request') return x.request === r.id;
+      if (sc === 'client') return x.client === r.clientId;
+      return false;
+    }).map((x) => Object.assign({}, x, { from: SCOPE_FROM[docScope(x)] || '' }));
+  }
   // A drill-down "Документы …" block for an entity card (deal/object/contact).
   function docsRows(list, emptyHint) {
     return list.length ? list.map((d) => docRow(d, false)).join('')
@@ -3530,6 +5534,8 @@
       formF: ['Form F — MOU купли-продажи (RERA)', [['Продавец', 'DEMO Owner'], ['Покупатель', 'Анна Петрова'], ['Объект', 'Creekline 1208'], ['Цена', '1 820 000 AED'], ['Депозит', '10%'], ['Статус', 'черновик — подписи сторон']]],
       formI: ['Form I — соглашение брокеров A2A (RERA)', [['Брокер 1', 'Harbour Key Realty'], ['Брокер 2', 'клубный партнёр'], ['Объект', 'Downtown'], ['Сплит комиссии', '50 / 50'], ['Раскрытие контакта', 'после принятия']]],
       oqood: ['Форма Oqood — регистрация off-plan (DLD)', [['Объект', 'Bayline Terraces 1603'], ['Застройщик', 'DEMO Developer'], ['Статус', 'внешний шаг — очередь DLD'], ['Требуется', 'подпись сторон, оплата DLD 4%']]],
+      passport: ['Паспорт и Emirates ID', [['Область', 'Документ клиента — действует по всем его заявкам и сделкам'], ['Проверка', 'KYC пройден'], ['Срок действия', 'до 08.2029'], ['Где используется', 'Form B, договор бронирования, регистрация']]],
+      funds: ['Подтверждение источника средств', [['Область', 'Документ клиента — действует по всем его заявкам и сделкам'], ['Основание', 'AML / требование банка'], ['Форма', 'выписка + справка о происхождении средств'], ['Где используется', 'эскроу, ипотечная заявка, регистрация']]],
       ejari: ['Договор аренды + Ejari (Фаза 3)', [['Объект', '—'], ['Статус', 'вне MVP — включается с арендой (Фаза 3)']]],
     };
     const m = meta[kind]; if (!m) { WS.router.go('docs'); return; }
@@ -3556,7 +5562,7 @@
       { h: 'Сравнение объектов' }, { k: 'Creekline 1208', v: 'ROI 39,40% · net 5,28%' }, { k: 'Palm Court 704', v: 'ниже бюджета · net 5,67% (предпочитает)' },
       { h: 'Аргументы (с источниками)' }, { k: 'Доходность', v: 'финмодель по объекту · допущения видны' }, { k: 'Клуб', v: 'Palm Court — эксклюзив клуба' },
       { h: 'Факты ↔ гипотезы' }, { k: 'Факт', v: 'бюджет до 2 млн, срок 1–3 мес' }, { k: 'Гипотеза', v: 'чувствителен к первому платежу (не подтверждено)' },
-      { h: 'Психологический профиль (сигналы стиля)' },
+      { h: 'Портрет клиента (сигналы стиля)' },
       { k: 'Тип решения', v: 'Аналитик — цифры и факты' }, { k: 'Что важно', v: 'доходность, безопасность сделки' },
       { k: 'Тон', v: 'по делу, с расчётами, без давления' }, { k: 'Триггеры', v: 'график первого платежа, подтверждённая доходность' },
       { k: 'Как вести', v: 'дать цифры и источники; для мессенджеров — короткие сообщения с конкретикой' },
@@ -3612,6 +5618,7 @@
     if (id === 's8_brief') return openBriefS8();
     if (id === 'dossier') return openDossier();
     if (id.indexOf('client:') === 0) return clientCard(id.slice(7));
+    if (id.indexOf('request:') === 0) return requestCard(id.slice(8));
     if (id.indexOf('object:') === 0) return objectCard(id.slice(7));
     if (id.indexOf('doc:') === 0) return openDoc(id.slice(4));
     if (id.indexOf('nav:') === 0) { WS.router.go(id.slice(4)); return; }
@@ -3703,11 +5710,11 @@
       const c = data.clients.find((x) => x.id === i.clientId) || {};
       const newId = 'd_ex_' + id;
       if (!data.deals.find((d) => d.id === newId)) {
-        data.deals.push({ id: newId, clientId: i.clientId, objectId: i.ex === 'unknown_object' ? null : 'o_creekline', agent: 'u_marina', amount: c.budget || 1500000, hot: true, stage: 'new', title: (c.name || 'Новый лид'), sub: 'Квалифицировано из исключения', tags: ['из инбокса'], updated: 'сейчас', funnel: 'sale_offplan', dealType: 'Продажа · off-plan', objectType: 'off-plan', goal: c.goal || 'Инвестиция', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Импорт', partnerAgent: null, companyId: null, consideredProjects: [], stageDays: 0, prov: { budget: 'ai', source: 'ai', goal: 'ai', objectType: 'ai', paymentForm: 'ai' } });
+        data.deals.push({ id: newId, clientId: i.clientId, objectId: i.ex === 'unknown_object' ? null : 'o_creekline', agent: 'u_marina', amount: c.budget || 1500000, hot: true, stage: 'work', title: (c.name || 'Новый лид'), sub: 'Квалифицировано из исключения', tags: ['из инбокса'], updated: 'сейчас', funnel: 'sale', dealType: 'Продажа', objectType: 'апартаменты', readiness: 'оффплан', saleKind: 'первичка', side: 'покупатель', goal: c.goal || 'Инвестиция', paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Импорт', partnerAgent: null, companyId: null, consideredProjects: [], stageDays: 0, prov: { budget: 'ai', source: 'ai', goal: 'ai', objectType: 'ai', paymentForm: 'ai' } });
       }
       data.inbox = data.inbox.filter((x) => x.id !== id);
-      WS.storeApi.toast('Квалифицировано → создана сделка в канбане (стадия «Новая заявка»)', 'ok');
-      WS.store.clientsTab = 'deals'; WS.store.dealFunnel = 'sale_offplan';
+      WS.storeApi.toast('Квалифицировано → создана сделка в канбане (стадия «В работе»)', 'ok');
+      WS.store.clientsTab = 'deals'; WS.store.dealFunnel = 'sale';
       WS.router.go('clients');
       return;
     }
@@ -3742,6 +5749,7 @@
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Мой день · сегодня ' + today.length + od + '</div>' +
       '<button class="btn sm" data-nav="tasks">' + I('arrowRight') + 'Все задачи</button></div>' + top;
   }
+
   // ---- Экран «Задачи» ----
   function tasksInsights() {
     return '<div class="section-label" style="margin:4px 0 8px;display:flex;align-items:center;gap:8px">Инсайты · группы задач <span class="badge ai-b">' + I('sparkle') + 'AI-сгенерировано</span></div>' + insightCards();
@@ -3851,7 +5859,7 @@
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' +
       '<div class="form-grid">' +
       '<label class="fld"><span>Что сделать</span><input id="ntTitle" type="text" placeholder="Например: перезвонить по КП"></label>' +
-      '<label class="fld"><span>Клиент</span><select id="ntClient">' + clientOpts + '</select></label>' +
+      pickerField('ntClient', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
       '<label class="fld"><span>Исполнитель</span><select id="ntAssignee">' + teamOpts + '</select></label>' +
       '<label class="fld"><span>Тип</span><select id="ntKind">' + kindOpts + '</select></label>' +
       '<label class="fld"><span>Срок</span><select id="ntWhen"><option value="today">сегодня</option><option value="tomorrow">завтра</option></select></label>' +
@@ -3922,22 +5930,85 @@
   function openDealForm(prefClient) {
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '"' + (c.id === prefClient ? ' selected' : '') + '>' + c.name + '</option>').join('');
     const objOpts = D().objects.map((o) => '<option value="' + o.id + '">' + o.name.split(',')[0] + '</option>').join('');
-    const stageOpts = STAGES.map((s) => '<option value="' + s.k + '">' + s.label + '</option>').join('');
+    // Stage options follow the funnel the form is currently on. Offering every stage of every
+    // funnel would let an agent file a lease deal at «Бронь (EOI)», which that funnel does not have.
+    // Stage options belong to ONE funnel — the board the agent is standing on — and «Тип сделки»
+    // is preselected to the same service, so the two cannot start out disagreeing. createDeal
+    // clamps anyway, because the type select is still free to change afterwards.
+    const curFunnel = (WS.FUNNELS || []).find((x) => x.k === (S().dealFunnel || 'sale')) || (WS.FUNNELS || [])[0] || { k: 'sale' };
+    const stageOpts = stepsForFunnel(curFunnel.k).filter((k) => k !== 'lost')
+      .map((k) => '<option value="' + k + '">' + stageLabel(k) + '</option>').join('');
+    const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
+    const agentOpts = dealAgentOptions(null);
+    const curType = (DEAL_ENUMS.dealType.find((t) => funnelForType(t) === curFunnel.k)) || DEAL_ENUMS.dealType[0];
+    const dealTypeOpts = DEAL_ENUMS.dealType.map((dt) => '<option value="' + dt + '"' + (dt === curType ? ' selected' : '') + '>' + dt + '</option>').join('');
+    const objectTypeOpts = DEAL_ENUMS.objectType.map((ot) => '<option value="' + ot + '">' + ot + '</option>').join('');
+    const paymentFormOpts = DEAL_ENUMS.paymentForm.map((pf) => '<option value="' + pf + '">' + pf + '</option>').join('');
+    const sourceOpts = DEAL_ENUMS.source.map((s) => '<option value="' + s + '">' + s + '</option>').join('');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Создать сделку вручную — из формы, приложенной заявки или PDF (в демо — форма). Это структурированный экран, а не диалог с Консьержем.</p>' +
-      '<div class="form-grid">' +
-      '<label class="fld"><span>Клиент</span><select id="nd_client">' + clientOpts + '</select></label>' +
-      '<label class="fld"><span>Объект</span><select id="nd_object">' + objOpts + '</select></label>' +
+      '<div class="section-label">Кто и что</div><div class="match-grid">' +
+      '<label class="fld wide"><span>Суть сделки</span><input id="nd_title" type="text" placeholder="Напр.: Инвест-квартира в Business Bay"></label>' +
+      pickerField('nd_client', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
+      pickerField('nd_object', 'Объект', objOpts, 'Поиск по названию объекта…') +
       '<label class="fld"><span>Сумма, AED</span><input id="nd_amount" type="number" step="50000"></label>' +
       '<label class="fld"><span>Стадия</span><select id="nd_stage">' + stageOpts + '</select></label>' +
+      '</div><div class="section-label">Условия</div><div class="match-grid">' +
+      '<label class="fld"><span>Тип сделки</span><select id="nd_dealType">' + dealTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Тип объекта</span><select id="nd_objectType">' + objectTypeOpts + '</select></label>' +
+      '<label class="fld"><span>Готовность</span><select id="nd_readiness">' + DEAL_ENUMS.readiness.map((r) => '<option value="' + r + '">' + r + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Вид сделки</span><select id="nd_saleKind">' + DEAL_ENUMS.saleKind.map((r) => '<option value="' + r + '">' + (r || '—') + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Сторона клиента</span><select id="nd_side">' + DEAL_ENUMS.side.map((r) => '<option value="' + r + '">' + r + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Форма оплаты</span><select id="nd_paymentForm">' + paymentFormOpts + '</select></label>' +
+      '<label class="fld"><span>Источник</span><select id="nd_source">' + sourceOpts + '</select></label>' +
+      '<label class="fld"><span>Цель</span><input id="nd_goal" type="text"></label>' +
+      '<label class="pcheck wide"><input type="checkbox" id="nd_vat"> Применяется VAT 5%</label>' +
+      '</div><div class="section-label">Ответственность</div><div class="match-grid">' +
+      pickerField('nd_company', 'Компания', '<option value="">— без компании</option>' + companyOpts, 'Поиск по названию компании…') +
+      '<label class="fld"><span>Ответственный агент</span><select id="nd_agent">' + agentOpts + '</select></label>' +
       '</div>' +
       '<div class="prov" style="margin-top:10px"><span class="badge">' + I('upload') + 'Приложить заявку (PDF) — демо</span><span class="badge demo">' + I('lock') + 'ручное создание</span></div>';
-    openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>');
+    openModal('Создать сделку', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="createDeal">' + I('check') + 'Создать сделку</button>', { wide: true });
   }
   function createDeal() {
     const cid = _g('nd_client'); const c = D().clients.find((x) => x.id === cid) || {};
+    const dealType = _g('nd_dealType') || 'Продажа';
+    const funnel = funnelForType(dealType);
+    // The stage list came from the board in view; the funnel comes from the chosen service. If the
+    // agent changed the service after opening the form, the stage is pulled into the new funnel
+    // instead of filing the deal where no column can draw it.
+    const readiness = _g('nd_readiness') || 'готовый';
+    const stage = clampStage(funnel, _g('nd_stage') || 'prep', readiness);
+    // The essence is what the deal is called everywhere afterwards; fall back to the client's name
+    // only when the agent left it blank, which is what the card used to do unconditionally.
+    const title = (_g('nd_title') || '').trim() || c.name || 'Сделка';
     const id = 'dm_' + Math.round(performance.now());
-    WS.storeApi.applyEffects([{ op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: _g('nd_object'), agent: 'u_marina', amount: parseInt(_g('nd_amount'), 10) || 0, hot: false, stage: _g('nd_stage') || 'new', title: c.name || 'Сделка', sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас' } }]);
-    closeModal(); WS.storeApi.toast('Сделка создана', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
+    const createdAt = (function() {
+      const now = (WS.fixtures && WS.fixtures.DEMO_NOW) || { d: 14, mo: 5 };
+      const months = ['', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+      return now.d + ' ' + months[now.mo];
+    })();
+    // У сделки всегда есть заявка, из которой она выросла, — даже когда её заводят руками.
+    // Ручное заведение это перенос уже идущей работы: запрос клиента был, просто не записан.
+    // Заводим его тем же движением, иначе у сделки нет ни истории запроса, ни места, где живут
+    // клиентские документы, и она выпадает из сводной воронки как сирота.
+    const rid = 'rm_' + id.slice(3);
+    const objForDeal = _g('nd_object');
+    const amount = parseInt(_g('nd_amount'), 10) || 0;
+    WS.storeApi.applyEffects([
+      { op: 'addRequest', obj: { id: rid, clientId: cid, title: title, createdAt: createdAt, channel: 'crm',
+        funnel: funnel, interest: dealType, paymentForm: _g('nd_paymentForm') || '100% оплата',
+        vat: !!(document.getElementById('nd_vat') || {}).checked, source: _g('nd_source') || 'Импорт', partnerAgent: null,
+        dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', bedrooms: '', goal: _g('nd_goal') || '',
+        budget: amount, areas: [], horizon: null, assignee: _g('nd_agent') || 'u_marina',
+        leadStatus: 'Условия согласованы', temperature: 'warm', nextContact: '—', funding: '',
+        offered: objForDeal ? [{ id: objForDeal, state: 'selected' }] : [], kp: { formed: false },
+        note: 'Заявка заведена вместе со сделкой при ручном переносе: запрос клиента был, в системе его не было.' } },
+      { op: 'addDeal', obj: { _new: true, id: id, clientId: cid, objectId: objForDeal, agent: _g('nd_agent') || 'u_marina', amount: amount, hot: false, stage: stage, title: title, sub: 'создано вручную', tags: ['ручное'], updated: 'сейчас', createdAt: createdAt, requestId: rid, funnel: funnel, dealType: dealType, objectType: _g('nd_objectType') || 'апартаменты', readiness: readiness, saleKind: _g('nd_saleKind') || '', side: _g('nd_side') || 'покупатель', paymentForm: _g('nd_paymentForm') || '100% оплата', source: _g('nd_source') || 'Импорт', goal: _g('nd_goal') || '', vat: !!(document.getElementById('nd_vat') || {}).checked, companyId: _g('nd_company') || null, prov: { budget: 'confirmed', paymentForm: 'confirmed', objectType: 'confirmed', readiness: 'confirmed', saleKind: 'confirmed', side: 'confirmed', goal: 'confirmed', source: 'confirmed' } } },
+    ]);
+    D().requestTimeline = D().requestTimeline || {};
+    D().requestTimeline[rid] = [{ ch: 'crm', kind: 'raw', by: 'Система', at: createdAt, ord: 999,
+      text: 'Перенос: сделка и её заявка заведены вручную, условия уже согласованы.' }];
+    closeModal(); WS.storeApi.toast('Сделка создана вместе с заявкой', 'ok'); S().clientsTab = 'deals'; WS.router.go('clients');
   }
 
   // Manager's team view (inner HTML — embedded into "Рабочий день").
@@ -3971,23 +6042,37 @@
   function teamAgentStats(id) {
     const list = D().deals.filter((d) => d.agent === id);
     const val = list.reduce((s, d) => s + (d.amount || 0), 0);
-    const active = list.filter((d) => d.stage !== 'done').length;
+    const active = list.filter((d) => !dealClosed(d)).length;
     const meta = TEAM_META[id] || { focus: '—', load: 50, conv: 30, sla: 90 };
     return { list: list, val: val, active: active, deals: list.length, meta: meta };
   }
+  // A head of brokerage opens the morning on money against plan, who will miss it, what is stuck and
+  // who is drowning. «Агентов на смене · вся команда активна» was a constant that decided nothing;
+  // «План месяца · N / 12» hard-coded the plan. Both are gone.
   function mgrTiles() {
-    const active = D().deals.filter((d) => d.stage !== 'done');
+    const deals = D().deals || [];
+    const active = deals.filter((d) => !dealClosed(d));
     const pipeline = Math.round(active.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
-    const closed = D().deals.filter((d) => d.stage === 'done').length;
+    // Closed business for the period lives in `attribution` — the same book the goals read, so the
+    // Пульс cannot contradict «План отдела» two blocks below it.
+    const attr = D().attribution || [];
+    const earned = attr.reduce((s, x) => s + (x.commission || 0), 0) +
+      Math.round(deals.filter(dealWon).reduce((s, d) => s + dealCommission(d), 0));
+    const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter(dealWon).length;
     const unassigned = (D().inbox || []).length;
-    const slaBreaches = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
+    const atRisk = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
+    const avgSla = Math.round(Object.keys(TEAM_META).reduce((s, k) => s + TEAM_META[k].sla, 0) / Object.keys(TEAM_META).length);
+    const stuckPred = (SAVED_VIEWS.find((v) => v.k === 'stuck') || {}).pred || (() => false);
+    const stuck = deals.filter(stuckPred);
+    const stuckSum = Math.round(stuck.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
     return '<div class="tiles" style="margin-top:20px">' +
-      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активные сделки всех агентов', 'up', 'accent', 'data-nav="clients"') +
-      tile('target', 'План месяца', closed + ' / 12', 'сделок', '', 'Закрыто из цели отдела', '', '', 'data-nav="analytics"') +
-      tile('warn', 'Нарушения SLA', slaBreaches, '', '', 'Агенты вне норматива', '', '', 'data-nav="team"') +
-      tile('mail', 'Нераспределённые', unassigned, '', '', 'Заявки ждут агента', '', '', 'data-nav="leads"') +
+      tile('money', 'Комиссия отдела за квартал', WS.AED(earned), '', '', closedN + ' ' + plural(closedN, 'закрытая сделка', 'закрытые сделки', 'закрытых сделок'), 'up', 'accent', 'data-nav="analytics"') +
+      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активных сделок — ' + active.length, 'up', '', 'data-nav="clients"') +
+      tile('clock', 'Застряли в стадии', stuck.length, '', '', stuckSum ? stuckSum.toLocaleString('ru-RU') + ' млн AED без движения 5+ дней' : 'всё движется', '', stuck.length ? 'accent' : '', 'data-savedview="stuck" data-nav="clients"') +
+      tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
+      tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
+      tile('mail', 'Нераспределённые заявки', unassigned, '', '', unassigned ? 'Ждут агента — назначить' : 'Все заявки распределены', '', unassigned > 0 ? 'accent' : '', 'data-nav="leads"') +
       tile('check', 'На согласовании', MGR_APPROVALS.length - (S().apprDone || []).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
-      tile('users', 'Агентов на смене', Object.keys(TEAM_META).length, '', '', 'Вся команда активна', '', '', 'data-nav="team"') +
       '</div>';
   }
   function viewTeam() {
@@ -4194,7 +6279,7 @@
     const body = wsDocHead('Переговорный бриф', 'К звонку · ' + c.name, 'Цель: согласовать объект и снять возражение по первому платежу') +
       '<div class="section-label">Сравнение объектов · чистая доходность</div>' +
       barChart([{ label: 'Creekline 1208', value: nyC, fmt: WS.finance.pct(nyC), hot: nyC >= 0.05 }, { label: 'Palm Court 704', value: nyP, fmt: WS.finance.pct(nyP), hot: nyP >= 0.05 }]) +
-      '<div class="section-label">Психологический профиль</div>' +
+      '<div class="section-label">Портрет клиента</div>' +
       '<div class="prov">' + (p.decision ? '<span class="badge">' + I('users') + p.decision + '</span>' : '') + (p.values || []).map((v) => '<span class="badge acc">' + I('target') + v + '</span>').join('') + '</div>' +
       '<div class="ws-flag" style="margin-top:8px">' + I('sparkle') + ' <b>Как вести разговор:</b> ' + (p.tone || 'по делу, с расчётами') + '. Триггеры: ' + ((p.triggers || []).join(', ') || '—') + '.</div>' +
       '<div class="section-label">Аргументы (с источниками)</div>' +
@@ -4419,8 +6504,10 @@
       '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
+  // Компании — legal entities (developers, funds, corporates, agencies). The list, its search and
+  // its filter live in companiesBlock() so the same block serves this screen and the contacts one.
   function viewCompanies() {
-    return head('Компании', 'Юрлица: застройщики, фонды, корпоративные клиенты, агентства. KYC-статус (не рейтинг) и связанные сделки. Клик по строке — карточка компании.',
+    return head('Компании', 'Юрлица: застройщики, фонды, корпоративные клиенты, агентства. KYC-статус (не рейтинг), контактные лица с ролями и связанные сделки. Клик по строке — карточка компании.',
       '<button class="btn sm primary" data-act="newContact">' + I('plus') + 'Добавить компанию</button>') + companiesBlock();
   }
   // Аналитика — team funnel + canonical metrics (reuses manager blocks).
@@ -4599,7 +6686,7 @@
     }).join('');
     const stat = '<div class="fin-kpis" style="margin-bottom:14px">' +
       '<div class="kpi"><div class="kv">' + (D().objects || []).length + '</div><div class="kk">Объектов в работе</div></div>' +
-      '<div class="kpi"><div class="kv">' + (D().deals || []).filter((d) => d.stage === 'done').length + '</div><div class="kk">Закрыто · демо</div></div>' +
+      '<div class="kpi"><div class="kv">' + (D().deals || []).filter(dealWon).length + '</div><div class="kk">Закрыто · демо</div></div>' +
       '<div class="kpi"><div class="kv">2–3%</div><div class="kk">Типовая комиссия</div></div></div>';
     const portfolio = '<div class="card" style="margin:16px 0 12px"><div class="section-label" style="padding:12px 16px 4px">Портфолио · кейсы</div><div class="feed" style="padding:0 16px 8px">' +
       PORTFOLIO.map((c) => '<div class="feed-row"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + c[0] + '</div><div class="m">' + c[2] + '</div></div><span class="badge ok" style="white-space:nowrap">' + I('check') + c[1] + '</span></div>').join('') + '</div></div>';
@@ -4628,8 +6715,8 @@
     const isMgr = S().role === 'manager';
     const role = isMgr ? 'Руководитель отдела · Harbour Key Realty' : 'Брокер · коммерческая недвижимость';
     const deals = D().deals || [];
-    const active = deals.filter((d) => d.stage !== 'done').length;
-    const closed = deals.filter((d) => d.stage === 'done').length;
+    const active = deals.filter((d) => !dealClosed(d)).length;
+    const closed = deals.filter(dealWon).length;
     const badges = '<span class="badge ok">' + I('shield') + 'RERA · BRN 41857</span>' +
       '<span class="badge acc">' + I('star') + 'Клуб · co-broking</span>' +
       '<span class="badge">' + I('check') + 'KYC подтверждён</span>';
@@ -4657,7 +6744,7 @@
     // Private metrics — visible only to the broker (not on the public витрина).
     const priv = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 10px;display:flex;align-items:center;gap:8px">Личная статистика <span class="badge demo">' + I('lock') + 'только вам</span></div>' +
       '<div class="fin-kpis">' +
-      '<div class="kpi"><div class="kv">214 000</div><div class="kk">Комиссия · квартал, AED</div></div>' +
+      '<div class="kpi"><div class="kv">' + WS.AED(goalFact({ metric: 'commission' }, S().role === 'manager' ? 'team' : 'me')) + '</div><div class="kk">Комиссия · квартал</div></div>' +
       '<div class="kpi"><div class="kv">34%</div><div class="kk">Конверсия лид → сделка</div></div>' +
       '<div class="kpi"><div class="kv">1,7</div><div class="kk">Средний чек, млн AED</div></div>' +
       '<div class="kpi"><div class="kv">28%</div><div class="kk">Повторные клиенты</div></div></div></div>';
@@ -4676,7 +6763,32 @@
       '</div>';
     const profileContact = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 10px">Контактные данные</div>' +
       contactVCard(USER_CONTACTS[S().role] || USER_CONTACTS.agent, 'whatsapp') + '</div>';
-    return header + profileContact + kpis + priv + about + objectsCard + svcAcc + links;
+    // Goals are configured here and surfaced on the Pulse; the row renderer is shared with
+    // pulseMyGoals so the two screens can never drift apart.
+    const goals = (u && u.goals) || [];
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    const goalsRows = goals.map((g) => {
+      const p = computeGoalProgress(g, scope);
+      const m = GOAL_METRICS[g.metric] || { label: g.metric };
+      const bar = Math.max(2, Math.min(100, p.pct));
+      const pin = '<button class="btn xs' + (g.pinned ? ' primary' : '') + '" data-act="toggleGoalPin" data-goal="' + g.id + '" title="' +
+        (g.pinned ? 'Убрать с Пульса' : 'Показывать на Пульсе') + '">' + I(g.pinned ? 'check' : 'plus') + 'На Пульсе</button>';
+      return '<div class="goal-row">' +
+        '<div class="goal-head"><span class="goal-label">' + escAttr(g.label) + '</span>' +
+        '<span class="goal-num">' + goalValue(g.metric, p.fact) + ' <i>из ' + goalValue(g.metric, p.target) + '</i></span></div>' +
+        '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
+        '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
+        '<span>' + m.label + ' · ' + (g.period === 'quarter' ? 'квартал' : 'месяц') + '</span>' +
+        '<span class="goal-acts">' + pin +
+        '<button class="btn xs" data-act="editGoal" data-goal="' + g.id + '">' + I('pencil') + 'Изменить</button>' +
+        '<button class="btn xs" data-act="deleteGoal" data-goal="' + g.id + '" title="Удалить цель">' + I('x') + '</button></span></div></div>';
+    }).join('');
+    const goalsEmpty = '<div style="font-size:12.5px;color:var(--mut);max-width:64ch">Целей пока нет. Поставьте первую — комиссия за месяц, число закрытых сделок, показы или новые клиенты. Прогресс Пульс посчитает сам, по вашим сделкам, и покажет темп против календаря.</div>';
+    const goalsCard = '<div class="card pad" style="margin-bottom:14px">' +
+      '<div class="wq-head" style="margin:0 0 12px"><div class="section-label" style="margin:0">' + (scope === 'team' ? 'Цели отдела' : 'Мои цели') + '</div>' +
+      '<button class="btn sm primary" data-act="addGoal">' + I('plus') + 'Добавить цель</button></div>' +
+      (goals.length ? goalsRows : goalsEmpty) + '</div>';
+    return header + profileContact + kpis + priv + about + goalsCard + objectsCard + svcAcc + links;
   }
 
   // ---------------- КЛУБНЫЕ (портал закрытого клуба брокеров и инвесторов) ----------------
@@ -5005,6 +7117,317 @@
       '</div>';
   }
 
+
+  // ---- Contracts: the process that runs after a deal is won -----------------------------------
+  // Decision of 14 August: сопровождение is not a stage of the board but an object of its own. An
+  // off-plan contract lives three to five years on a payment schedule; a stage cannot hold that,
+  // and a deal left open for it reports work that is already done as pipeline.
+  //
+  // Every milestone carries two wordings. `label` is ours; `client` is what a client would read.
+  // They are authored together deliberately: the client register is meant to reach a client cabinet
+  // later, and writing it after the fact means re-deciding every milestone's disclosure at once.
+  function contractsAll() { return D().contracts || []; }
+  function contractById(id) { return contractsAll().find((k) => k.id === id) || null; }
+  function contractsOfDeal(id) { return contractsAll().filter((k) => k.dealId === id); }
+  function contractsOfClient(id) { return contractsAll().filter((k) => k.clientId === id); }
+  function contractKind(k) { return ((WS.fixtures && WS.fixtures.CONTRACT_KINDS) || {})[k && k.kind] || { label: 'Договор', icon: 'doc' }; }
+  function contractStep(k) {
+    const ms = (k && k.milestones) || [];
+    const cur = ms.filter((m) => m.state === 'now');
+    return { cur: cur, done: ms.filter((m) => m.state === 'done').length, total: ms.length };
+  }
+  // Money on a contract is a state, not a number: a developer pays in tranches, and the difference
+  // between «начислено» and «оплачено» is what tells an agent whether to chase anyone.
+  function commissionState(k) {
+    const c = (k && k.commission) || { entries: [] };
+    const paid = (c.entries || []).filter((e) => e.k === 'paid');
+    const got = paid.reduce((sum, e) => sum + (e.state === 'wait' ? 0 : (e.amount || 0)), 0);
+    const total = c.total || 0;
+    const label = !total ? '—' : (got >= total ? 'получена' : (got > 0 ? 'получена частично' : ((c.entries || []).some((e) => e.k === 'invoiced' && e.state !== 'wait') ? 'счёт выставлен' : 'начислена')));
+    return { total: total, got: got, label: label, tone: got >= total && total ? 'ok' : (got > 0 ? 'acc' : ''), payer: c.payer || 'по договору', vat: !!c.vat };
+  }
+  function contractRow(k) {
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const st = contractStep(k), money = commissionState(k);
+    const now = st.cur.length ? st.cur.map((m) => m.label).join(' · ') : 'все вехи пройдены';
+    return '<div class="feed-row" data-contract="' + k.id + '" style="cursor:pointer">' +
+      '<div class="fi i-acc">' + I(contractKind(k).icon) + '</div>' +
+      '<div class="ft"><div class="t">' + contractKind(k).label + ' · ' + (c.name || '—') + '</div>' +
+      '<div class="m">' + now + ' · веха ' + Math.min(st.done + 1, st.total) + ' из ' + st.total +
+      (k.nextDue ? ' · ' + k.nextDue : '') + '</div></div>' +
+      '<span class="badge ' + money.tone + '">' + I('money') + 'Комиссия · ' + money.label + '</span>' +
+      I('arrowRight') + '</div>';
+  }
+  function viewContracts() {
+    const list = contractsAll();
+    const active = list.filter((k) => k.status !== 'closed');
+    const due = active.filter((k) => k.nextDue).length;
+    const owed = active.reduce((sum, k) => { const m = commissionState(k); return sum + Math.max(0, m.total - m.got); }, 0);
+    const rows = list.map(contractRow).join('') ||
+      '<div style="font-size:12px;color:var(--faint);padding:10px 0">договоров пока нет — они открываются после успешной сделки</div>';
+    return heroBand('Договоры', 'Что идёт после успешной сделки: платежи по графику, регистрация права, продления. Сделка закрывается на подписании — дальше живёт договор.', 'o_bayline') +
+      '<div class="tiles" style="margin-top:20px">' +
+      tile('doc', 'Действующих договоров', active.length, '', '', 'Открыты после успешных сделок', '', 'accent', 'data-nav="contracts"') +
+      tile('money', 'Комиссия к получению', WS.AED(owed), '', '', owed ? 'Начислено, но ещё не поступило' : 'Всё получено', '', owed ? 'accent' : '', 'data-nav="contracts"') +
+      tile('clock', 'Со сроком на контроле', due, '', '', 'Платежи, продления, отчётность', '', '', 'data-nav="contracts"') +
+      '</div>' +
+      '<div class="card" style="margin-top:16px"><div class="section-label" style="padding:14px 16px 0">Договоры · ' + list.length + '</div>' +
+      '<div class="feed" style="padding:2px 16px 10px">' + rows + '</div></div>';
+  }
+  function contractMilestones(k, forClient) {
+    // `internalOnly` is a promise the model makes: such a milestone never reaches the client side,
+    // however the cabinet is eventually built. Honouring it only in a comment is worse than not
+    // making the promise — the preview would be showing what it claims it never shows.
+    const src = (k.milestones || []).filter((m) => !(forClient && m.internalOnly));
+    const rows = src.map((m, i) => {
+      const cls = m.state === 'done' ? 'done' : (m.state === 'now' ? 'now' : 'wait');
+      const icon = m.state === 'done' ? 'check' : (m.state === 'now' ? 'clock' : 'dot');
+      const text = forClient ? (m.client || m.label) : m.label;
+      return '<div class="ms-row ' + cls + '"><span class="ms-i">' + I(icon) + '</span>' +
+        '<span class="ms-t"><span class="ms-l">' + text + '</span>' +
+        '<span class="ms-a">' + (m.at || '—') + '</span></span></div>';
+    }).join('');
+    const hidden = (k.milestones || []).length - src.length;
+    return '<div class="ms-list">' + rows + '</div>' +
+      (forClient && hidden ? '<div class="gate-foot">Скрыто от клиента: ' + hidden + ' ' +
+        plural(hidden, 'внутренняя веха', 'внутренние вехи', 'внутренних вех') + '.</div>' : '');
+  }
+  function contractMoney(k) {
+    const m = commissionState(k);
+    const rows = ((k.commission || {}).entries || []).map((e) => {
+      const cls = e.state === 'done' ? 'done' : (e.state === 'now' ? 'now' : 'wait');
+      return '<div class="ms-row ' + cls + '"><span class="ms-i">' + I(e.state === 'done' ? 'check' : (e.state === 'now' ? 'clock' : 'dot')) + '</span>' +
+        '<span class="ms-t"><span class="ms-l">' + e.label + ' · ' + WS.AED(e.amount || 0) + '</span>' +
+        '<span class="ms-a">' + (e.at || '—') + '</span></span></div>';
+    }).join('');
+    return '<div class="dfields">' +
+      dfPair('Комиссия по договору', WS.AED(m.total)) +
+      dfPair('Получено', WS.AED(m.got) + (m.got && m.got < m.total ? ' · частично' : '')) +
+      dfPair('Плательщик', m.payer) +
+      dfPair('VAT', m.vat ? '5% применяется' : 'не применяется') +
+      ((k.commission || {}).split ? dfPair('Co-broking', k.commission.split) : '') +
+      '</div><div style="height:12px"></div><div class="ms-list">' + rows + '</div>' +
+      '<div class="gate-foot">Выплата отстаёт от передачи и часто приходит частями — поэтому комиссия ведётся статусом, а не одним числом в сделке.</div>';
+  }
+
+  // ---- Contract as a PROCESS card, built on the deal's frame ------------------------------------
+  // A contract has stages exactly as a deal does — they are just measured in months rather than
+  // days — so it gets the same reading order: hero → what it is → step line → chips → facing pair
+  // (brief + schedule on the left, client + latest events on the right). Anything less made it a
+  // list of milestones wearing a card, which is what it was.
+  function contractHero(k) {
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const o = (D().objects || []).find((x) => x.id === k.objectId);
+    const bg = (o && WS.photos && WS.photos[o.id]) || (WS.photos && WS.photos.o_interior) || '';
+    const init = (c.name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    const sub = [contractKind(k).label, o ? o.name.split(',')[0] : null, k.amount ? WS.AED(k.amount) : null].filter(Boolean).join(' · ');
+    return '<div class="dhero">' + (bg ? '<img class="dhero-img" src="' + bg + '" alt="">' : '') +
+      '<div class="dhero-scrim"></div>' +
+      '<div class="dhero-content"><div class="dhero-av">' + init + '</div>' +
+      '<div class="dhero-info"><div class="dhero-name">' + (c.name || 'Без клиента') + '</div>' +
+      '<div class="dhero-sub">' + sub + '</div></div></div></div>';
+  }
+  function contractStepperSection(k) {
+    const ms = k.milestones || [];
+    const idx = Math.max(0, ms.findIndex((m) => m.state === 'now'));
+    const steps = ms.map((m, i) => {
+      const cls = m.state === 'done' ? 'done' : (m.state === 'now' ? 'cur' : 'todo');
+      return '<button class="dx-step ' + cls + '" title="' + escAttr(m.at || '') + '"><span class="d">' +
+        (m.state === 'done' ? I('check') : String(i + 1)) + '</span><span class="l">' + m.label + '</span></button>';
+    }).join('');
+    const cap = 'Веха ' + (idx + 1) + ' из ' + ms.length + ' · ' + ((ms[idx] || {}).label || '—');
+    return dxSec('trend', 'Ход договора', '<span class="dx-step-cap">' + cap + '</span>',
+      '<div class="dx-stepper' + (ms.length > 5 ? ' long' : '') + '">' + steps + '</div>');
+  }
+  function contractChipRow(k) {
+    const age = createdAgoLabel({ createdAt: k.signedAt });
+    const money = commissionState(k);
+    return '<div class="dnb-chips">' +
+      '<span class="chip">' + I('calendar') + 'подписан ' + k.signedAt + (age ? ' · ' + age : '') + '</span>' +
+      (k.nextDue ? '<span class="chip">' + I('clock') + k.nextDue + '</span>' : '') +
+      '<span class="chip">' + I('money') + 'комиссия ' + money.label + '</span>' +
+      (k.status === 'closed' ? '<span class="chip">' + I('check') + 'закрыт</span>' : '') + '</div>';
+  }
+  // The schedule is what the contract IS for an off-plan purchase or a lease. Rendering it as one
+  // milestone («платежи по графику») hid the four dates the money actually moves on.
+  function contractSchedule(k) {
+    const rows = (k.schedule || []).map((x) => {
+      const cls = x.state === 'paid' ? 'done' : (x.state === 'wait' ? 'wait' : 'now');
+      const tone = x.state === 'paid' ? 'ok' : (x.state === 'overdue' ? 'stop' : (x.state === 'due' ? 'acc' : ''));
+      const word = x.state === 'paid' ? 'оплачен' : (x.state === 'overdue' ? 'просрочен' : (x.state === 'due' ? 'ближайший' : 'ожидается'));
+      return '<div class="ms-row ' + cls + '"><span class="ms-i">' + I(x.state === 'paid' ? 'check' : (x.state === 'due' ? 'clock' : 'dot')) + '</span>' +
+        '<span class="ms-t"><span class="ms-l">' + x.label + ' · ' + WS.AED(x.amount || 0) + '</span>' +
+        '<span class="ms-a">' + (x.due || '—') + '</span></span>' +
+        '<span class="badge ' + tone + '">' + word + '</span></div>';
+    }).join('');
+    if (!rows) return '';
+    const paid = (k.schedule || []).filter((x) => x.state === 'paid').reduce((a, x) => a + (x.amount || 0), 0);
+    const total = (k.schedule || []).reduce((a, x) => a + (x.amount || 0), 0);
+    return dxSec('money', 'График по договору',
+      '<span class="badge' + (paid >= total ? ' ok' : ' acc') + '">' + WS.AED(paid) + ' из ' + WS.AED(total) + '</span>',
+      '<div class="ms-list">' + rows + '</div>');
+  }
+  function contractDocs(k) {
+    const rows = (k.documents || []).map((x) => {
+      const on = x.state === 'ok';
+      return '<div class="ms-row ' + (on ? 'done' : 'wait') + '"><span class="ms-i">' + I(on ? 'doc' : 'dot') + '</span>' +
+        '<span class="ms-t"><span class="ms-l">' + x.name + '</span><span class="ms-a">' + (x.at || '—') + '</span></span>' +
+        (on ? '<button class="btn xs" data-act="contractDoc" data-kref="' + k.id + '" data-docname="' + escAttr(x.name) + '">' + I('download') + 'Открыть</button>'
+            : '<span class="badge">ожидается</span>') + '</div>';
+    }).join('');
+    return dxSec('doc', 'Документы договора', '', rows || '<div style="font-size:12px;color:var(--faint);padding:6px 0">документов по договору пока нет</div>');
+  }
+  // Latest events, mirroring dealRecentCard — a contract card with no recent activity reads as dead.
+  function contractRecentCard(k) {
+    const rows = (k.timeline || []).slice(0, 3).map((e) => tlRow(e)).join('') ||
+      '<div style="font-size:12px;color:var(--faint);padding:6px 0">событий пока нет</div>';
+    return dxSec('clock', 'Последние события',
+      '<button class="btn xs" data-etab="contract~' + k.id + '~history">' + I('arrowRight') + 'вся история</button>',
+      '<div class="feed">' + rows + '</div>');
+  }
+  // The contract brief: where this contract stands, what moves next and whether the money arrived.
+  function contractBriefSentences(k) {
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const st = contractStep(k), money = commissionState(k);
+    const out = [];
+    const age = createdAgoLabel({ createdAt: k.signedAt });
+    // The client's name never lands after a preposition: «с Анна Петрова» is what a template
+    // produces, and there is no reliable way to decline an arbitrary name.
+    out.push(contractKind(k).label + ', номер ' + k.number + '. Клиент — ' + (c.name || 'не указан') +
+      '; подписан ' + k.signedAt + (age ? ', ' + age : '') + '.');
+    const now = st.cur.map((m) => lowerFirst(m.label));
+    out.push(now.length
+      ? 'Сейчас: ' + now.join('; ') + '.'
+      : 'Все вехи пройдены — договор можно закрывать.');
+    const late = (k.schedule || []).find((x) => x.state === 'overdue');
+    const due = (k.schedule || []).find((x) => x.state === 'due');
+    if (late) out.push('Просрочен платёж: ' + lowerFirst(late.label) + ' на ' + WS.AED(late.amount) + ', срок был ' + late.due + '.');
+    else if (due) out.push('Ближайший платёж — ' + lowerFirst(due.label) + ' на ' + WS.AED(due.amount) + ', срок ' + due.due + '.');
+    if (money.total) {
+      out.push(money.got >= money.total
+        ? 'Комиссия ' + WS.AED(money.total) + ' получена полностью, платил ' + money.payer + '.'
+        : 'Из комиссии ' + WS.AED(money.total) + ' получено ' + WS.AED(money.got) + '; платит ' + money.payer + '.');
+    }
+    const waitingDocs = (k.documents || []).filter((x) => x.state !== 'ok').length;
+    if (waitingDocs) out.push('Не хватает ' + waitingDocs + ' ' + plural(waitingDocs, 'документа', 'документов', 'документов') + '.');
+    return out;
+  }
+  function contractStatusBrief(k) {
+    return dxSec('sparkle', 'Справка по договору', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
+      '<p class="deal-brief">' + contractBriefSentences(k).join(' ') + '</p>');
+  }
+  function contractClientCard(k) {
+    const c = D().clients.find((x) => x.id === k.clientId);
+    if (!c) return '';
+    // Explicit thread: passing the contract through as a deal produced «deal:k_palm», a thread id
+    // for a deal that does not exist.
+    return dealClientCard({ clientId: c.id, id: k.id }, 'contract:' + k.id);
+  }
+  function contractHero2(k) {
+    return contractHero(k) +
+      '<div class="deal-title-edit"><span class="deal-title-lbl">' + I('doc') + 'Договор</span>' +
+      '<span class="deal-title-text is-static">' + contractKind(k).label + ' · ' + k.number + '</span></div>';
+  }
+  function contractState(k) {
+    return '<div class="deal-stepper-compact">' + contractStepperSection(k) + '</div>' +
+      contractChipRow(k) +
+      cxStack([[cxCol([contractStatusBrief(k), contractSchedule(k)]),
+                cxCol([contractClientCard(k), contractRecentCard(k)])]]);
+  }
+  // Things you do TO a contract, as opposed to reading it: amend it, invoice against it, renew or
+  // terminate it. They live in the same bar as every other card's actions.
+  // The id travels as data-kref, NOT data-contract: the latter is the navigation attribute a
+  // contract ROW carries, and the delegated handler reaches it first — the button would silently
+  // reopen the card instead of running the verb.
+  function contractActions(k) {
+    const money = commissionState(k);
+    const acts = [
+      ['pencil', 'Доп. соглашение', 'data-act="contractAmend" data-kref="' + k.id + '"', ''],
+      money.got < money.total ? ['money', 'Выставить счёт', 'data-act="contractInvoice" data-kref="' + k.id + '"', 'primary'] : null,
+      k.kind === 'lease' || k.kind === 'lease_comm' ? ['replay', 'Продлить', 'data-act="contractRenew" data-kref="' + k.id + '"', ''] : null,
+      ['x', 'Расторжение', 'data-act="contractTerminate" data-kref="' + k.id + '"', 'danger'],
+      ['chat', 'Чат по договору', 'data-thread="contract:' + k.id + '" data-tlabel="' + escAttr(contractKind(k).label) + '" data-ticon="doc"', ''],
+      k.clientId ? ['users', 'Открыть клиента', 'data-client="' + k.clientId + '"', ''] : null,
+      k.dealId ? ['briefcase', 'Исходная сделка', 'data-deal="' + k.dealId + '"', ''] : null,
+    ].filter(Boolean);
+    return acts;
+  }
+  // A demo has to be honest about what it does not do: these open a described intent, not a stub
+  // that silently succeeds.
+  function contractDocOpen(id, name) {
+    const k = contractById(id); if (!k) return;
+    openModal('Документ · ' + escAttr(name),
+      '<p style="font-size:13px;line-height:1.5;margin-top:0">Документ по договору ' + escAttr(k.number) +
+      '. В рабочей системе здесь открывается файл из хранилища тенанта; в демо файлов нет.</p>' +
+      '<div class="prov" style="margin-top:12px"><span class="badge demo">' + I('lock') + 'демо — файла нет</span></div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+  function contractAct(kind, id) {
+    const k = contractById(id); if (!k) return;
+    const M = {
+      contractAmend: ['Дополнительное соглашение', 'Меняем условия действующего договора: сумму, график платежей, срок или состав услуг. Прежняя редакция сохраняется в истории договора, новая уходит на подпись сторонам.'],
+      contractInvoice: ['Счёт на комиссию', 'Выставляем счёт на невыплаченный остаток комиссии по этому договору. Плательщик — ' + commissionState(k).payer + '. Статус в блоке «Комиссия» перейдёт в «счёт выставлен».'],
+      contractRenew: ['Продление договора', 'Запускаем продление: уведомление об изменении условий за 90 дней, проверка по индексу RERA и перерегистрация Ejari.'],
+      contractTerminate: ['Расторжение договора', 'Расторжение прекращает обязательства сторон и закрывает договор. Начисленная, но не полученная комиссия останется задолженностью и не спишется автоматически.'],
+    }[kind] || ['Действие по договору', ''];
+    openModal(M[0] + ' · ' + escAttr(k.number),
+      '<p style="font-size:13px;line-height:1.5;margin-top:0">' + M[1] + '</p>' +
+      '<div class="prov" style="margin-top:12px"><span class="badge demo">' + I('lock') + 'демо — действие описано, но не выполняется</span></div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+  function contractTabContent(k, tab) {
+    if (tab === 'docs') return contractDocs(k);
+    if (tab === 'money') return dxSec('money', 'Комиссия', '<span class="badge ' + commissionState(k).tone + '">' + commissionState(k).label + '</span>', contractMoney(k));
+    if (tab === 'client') {
+      return dxSec('users', 'Что видит клиент', '<span class="badge demo">' + I('lock') + 'предпросмотр</span>',
+        '<div class="gate-foot" style="margin-top:0;margin-bottom:12px">Так этот договор читается со стороны клиента. Личного кабинета ещё нет — здесь показано, что в него пойдёт: клиент видит, где находится его проект, не звоня агенту.</div>' +
+        contractMilestones(k, true));
+    }
+    if (tab === 'history') {
+      const rows = (k.timeline || []).map((e) => tlRow(e)).join('') ||
+        '<div style="font-size:12px;color:var(--faint);padding:6px 0">по договору пока нет событий</div>';
+      return dxSec('clock', 'История договора', '', '<div class="feed">' + rows + '</div>');
+    }
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const co = (D().companies || []).find((x) => x.id === k.companyId);
+    const o = (D().objects || []).find((x) => x.id === k.objectId);
+    const d = (D().deals || []).find((x) => x.id === k.dealId);
+    // The step line is up in the header now, so the tab carries the dated detail behind it.
+    return cxStack([
+      dxSec('doc', 'Вехи договора', '<span class="badge acc">' + contractStep(k).done + ' из ' + contractStep(k).total + '</span>', contractMilestones(k, false)),
+      dxSec('briefcase', 'Реквизиты договора', '', '<div class="dfields cols2">' +
+        dfPair('Номер', k.number) + dfPair('Подписан', k.signedAt) +
+        dfPair('Клиент', c.name || '—') + (co ? dfPair('Компания', co.name) : '') +
+        (o ? dfPair('Объект', o.name) : '') + dfPair('Сумма договора', WS.AED(k.amount || 0)) +
+        (k.nextDue ? dfPair('Ближайший срок', k.nextDue) : '') +
+        (d ? dfPair('Из сделки', '<a href="#" data-deal="' + d.id + '">' + d.title + '</a>') : dfPair('Из сделки', 'закрыта до демо-периода')) +
+        '</div>'),
+    ]);
+  }
+  function contractSpec(id) {
+    const k = contractById(id); if (!k) return null;
+    const c = D().clients.find((x) => x.id === k.clientId) || {};
+    const money = commissionState(k);
+    return {
+      type: 'contract', id: id, title: contractKind(k).label + ' · ' + (c.name || ''),
+      hero: contractHero2(k),
+      acts: entityActionBar(contractActions(k)),
+      state: contractState(k),
+      tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
+      render: (tab) => contractTabContent(k, tab),
+      concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
+    };
+  }
+  function viewContractDetail(id) {
+    const spec = contractSpec(id);
+    if (!spec) return viewContracts();
+    return entityPage(spec, 'contracts', '', 'Назад к договорам');
+  }
+  function contractCard(id) {
+    const spec = contractSpec(id); if (!spec) return;
+    S().contractId = id; WS.router.go('contractDetail');
+  }
+
   // ---------------- MAIN RENDER ----------------
   function viewFor(id) {
     switch (id) {
@@ -5012,9 +7435,12 @@
       case 'concierge': return viewConcierge();
       case 'clients': return wrap(viewClients());
       case 'objects': return wrap(viewObjects());
+      case 'contracts': return wrap(viewContracts());
+      case 'contractDetail': return wrap(viewContractDetail(S().contractId));
       case 'objectDetail': return wrap(viewObjectDetail(S().objectId));
       case 'dealDetail': return wrap(viewDealDetail(S().dealId));
       case 'clientDetail': return wrap(viewClientDetail(S().clientId));
+      case 'companyDetail': return wrap(viewCompanyDetail(S().companyId));
       case 'tasks': return wrap(viewTasks());
       case 'team': return S().role === 'manager' ? wrap(viewTeam()) : viewStart();
       case 'leads': return S().role === 'manager' ? wrap(viewLeadsDistribution()) : wrap(viewRequests());
@@ -5056,6 +7482,7 @@
 
     if (st.view === 'concierge') mountConcierge();
     if (st.view === 'objects') bindObjects();
+    bindListSearch();
     if (st.view === 'finance') renderFinance();
     // Hide the floating Concierge launcher (W) on the Concierge screen itself — it's redundant there.
     const _fab = document.querySelector('.fab-w'); if (_fab) _fab.style.display = (st.view === 'concierge') ? 'none' : '';
@@ -5067,6 +7494,7 @@
     if (focusId) { const elx = document.getElementById(focusId); if (elx) { elx.focus(); try { elx.setSelectionRange(caret, caret); } catch (e) {} } }
     // docked chat lives outside #app (survives re-render); keep the engine pointed at it while open
     if (st.cgDock) { const m = document.getElementById('cgdockmsgs'); if (m) WS.engine.mount(m, renderDockMsgs); }
+    if (WS.router && WS.router.mark) WS.router.mark();
   }
 
   function showIncompatible() {
@@ -5077,11 +7505,12 @@
 
   WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
     openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+    docsOfDeal, docsOfRequest, docScope, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab };
+    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

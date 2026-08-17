@@ -11,6 +11,7 @@
   const COLLECTIONS = {
     clients: 'контакты',
     deals: 'сделки',
+    requests: 'заявки',
     objects: 'объекты',
     tasks: 'задачи',
     events: 'события календаря',

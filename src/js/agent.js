@@ -19,7 +19,8 @@
   const lc = (s) => String(s == null ? '' : s).toLowerCase();
 
   // ---------- hands ----------
-  const ACTIVE = [{ field: 'stage', op: 'ne', value: 'done' }];
+  // `where` is a conjunction, so «not terminal» is two conditions rather than one negated value.
+  const ACTIVE = [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }];
 
   // Named readings, each paired with the query that produced it so the number
   // stays openable rather than merely asserted.
@@ -40,7 +41,7 @@
     deals_active: { label: ['сделка в работе', 'сделки в работе', 'сделок в работе'], q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
     deals_active_sum: { label: 'на сумму', money: true, q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } } },
     deals_hot: { label: ['горячая сделка', 'горячие сделки', 'горячих сделок'], q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
-    deals_closed: { label: ['закрытая сделка', 'закрытые сделки', 'закрытых сделок'], q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'done' }], aggregate: { fn: 'count' } } },
+    deals_closed: { label: ['закрытая сделка', 'закрытые сделки', 'закрытых сделок'], q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'won' }], aggregate: { fn: 'count' } } },
     tasks_open: { label: ['открытая задача', 'открытые задачи', 'открытых задач'], q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
     tasks_overdue: { label: ['просроченная задача', 'просроченные задачи', 'просроченных задач'], q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
     clients_total: { label: ['контакт', 'контакта', 'контактов'], q: { from: 'clients', aggregate: { fn: 'count' } } },
@@ -85,7 +86,36 @@
     };
     return byName(d.clients || [], 'contact') || byName(d.companies || [], 'company') || null;
   }
-  function dealOf(clientId) { return (WS.store.data.deals || []).find((x) => x.clientId === clientId) || null; }
+  function dealsOf(clientId) {
+    return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
+  }
+  // Одна живая сделка — берём её. Несколько — не угадываем: раньше бралась первая в массиве,
+  // и «переведи сделку Анны дальше» двигало ту, которую агент не имел в виду.
+  function dealOf(clientId) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    if (live.length === 1) return live[0];
+    if (!live.length) { const all = dealsOf(clientId); return all.length === 1 ? all[0] : null; }
+    return null;
+  }
+  // Уточнение имеет смысл, только если названное можно узнать. Раньше Консьерж спрашивал,
+  // о какой сделке речь, и на ответ отвечал тем же вопросом: названия сделок он не разбирал.
+  function dealByText(clientId, t) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    const low = String(t || '').toLowerCase();
+    const words = (s) => String(s || '').toLowerCase().split(/[^a-zа-яё0-9]+/i).filter((w) => w.length > 3);
+    const hit = live.filter((d) => {
+      if (low.indexOf(String(d.id).toLowerCase()) >= 0) return true;
+      const o = (WS.store.data.objects || []).find((x) => x.id === d.objectId);
+      const pool = words(d.title).concat(words(d.sub)).concat(words(o && o.name)).concat(words(o && o.project));
+      return pool.some((w) => low.indexOf(w) >= 0);
+    });
+    return hit.length === 1 ? hit[0] : null;
+  }
+  function dealChoiceText(clientId) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    if (live.length < 2) return '';
+    return ' У клиента открыто ' + live.length + ' сделки: ' + live.map((d) => '«' + (d.title || d.id) + '»').join(', ') + '. Назовите, о какой речь.';
+  }
 
   // ---------- proposals ----------
   // A proposal is a dry run held against the revision it was built at. If the
@@ -145,7 +175,13 @@
     [/сделк|работе|активн|пайплайн|сумм/, ['deals_active', 'deals_active_sum']],
   ];
 
-  const STAGES = [[/новы|заявк/, 'new'], [/работ/, 'work'], [/документ|догов/, 'docs'], [/закрыт|заверш/, 'done']];
+  // Spoken stage names → keys. Ordered longest-intent first: «подготовк» must win over «работ»,
+  // and «проигр» over «закрыт», or a lost deal gets filed as a win.
+  const STAGES = [[/подготовк/, 'prep'], [/брон/, 'book'], [/подписан|оплат/, 'sign'],
+    [/регистрац/, 'reg'], [/выполнен/, 'exec'], [/проигр|отказ/, 'lost'], [/успех|закрыт|заверш|выигр/, 'won']];
+  // Слова пресейла сделке не принадлежат: подбор, КП, показ и переговоры — состояния заявки,
+  // и стадия заявки не присваивается, а вычисляется. Их ловим отдельно, чтобы ответить по делу.
+  const PRESALE_WORDS = /подбор|кп|предложен|показ|встреч|осмотр|переговор/i;
   const WHEN = [[/послезавтра/, ['послезавтра', 'tomorrow']], [/завтра/, ['завтра', 'tomorrow']], [/сегодня/, ['сегодня', 'today']]];
 
   function suggestions() {
@@ -231,9 +267,13 @@
     // stage change
     if (RE.stage.test(t)) {
       const st = (STAGES.find((x) => x[0].test(t)) || [])[1];
-      const deal = ent && ent.kind === 'contact' ? dealOf(ent.id) : null;
+      const deal = ent && ent.kind === 'contact' ? (dealOf(ent.id) || dealByText(ent.id, t)) : null;
+      if (!st && PRESALE_WORDS.test(t)) {
+        return { kind: 'answer', text: 'Это стадия заявки, а не сделки, и она не выставляется вручную: заявка сама встаёт на подбор, показ или переговоры, когда появляется факт. Отметьте на заявке предложенный объект или добавьте событие — стадия сдвинется сама.', evidence: [], next: suggestions() };
+      }
       if (!deal || !st) {
-        return { kind: 'answer', text: 'Понял про стадию, но не хватает деталей: по какой сделке и в какую стадию. Стадии: заявка, в работе, документы, закрыта.', evidence: [], next: suggestions() };
+        const pick = ent && ent.kind === 'contact' ? dealChoiceText(ent.id) : '';
+        return { kind: 'answer', text: 'Понял про шаг сделки, но не хватает деталей: по какой сделке и на какой шаг. Шаги: подготовка, бронирование, подписание, регистрация, закрыта.' + pick, evidence: [], next: suggestions() };
       }
       return propose([{ op: 'dealStage', id: deal.id, stage: st }],
         { subject: deal.id, title: 'Смена стадии', lines: ['Сделка ' + (deal.title || deal.id) + ': ' + deal.stage + ' → ' + st] });
@@ -263,6 +303,10 @@
         const deal = ent.kind === 'contact' ? dealOf(ent.id) : null;
         const bits = [ent.name];
         if (deal) bits.push('сделка на ' + money(deal.amount) + ', стадия «' + deal.stage + '»');
+        else if (ent.kind === 'contact') {
+          const live = dealsOf(ent.id).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+          if (live.length > 1) bits.push('открытых сделок — ' + live.length + ': ' + live.map((d) => '«' + (d.title || d.id) + '»').join(', '));
+        }
         return {
           kind: 'answer', text: bits.join(' — ') + '.',
           evidence: deal ? [{ label: 'сделка', value: deal.amount, money: true, query: { from: 'deals', where: [{ field: 'id', op: 'eq', value: deal.id }] } }] : [],

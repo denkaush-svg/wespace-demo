@@ -218,7 +218,12 @@ setTimeout(async () => {
     const sorted = own.slice().sort((a, b) => a.ord - b.ord);
     const oldest = sorted[0], newest = sorted[sorted.length - 1];
     openFn();
-    const h = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+    // Scoped to the feed itself: other blocks now quote timeline entries too («Что делал клиент»),
+    // and their order is their own business.
+    const scope = doc.querySelector('#app .dx-tabbody') || doc.getElementById('app');
+    const feed = [].slice.call(scope.querySelectorAll('.feed, .timeline'))
+      .map((el) => el.innerHTML).join('') || scope.innerHTML;
+    const h = feed + doc.getElementById('modal').innerHTML;
     const iOld = h.indexOf(oldest.text), iNew = h.indexOf(newest.text);
     check(label + ' · newest above oldest', iOld > 0 && iNew > 0 && iNew < iOld,
       'iNewest=' + iNew + ' iOldest=' + iOld);
@@ -247,7 +252,7 @@ setTimeout(async () => {
       WS.ui.setEntityTab('deal', 'd_anna', 'history');
       const hd = doc.getElementById('app').innerHTML;
       const iNew = hd.indexOf('СМОУК: запись по сделке');
-      const iOld = hd.indexOf('Просила график первого платежа');
+      const iOld = hd.indexOf('Запросила у застройщика график платежей');
       check('deal entry renders ABOVE the 09:20 note (newest first)', iNew < iOld && iNew > 0, 'iNew=' + iNew + ' iOld=' + iOld);
     } else { check('deal event form opened', false); }
   }
@@ -325,7 +330,7 @@ setTimeout(async () => {
     check('headless entry carries the requested type', e && e.ch === 'call' && e.kind === 'raw', JSON.stringify(e && e.ch));
     check('headless entry lands newest', e && e.ord >= N.d * 10000 + N.h * 100 + N.mi, 'ord=' + (e && e.ord));
 
-    const back = WS.ui.addEventEntry('deal', 'd_igor', { type: 'meet', text: 'АГЕНТ: встреча позавчера', when: { daysAgo: 2, h: 15, mi: 30 } });
+    const back = WS.ui.addEventEntry('deal', 'd_viktor', { type: 'meet', text: 'АГЕНТ: встреча позавчера', when: { daysAgo: 2, h: 15, mi: 30 } });
     check('headless back-dating works', back && back.ord === (N.d - 2) * 10000 + 1530, 'ord=' + (back && back.ord));
 
     const co = WS.ui.addEventEntry('company', 'co_meydan', { type: 'note', text: 'АГЕНТ: заметка по компании' });
@@ -346,9 +351,9 @@ setTimeout(async () => {
   {
     const snap = WS.ui.metricsSnapshot();
     check('metricsSnapshot returns named metrics', !!(snap && snap.metrics && snap.metrics.deals_active));
-    const activeReal = data.deals.filter((d) => d.stage !== 'done').length;
+    const activeReal = data.deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
     check('deals_active matches the real data', snap.metrics.deals_active.v === activeReal, snap.metrics.deals_active.v + ' vs ' + activeReal);
-    const closedReal = data.deals.filter((d) => d.stage === 'done').length;
+    const closedReal = data.deals.filter((d) => d.stage === 'won').length;
     check('deals_closed matches the real data', snap.metrics.deals_closed.v === closedReal, snap.metrics.deals_closed.v + ' vs ' + closedReal);
     const noConsentReal = data.clients.filter((c) => !c.consent).length;
     check('clients_no_consent matches the real data', snap.metrics.clients_no_consent.v === noConsentReal);
@@ -366,6 +371,15 @@ setTimeout(async () => {
   const sapi = WS.storeApi;
   const QRY = WS.query;
   const dd = () => WS.store.data;
+  /* Which step a deal may be moved to. The board is no longer four columns for
+     everyone: the steps follow from the contract the deal ends in, so a stage
+     spelled out in a test is a stage that stops existing the next time the
+     model is reworked. Ask the model instead. */
+  const otherStep = (deal) => {
+    const kind = WS.contractKindFor ? WS.contractKindFor((deal && deal.funnel) || 'sale', deal && deal.readiness) : '';
+    const steps = (WS.DEAL_STEPS || {})[kind] || [];
+    return steps.filter((k) => k !== (deal && deal.stage))[0] || '';
+  };
   const dealBy = (id) => dd().deals.find((x) => x.id === id);
 
   check('data plane · storeApi.apply exists', typeof sapi.apply === 'function');
@@ -405,12 +419,17 @@ setTimeout(async () => {
     // ---- a guarded field needs explicit confirmation ----
     const stageWas = dealBy('d_anna').stage;
     const revB = WS.store.dataRevision;
-    const r5 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'work' } }]);
+    const r5 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'book' } }]);
     check('apply · guarded field refused without confirmation', !!r5 && r5.ok === false && r5.code === 'needs_confirmation', JSON.stringify(r5));
     check('apply · unconfirmed guarded write changes nothing', dealBy('d_anna').stage === stageWas);
     check('apply · unconfirmed guarded write leaves revision alone', WS.store.dataRevision === revB);
-    const r6 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'work' } }], { confirmed: true });
-    check('apply · guarded field applies once confirmed', !!r6 && r6.ok === true && dealBy('d_anna').stage === 'work', JSON.stringify(r6));
+    const r6 = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'book' } }], { confirmed: true });
+    check('apply · guarded field applies once confirmed', !!r6 && r6.ok === true && dealBy('d_anna').stage === 'book', JSON.stringify(r6));
+    // Тот же запрет действует и через патч: назвать поле «stage» — не способ обойти договор.
+    const r5b = sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'exec' } }], { confirmed: true });
+    check('apply · шаг вне договора отклонён и в патче', !!r5b && r5b.ok === false && /договор/.test(r5b.error || ''), JSON.stringify(r5b));
+    check('apply · отклонённый патч не сдвинул сделку', dealBy('d_anna').stage === 'book');
+    sapi.apply([{ op: 'updateDeal', id: 'd_anna', patch: { stage: 'prep' } }], { confirmed: true });
     check('apply · guarded patch reported as tier=guarded', !!r6 && r6.tier === 'guarded', r6 && r6.tier);
 
     // ---- a batch is all-or-nothing ----
@@ -450,13 +469,13 @@ setTimeout(async () => {
     check('query · returns all rows of a collection', !!qAll && qAll.ok === true && qAll.rows.length === dd().deals.length, JSON.stringify(qAll && qAll.rows && qAll.rows.length));
     check('query · result carries the revision it was computed at', qAll.revision === WS.store.dataRevision);
 
-    const expectActive = dd().deals.filter((d) => d.stage !== 'done').length;
-    const qActive = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } });
+    const expectActive = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
+    const qActive = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }], aggregate: { fn: 'count' } });
     check('query · count matches an independent computation', qActive.value === expectActive, qActive.value + ' vs ' + expectActive);
     check('query · the number comes with the records behind it', qActive.rows.length === expectActive, 'rows=' + qActive.rows.length);
 
-    const expectSum = dd().deals.filter((d) => d.stage !== 'done').reduce((s, d) => s + (d.amount || 0), 0);
-    const qSum = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'sum', field: 'amount' } });
+    const expectSum = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').reduce((s, d) => s + (d.amount || 0), 0);
+    const qSum = QRY.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'won' }, { field: 'stage', op: 'ne', value: 'lost' }], aggregate: { fn: 'sum', field: 'amount' } });
     check('query · sum matches an independent computation', qSum.value === expectSum, qSum.value + ' vs ' + expectSum);
 
     const qGroup = QRY.run({ from: 'deals', groupBy: 'stage', aggregate: { fn: 'count' } });
@@ -486,13 +505,25 @@ setTimeout(async () => {
       'analytics.pipelineValue=' + dd().analytics.pipelineValue);
 
     // ---- commission follows the linked object's rate, not a flat guess ----
-    const dKarim = dealBy('d_karim');
-    if (dKarim) {
-      const oKarim = dd().objects.find((o) => o.id === dKarim.objectId);
-      const expectComm = Math.round(dKarim.amount * (oKarim.commissionPct || 2) / 100);
-      check('commission · a deal uses its object\'s rate', WS.ui.dealCommission(dKarim) === expectComm,
-        WS.ui.dealCommission(dKarim) + ' vs ' + expectComm);
+    const dVik = dealBy('d_viktor');
+    if (dVik) {
+      const oVik = dd().objects.find((o) => o.id === dVik.objectId);
+      const expectComm = Math.round(dVik.amount * (oVik.commissionPct || 2) / 100);
+      check('commission · a deal uses its object\'s rate', WS.ui.dealCommission(dVik) === expectComm,
+        WS.ui.dealCommission(dVik) + ' vs ' + expectComm);
     }
+    // Сделка с несколькими лотами: ставка у каждого своя, и брать ставку первого на всю сумму нельзя.
+    const dPort = dealBy('d_rentbiz');
+    if (dPort) {
+      const lots = (dPort.lots || []).map((id) => dd().objects.find((o) => o.id === id)).filter(Boolean);
+      const byLot = Math.round(lots.reduce((a, o) => a + o.price * ((o.commissionPct || 2) / 100), 0));
+      check('commission · многолотовая сделка считается по лотам',
+        WS.ui.dealCommission(dPort) === byLot, WS.ui.dealCommission(dPort) + ' vs ' + byLot);
+    }
+    // Сделка без объекта не должна падать — у неё берётся ставка по умолчанию.
+    const dNoObj = Object.assign({}, dealBy('d_anna'), { objectId: null, lots: [] });
+    check('commission · сделка без объекта берёт ставку по умолчанию',
+      WS.ui.dealCommission(dNoObj) === Math.round(dNoObj.amount * 2 / 100), String(WS.ui.dealCommission(dNoObj)));
 
     // ---- every agent referenced by a deal is a real person ----
     check('roster · every deal agent resolves to a named person',
@@ -604,8 +635,8 @@ setTimeout(async () => {
 
     // ---- an analytical question is answered from the store ----
     const a1 = AG.ask('сколько у меня активных сделок и на какую сумму');
-    const expectN = dd().deals.filter((d) => d.stage !== 'done').length;
-    const expectSum = dd().deals.filter((d) => d.stage !== 'done').reduce((s, d) => s + (d.amount || 0), 0);
+    const expectN = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
+    const expectSum = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').reduce((s, d) => s + (d.amount || 0), 0);
     check('agent · answers an analytics question', !!a1 && a1.kind === 'answer', JSON.stringify(a1 && a1.kind));
     check('agent · the number is the real one', (a1.text || '').indexOf(String(expectN)) >= 0, 'expected ' + expectN + ' in: ' + (a1.text || '').slice(0, 120));
     check('agent · the money figure is the real one', !!(a1.evidence || []).find((e) => e.value === expectSum), 'sum=' + expectSum);
@@ -629,11 +660,11 @@ setTimeout(async () => {
 
     // ---- a guarded change still needs the confirmation, through the agent too ----
     const dealStageWas = dealBy('d_anna').stage;
-    const p2 = AG.ask('переведи сделку Анны в стадию документы');
+    const p2 = AG.ask('переведи сделку Анны Инвест-квартира в стадию подготовка');
     check('agent · a stage change is proposed, not applied', !!p2 && p2.kind === 'proposal' && dealBy('d_anna').stage === dealStageWas);
     check('agent · the proposal is marked as needing confirmation', p2.tier === 'guarded', 'tier=' + (p2 && p2.tier));
     AG.confirm(p2.id);
-    check('agent · confirmed stage change lands', dealBy('d_anna').stage === 'docs', 'stage=' + dealBy('d_anna').stage);
+    check('agent · confirmed stage change lands', dealBy('d_anna').stage === 'prep', 'stage=' + dealBy('d_anna').stage);
 
     // ---- a task request creates a task, once confirmed ----
     const tasksWas2 = dd().tasks.length;
@@ -678,13 +709,1275 @@ setTimeout(async () => {
   }
 
   // ---- regression: main screens still render ----
-  ['start', 'concierge', 'clients', 'objects', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
+  ['start', 'concierge', 'clients', 'objects', 'contracts', 'calc', 'finance', 'tasks', 'docs', 'analytics', 'club', 'network', 'profile', 'settings'].forEach((v) => {
     try {
       WS.router.go(v);
       const h = doc.getElementById('app').innerHTML;
       check('screen ' + v + ' renders', h && h.length > 400, 'len=' + (h || '').length);
     } catch (e) { check('screen ' + v + ' renders', false, e.message); }
   });
+
+  // ---- every data-* control the UI renders must be caught by the delegated click handler ----
+  // A handler behind a selector that does not list its attribute is dead markup: the function is
+  // there, the button is there, and clicking does nothing. Only a real click proves the wiring.
+  {
+    const clickable = ['data-gate', 'data-contract', 'data-deal', 'data-client', 'data-savedview', 'data-funnel'];
+    const sel = (() => {
+      // Read the live handler's own selector out of the built markup rather than restating it here,
+      // so this test cannot drift into agreeing with a copy of the list it is supposed to check.
+      const m = /const t = e\.target\.closest\('([^']+)'\)/.exec(read('js/main.js'));
+      return m ? m[1] : null;
+    })();
+    if (sel) {
+      clickable.forEach((attr) => {
+        check('delegation · ' + attr + ' is reachable by click', sel.indexOf('[' + attr + ']') >= 0, sel.slice(0, 60));
+      });
+    }
+    // And the round trip: a rendered gate row, clicked, actually flips the gate.
+    const gd = dd().deals.find((d) => d.funnel === 'sale');
+    WS.ui.dealCard(gd.id); WS.ui.setEntityTab('deal', gd.id, 'docs');
+    const scope = doc.getElementById('modal').innerHTML.indexOf('gate-row') >= 0 ? doc.getElementById('modal') : doc.getElementById('app');
+    const row = scope.querySelector('[data-gate]');
+    check('gate · a row is rendered to click', !!row);
+    if (row) {
+      const key = row.getAttribute('data-gate').split('~')[1];
+      const was = !!((gd.gates || {})[key]);
+      row.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      const now = !!((dd().deals.find((d) => d.id === gd.id).gates || {})[key]);
+      check('gate · clicking the row toggles the gate', now === !was, 'was=' + was + ' now=' + now);
+    }
+    // A contract row, clicked, opens that contract.
+    WS.router.go('contracts');
+    const krow = doc.getElementById('app').querySelector('[data-contract]');
+    check('contract · a row is rendered to click', !!krow);
+    if (krow) {
+      const kid = krow.getAttribute('data-contract');
+      krow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('contract · clicking the row opens the contract', WS.store.view === 'contractDetail' && WS.store.contractId === kid,
+        'view=' + WS.store.view + ' id=' + WS.store.contractId);
+    }
+  }
+
+  // ---- one card grammar: the verbs sit in the same place on every entity, on every tab ----
+  {
+    const cards = [
+      ['сделка', () => WS.ui.dealCard(dd().deals[0].id)],
+      ['клиент', () => WS.ui.clientCard('c_anna')],
+      ['компания', () => WS.ui.companyCard(dd().companies[0].id)],
+      ['заявка', () => WS.ui.requestCard(dd().requests[0].id)],
+      ['договор', () => WS.ui.contractCard('k_palm')],
+    ];
+    cards.forEach(([name, open]) => {
+      open();
+      const view = doc.querySelector('#app .view');
+      const bar = view && view.querySelector('.qa-bar');
+      const tabs = view && view.querySelector('.dx-tabs');
+      check(name + ' · панель действий есть', !!bar);
+      check(name + ' · панель действий выше вкладок',
+        !!bar && !!tabs && (bar.compareDocumentPosition(tabs) & 4) !== 0);
+      check(name + ' · панель действий вне тела вкладки', !!bar && !bar.closest('.dx-tabbody'));
+      check(name + ' · в шапке страницы нет второго набора кнопок',
+        !!view && view.querySelectorAll('.obj-page-head button').length === 1,
+        view ? String(view.querySelectorAll('.obj-page-head button').length) : '');
+      // A bar that scrolls sideways hides half its verbs with nothing to say so.
+      check(name + ' · панель действий переносится, а не прокручивается',
+        !!bar && !/overflow-x:\s*auto/.test(bar.getAttribute('style') || ''));
+      // Switching tabs must not take the verbs away with the tab content.
+      const spec = WS._card;
+      if (spec && spec.tabs && spec.tabs.length > 1) {
+        WS.ui.setEntityTab(spec.type, spec.id, spec.tabs[spec.tabs.length - 1][0]);
+        check(name + ' · панель действий пережила смену вкладки',
+          !!doc.querySelector('#app .view .qa-bar'));
+        WS.ui.setEntityTab(spec.type, spec.id, spec.tabs[0][0]);   // leave the card as we found it
+      }
+      // A feed grows with the record; pairing it with a fixed block stretches the neighbour.
+      const paired = [].slice.call(doc.querySelectorAll('#app .cx-pair')).filter((r) =>
+        /Лента событий|История/.test(r.textContent) && r.children.length === 2);
+      check(name + ' · лента не стоит в паре с другим блоком', paired.length === 0,
+        paired.length ? paired[0].textContent.slice(0, 50) : '');
+      // Rhythm belongs to the stack: a row that also carries its own margin is hand-spacing.
+      const inlineRows = [].slice.call(doc.querySelectorAll('#app .cx-row')).filter((r) => r.style && r.style.marginTop);
+      check(name + ' · ряды не носят собственных отступов', inlineRows.length === 0, String(inlineRows.length));
+    });
+  }
+
+  // ---- the object card states facts, not adjectives, and says whom the object is for ----
+  {
+    (dd().objects || []).forEach((o) => {
+      const a = o.attrs || {};
+      check('object ' + o.id + ' · этаж — число', typeof a.floor === 'number', String(a.floor));
+    });
+    WS.ui.objectCard(dd().objects[0].id);
+    const body = doc.querySelector('#app .view').textContent;
+    check('object · есть справка по объекту', body.indexOf('Справка по объекту') >= 0);
+    check('object · справка говорит, кому подходит', body.indexOf('Подходит') >= 0);
+    check('object · этаж больше не «Высокий»', !/Этаж\s*Высокий/.test(body), body.slice(0, 40));
+    // Каждый факт живёт в одном месте: срок сдачи стоит в обложке, повторять его в условиях незачем.
+    check('object · срок сдачи не повторяется', (body.match(/Срок сдачи/g) || []).length === 1,
+      String((body.match(/Срок сдачи/g) || []).length));
+  }
+
+  // ---- the object card is a sales tool: claims carry numbers, objections carry answers ----
+  {
+    const src = read('js/ui.js');
+    // Словарь прилагательных не знает числа 12 — любой оставшийся вызов печатает голую цифру.
+    check('object · этаж нигде не идёт через словарь прилагательных', src.indexOf("objAttr(o, 'floor')") < 0);
+    check('object · «высокий этаж» в подборе читает floorBand', /floorBand === 'high'/.test(src));
+
+    (dd().objects || []).forEach((o) => {
+      check('market · срез рынка есть для района ' + o.area, !!(WS.AREAS || {})[o.area]);
+      check('object ' + o.id + ' · есть довод сверх полей', !!o.usp);
+    });
+
+    WS.ui.objectCard('o_creekline');
+    let body = doc.querySelector('#app .view').textContent;
+    check('object · есть блок «Чем продавать»', body.indexOf('Чем продавать') >= 0);
+    check('object · есть блок «Что спросят»', body.indexOf('Что спросят') >= 0);
+    check('object · район назван и помечен как срез DEMO',
+      body.indexOf('Район · Business Bay') >= 0 && /срез рынка — DEMO/.test(body));
+    check('object · уникальное качество юнита на карточке', body.indexOf('Корпус B') >= 0);
+    // Довод без цифры — лозунг. Каждый тезис подпирается числом из карточки или из среза района.
+    const pts = [].slice.call(doc.querySelectorAll('#app .sp-row .sp-d'));
+    check('object · доводов не меньше трёх', pts.length >= 3, String(pts.length));
+    const thin = pts.filter((p) => p.textContent.trim().length < 30);
+    check('object · у каждого довода есть подпись с доказательством', thin.length === 0,
+      thin.length ? thin[0].textContent.slice(0, 50) : '');
+    check('object · доводов с цифрами не меньше двух',
+      pts.filter((p) => /\d/.test(p.textContent)).length >= 2);
+    // Возражение без ответа бесполезно: блок существует ровно ради второй строки.
+    const qa = [].slice.call(doc.querySelectorAll('#app .oq-row'));
+    check('object · у каждого возражения есть ответ',
+      qa.length >= 2 && qa.every((r) => r.querySelector('.oq-a') && r.querySelector('.oq-a').textContent.trim().length > 20),
+      String(qa.length));
+    // Цена выше средней по району прозвучит как возражение, а не как довод.
+    check('object · «дороже района» стоит в вопросах, а не в доводах', /Почему дороже/.test(body));
+
+    WS.ui.objectCard('o_bayline');
+    body = doc.querySelector('#app .view').textContent;
+    // Истёкшая проверка — первое, что агент должен знать, а не то, что вытеснено лимитом списка.
+    check('object · устаревшая проверка вынесена в вопросы', /ещё продаётся/.test(body));
+    check('object · истёкшая проверка не выдаётся за довод', !/Доступность проверена/.test(body));
+
+    WS.ui.objectCard('o_palmcourt');
+    body = doc.querySelector('#app .view').textContent;
+    // toLocaleString ставит неразрывный пробел — сравнивать надо по нормализованному тексту.
+    const flat = body.replace(/\s+/g, ' ');
+    check('object · «дешевле района» называет обе цены',
+      /дешевле района/.test(flat) && /18 600 AED/.test(flat));
+  }
+
+  // ---- the two-level stage model: one request funnel, deal steps derived from the contract ----
+  {
+    const RS = WS.REQ_STAGES || [], RL = WS.REQ_STAGE_LABELS || {}, DS = WS.DEAL_STEPS || {};
+    // Одна воронка заявки на все услуги — список стадий существует ровно один.
+    check('model · воронка заявки одна и терминальна', RS.length > 3 &&
+      RS.indexOf('closed') > RS.indexOf('talks') && RS[RS.length - 1] === 'lost', RS.join(' '));
+    // Граница — событие по группе лотов. Стадия «согласовано» на заявке лгала бы при частичном
+    // переходе: один ЖК уже в сделке, по другому ещё переговоры.
+    check('model · согласование не стадия заявки', RS.indexOf('agreed') < 0, RS.join(' '));
+    check('model · у каждой стадии заявки есть подпись', RS.every((k) => !!RL[k]),
+      RS.filter((k) => !RL[k]).join(' '));
+    // Услуги расходятся подписью, а не набором стадий: там, где расхождение есть, оно по стороне.
+    check('model · подпись предложения зависит от стороны',
+      RL.offer && RL.offer.buyer !== RL.offer.owner && !!RL.offer.any,
+      JSON.stringify(RL.offer || {}));
+    check('model · подпись встречи зависит от стороны',
+      RL.meet && RL.meet.buyer !== RL.meet.owner, JSON.stringify(RL.meet || {}));
+
+    // Шаги сделки следуют из вида договора: агент их не выбирает.
+    const kinds = Object.keys(dd().CONTRACT_KINDS || WS.fixtures.CONTRACT_KINDS || {});
+    check('model · у каждого вида договора есть шаги', kinds.length > 0 && kinds.every((k) => Array.isArray(DS[k])),
+      kinds.filter((k) => !DS[k]).join(' '));
+    check('model · бронь есть только у оффплана',
+      DS.offplan_spa.indexOf('book') >= 0 && DS.resale_title.indexOf('book') < 0 && DS.lease.indexOf('book') < 0);
+    check('model · у услуги собственнику регистрации нет',
+      DS.management.indexOf('reg') < 0 && DS.exclusive.indexOf('reg') < 0);
+    check('model · у услуги есть выполнение работ', DS.service.indexOf('exec') >= 0);
+    check('model · регистрация называется по своему реестру',
+      /Oqood/.test(WS.REG_LABELS.offplan_spa) && /Ejari/.test(WS.REG_LABELS.lease) &&
+      /Title Deed/.test(WS.REG_LABELS.resale_title));
+    // Каждый шаг всякого вида договора должен уметь назваться — иначе лента покажет ключ.
+    const SL = WS.fixtures.STAGE_LABELS || {};
+    const nameless = [];
+    kinds.forEach((k) => (DS[k] || []).forEach((st) => { if (!SL[st]) nameless.push(k + ':' + st); }));
+    check('model · у каждого шага сделки есть подпись', nameless.length === 0, nameless.join(' '));
+
+    // Услуга + готовность объекта → вид договора. Продажу различает готовность, остальные — услуга.
+    const ck = WS.contractKindFor;
+    check('model · оффплан ведёт к SPA, готовое — к вторичке',
+      ck('sale', 'оффплан') === 'offplan_spa' && ck('sale', 'готовый') === 'resale_title');
+    check('model · у каждой услуги стенда выводится вид договора',
+      (WS.FUNNELS || []).every((f) => !!DS[ck(f.k, 'готовый')]),
+      (WS.FUNNELS || []).filter((f) => !DS[ck(f.k, 'готовый')]).map((f) => f.k).join(' '));
+    // Вид договора, выведенный из услуги, должен существовать в справочнике договоров.
+    const CK = WS.fixtures.CONTRACT_KINDS || {};
+    check('model · выведенный вид договора есть в справочнике',
+      (WS.FUNNELS || []).every((f) => !!CK[ck(f.k, 'оффплан')] && !!CK[ck(f.k, 'готовый')]));
+  }
+
+  // ---- каждая сделка выросла из заявки, и ни одна не стоит на пресейл-шаге ----
+  // Раньше пресейл и договорная работа лежали в одном списке стадий, и одиннадцать записей
+  // назывались сделками, хотя по семи из них не было согласовано ничего. Проверки держат
+  // границу: сделка = согласованные условия, шаги = вид договора, всё остальное — заявка.
+  {
+    const orphan = (dd().deals || []).filter((d) => !d.requestId ||
+      !(dd().requests || []).some((r) => r.id === d.requestId));
+    check('данные · у каждой сделки есть родительская заявка', orphan.length === 0,
+      orphan.map((d) => d.id).join(' '));
+
+    const DS = WS.DEAL_STEPS || {}, ck = WS.contractKindFor;
+    const off = (dd().deals || []).filter((d) => (DS[ck(d.funnel, d.readiness)] || []).indexOf(d.stage) < 0);
+    check('данные · сделка стоит на шаге своего договора, не на пресейл-стадии', off.length === 0,
+      off.map((d) => d.id + ':' + d.stage).join(' '));
+
+    const noClient = (dd().requests || []).filter((r) => !(dd().clients || []).some((c) => c.id === r.clientId));
+    check('данные · у каждой заявки есть клиент', noClient.length === 0, noClient.map((r) => r.id).join(' '));
+
+    const noFunnel = (dd().requests || []).filter((r) => !(WS.FUNNELS || []).some((f) => f.k === r.funnel));
+    check('данные · каждая заявка называет услугу, которой станет', noFunnel.length === 0,
+      noFunnel.map((r) => r.id + ':' + r.funnel).join(' '));
+
+    const mute = (dd().requests || []).filter((r) => !((dd().requestTimeline || {})[r.id] || []).length);
+    check('данные · у каждой заявки есть история', mute.length === 0, mute.map((r) => r.id).join(' '));
+
+    // Расхождение фактов висит на записи, которая этим полем владеет. Ключ, ни во что не
+    // попадающий, — это карточка расхождения, которую никто никогда не увидит.
+    const cf = Object.keys(dd().conflicts || {}).filter((id) =>
+      !(dd().deals || []).some((d) => d.id === id) && !(dd().requests || []).some((r) => r.id === id));
+    check('данные · расхождение привязано к существующей записи', cf.length === 0, cf.join(' '));
+
+    // Один объект — одна живая сделка. Две сделки на один лот означают, что его продали дважды.
+    const taken = {}; const dbl = [];
+    (dd().deals || []).forEach((d) => {
+      if (d.stage === 'lost') return;
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((oid) => {
+        if (!oid) return;
+        if (taken[oid]) dbl.push(oid + ': ' + taken[oid] + ' и ' + d.id); else taken[oid] = d.id;
+      });
+    });
+    check('данные · один объект не уходит в две сделки сразу', dbl.length === 0, dbl.join(' | '));
+
+    // И его не предлагают дальше по другим заявкам как свободный.
+    const resold = [];
+    (dd().requests || []).forEach((r) => (r.offered || []).forEach((o) => {
+      if (o.state === 'rejected') return;
+      const holder = taken[o.id];
+      if (holder && !(dd().deals || []).some((d) => d.id === holder && d.requestId === r.id)) {
+        resold.push(r.id + ' предлагает ' + o.id + ', занятый сделкой ' + holder);
+      }
+    }));
+    check('данные · занятый сделкой объект не предлагают другой заявке', resold.length === 0, resold.join(' | '));
+  }
+
+  // ---- the request's stage is computed from its own facts, so it cannot lie ----
+  {
+    const path = (WS.REQ_STAGES || []).filter((k) => k !== 'lost');
+    (dd().requests || []).forEach((r) => {
+      WS.ui.requestCard(r.id);
+      const view = doc.querySelector('#app .view');
+      const body = view.textContent;
+      check('req ' + r.id + ' · лента заявки нарисована', !!view.querySelector('.dx-stepper'));
+      // Стадия — следствие фактов, поэтому шаг не нажимается: кнопки и обработчика у него нет.
+      const steps = [].slice.call(view.querySelectorAll('.dx-stepper .dx-step'));
+      check('req ' + r.id + ' · шагов столько же, сколько в воронке', steps.length === path.length,
+        steps.length + ' против ' + path.length);
+      check('req ' + r.id + ' · стадию заявки нельзя переставить кликом',
+        steps.every((el) => el.tagName !== 'BUTTON' && !el.getAttribute('data-stage')));
+      // У отказной заявки текущего шага нет — как и у проигранной сделки: рисовать его значило бы
+      // показать движение там, где его прекратили. Вместо него стоит подпись об отказе.
+      const lost = WS.ui.reqStage(r) === 'lost';
+      check('req ' + r.id + ' · ровно один текущий шаг',
+        view.querySelectorAll('.dx-stepper .dx-step.cur').length === (lost ? 0 : 1));
+      if (lost) check('req ' + r.id + ' · отказ назван словами', !!view.querySelector('.dx-lost'));
+    });
+    // Текущий шаг читается с самой ленты: заголовка и счётчика над ней больше нет — они не
+    // сообщали ничего, чего не видно по галочкам и подсветке.
+    const curLabel = () => {
+      const el = doc.querySelector('#app .view .dx-stepper .dx-step.cur .l');
+      return el ? el.textContent.trim() : '';
+    };
+    check('req · над лентой нет ни заголовка, ни счётчика шагов',
+      !doc.querySelector('#app .view .dx-step-cap') &&
+      doc.querySelector('#app .view').textContent.indexOf('Ход заявки') < 0);
+    // Заявка Виктора: квартира ушла в бронь, оба офиса — в портфель, в подборке пусто → закрыта.
+    WS.ui.requestCard('r_viktor');
+    check('req · заявка закрывается, когда подборка исчерпана', curLabel() === 'Закрыта', curLabel());
+    // Заявка Анны: Creekline в сделке, Palm Court отклонён, Bayline ещё открыт → заявка жива.
+    WS.ui.requestCard('r_anna');
+    check('req · заявка с открытым объектом не закрыта', curLabel() === 'Переговоры', curLabel());
+    // Подпись стадии зависит от стороны сделки, а не от услуги.
+    check('req · покупателю подбор, а не КП', /Направлен подбор/.test(doc.querySelector('#app .view').textContent));
+  }
+
+  // ---- справки следуют одним правилам (docs/2026-08-17-brief-writing-rules.md) ----
+  {
+    const briefOf = (open, id) => { open(id); const e = doc.querySelector('#app .view .deal-brief'); return e ? e.textContent.trim() : ''; };
+    // Покрытие — все виды справок, а не только те, что переписывались последними: дыра в покрытии
+    // читается как исправность, пока в неё кто-нибудь не заглянет.
+    const cases = [
+      ['сделка', () => WS.ui.dealCard('d_anna')], ['сделка·бронь', () => WS.ui.dealCard('d_viktor')],
+      ['портфель', () => WS.ui.dealCard('d_rentbiz')], ['сделка·успех', () => WS.ui.dealCard('d_won')],
+      ['клиент', () => WS.ui.clientCard('c_anna')], ['клиент·EN', () => WS.ui.clientCard('c_partner')],
+      ['клиент·ночной', () => WS.ui.clientCard('c_night')],
+    ].concat((dd().companies || []).map((co) => ['компания·' + co.id, () => WS.ui.companyCard(co.id)]))
+     .concat((dd().objects || []).map((o) => ['объект·' + o.id, () => WS.ui.objectCard(o.id)]))
+     .concat((dd().contracts || []).map((k) => ['договор·' + k.id, () => WS.ui.contractCard(k.id)]));
+    cases.forEach(([name, open]) => {
+      open();
+      const el = doc.querySelector('#app .view .deal-brief');
+      const t = el ? el.textContent.trim() : '';
+      check('brief ' + name + ' · справка есть', t.length > 40, t.slice(0, 40));
+      // Счётчик — не содержание: «пройдено 2 из 5 контрольных точек» агенту не сообщает ничего.
+      // Запрещён счётчик, пересказывающий ленту шагов, а не любое «N из M»: у договора аренды
+      // «оплата по чекам — 2 из 4» и есть факт, которого больше нигде нет.
+      check('brief ' + name + ' · без счётчиков прогресса',
+        !/пройдено\s+\d+\s+из\s+\d+/i.test(t) && !/шаг\s+\d+\s+из\s+\d+/i.test(t) && !/контрольных точек/i.test(t),
+        t.slice(0, 80));
+      // Связный текст: от трёх до семи предложений, каждое закрыто точкой.
+      const sent = t.split(/(?<=[.!?])\s+/).filter((x) => x.trim());
+      check('brief ' + name + ' · от трёх до семи предложений', sent.length >= 3 && sent.length <= 7, String(sent.length));
+      // Аббревиатура не должна строчиться шаблоном: «MOU» не становится «mOU».
+      check('brief ' + name + ' · аббревиатуры целы', !/(^|[\s("«])[a-zа-я][A-ZА-Я]{2,}/.test(t), t.slice(0, 80));
+      check('brief ' + name + ' · нет сдвоенного «и»', !/ и [^.]{0,40} и /.test(t), t.slice(0, 90));
+    });
+    // Область справки равна области карточки: справка клиента не называет стадию его сделки.
+    WS.ui.clientCard('c_anna');
+    const ct = doc.querySelector('#app .view .deal-brief').textContent;
+    const stageWords = Object.keys(WS.fixtures.STAGE_LABELS || {}).map((k) => WS.fixtures.STAGE_LABELS[k]);
+    const leaked = stageWords.filter((w) => w && w.length > 4 && ct.indexOf('«' + w + '»') >= 0);
+    check('brief клиент · не пересказывает стадию сделки', leaked.length === 0, leaked.join(' '));
+  }
+
+  // ---- панель диалогов Консьержа открывается с историей, а не с пустым листом ----
+  {
+    // main.js делает то же самое на загрузке, когда сохранённых диалогов нет.
+    WS.engine.seedThreads();
+    const list = (WS.engine.threadList() || []).filter((t) => String(t.id).indexOf('probe') !== 0);
+    check('concierge · диалогов засеяно не меньше пяти', list.length >= 5, String(list.length));
+    check('concierge · в каждом диалоге есть сообщения', list.every((t) => (t.items || []).length > 0));
+    check('concierge · есть непрочитанные', list.some((t) => t.unread > 0));
+    // Разделы панели строятся по типу сущности: пустая группа — признак несуществующего вида.
+    const kinds = {};
+    list.forEach((t) => { kinds[String(t.id).split(':')[0]] = 1; });
+    check('concierge · диалоги разных видов', Object.keys(kinds).length >= 4, Object.keys(kinds).join(' '));
+    // Сценарные плашки под полем ввода убраны — к Консьержу подключается живая модель.
+    WS.storeApi.setView('concierge');
+    const view = doc.querySelector('#app');
+    check('concierge · под полем ввода нет сценарных плашек',
+      !view.querySelector('.qa-row [data-scn]'), 'есть');
+  }
+
+  // ---- «Что предложить»: подбор не обещает того, чего нет ----
+  {
+    const objById = {}; (dd().objects || []).forEach((o) => { objById[o.id] = o; });
+    const taken = {};
+    (dd().deals || []).forEach((d) => { if (d.stage === 'lost') return;
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => { if (id) taken[id] = d.id; }); });
+    (dd().clients || []).forEach((c) => {
+      WS.ui.clientCard(c.id);
+      const sec = [].slice.call(doc.querySelectorAll('#app .view .dx-sec'))
+        .find((e) => /Что предложить/.test(e.textContent));
+      check('offer ' + c.id + ' · блок есть', !!sec);
+      if (!sec) return;
+      const rows = [].slice.call(sec.querySelectorAll('.of-row'));
+      // Занятый объект нельзя предложить никому: он уже в чьей-то живой сделке.
+      const busy = rows.map((r) => r.getAttribute('data-obj')).filter((id) => taken[id]);
+      check('offer ' + c.id + ' · не предлагает занятое', busy.length === 0, busy.join(' '));
+      // Показанное этому клиенту — тоже не предложение: он его уже видел.
+      const seen = {};
+      (dd().requests || []).filter((r) => r.clientId === c.id)
+        .forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = 1; }));
+      const again = rows.map((r) => r.getAttribute('data-obj')).filter((id) => seen[id]);
+      check('offer ' + c.id + ' · не предлагает показанное дважды', again.length === 0, again.join(' '));
+      // Цена выше бюджета — не предложение, а трата внимания. Потолок считается по запросам
+      // на покупку: бюджет аренды — ставка за год, и в одной шкале с ценой объекта его нет.
+      const BUY = ['sale', 'cross', 'consult', 'exclusive'];
+      const reqs = (dd().requests || []).filter((r) => r.clientId === c.id && BUY.indexOf(r.funnel || 'sale') >= 0)
+        .map((r) => r.budget).filter(Boolean);
+      const cap = reqs.length ? Math.max.apply(null, reqs) : (c.budget || 0);
+      const over = cap ? rows.map((r) => objById[r.getAttribute('data-obj')])
+        .filter((o) => o && o.price > cap * 1.05).map((o) => o.id) : [];
+      check('offer ' + c.id + ' · не предлагает вне бюджета', over.length === 0, over.join(' '));
+      // У каждой строки есть причина: процент без объяснения — это не подбор, а лотерея.
+      check('offer ' + c.id + ' · у каждого предложения есть причина',
+        rows.every((r) => r.querySelector('.of-why') && r.querySelector('.of-why').textContent.trim().length > 8));
+      // Пусто — тоже ответ, но он должен быть объяснён.
+      if (!rows.length) check('offer ' + c.id + ' · пустой блок объясняет почему',
+        /уже показывали|ничего нет/.test(sec.textContent));
+    });
+  }
+
+  // ---- one deal is one contract: every lot in it sits in the same development ----
+  {
+    const objById = {};
+    (dd().objects || []).forEach((o) => { objById[o.id] = o; });
+    const bad = [];
+    (dd().deals || []).forEach((d) => {
+      const ids = (d.lots && d.lots.length) ? d.lots : (d.objectId ? [d.objectId] : []);
+      const projects = ids.map((id) => (objById[id] || {}).project).filter(Boolean);
+      const sellers = ids.map((id) => (objById[id] || {}).developer).filter(Boolean);
+      if (new Set(projects).size > 1 || new Set(sellers).size > 1) bad.push(d.id + ': ' + projects.join(' | '));
+    });
+    // Сделка заканчивается одним договором. Несколько лотов допустимы, пока они в одном ЖК у одного
+    // продавца: другой комплекс — другой договор, а значит другая сделка.
+    check('deal · лоты сделки — один ЖК и один продавец', bad.length === 0, bad.join(' ; '));
+    // Один объект не может стоять в двух сделках ОДНОЙ заявки: клиент не покупает один юнит дважды.
+    // Более широкая версия правила — «объект занят не более чем одной живой сделкой на весь стенд» —
+    // сейчас нарушается записями, которые после миграции станут заявками, и включится вместе с ней.
+    const perReq = {}, twice = [];
+    (dd().deals || []).forEach((d) => {
+      if (!d.requestId || d.stage === 'lost') return;
+      const m = perReq[d.requestId] || (perReq[d.requestId] = {});
+      ((d.lots && d.lots.length) ? d.lots : [d.objectId]).forEach((id) => {
+        if (!id) return;
+        if (m[id] && m[id] !== d.id) twice.push(id + ' в ' + m[id] + ' и ' + d.id);
+        m[id] = d.id;
+      });
+    });
+    check('deal · объект не стоит в двух сделках одной заявки', twice.length === 0, twice.join(' ; '));
+  }
+
+  // ---- object maps: real imagery for every object, with the attribution the licence requires ----
+  {
+    const objs = dd().objects || [];
+    objs.forEach((o) => {
+      check('map · ' + o.id + ' — картинка карты есть', !!(WS.maps || {})[o.id]);
+    });
+    WS.ui.objectCard(objs[0].id);
+    const map = doc.querySelector('#app .obj-map-canvas');
+    check('map · карта отрисована картинкой', !!map && !!map.querySelector('img'));
+    check('map · точка объекта на карте', !!map && !!map.querySelector('.obj-map-marker'));
+    check('map · указан источник данных (ODbL)',
+      !!map && /OpenStreetMap/.test(map.textContent), map ? map.textContent.slice(0, 40) : '');
+  }
+
+  // ---- the stylesheet parses: an unbalanced brace silently kills every rule after it ----
+  {
+    ['tokens.css', 'app.css', 'theme.css'].forEach((f) => {
+      const css = read('css/' + f).replace(/\/\*[\s\S]*?\*\//g, '');
+      const open = (css.match(/\{/g) || []).length, close = (css.match(/\}/g) || []).length;
+      check('css · ' + f + ' — скобки сходятся', open === close, open + ' { против ' + close + ' }');
+    });
+    // Every class the card constructor emits has to exist in the stylesheet, or a card renders
+    // as an unstyled stack of blocks.
+    const all = ['tokens.css', 'app.css', 'theme.css'].map((f) => read('css/' + f)).join(' ');
+    ['cx-stack', 'cx-row', 'cx-pair', 'cx-col'].forEach((cls) => {
+      check('css · .' + cls + ' описан', all.indexOf('.' + cls) >= 0);
+    });
+    check('css · --card-gap задан', /--card-gap\s*:/.test(all));
+    // Дисплейный шрифт стенда — Bebas Neue: без кириллицы и без строчных. Имя человека, набранное
+    // им, печатается капителью на латинице и проваливается в другой шрифт на кириллице. Любое поле
+    // с человеческим именем обязано брать текстовый шрифт, а не дисплейный.
+    {
+      const css = read('css/app.css');
+      const nameSel = ['.chero-avatar', '.chero-name', '.dhero-av', '.dhero-name', '.rh-client',
+                       '.wsdoc-title', '.kp-doc-to', '.acc-term b'];
+      const bad = nameSel.filter((sel) => {
+        const i = css.indexOf(sel + ' {');
+        if (i < 0) return false;
+        return css.slice(i, css.indexOf('}', i)).indexOf('--font-disp') >= 0;
+      });
+      check('css · имена набраны текстовым шрифтом, не дисплейным', bad.length === 0, bad.join(' '));
+      check('css · токен шрифта имён объявлен', /--font-name\s*:/.test(read('css/tokens.css')));
+    }
+  }
+
+  // ---- the client overview: a feed spans the page, and no two blocks state the same thing ----
+  {
+    WS.ui.clientCard('c_anna');
+    const rows = [].slice.call(doc.querySelectorAll('#app .cx-stack > .cx-row'));
+    const last = rows[rows.length - 1];
+    check('client · лента событий — последний блок', !!last && last.innerHTML.indexOf('Лента событий') >= 0,
+      last ? last.innerHTML.slice(0, 60) : 'нет строк');
+    check('client · лента идёт во всю ширину, а не в половине',
+      !!last && last.className.indexOf('cx-pair') < 0 && last.children.length === 1,
+      last ? last.className + ' kids=' + last.children.length : '');
+    const sigRow = rows.find((r) => r.innerHTML.indexOf('Сигналы и приоритет') >= 0);
+    check('client · сигналы не растянуты лентой', !!sigRow && sigRow.innerHTML.indexOf('Лента событий') < 0);
+    const body = doc.querySelector('#app .dx-tabbody').innerHTML;
+    const prefTitles = (body.match(/Профиль предпочтений/g) || []).length;
+    check('client · «Профиль предпочтений» на карточке один', prefTitles === 1, 'встретился ' + prefTitles + ' раз(а)');
+  }
+
+  // ---- «назад» returns to where you came FROM, not to a list the code guessed ----
+  {
+    const app = () => doc.getElementById('app');
+    const clickIn = (sel) => { const el = app().querySelector(sel); if (el) el.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); return !!el; };
+    const backEl = () => app().querySelector('[data-act="navBack"]');
+
+    const nd = dd().deals.find((d) => d.clientId);
+    WS.router.go('clients');
+    WS.store.navStack = [];          // start the trail at the list, whatever ran before
+    WS.ui.dealCard(nd.id);
+    check('nav · сделка из списка помнит список', WS.store.navStack.length === 1 && WS.store.navStack[0].view === 'clients',
+      JSON.stringify(WS.store.navStack));
+
+    // deal → client
+    const wentToClient = clickIn('[data-client]');
+    check('nav · the deal page offers a way to the client', wentToClient);
+    check('nav · клиент открыт', WS.store.view === 'clientDetail', 'view=' + WS.store.view);
+    const b1 = backEl();
+    check('nav · клиент показывает кнопку «назад»', !!b1, 'head=' + (app().querySelector('.obj-page-head') || {}).innerHTML);
+    check('nav · кнопка названа сделкой, из которой пришли', !!b1 && b1.textContent.indexOf(nd.title.slice(0, 12)) >= 0,
+      b1 ? b1.textContent : '');
+
+    // клиент → назад → сделка
+    const b2 = backEl();
+    if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('nav · назад с клиента возвращает в ту же сделку',
+      WS.store.view === 'dealDetail' && WS.store.dealId === nd.id, 'view=' + WS.store.view + ' id=' + WS.store.dealId);
+
+    // сделка → объект → клиент → назад → объект → назад → сделка: три уровня, пройденные обратно.
+    const wentToObj = clickIn('[data-obj]');
+    check('nav · объект открыт из сделки', wentToObj && WS.store.view === 'objectDetail', 'view=' + WS.store.view);
+    if (wentToObj) {
+      const oid = WS.store.objectId;
+      check('nav · объект показывает «назад»', !!backEl());
+      WS.ui.clientCard(nd.clientId);
+      const bo = backEl();
+      check('nav · клиент помнит объект, а не список', !!bo && bo.textContent.indexOf('Назад') >= 0, bo ? bo.textContent : '');
+      if (bo) bo.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('nav · назад возвращает к объекту', WS.store.view === 'objectDetail' && WS.store.objectId === oid,
+        'view=' + WS.store.view);
+      const bo2 = backEl();
+      if (bo2) bo2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('nav · и следующий шаг назад — снова сделка',
+        WS.store.view === 'dealDetail' && WS.store.dealId === nd.id, 'view=' + WS.store.view);
+    }
+
+    // Alt+← is the same action from the keyboard.
+    clickIn('[data-client]');
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true }));
+    check('nav · Alt+← работает как «назад»', WS.store.view === 'dealDetail' && WS.store.dealId === nd.id,
+      'view=' + WS.store.view);
+
+    // A trail that loops rewinds instead of growing: сделка → клиент → та же сделка leaves one entry.
+    WS.store.navStack = []; WS.router.go('clients');
+    WS.ui.dealCard(nd.id); WS.ui.clientCard(nd.clientId); WS.ui.dealCard(nd.id);
+    check('nav · возврат по кругу не наращивает историю', WS.store.navStack.length <= 1,
+      'stack=' + JSON.stringify(WS.store.navStack.map((r) => r.view)));
+
+    // With no history at all the card still offers the owning list — never a dead header.
+    WS.store.navStack = []; WS.store.navHere = null;
+    WS.ui.dealCard(nd.id);
+    WS.store.navStack = [];
+    WS.ui.render();
+    const head = app().querySelector('.obj-page-head');
+    check('nav · без истории остаётся возврат к списку',
+      !!head && head.innerHTML.indexOf('data-nav=') >= 0, head ? head.innerHTML.slice(0, 120) : 'нет шапки');
+  }
+
+  // ---- a step that the deal's contract does not have is refused, not silently applied ----
+  {
+    const sd = dd().deals.find((d) => d.funnel === 'sale' && d.stage !== 'won' && d.stage !== 'lost');
+    const was = sd.stage;
+    const bad = sapi.apply([{ op: 'dealStage', id: sd.id, stage: 'exec' }], { confirmed: true });
+    check('stage · a stage outside the funnel is refused', !bad || bad.ok === false, JSON.stringify(bad));
+    check('stage · the refused change left the deal alone', dd().deals.find((d) => d.id === sd.id).stage === was);
+
+    // Пресейл сделке не принадлежит вовсе: «переведи в показ» — это факт заявки, а стадия
+    // заявки вычисляется. Раньше такой шаг проходил, потому что список стадий был один на всё.
+    const pre = sapi.apply([{ op: 'dealStage', id: sd.id, stage: 'show' }], { confirmed: true });
+    check('stage · пресейл-стадию сделке присвоить нельзя', !pre || pre.ok === false, JSON.stringify(pre));
+    check('stage · отказ не сдвинул сделку', dd().deals.find((d) => d.id === sd.id).stage === was);
+    check('stage · отказ называет договор, а не воронку',
+      pre && /договор/.test(pre.error || ''), (pre || {}).error);
+
+    // Доска стоит на тех же шагах: колонки услуги — объединение её видов договора.
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const cols = [].slice.call(doc.querySelectorAll('#app .kanban .kcol .kh span:first-child')).map((e) => e.textContent.trim());
+    const presale = ['Подбор', 'КП', 'Показ', 'Осмотр', 'Переговоры', 'В работе'];
+    check('доска · в колонках нет пресейл-стадий',
+      cols.length > 0 && !cols.some((c) => presale.indexOf(c) >= 0), cols.join(' | '));
+
+    // И лента на карточке рисует ровно шаги договора этой сделки — ни одним больше.
+    const off = [];
+    (dd().deals || []).forEach((d) => {
+      const want = ((WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || []).filter((k) => k !== 'lost');
+      WS.ui.dealCard(d.id);
+      const n = doc.querySelectorAll('#app .view .dx-stepper .dx-step').length;
+      if (n !== want.length) off.push(d.id + ': ' + n + ' против ' + want.length);
+    });
+    check('сделка · лента рисует шаги своего договора', off.length === 0, off.join(' | '));
+
+    // Оффплан регистрируется в Oqood, вторичка — Title Deed, аренда — Ejari: шаг один, реестр разный.
+    WS.ui.dealCard('d_anna');
+    check('сделка · регистрация названа своим реестром',
+      /Oqood/.test(doc.querySelector('#app .view').textContent),
+      (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
+  }
+
+  // ---- каждая услуга показана живым примером, и фильтры по ней что-то находят ----
+  {
+    const svc = (WS.FUNNELS || []).map((f) => f.k);
+    const empty = svc.filter((k) => !(dd().deals || []).some((d) => (d.funnel || 'sale') === k));
+    check('данные · у каждой услуги есть хотя бы одна сделка', empty.length === 0, empty.join(' '));
+    // Услуги без нашего инвентаря — управление, эксклюзив, кросс, консалтинг — должны быть
+    // представлены и сделкой без объекта: объект там принадлежит клиенту или партнёру.
+    check('данные · есть сделка без объекта', (dd().deals || []).some((d) => !d.objectId && !(d.lots || []).length));
+
+    // Фильтр, под который нет ни одной записи, — мёртвый пункт меню.
+    WS.store.role = 'manager'; WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const dead = [];
+    ['dealObjType', 'dealReadiness', 'dealAgent'].forEach((id) => {
+      const el = doc.getElementById(id);
+      if (!el) { dead.push(id + ': нет фильтра'); return; }
+      [].slice.call(el.options).forEach((o) => {
+        if (o.value === 'all') return;
+        const n = (dd().deals || []).filter((d) =>
+          (id === 'dealObjType' ? d.objectType : id === 'dealReadiness' ? d.readiness : d.agent) === o.value).length;
+        if (!n) dead.push(id + ':' + o.value);
+      });
+    });
+    check('фильтры сделок · каждый вариант что-то находит', dead.length === 0, dead.join(' '));
+    check('фильтры сделок · есть выбор по типу объекта, готовности и агенту',
+      !!doc.getElementById('dealObjType') && !!doc.getElementById('dealReadiness') && !!doc.getElementById('dealAgent'));
+    WS.store.role = 'agent';
+
+    // Фильтры клиентов — по тому, чем клиента ищут, а не только по AI-профилю.
+    WS.store.clientsTab = 'contacts'; WS.store.contactsFiltersOpen = true; WS.router.go('clients');
+    ['cfArea', 'cfBudget', 'cfState', 'cfConsent'].forEach((id) =>
+      check('фильтры клиентов · есть ' + id, !!doc.getElementById(id)));
+    // И каждый из них действительно сужает список, а не только рисуется.
+    const all = WS.ui.contactsSearchList().length;
+    WS.store.contactsFilters = Object.assign({}, WS.store.contactsFilters, { budget: 'lo' });
+    const lo = WS.ui.contactsSearchList();
+    check('фильтры клиентов · бюджет сужает список', lo.length > 0 && lo.length < all, lo.length + ' из ' + all);
+    check('фильтры клиентов · в выборке только этот бюджет',
+      lo.every((p) => (p.c.budget || 0) < 1500000), lo.map((p) => p.c.budget).join(' '));
+    WS.store.contactsFilters = Object.assign({}, WS.store.contactsFilters, { budget: 'all', state: 'open' });
+    const open = WS.ui.contactsSearchList();
+    check('фильтры клиентов · состояние работы сужает список', open.length > 0 && open.length < all, open.length + ' из ' + all);
+    WS.store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' };
+
+    // «Что предложить» наполнено у каждого клиента, у кого есть свободный подходящий инвентарь.
+    const bare = [];
+    (dd().clients || []).forEach((c) => {
+      if (!WS.ui.clientOffers(c).length) bare.push(c.id);
+    });
+    check('подборка · клиенту всегда есть что предложить', bare.length === 0, bare.join(' '));
+
+    // Бюджет аренды — ставка за год; в одной шкале с ценой объекта его нет.
+    const sarah = (dd().clients || []).find((c) => c.id === 'c_night');
+    check('подборка · арендная ставка не становится потолком покупки',
+      WS.ui.clientOffers(sarah).every((x) => x.o.price > 200000),
+      WS.ui.clientOffers(sarah).map((x) => x.o.price).join(' '));
+  }
+
+  // ---- клиент — это человек, а не его текущая сделка ----
+  // Правило чинилось трижды и трижды возвращалось в новом месте: то в полосе операций, то в
+  // подписи под именем, то в строке списка. Проверка держит его целиком, а не по одному месту:
+  // ни одна клиентская поверхность не называет стадию сделки и не показывает её сумму.
+  //
+  // Вкладка «Сделки» на карточке клиента — исключение по назначению: агент открыл её именно
+  // затем, чтобы увидеть сделки. Всё остальное о человеке.
+  {
+    const SL = WS.fixtures.STAGE_LABELS || {};
+    const stageWords = Object.keys(SL).map((k) => SL[k]).filter((w) => w && w.length > 5);
+    const dealMoney = (dd().deals || []).map((d) => WS.AED(d.amount || 0));
+    const hit = (txt, words) => words.filter((w) => txt.indexOf(w) >= 0);
+
+    const bad = [];
+    (dd().clients || []).forEach((c) => {
+      ['overview', 'profile', 'kyc', 'history'].forEach((tab) => {
+        WS.ui.clientCard(c.id);
+        WS.ui.setEntityTab('client', c.id, tab);
+        const t = (doc.querySelector('#app .view') || {}).textContent || '';
+        hit(t, stageWords).forEach((w) => bad.push(c.id + '/' + tab + ': стадия «' + w + '»'));
+      });
+    });
+    check('клиент · карточка не называет стадию сделки', bad.length === 0, bad.slice(0, 4).join(' | '));
+
+    // Список клиентов — клиентская книга, а не второй вид воронки.
+    WS.store.clientsTab = 'contacts'; WS.router.go('clients');
+    const list = (doc.querySelector('#app .view') || {}).textContent || '';
+    const listHtml = (doc.querySelector('#app .view') || {}).innerHTML || '';
+    check('список клиентов · без стадий сделок', hit(list, stageWords).length === 0, hit(list, stageWords).join(' '));
+    check('список клиентов · без кнопки «Сделка»', listHtml.indexOf('>Сделка<') < 0 && !/data-deal=/.test(listHtml));
+    // Ни стадии, ни суммы, ни счётчика заявок: строка списка описывает человека, а не то, на
+    // каком шаге его процесс сегодня. Состояние работы осталось фильтром — там ему и место.
+    const rowBadges = [].slice.call(doc.querySelectorAll('#app .view .feed-row .badge')).map((b) => b.textContent);
+    check('список клиентов · в строке нет состояния процесса',
+      !rowBadges.some((t) => /заявк|сделк/i.test(t)), rowBadges.filter((t) => /заявк|сделк/i.test(t)).join(' '));
+    check('список клиентов · состояние работы доступно фильтром',
+      !!doc.getElementById('cfState') || WS.store.contactsFiltersOpen === false);
+    // Строка под именем описывает человека, а не его запрос: ни цели, ни района, ни суммы —
+    // это условия сделки, они живут в заявке, а в книге клиентов работают фильтрами.
+    const rowSubs = [].slice.call(doc.querySelectorAll('#app .view .feed-row .m')).map((e) => e.textContent);
+    const subJoin = rowSubs.join(' | ');
+    check('список клиентов · в строке нет суммы', !/AED|млн/i.test(subJoin), subJoin.slice(0, 120));
+    const briefLeak = (dd().clients || []).filter((c) =>
+      (c.goal && subJoin.indexOf(c.goal) >= 0) || (c.areas || []).some((a) => subJoin.indexOf(a) >= 0)).map((c) => c.name);
+    check('список клиентов · в строке нет запроса (цель, район)', briefLeak.length === 0, briefLeak.join(', '));
+    // Взамен — то, чем человека находят и как к нему обращаются.
+    check('список клиентов · показывает связь и последнее касание',
+      /касание/.test(subJoin) && rowSubs.every((t) => /\+/.test(t) || /WhatsApp|Telegram|Email|Телефон/.test(t)),
+      subJoin.slice(0, 120));
+
+    // Блок связи внутри сделки и заявки — про связь, а не про условия страницы, на которой стоит.
+    const metaBad = [];
+    (dd().deals || []).forEach((d) => {
+      WS.ui.dealCard(d.id);
+      const m = doc.querySelector('#app .view .dcli-meta');
+      const t = m ? m.textContent : '';
+      hit(t, stageWords.concat(dealMoney)).forEach((w) => metaBad.push(d.id + ': «' + w + '»'));
+    });
+    (dd().requests || []).forEach((r) => {
+      WS.ui.requestCard(r.id);
+      const m = doc.querySelector('#app .view .dcli-meta');
+      const t = m ? m.textContent : '';
+      hit(t, stageWords.concat(dealMoney)).forEach((w) => metaBad.push(r.id + ': «' + w + '»'));
+    });
+    check('блок связи · не пересказывает страницу, на которой стоит', metaBad.length === 0, metaBad.slice(0, 4).join(' | '));
+    WS.ui.dealCard('d_anna');
+    const meta = (doc.querySelector('#app .view .dcli-meta') || {}).textContent || '';
+    check('блок связи · говорит, как связаться и когда говорили',
+      /язык/.test(meta) && /касание/.test(meta), meta);
+
+    // Корень дефекта был в самих данных: у клиента в поле «цель» стояло состояние сделки.
+    const leaked = (dd().clients || []).filter((c) =>
+      /договор|сделк|бронирован|подписан/i.test(c.goal || '') || /сделк/i.test(c.horizon || ''));
+    check('данные · цель клиента описывает поиск, а не сделку', leaked.length === 0,
+      leaked.map((c) => c.id + ': «' + c.goal + '» / «' + c.horizon + '»').join(' | '));
+  }
+
+  // ---- что нашёл сторонний ревьюер: пять дыр, каждая без своей проверки ----
+  {
+    // Проигрыш освобождает лот. Иначе объект вычеркнут из работы навсегда: договор не состоялся,
+    // а заявка показывает «В сделке» и не даёт предложить его заново.
+    const rs = dd().requests.find((x) => x.id === 'r_sarah_apr');
+    const lost = dd().deals.find((d) => d.id === 'd_sarah_apr');
+    check('данные · на стенде есть проигранная сделка с лотом', !!lost && lost.stage === 'lost' && !!lost.objectId);
+    const st = WS.ui.reqOfferStatus(rs, (rs.offered || [])[0]);
+    check('проигрыш · лот больше не числится в сделке', st.label !== 'В сделке' && st.label !== 'Сделка закрыта', st.label);
+    check('проигрыш · освобождённый объект снова доступен к переходу',
+      WS.ui.reqSelectedFree(rs).indexOf('o_jvcpark') >= 0, WS.ui.reqSelectedFree(rs).join(' '));
+
+    // Шаг зажимается видом договора, а не услугой: у вторички брони нет.
+    check('форма · бронь недоступна вторичке', WS.ui.clampStage('sale', 'book', 'готовый') !== 'book',
+      WS.ui.clampStage('sale', 'book', 'готовый'));
+    check('форма · оффплану бронь остаётся', WS.ui.clampStage('sale', 'book', 'оффплан') === 'book');
+
+    // Сделка, заведённая руками, тоже растёт из заявки — иначе она сирота в сводной воронке.
+    const nBefore = dd().deals.length, rBefore = dd().requests.length;
+    WS.ui.openDealForm();
+    const setv = (id, v) => { const el = doc.getElementById(id); if (el) el.value = v; };
+    setv('nd_client', 'c_anna'); setv('nd_title', 'СМОУК: ручная сделка');
+    setv('nd_amount', '1000000'); setv('nd_readiness', 'готовый'); setv('nd_stage', 'book');
+    WS.ui.createDeal();
+    check('ручное заведение · сделка создана', dd().deals.length === nBefore + 1);
+    check('ручное заведение · заявка создана вместе с ней', dd().requests.length === rBefore + 1);
+    const made = dd().deals[0].id === dd().deals[0].id ? dd().deals.find((d) => d.title === 'СМОУК: ручная сделка') : null;
+    check('ручное заведение · у сделки есть родительская заявка',
+      !!made && !!made.requestId && dd().requests.some((r) => r.id === made.requestId), made && made.requestId);
+    check('ручное заведение · шаг зажат видом договора, а не услугой',
+      !!made && ((WS.DEAL_STEPS || {})[WS.contractKindFor(made.funnel, made.readiness)] || []).indexOf(made.stage) >= 0,
+      made && (made.stage + '/' + made.readiness));
+    if (made) {
+      dd().deals = dd().deals.filter((d) => d.id !== made.id);
+      dd().requests = dd().requests.filter((r) => r.id !== made.requestId);
+    }
+
+    // Документы объекта видны по КАЖДОМУ лоту: разрешение на второй юнит нельзя спрятать.
+    const port = dd().deals.find((d) => d.id === 'd_rentbiz');
+    if (port) {
+      const objDocs = WS.ui.docsOfDeal(port).filter((x) => x.from === 'по объекту');
+      const lots = (port.lots || []);
+      check('документы · сделка видит документы своих лотов',
+        objDocs.length === 0 || objDocs.every((x) => lots.indexOf(x.object) >= 0),
+        objDocs.map((x) => x.object).join(' '));
+      // Проверяем механику на объекте, у которого документ точно есть.
+      const anna = dd().deals.find((d) => d.id === 'd_anna');
+      check('документы · документ объекта поднимается в сделку по этому объекту',
+        WS.ui.docsOfDeal(anna).some((x) => x.object === 'o_creekline' && x.from === 'по объекту'),
+        WS.ui.docsOfDeal(anna).map((x) => x.open + ':' + (x.from || '—')).join(' '));
+    }
+
+    // Уточнение имеет смысл, только если названное можно узнать.
+    const ask1 = WS.agent.ask('переведи сделку Виктора Орлова в подписание');
+    check('консьерж · без уточнения по-прежнему спрашивает', ask1.kind !== 'proposal', ask1.kind);
+    const ask2 = WS.agent.ask('переведи сделку Виктора Орлова по портфелю DIFC в подписание');
+    check('консьерж · названную сделку узнаёт и предлагает шаг', ask2.kind === 'proposal',
+      ask2.kind + ' · ' + (ask2.text || '').slice(0, 80));
+  }
+
+  // ---- заявки адресуемы запросом, и сделка клиента не выбирается наугад ----
+  {
+    const q = WS.query.run({ from: 'requests', where: [{ field: 'clientId', op: 'eq', value: 'c_docs' }] });
+    check('запрос · заявки — адресуемая коллекция', q && q.ok !== false && (q.rows || []).length >= 2,
+      JSON.stringify(q && (q.error || (q.rows || []).length)));
+    check('запрос · коллекция заявок названа по-русски',
+      (WS.query.collections() || []).some((c) => c.name === 'requests' && /заявк/i.test(c.label)));
+
+    // У Виктора две открытые сделки: угадывать, какую из них двигать, нельзя.
+    const many = (dd().deals || []).filter((d) => d.clientId === 'c_docs' && d.stage !== 'won' && d.stage !== 'lost');
+    check('данные · у клиента и правда несколько открытых сделок', many.length > 1, String(many.length));
+    const r = WS.agent.ask('переведи сделку Виктора Орлова в подписание');
+    check('консьерж · при двух сделках ничего не предлагается', r.kind !== 'proposal', r.kind);
+    check('консьерж · сказано, какие сделки открыты и что надо выбрать',
+      /Назовите, о какой речь/.test(r.text || '') && /2 сделки/.test(r.text || ''), (r.text || '').slice(-140));
+
+    // У клиента с одной сделкой поведение прежнее — уточнять там нечего.
+    const one = WS.agent.ask('переведи сделку Дмитрия Соколова в подписание');
+    check('консьерж · одна открытая сделка выбирается без вопросов', one.kind === 'proposal', one.kind);
+  }
+
+  // ---- доска или список решает ширина экрана, а не роль ----
+  {
+    check('доска · порог доски читается из одного места', typeof WS.ui.boardFits === 'function');
+    // jsdom ширину не считает, поэтому проверяем связку иначе: правило CSS и константа JS
+    // должны называть одно число, иначе появится полоса, где доска отрисована и не видна.
+    const css = read('css/app.css');
+    const m = /max-width:\s*(\d+(?:\.\d+)?)px\s*\)\s*\{\s*\.kanban\s*\{\s*display:\s*none/.exec(css);
+    check('доска · CSS прячет доску ниже порога', !!m, 'правило не найдено');
+    const js = /\(min-width:\s*(\d+)px\)/.exec(read('js/ui.js') || '');
+    check('доска · порог написан и в JS', !!js, 'BOARD_MIN не найден');
+    if (m && js) check('доска · порог CSS и порог JS сходятся',
+      Math.abs(parseFloat(m[1]) - (parseFloat(js[1]) - 0.02)) < 0.05,
+      m[1] + ' против ' + js[1]);
+    // На узком экране доска не отдаётся вовсе — вместе с переключателем, который её обещает.
+    const mmWas = win.matchMedia;
+    win.matchMedia = (q) => ({ matches: false, media: q, addListener: () => {}, removeListener: () => {} });
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const narrow = doc.querySelector('#app').innerHTML;
+    check('доска · на узком экране доски нет', narrow.indexOf('class="kanban"') < 0);
+    check('доска · и переключателя, который её обещает, тоже', narrow.indexOf('data-v="kanban"') < 0);
+    check('доска · вместо неё список сделок', narrow.indexOf('deals-table') >= 0);
+    win.matchMedia = mmWas;
+    WS.router.go('clients');
+    check('доска · на широком экране доска возвращается',
+      doc.querySelector('#app').innerHTML.indexOf('class="kanban"') >= 0);
+  }
+
+  // ---- сводная воронка идёт по всей книге, и две конверсии не складываются ----
+  {
+    const roleWas = WS.store.role;
+    WS.storeApi.setRole('manager');
+    WS.store.clientsTab = 'deals'; WS.router.go('clients');
+    const cells = [].slice.call(doc.querySelectorAll('#app .fn-cell')).map((c) => ({
+      n: parseInt(c.querySelector('.fn-n').textContent, 10),
+      l: c.querySelector('.fn-l').textContent,
+    }));
+    check('воронка · четыре отсека на месте', cells.length === 4, JSON.stringify(cells.map((c) => c.l)));
+    check('воронка · ни один отсек не пуст', cells.every((c) => c.n > 0),
+      cells.filter((c) => !c.n).map((c) => c.l).join(' '));
+    // Заявки и сделки считаются каждая по своему уровню, а закрытая заявка — нигде: она уже
+    // представлена своими сделками, и посчитать её ещё раз значило бы удвоить одну работу.
+    const openReq = (dd().requests || []).filter((r) => ['closed', 'lost'].indexOf(WS.ui.reqStage(r)) < 0).length;
+    check('воронка · в отсеках заявок ровно открытые заявки',
+      cells[0].n + cells[1].n === openReq, (cells[0].n + cells[1].n) + ' против ' + openReq);
+    const liveDeals = (dd().deals || []).filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
+    check('воронка · в отсеке договоров ровно живые сделки', cells[2].n === liveDeals,
+      cells[2].n + ' против ' + liveDeals);
+
+    // Деньги заявки — намерение, деньги сделки — согласованная цифра. В одну строку они не идут.
+    const prov = doc.querySelector('#app .card .prov').textContent;
+    check('воронка · пайплайн и потенциал названы порознь',
+      /Пайплайн по сделкам/.test(prov) && /Потенциал заявок/.test(prov), prov.slice(0, 90));
+
+    // Две конверсии считают разное, и у каждой виден свой знаменатель.
+    const cv = [].slice.call(doc.querySelectorAll('#app .cv-cell')).map((c) => c.textContent);
+    check('воронка · показаны обе конверсии', cv.length === 2, cv.join(' | '));
+    check('воронка · у каждой конверсии виден знаменатель',
+      cv.every((t) => /\d+ из \d+/.test(t)), cv.join(' | '));
+    // Число, равное 100% на одном наблюдении, ничего не измеряет: на стенде есть и отказ, и проигрыш.
+    check('воронка · конверсии не упираются в 100%', cv.every((t) => t.indexOf('100%') !== 0), cv.join(' | '));
+    check('воронка · сказано, что складывать их нельзя',
+      /Складывать их нельзя/.test(doc.querySelector('#app .cv-note').textContent));
+    WS.storeApi.setRole(roleWas);
+  }
+
+  // ---- документы: собранное по клиенту не собирается заново на каждый договор ----
+  {
+    const anna = dd().deals.find((d) => d.id === 'd_anna');
+    WS.ui.dealCard('d_anna'); WS.ui.setEntityTab('deal', 'd_anna', 'docs');
+    const txt = doc.querySelector('#app .view').textContent;
+    check('документы · паспорт клиента виден в сделке', /Паспорт и Emirates ID/.test(txt), txt.slice(0, 60));
+    check('документы · унаследованный помечен источником', /по клиенту/.test(txt));
+    check('документы · собственные документы сделки на месте', /Form B/.test(txt));
+
+    // Обе сделки одного клиента видят один и тот же клиентский документ — он собран один раз.
+    const bothSee = ['d_anna', 'd_won'].every((id) => {
+      const d = dd().deals.find((x) => x.id === id);
+      return WS.ui.docsOfDeal(d).some((x) => x.open === 'doc:passport');
+    });
+    check('документы · один паспорт обслуживает все сделки клиента', bothSee);
+
+    // Документ заявки поднимается в её сделки, но не наоборот: заявка не отвечает за договор.
+    const karim = dd().requests.find((r) => r.id === 'r_karim');
+    check('документы · соглашение брокеров живёт на заявке',
+      WS.ui.docsOfRequest(karim).some((x) => x.open === 'doc:formI'));
+    check('документы · документ сделки не всплывает в заявку',
+      !WS.ui.docsOfRequest(dd().requests.find((r) => r.id === 'r_anna')).some((x) => x.open === 'doc:formB'));
+
+    // Область — это владелец, а не любая ссылка: у Form B в записи есть клиент, но принадлежит
+    // он сделке, и в список клиентских документов попадать не должен.
+    const annaClientDocs = WS.ui.docsOfDeal(anna).filter((x) => x.from === 'по клиенту');
+    check('документы · ссылка на клиента не делает документ клиентским',
+      !annaClientDocs.some((x) => x.open === 'doc:formB'),
+      annaClientDocs.map((x) => x.open).join(' '));
+
+    // Каждый документ открывается: шаблон, которого нет, молча выкидывает в общий реестр.
+    const noTpl = [];
+    WS.ui.docsOfDeal(anna).concat(WS.ui.docsOfRequest(karim)).forEach((x) => {
+      if (x.open.indexOf('doc:') !== 0) return;
+      WS.store.view = 'probe';
+      WS.ui.openArtifactId(x.open);
+      if (WS.store.view !== 'probe') noTpl.push(x.open);
+      WS.ui.closeModal();
+    });
+    check('документы · у каждого документа есть что открыть', noTpl.length === 0, noTpl.join(' '));
+  }
+
+  // ---- переход: один комплекс — один договор — одна сделка ----
+  // Кнопка «создать сделку» делала одну сделку из всего выбранного, чем бы оно ни было: две
+  // квартиры в разных ЖК от разных застройщиков попадали под один договор, которого не бывает.
+  {
+    const D2 = () => WS.store.data;
+    const revert = JSON.parse(JSON.stringify({ deals: D2().deals, reqs: D2().requests,
+      dtl: D2().dealTimeline, rtl: D2().requestTimeline }));
+
+    // Два комплекса от разных продавцов в одной заявке → две сделки, каждая со своим договором.
+    const r = D2().requests.find((x) => x.id === 'r_lease');
+    r.offered = [{ id: 'o_baycentral', state: 'selected' }, { id: 'o_jvcpark', state: 'selected' }];
+    r.funnel = 'sale';
+    const before = D2().deals.length;
+    WS.ui.reqCreateDeal('r_lease');
+    const made = D2().deals.filter((d) => d.requestId === 'r_lease');
+    check('переход · разные комплексы разошлись по сделкам', made.length === 2,
+      made.length + ' (создано ' + (D2().deals.length - before) + ')');
+    check('переход · в каждой сделке лоты одного комплекса',
+      made.every((d) => {
+        const projs = (d.lots || []).map((id) => (D2().objects.find((o) => o.id === id) || {}).project || '');
+        return new Set(projs.map((p) => p.split('·')[0].trim())).size === 1;
+      }), made.map((d) => (d.lots || []).join('+')).join(' | '));
+    check('переход · сделка стартует с первого шага своего договора',
+      made.every((d) => {
+        const steps = (WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || [];
+        return steps[0] === d.stage;
+      }), made.map((d) => d.stage + '/' + d.readiness).join(' '));
+    check('переход · услуга наследуется от заявки', made.every((d) => d.funnel === 'sale'));
+    check('переход · у каждой новой сделки есть история',
+      made.every((d) => ((D2().dealTimeline || {})[d.id] || []).length > 0));
+    check('переход · заявка помнит, что разошлась на договоры',
+      ((D2().requestTimeline || {})['r_lease'] || []).some((e) => /Условия согласованы/.test(e.text || '')));
+
+    // Повторное нажатие ничего не удваивает: занятые сделкой лоты в выборку уже не попадают.
+    const n2 = D2().deals.length;
+    WS.ui.reqCreateDeal('r_lease');
+    check('переход · повторный переход не создаёт дублей', D2().deals.length === n2,
+      D2().deals.length + ' против ' + n2);
+
+    // Два лота в ОДНОМ комплексе — это один договор и одна сделка с двумя лотами.
+    D2().deals = JSON.parse(JSON.stringify(revert.deals));
+    D2().requests = JSON.parse(JSON.stringify(revert.reqs));
+    D2().dealTimeline = JSON.parse(JSON.stringify(revert.dtl));
+    D2().requestTimeline = JSON.parse(JSON.stringify(revert.rtl));
+    const r2 = D2().requests.find((x) => x.id === 'r_lease');
+    r2.offered = [{ id: 'o_difc_a', state: 'selected' }, { id: 'o_difc_b', state: 'selected' }];
+    r2.funnel = 'sale';
+    // Освободим офисы от портфельной сделки, чтобы они снова были доступны к переходу.
+    D2().deals = D2().deals.filter((d) => d.id !== 'd_rentbiz');
+    WS.ui.reqCreateDeal('r_lease');
+    const one = D2().deals.filter((d) => d.requestId === 'r_lease');
+    check('переход · один комплекс остаётся одной сделкой', one.length === 1, String(one.length));
+    check('переход · оба лота внутри одного договора',
+      one.length === 1 && (one[0].lots || []).length === 2, JSON.stringify(one[0] && one[0].lots));
+
+    D2().deals = JSON.parse(JSON.stringify(revert.deals));
+    D2().requests = JSON.parse(JSON.stringify(revert.reqs));
+    D2().dealTimeline = JSON.parse(JSON.stringify(revert.dtl));
+    D2().requestTimeline = JSON.parse(JSON.stringify(revert.rtl));
+  }
+
+  // ---- Консьерж не делает вид, что умеет двигать стадию заявки ----
+  {
+    const r = WS.agent.ask('переведи сделку Анны в показ');
+    check('консьерж · пресейл-команда не превращается в шаг сделки', r.kind !== 'proposal', r.kind);
+    check('консьерж · объясняет, что стадия заявки вычисляется',
+      /заявк/i.test(r.text || '') && /не выставляется|сама/i.test(r.text || ''), (r.text || '').slice(0, 90));
+  }
+
+  // ---- the client register never shows a milestone marked internal ----
+  {
+    const withInternal = (dd().contracts || []).find((k) => (k.milestones || []).some((m) => m.internalOnly));
+    if (withInternal) {
+      const m = withInternal.milestones.find((x) => x.internalOnly);
+      WS.ui.contractCard(withInternal.id);
+      WS.ui.setEntityTab('contract', withInternal.id, 'client');
+      // Scoped to the tab body: that IS the client view. The page around it — the step line in the
+      // header — is ours and legitimately shows internal work.
+      const cv = doc.querySelector('.dx-tabbody');
+      const h = cv ? cv.innerHTML : '';
+      check('contract · an internal milestone stays out of the client view', !!cv && h.indexOf(m.label) < 0, m.label);
+      WS.ui.setEntityTab('contract', withInternal.id, 'milestones');
+      const h2 = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+      check('contract · the internal milestone is still on our side', h2.indexOf(m.label) >= 0);
+    }
+  }
+
+  // ---- a deal created in an earlier month reads as older, not as the future ----
+  // «18 апреля» against a 14 мая clock gave «-4 дн. назад», and its creation entry sorted above
+  // everything that happened since — both from reading the day and ignoring the month.
+  {
+    const old = dd().deals.find((d) => /апрел/.test(d.createdAt || ''));
+    if (old) {
+      WS.ui.dealCard(old.id);
+      const h = doc.getElementById('app').innerHTML + doc.getElementById('modal').innerHTML;
+      check('deal age · no negative age on the card', h.indexOf('-') < 0 || !/-\d+ дн\. назад/.test(h), (h.match(/-?\d+ дн\. назад/) || [])[0]);
+      check('deal age · an April deal reads as weeks old', /2[0-9] дн\. назад/.test(h), (h.match(/-?\d+ дн\. назад/) || [])[0]);
+    }
+  }
+
+  // ---- an inline editor must survive being clicked ----
+  // The editable «Суть сделки» sat inside a wrapper carrying data-deal, the same attribute the
+  // delegated click handler navigates on. Clicking into the field reopened the card, replaced the
+  // node mid-keystroke and read as a flickering screen you could not type into. The regression is
+  // only visible through a real click: calling the render function proves nothing.
+  {
+    const td = dd().deals[0];
+    WS.ui.dealCard(td.id);
+    const field = doc.querySelector('.deal-title-text');
+    check('title · the editable field is rendered', !!field);
+    if (field) {
+      const viewWas = WS.store.view;
+      field.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('title · clicking into the field does not navigate', WS.store.view === viewWas, 'view=' + WS.store.view);
+      check('title · clicking into the field does not replace it', doc.contains(field));
+      // typing then leaving commits the new essence, without a redraw under the pointer
+      field.textContent = 'Новая суть сделки';
+      field.dispatchEvent(new win.FocusEvent('blur', { bubbles: false }));
+      check('title · leaving the field saves the new essence',
+        (dd().deals.find((x) => x.id === td.id) || {}).title === 'Новая суть сделки',
+        (dd().deals.find((x) => x.id === td.id) || {}).title);
+      check('title · the field is still the same node after saving', doc.contains(field));
+    }
+  }
+
+  // ---- every rendered action must have a handler, and every handler must not throw ----
+  // Third time this class has shipped: a control that renders, looks live and does nothing (or
+  // throws) when clicked. The selector test covers delegation; this covers the switch behind it.
+  {
+    const uiSrc = read('js/ui.js'), mainSrc = read('js/main.js');
+    const acts = Array.from(new Set((uiSrc.match(/data-act="[a-zA-Z][a-zA-Z0-9_]*"/g) || [])
+      .map((x) => x.replace(/data-act="|"/g, ''))));
+    const cases = new Set((mainSrc.match(/case '[a-zA-Z][a-zA-Z0-9_]*'/g) || []).map((x) => x.slice(6, -1)));
+    const orphans = acts.filter((a2) => !cases.has(a2));
+    check('actions · every rendered data-act has a handler', orphans.length === 0, orphans.join(', '));
+  }
+
+  // ---- an explicit action outranks navigation, wherever both are on one element ----
+  // A verb needs the id of the thing it acts on, so buttons legitimately carry both. The handler
+  // must therefore test data-act FIRST; when it did not, the contract verbs silently reopened the
+  // card. Asserted on the live handler's own source, not on a restatement of the rule.
+  {
+    const src = read('js/main.js');
+    const iAct = src.indexOf('if (d.act) return handleAct');
+    const navChecks = ['if (d.deal)', 'if (d.client)', 'if (d.contract)', 'if (d.obj)', 'if (d.task)'];
+    const late = navChecks.filter((n) => { const i2 = src.indexOf(n); return i2 >= 0 && i2 < iAct; });
+    check('actions · data-act is resolved before any navigation attribute', iAct > 0 && late.length === 0, late.join(', '));
+  }
+
+  // ---- the contract verbs actually run when clicked ----
+  {
+    const k0 = (dd().contracts || [])[0];
+    if (k0) {
+      WS.ui.contractCard(k0.id);
+      const btn = doc.getElementById('app').querySelector('[data-act="contractAmend"]');
+      check('contract · the amend action is rendered', !!btn);
+      if (btn) {
+        const errsWas = errors.length;
+        btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        const modalHtml = doc.getElementById('modal').innerHTML;
+        check('contract · clicking amend opens something and throws nothing',
+          errors.length === errsWas && modalHtml.indexOf('соглашение') >= 0, modalHtml.slice(0, 80));
+        WS.ui.closeModal();
+      }
+    }
+  }
+
+  // ---- no dated fact on a deal may predate the deal itself ----
+  // Two deals booked a deposit days before they were created. Nothing crashes; the card simply
+  // states an impossible order of events, which is worse than a crash because it looks fine.
+  {
+    const MONTHS2 = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const LEN2 = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const doy = (t) => {
+      const m = /^(\d+)\s*([а-яё]*)/i.exec(t || '');
+      if (!m) return null;
+      const mi = MONTHS2.indexOf((m[2] || '').toLowerCase());
+      const mo = mi >= 0 ? mi + 1 : 5;
+      let n = parseInt(m[1], 10);
+      for (let i = 0; i < mo - 1; i++) n += LEN2[i];
+      return n;
+    };
+    const bad = [];
+    (dd().deals || []).forEach((d) => {
+      const born = doy(d.createdAt);
+      if (born == null) return;
+      if (d.deposit && d.deposit.paid && d.deposit.at) {
+        const paid = doy(d.deposit.at);
+        if (paid != null && paid < born) bad.push(d.id + ': задаток ' + d.deposit.at + ' раньше создания ' + d.createdAt);
+      }
+      ((dd().dealTimeline || {})[d.id] || []).forEach((e) => {
+        const at = doy(e.at);
+        if (at != null && at < born) bad.push(d.id + ': событие ' + e.at + ' раньше создания ' + d.createdAt);
+      });
+    });
+    check('deal · nothing is dated before the deal was created', bad.length === 0, bad.slice(0, 3).join(' | '));
+  }
+
+  // ---- заявка старше своей сделки, и ни один сценарий не ссылается в пустоту ----
+  // Стенд рассказывал две несовместимые истории про одного клиента: показ прошёл 9 мая по заявке,
+  // а сделка утверждала, что заявка пришла 14-го и показ ещё впереди. Проверки ниже держат не
+  // конкретный случай, а класс: у следствия не может быть даты раньше причины, а сценарий не
+  // может двигать запись, которой нет, или называть объект, которого клиенту не предлагали.
+  {
+    const MO = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const LN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const day = (t) => {
+      const m = /^(\d+)\s*([а-яё]*)/i.exec(t || '');
+      if (!m) return null;
+      const mi = MO.indexOf((m[2] || '').toLowerCase());
+      const mo = mi >= 0 ? mi + 1 : 5;
+      let n = parseInt(m[1], 10);
+      for (let i = 0; i < mo - 1; i++) n += LN[i];
+      return n;
+    };
+    const reqById = (id) => (dd().requests || []).find((r) => r.id === id);
+
+    const early = [];
+    (dd().deals || []).forEach((d) => {
+      const r = d.requestId && reqById(d.requestId);
+      if (!r) return;
+      const born = day(d.createdAt); const asked = day(r.createdAt);
+      if (born != null && asked != null && born < asked) {
+        early.push(d.id + ': сделка ' + d.createdAt + ' раньше заявки ' + r.createdAt);
+      }
+    });
+    check('данные · сделка не рождается раньше своей заявки', early.length === 0, early.join(' | '));
+
+    // Сценарии и события дня трогают общие данные. Опечатка в id — это молчаливый ноль: эффект
+    // применяется, ничего не меняется, демонстрация выглядит исправной.
+    const COLL = { updateDeal: 'deals', dealStage: 'deals', updateRequest: 'requests', updateClient: 'clients',
+      setObject: 'objects', updateObject: 'objects', removeTask: 'tasks' };
+    const effectsOf = (s) => {
+      let out = [];
+      (s.flow || []).forEach((st) => {
+        if (st.effects) out = out.concat(st.effects);
+        if (st.result && st.result.effects) out = out.concat(st.result.effects);
+        if (st.fieldEffects) Object.keys(st.fieldEffects).forEach((k) => { out = out.concat(st.fieldEffects[k]); });
+      });
+      return out;
+    };
+    const sources = (WS.scenarioList || []).map((s) => [s.id, effectsOf(s)])
+      .concat(((WS.events && WS.events.EVENTS) || []).map((e) => [e.id, e.effects || []]));
+    // Задача, созданная одним сценарием и снятая следующим, в покое не существует — это не
+    // призрак, а звено цепочки, поэтому созданное сценариями считается существующим.
+    const born = {};
+    sources.forEach(([, eff]) => (eff || []).forEach((e) => {
+      const rec = e.task || e.obj || e.record;
+      if (rec && rec.id) born[rec.id] = 1;
+    }));
+    const ghosts = [];
+    sources.forEach(([name, eff]) => (eff || []).forEach((e) => {
+      const coll = COLL[e.op]; if (!coll) return;
+      if (born[e.id]) return;
+      if (!(dd()[coll] || []).some((x) => x.id === e.id)) ghosts.push(name + ' → ' + e.op + ' ' + e.id);
+    }));
+    check('сценарии · каждый эффект попадает в существующую запись', ghosts.length === 0, ghosts.slice(0, 3).join(' | '));
+
+    // Объект, который сценарий объявляет выбранным, должен быть среди предложенных клиенту.
+    // Иначе карточка заявки и рассказ сценария расходятся: «клиент выбрал» то, чего не видел.
+    const strays = [];
+    sources.forEach(([name, eff]) => (eff || []).forEach((e) => {
+      if (e.op !== 'updateClient' || !e.patch || !e.patch.preferred) return;
+      const offered = (dd().requests || []).filter((r) => r.clientId === e.id)
+        .reduce((a, r) => a.concat((r.offered || []).map((o) => o.id)), []);
+      const names = offered.map((id) => ((dd().objects || []).find((o) => o.id === id) || {}).name || '');
+      const pref = String(e.patch.preferred);
+      // Точное совпадение с именем объекта, а не «похоже»: «Creekline Residences 1208» вместо
+      // «Creekline Residences, Unit 1208» — это уже другое название, и клиент увидит другое.
+      if (names.indexOf(pref) < 0) {
+        strays.push(name + ': «' + pref + '» клиенту ' + e.id + ' не предлагали');
+      }
+    }));
+    check('сценарии · выбранным можно назвать только предложенное', strays.length === 0, strays.join(' | '));
+
+    // Календарь обещает будущее. Показ, который ленты уже записали как состоявшийся, —
+    // это не напоминание, а противоречие: агент придёт на встречу, которая была неделю назад.
+    // В прозе объект зовут не полным именем из карточки, а проектом и номером: «Creekline 1208»
+    // при name = «Creekline Residences, Unit 1208». Сверяем по этой паре — иначе проверка
+    // молчит ровно там, где нужна.
+    const keyOf = (o) => {
+      const first = String(o.name || '').split(/[\s,]+/)[0];
+      const unit = (/(\d{2,})\s*$/.exec(o.name || '') || [])[1];
+      return first && unit ? [first, unit] : null;
+    };
+    const has = (t, k) => t.indexOf(k[0]) >= 0 && t.indexOf(k[1]) >= 0;
+    const stale = [];
+    (dd().events || []).forEach((ev) => {
+      if (ev.kind !== 'show' || !ev.clientId) return;
+      const feeds = [].concat(
+        (dd().requests || []).filter((r) => r.clientId === ev.clientId).map((r) => (dd().requestTimeline || {})[r.id] || []),
+        (dd().deals || []).filter((x) => x.clientId === ev.clientId).map((x) => (dd().dealTimeline || {})[x.id] || []));
+      (dd().objects || []).forEach((o) => {
+        const k = keyOf(o);
+        if (!k || !has(ev.title || '', k)) return;
+        feeds.forEach((f) => f.forEach((it) => {
+          if (it.ch === 'meet' && has(it.text || '', k)) {
+            stale.push(ev.id + ': показ ' + o.name + ' уже проведён (' + it.at + ')');
+          }
+        }));
+      });
+    });
+    check('календарь · не назначает показ, который уже состоялся', stale.length === 0, stale.slice(0, 3).join(' | '));
+  }
+
+  // ---- sort keys must agree with the dates they claim ----
+  //  is a DDHHMM key built for a demo week in May. Entries dated in an earlier month were
+  // given day-only keys, so «28 апреля» outranked «06 мая» and a merged feed showed the past on
+  // top. The invariant is cheap to state and catches the whole class, not the one instance.
+  {
+    const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const LEN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const when = (at) => {
+      const m = /^(\d+)\s+([а-яё]+)(?:[^0-9]+(\d+):(\d+))?/i.exec(at || '');
+      if (!m) return null;
+      const mo = MONTHS.indexOf(m[2].toLowerCase()) + 1;
+      if (!mo) return null;
+      let doy = parseInt(m[1], 10);
+      for (let i2 = 0; i2 < mo - 1; i2++) doy += LEN[i2];
+      return doy * 1440 + (parseInt(m[3] || '0', 10) * 60) + parseInt(m[4] || '0', 10);
+    };
+    const collections = [];
+    ['dealTimeline', 'contactTimeline', 'companyTimeline', 'requestTimeline'].forEach((k) => {
+      const box = dd()[k] || {};
+      Object.keys(box).forEach((id) => collections.push([k + '.' + id, box[id]]));
+    });
+    (dd().contracts || []).forEach((c) => { if (c.timeline) collections.push(['contract.' + c.id, c.timeline]); });
+    let bad = [];
+    collections.forEach(([name, list]) => {
+      const rows = (list || []).filter((e) => e && e.at && e.ord != null && when(e.at) != null);
+      for (let a = 0; a < rows.length; a++) {
+        for (let b = a + 1; b < rows.length; b++) {
+          const dt = when(rows[a].at) - when(rows[b].at);
+          const dd2 = rows[a].ord - rows[b].ord;
+          if (dt !== 0 && (dt > 0) !== (dd2 > 0)) bad.push(name + ': «' + rows[a].at + '» vs «' + rows[b].at + '»');
+        }
+      }
+    });
+    check('feed · every ord agrees with the date it claims', bad.length === 0, bad.slice(0, 3).join(' | '));
+  }
+
+
+  // ---- a hand edit moves the revision, or a stale proposal stays confirmable ----
+  {
+    const revWas = WS.store.dataRevision;
+    sapi.touch();
+    check('store · touch() advances the revision', WS.store.dataRevision === revWas + 1,
+      'was=' + revWas + ' now=' + WS.store.dataRevision);
+  }
 
   // ============================================================
   //  The live head: a model may speak, but it may not supply a number, write
@@ -844,8 +2137,9 @@ setTimeout(async () => {
       check('запись · and moving it asks for a confirmation', dry.tier === 'guarded', dry.tier);
       const note = WS.storeApi.preview([{ op: 'updateRequest', id: r0.id, patch: { note: 'перезвонить в среду' } }]);
       check('запись · a note on it does not', note.ok === true && note.tier === 'safe', note.tier || note.error);
-      const bad = WS.storeApi.preview([{ op: 'updateRequest', id: r0.id, patch: { kp: { formed: false } } }]);
-      check('запись · what the deal owns is not writable from a chat', bad.ok === false && bad.code === 'field_not_writable', bad.code);
+      const bad = WS.storeApi.preview([{ op: 'updateRequest', id: r0.id, patch: { stage: 'talks' } }]);
+      check('запись · a request’s stage cannot be assigned, because it is computed',
+        bad.ok === false && bad.code === 'field_not_writable', bad.code);
       const ghost = WS.storeApi.preview([{ op: 'updateRequest', id: 'r_nope', patch: { note: 'x' } }]);
       check('запись · an invented request id is refused', ghost.ok === false && ghost.code === 'not_found');
 
@@ -1131,7 +2425,7 @@ setTimeout(async () => {
           line);
         check('подтверждение · and what is being replaced',
           line.replace(/ | |\s/g, '').indexOf(String(was)) >= 0, line);
-        const other = (WS.ui.STAGE_CODES || []).find((s) => s !== d0.stage);
+        const other = otherStep(d0);
         const st = WS.storeApi.preview([{ op: 'dealStage', id: d0.id, stage: other }]);
         check('подтверждение · a stage change names the stage it leaves',
           st.ok === true && (st.pending || []).join(' ')
@@ -1218,7 +2512,7 @@ setTimeout(async () => {
            сделку дальше» was sent to switch mode and say it again. That gate
            protected nothing — the change was already inert until a person
            confirmed the exact old → new diff — and it cost exactly that. */
-        const act = { op: 'dealStage', id: dd().deals[0].id, stage: 'work' };
+        const act = { op: 'dealStage', id: dd().deals[0].id, stage: otherStep(dd().deals[0]) };
         const fromAnalysis = L.toReply('Перевожу дальше.', { act: act });
         check('режим · an instruction given from an analysis mode is carried out',
           !!fromAnalysis && fromAnalysis.kind === 'proposal', JSON.stringify(fromAnalysis && fromAnalysis.kind));
@@ -1277,7 +2571,7 @@ setTimeout(async () => {
         const deepRan = L.toReply('ответ', { blocks: many() }, { mode: 'auto', depth: 'deep' });
         check('глубина · an answer is cut by the setting it ran under, not the one on screen now',
           !!deepRan && deepRan.blocks.length === 10, deepRan && deepRan.blocks.length);
-        const askedFrom = L.toReply('ок', { act: { op: 'dealStage', id: dd().deals[0].id, stage: 'work' } },
+        const askedFrom = L.toReply('ок', { act: { op: 'dealStage', id: dd().deals[0].id, stage: otherStep(dd().deals[0]) } },
           { mode: 'cma', depth: 'think' });
         check('режим · and marked with the mode it ran under',
           !!askedFrom && askedFrom.askedIn === 'Оценка · CMA', askedFrom && askedFrom.askedIn);
@@ -1363,7 +2657,7 @@ setTimeout(async () => {
         done.error || '');
 
       // A stage the board has no column for takes the deal off the board.
-      const okStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: 'docs' }]);
+      const okStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: otherStep(dd().deals[0]) }]);
       const badStage = WS.storeApi.preview([{ op: 'dealStage', id: dd().deals[0].id, stage: 'подписан' }]);
       check('стадия · a real stage passes', okStage.ok === true, okStage.error || '');
       check('стадия · an invented one is refused', badStage.ok === false && badStage.code === 'bad_value', badStage.code);
@@ -1502,7 +2796,9 @@ setTimeout(async () => {
     // Evidence is re-read from the store, so the figure on a chip is the
     // store's figure whatever the model said around it.
     const ev = L.evidenceFor(['deals_active']);
-    const truth = WS.query.run({ from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } });
+    // The same query the reading runs, taken FROM the reading: written out
+    // again here it would keep passing while the two drifted apart.
+    const truth = WS.query.run(WS.agent.READINGS.deals_active.q);
     check('live · evidence values come from the store, not the model',
       ev.length === 1 && ev[0].value === truth.value, 'chip=' + (ev[0] && ev[0].value) + ' store=' + truth.value);
     check('live · an unknown reading is dropped rather than shown',
@@ -1610,6 +2906,22 @@ setTimeout(async () => {
         all.ok && all.rows.every((r) => !!r.basis), 'rows=' + (all.rows || []).length);
       check('market · rent, price and yield cannot contradict each other',
         all.rows.every((r) => Math.abs(r.арендаЗаМетрВГод - Math.round(r.ценаЗаМетр * r.доходностьПроцент / 100)) <= 1));
+      /* Two market slices live in this stand now: AREAS behind the object
+         cards, and this one behind the Concierge's answers. A district
+         described in both with different numbers is the contradiction a broker
+         finds first — one screen and one question is all it takes — so where
+         they overlap they are the same figures, not merely similar ones. */
+      {
+        const A = (WS.fixtures && WS.fixtures.AREAS) || {};
+        const shared = all.rows.filter((r) => A[r.район]);
+        check('market · the slice and the area cards describe the same districts',
+          shared.length >= 3, 'overlap=' + shared.length);
+        const off = shared.filter((r) => r.ценаЗаМетр !== A[r.район].perM2 ||
+          r.доходностьПроцент !== A[r.район].yieldTypical);
+        check('market · and where they overlap they do not contradict each other',
+          off.length === 0, off.map((r) => r.район + ': ' + r.ценаЗаМетр + '≠' + A[r.район].perM2).join('; '));
+      }
+
       // Downtown came back as «нет данных» in the live breadth pass.
       const areas = (dd().objects || []).map((o) => o.area);
       check('market · it covers the districts the stand already sells in',
@@ -1633,10 +2945,40 @@ setTimeout(async () => {
     // Sending only the stage code put «две сделки на стадии docs» into a reply.
     {
       const deal = (L.digest().сделки || [])[0];
+      /* The head follows the model, and the model moved: the board is no longer
+         four columns for everyone. Without the steps THIS deal may take, a
+         proposal to move it is a guess the store refuses after the person has
+         already read it. */
+      check('live · a deal carries the steps its own contract allows',
+        !!deal && Array.isArray(deal.шаги) && deal.шаги.length > 0 &&
+        deal.шаги.every((s) => s.код && s.шаг && s.код !== s.шаг),
+        JSON.stringify(deal && deal.шаги));
+      {
+        const src = (dd().deals || []).find((d) => d.id === deal.id);
+        const allowed = WS.ui.dealSteps(src).join(',');
+        check('live · and they are the same steps the board would offer',
+          deal.шаги.map((s) => s.код).join(',') === allowed, allowed);
+        // The one thing the rules tell the model to copy is a stage code, so a
+        // stage taken from the digest has to be one the store accepts.
+        const pv = WS.storeApi.preview([{ op: 'dealStage', id: deal.id,
+          stage: deal.шаги.map((s) => s.код).filter((k) => k !== src.stage)[0] }]);
+        check('live · a step taken from the digest is one the store accepts', pv.ok === true, pv.error || '');
+      }
+      // A request has no stage of its own — it is computed — so what the model
+      // is given is the reading the screens show, not a field that is not there.
+      {
+        const req = (L.digest().заявки || [])[0];
+        const raw = (dd().requests || []).find((r) => r.id === req.id);
+        check('live · a request carries the stage the screens compute for it',
+          !!req.стадия && req.стадия === WS.ui.reqStageLabel(WS.ui.reqStage(raw), raw) &&
+          req.стадия !== WS.ui.reqStage(raw),
+          req.стадия + ' / ' + WS.ui.reqStage(raw));
+      }
+      const codes = Object.keys((WS.fixtures && WS.fixtures.STAGE_LABELS) || {});
       check('live · a stage reaches the model as words, not a code',
-        !!deal && !/^(new|work|docs|done)$/.test(deal.стадия), deal && deal.стадия);
+        !!deal && codes.indexOf(deal.стадия) < 0, deal && deal.стадия);
       check('live · and the code is still there to write a change with',
-        !!deal && /^(new|work|docs|done)$/.test(deal.стадия_код), deal && deal.стадия_код);
+        !!deal && codes.indexOf(deal.стадия_код) >= 0, deal && deal.стадия_код);
     }
 
     // A bad second at page load must not cost the visitor the live Concierge
@@ -1848,26 +3190,26 @@ setTimeout(async () => {
   //  The module tests above prove the reasoning; this proves the wiring.
   // ============================================================
   const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
-  // The Concierge answers on a scripted delay, so waiting a fixed span races it
-  // on a busy machine — and a race here used to surface as a TypeError three
-  // lines later rather than as a failed check. Wait for the thing itself.
-  async function waitFor(cond, ms) {
-    const until = Date.now() + (ms || 6000);
-    while (Date.now() < until) {
-      try { if (cond()) return true; } catch (e) { /* not there yet */ }
-      await wait(60);
+  // Wait for the CONDITION, not for a guessed duration. The Concierge answers after a chain of
+  // scripted delays plus a full re-render per message, so the cost grows with the fixtures — a
+  // fixed 1500 ms silently became too short the moment the stand gained a tenth deal.
+  const waitFor = async (fn, ms) => {
+    const limit = ms || 8000;
+    for (let spent = 0; spent < limit; spent += 50) {
+      try { if (fn()) return true; } catch (e) { /* not there yet */ }
+      await wait(50);
     }
     return false;
-  }
+  };
   if (WS.agent && typeof WS.router.routePrompt === 'function') {
     WS.engine.openThread('probe:e2e', 'Сквозная', 'chat');
     WS.router.go('concierge');
 
     WS.router.routePrompt('сколько сделок в работе и на какую сумму');
-    await waitFor(() => doc.getElementById('chat').querySelector('[data-agev]'));
+    await waitFor(() => { const el = doc.getElementById('chat'); return el && el.querySelector('[data-agev]'); });
     const chat1 = doc.getElementById('chat');
     const html1 = chat1 ? chat1.innerHTML : '';
-    const liveActive = dd().deals.filter((d) => d.stage !== 'done').length;
+    const liveActive = dd().deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length;
     check('e2e · a typed question produces an answer in the chat', html1.indexOf(String(liveActive)) >= 0, 'looking for ' + liveActive);
     const chip = chat1 && chat1.querySelector('[data-agev]');
     check('e2e · the answer offers openable evidence', !!chip);
@@ -1934,7 +3276,7 @@ setTimeout(async () => {
     // A write instruction reaches a proposal, and only a click applies it.
     const feedWas = (dd().contactTimeline['c_anna'] || []).length;
     WS.router.routePrompt('запиши по Анне: проверка сквозного пути');
-    await waitFor(() => doc.getElementById('chat').querySelector('[data-agok]'));
+    await waitFor(() => { const el = doc.getElementById('chat'); return el && el.querySelector('[data-agok]'); });
     const chat2 = doc.getElementById('chat');
     const okBtn = chat2 && chat2.querySelector('[data-agok]');
     check('e2e · a write instruction produces a confirm button', !!okBtn);
