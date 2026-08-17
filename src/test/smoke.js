@@ -1290,6 +1290,54 @@ setTimeout(async () => {
       (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
   }
 
+  // ---- заявки адресуемы запросом, и сделка клиента не выбирается наугад ----
+  {
+    const q = WS.query.run({ from: 'requests', where: [{ field: 'clientId', op: 'eq', value: 'c_docs' }] });
+    check('запрос · заявки — адресуемая коллекция', q && q.ok !== false && (q.rows || []).length >= 2,
+      JSON.stringify(q && (q.error || (q.rows || []).length)));
+    check('запрос · коллекция заявок названа по-русски',
+      (WS.query.collections() || []).some((c) => c.name === 'requests' && /заявк/i.test(c.label)));
+
+    // У Виктора две открытые сделки: угадывать, какую из них двигать, нельзя.
+    const many = (dd().deals || []).filter((d) => d.clientId === 'c_docs' && d.stage !== 'won' && d.stage !== 'lost');
+    check('данные · у клиента и правда несколько открытых сделок', many.length > 1, String(many.length));
+    const r = WS.agent.ask('переведи сделку Виктора Орлова в подписание');
+    check('консьерж · при двух сделках ничего не предлагается', r.kind !== 'proposal', r.kind);
+    check('консьерж · сказано, какие сделки открыты и что надо выбрать',
+      /Назовите, о какой речь/.test(r.text || '') && /2 сделки/.test(r.text || ''), (r.text || '').slice(-140));
+
+    // У клиента с одной сделкой поведение прежнее — уточнять там нечего.
+    const one = WS.agent.ask('переведи сделку Анны Петровой в бронирование');
+    check('консьерж · одна открытая сделка выбирается без вопросов', one.kind === 'proposal', one.kind);
+  }
+
+  // ---- доска или список решает ширина экрана, а не роль ----
+  {
+    check('доска · порог доски читается из одного места', typeof WS.ui.boardFits === 'function');
+    // jsdom ширину не считает, поэтому проверяем связку иначе: правило CSS и константа JS
+    // должны называть одно число, иначе появится полоса, где доска отрисована и не видна.
+    const css = read('css/app.css');
+    const m = /max-width:\s*(\d+(?:\.\d+)?)px\s*\)\s*\{\s*\.kanban\s*\{\s*display:\s*none/.exec(css);
+    check('доска · CSS прячет доску ниже порога', !!m, 'правило не найдено');
+    const js = /\(min-width:\s*(\d+)px\)/.exec(read('js/ui.js') || '');
+    check('доска · порог написан и в JS', !!js, 'BOARD_MIN не найден');
+    if (m && js) check('доска · порог CSS и порог JS сходятся',
+      Math.abs(parseFloat(m[1]) - (parseFloat(js[1]) - 0.02)) < 0.05,
+      m[1] + ' против ' + js[1]);
+    // На узком экране доска не отдаётся вовсе — вместе с переключателем, который её обещает.
+    const mmWas = win.matchMedia;
+    win.matchMedia = (q) => ({ matches: false, media: q, addListener: () => {}, removeListener: () => {} });
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const narrow = doc.querySelector('#app').innerHTML;
+    check('доска · на узком экране доски нет', narrow.indexOf('class="kanban"') < 0);
+    check('доска · и переключателя, который её обещает, тоже', narrow.indexOf('data-v="kanban"') < 0);
+    check('доска · вместо неё список сделок', narrow.indexOf('deals-table') >= 0);
+    win.matchMedia = mmWas;
+    WS.router.go('clients');
+    check('доска · на широком экране доска возвращается',
+      doc.querySelector('#app').innerHTML.indexOf('class="kanban"') >= 0);
+  }
+
   // ---- сводная воронка идёт по всей книге, и две конверсии не складываются ----
   {
     const roleWas = WS.store.role;

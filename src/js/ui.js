@@ -1008,14 +1008,26 @@
     let body;
     if (tab === 'contacts') body = contactsPeople();
     else {
-      const dview = st.dealsView || (isMgr ? 'table' : 'kanban');
-      const vtoggle = '<div class="seg">' +
+      // Доска шириной в девять колонок на телефоне не доска, а горизонтальная лента, по которой
+      // невозможно вести работу. Ширина решает, а не роль: на узком экране остаётся список — он
+      // и есть та же воронка, просто читаемая. Сохранённый выбор доски узкий экран не переубеждает.
+      const dview = boardFits() ? (st.dealsView || (isMgr ? 'table' : 'kanban')) : 'table';
+      const vtoggle = boardFits() ? '<div class="seg">' +
         '<button class="' + (dview === 'kanban' ? 'on' : '') + '" data-act="dealsView" data-v="kanban">' + I('grid') + 'Канбан</button>' +
-        '<button class="' + (dview === 'table' ? 'on' : '') + '" data-act="dealsView" data-v="table">' + I('menu') + 'Таблица</button></div>';
+        '<button class="' + (dview === 'table' ? 'on' : '') + '" data-act="dealsView" data-v="table">' + I('menu') + 'Таблица</button></div>' : '';
       const funnelSwitch = dview === 'kanban' ? funnelSwitcher() : '';
       body = (isMgr ? dealsFunnel() : '') + '<div class="deals-toolbar">' + vtoggle + funnelSwitch + '</div>' + dealFilterBar() + (dview === 'table' ? dealsTable(isMgr) : kanbanDeals(isMgr));
     }
     return head(title, desc, actions) + body;
+  }
+  // Порог доски написан один раз и читается обоими: CSS прячет её тем же условием, каким JS
+  // решает не отдавать. Два порога, разъехавшиеся на пиксель, дают полосу, где доска отрисована
+  // и невидима.
+  const BOARD_MIN = '(min-width: 900px)';
+  function boardFits() {
+    const w = (typeof window !== 'undefined') && window;
+    if (!w || !w.matchMedia) return true;
+    return w.matchMedia(BOARD_MIN).matches;
   }
   // ---- Search and filter helpers ----
   // One search field for every list — same affordance, same shape, wherever a broker looks for
@@ -7303,7 +7315,7 @@
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope, reqStage,
+    docsOfDeal, docsOfRequest, docScope, reqStage, boardFits,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

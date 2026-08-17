@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:12</title>
+  <title>WESPACE · сборка 23:19</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:12';
+    window.WS_BUILD='23:19';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -633,6 +633,9 @@ button { font-family: inherit; cursor: pointer; }
 /* Лента шагов без заголовка: сама цепочка и есть заголовок. */
 .dx-sec-bare { padding-top: 16px; }
 .dx-sec-bare .dx-stepper { margin-top: 0; }
+/* Порог доски. Тот же, что BOARD_MIN в ui.js: если они разъедутся, появится полоса ширины,
+   где доска отрисована, но не видна, — и агент решит, что сделки пропали. */
+@media (max-width: 899.98px) { .kanban { display: none; } }
 /* Две конверсии рядом, каждая со своим знаменателем. */
 .cv-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
   margin: 10px 0 2px; padding: 11px 13px; border: 1px solid var(--line);
@@ -4294,6 +4297,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const COLLECTIONS = {
     clients: 'контакты',
     deals: 'сделки',
+    requests: 'заявки',
     objects: 'объекты',
     tasks: 'задачи',
     events: 'события календаря',
@@ -6508,14 +6512,26 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     let body;
     if (tab === 'contacts') body = contactsPeople();
     else {
-      const dview = st.dealsView || (isMgr ? 'table' : 'kanban');
-      const vtoggle = '<div class="seg">' +
+      // Доска шириной в девять колонок на телефоне не доска, а горизонтальная лента, по которой
+      // невозможно вести работу. Ширина решает, а не роль: на узком экране остаётся список — он
+      // и есть та же воронка, просто читаемая. Сохранённый выбор доски узкий экран не переубеждает.
+      const dview = boardFits() ? (st.dealsView || (isMgr ? 'table' : 'kanban')) : 'table';
+      const vtoggle = boardFits() ? '<div class="seg">' +
         '<button class="' + (dview === 'kanban' ? 'on' : '') + '" data-act="dealsView" data-v="kanban">' + I('grid') + 'Канбан</button>' +
-        '<button class="' + (dview === 'table' ? 'on' : '') + '" data-act="dealsView" data-v="table">' + I('menu') + 'Таблица</button></div>';
+        '<button class="' + (dview === 'table' ? 'on' : '') + '" data-act="dealsView" data-v="table">' + I('menu') + 'Таблица</button></div>' : '';
       const funnelSwitch = dview === 'kanban' ? funnelSwitcher() : '';
       body = (isMgr ? dealsFunnel() : '') + '<div class="deals-toolbar">' + vtoggle + funnelSwitch + '</div>' + dealFilterBar() + (dview === 'table' ? dealsTable(isMgr) : kanbanDeals(isMgr));
     }
     return head(title, desc, actions) + body;
+  }
+  // Порог доски написан один раз и читается обоими: CSS прячет её тем же условием, каким JS
+  // решает не отдавать. Два порога, разъехавшиеся на пиксель, дают полосу, где доска отрисована
+  // и невидима.
+  const BOARD_MIN = '(min-width: 900px)';
+  function boardFits() {
+    const w = (typeof window !== 'undefined') && window;
+    if (!w || !w.matchMedia) return true;
+    return w.matchMedia(BOARD_MIN).matches;
   }
   // ---- Search and filter helpers ----
   // One search field for every list — same affordance, same shape, wherever a broker looks for
@@ -12803,7 +12819,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.ui = { render, openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope, reqStage,
+    docsOfDeal, docsOfRequest, docScope, reqStage, boardFits,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
@@ -12885,7 +12901,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     };
     return byName(d.clients || [], 'contact') || byName(d.companies || [], 'company') || null;
   }
-  function dealOf(clientId) { return (WS.store.data.deals || []).find((x) => x.clientId === clientId) || null; }
+  function dealsOf(clientId) {
+    return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
+  }
+  // Одна живая сделка — берём её. Несколько — не угадываем: раньше бралась первая в массиве,
+  // и «переведи сделку Анны дальше» двигало ту, которую агент не имел в виду.
+  function dealOf(clientId) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    if (live.length === 1) return live[0];
+    if (!live.length) { const all = dealsOf(clientId); return all.length === 1 ? all[0] : null; }
+    return null;
+  }
+  function dealChoiceText(clientId) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    if (live.length < 2) return '';
+    return ' У клиента открыто ' + live.length + ' сделки: ' + live.map((d) => '«' + (d.title || d.id) + '»').join(', ') + '. Назовите, о какой речь.';
+  }
 
   // ---------- proposals ----------
   // A proposal is a dry run held against the revision it was built at. If the
@@ -13041,7 +13072,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         return { kind: 'answer', text: 'Это стадия заявки, а не сделки, и она не выставляется вручную: заявка сама встаёт на подбор, показ или переговоры, когда появляется факт. Отметьте на заявке предложенный объект или добавьте событие — стадия сдвинется сама.', evidence: [], next: suggestions() };
       }
       if (!deal || !st) {
-        return { kind: 'answer', text: 'Понял про шаг сделки, но не хватает деталей: по какой сделке и на какой шаг. Шаги: подготовка, бронирование, подписание, регистрация, закрыта.', evidence: [], next: suggestions() };
+        const pick = ent && ent.kind === 'contact' ? dealChoiceText(ent.id) : '';
+        return { kind: 'answer', text: 'Понял про шаг сделки, но не хватает деталей: по какой сделке и на какой шаг. Шаги: подготовка, бронирование, подписание, регистрация, закрыта.' + pick, evidence: [], next: suggestions() };
       }
       return propose([{ op: 'dealStage', id: deal.id, stage: st }],
         { subject: deal.id, title: 'Смена стадии', lines: ['Сделка ' + (deal.title || deal.id) + ': ' + deal.stage + ' → ' + st] });
@@ -13068,6 +13100,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         const deal = ent.kind === 'contact' ? dealOf(ent.id) : null;
         const bits = [ent.name];
         if (deal) bits.push('сделка на ' + money(deal.amount) + ', стадия «' + deal.stage + '»');
+        else if (ent.kind === 'contact') {
+          const live = dealsOf(ent.id).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+          if (live.length > 1) bits.push('открытых сделок — ' + live.length + ': ' + live.map((d) => '«' + (d.title || d.id) + '»').join(', '));
+        }
         return {
           kind: 'answer', text: bits.join(' — ') + '.',
           evidence: deal ? [{ label: 'сделка', value: deal.amount, money: true, query: { from: 'deals', where: [{ field: 'id', op: 'eq', value: deal.id }] } }] : [],

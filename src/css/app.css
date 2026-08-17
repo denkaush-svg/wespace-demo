@@ -483,6 +483,9 @@ button { font-family: inherit; cursor: pointer; }
 /* Лента шагов без заголовка: сама цепочка и есть заголовок. */
 .dx-sec-bare { padding-top: 16px; }
 .dx-sec-bare .dx-stepper { margin-top: 0; }
+/* Порог доски. Тот же, что BOARD_MIN в ui.js: если они разъедутся, появится полоса ширины,
+   где доска отрисована, но не видна, — и агент решит, что сделки пропали. */
+@media (max-width: 899.98px) { .kanban { display: none; } }
 /* Две конверсии рядом, каждая со своим знаменателем. */
 .cv-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;
   margin: 10px 0 2px; padding: 11px 13px; border: 1px solid var(--line);

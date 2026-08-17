@@ -68,7 +68,22 @@
     };
     return byName(d.clients || [], 'contact') || byName(d.companies || [], 'company') || null;
   }
-  function dealOf(clientId) { return (WS.store.data.deals || []).find((x) => x.clientId === clientId) || null; }
+  function dealsOf(clientId) {
+    return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
+  }
+  // Одна живая сделка — берём её. Несколько — не угадываем: раньше бралась первая в массиве,
+  // и «переведи сделку Анны дальше» двигало ту, которую агент не имел в виду.
+  function dealOf(clientId) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    if (live.length === 1) return live[0];
+    if (!live.length) { const all = dealsOf(clientId); return all.length === 1 ? all[0] : null; }
+    return null;
+  }
+  function dealChoiceText(clientId) {
+    const live = dealsOf(clientId).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+    if (live.length < 2) return '';
+    return ' У клиента открыто ' + live.length + ' сделки: ' + live.map((d) => '«' + (d.title || d.id) + '»').join(', ') + '. Назовите, о какой речь.';
+  }
 
   // ---------- proposals ----------
   // A proposal is a dry run held against the revision it was built at. If the
@@ -224,7 +239,8 @@
         return { kind: 'answer', text: 'Это стадия заявки, а не сделки, и она не выставляется вручную: заявка сама встаёт на подбор, показ или переговоры, когда появляется факт. Отметьте на заявке предложенный объект или добавьте событие — стадия сдвинется сама.', evidence: [], next: suggestions() };
       }
       if (!deal || !st) {
-        return { kind: 'answer', text: 'Понял про шаг сделки, но не хватает деталей: по какой сделке и на какой шаг. Шаги: подготовка, бронирование, подписание, регистрация, закрыта.', evidence: [], next: suggestions() };
+        const pick = ent && ent.kind === 'contact' ? dealChoiceText(ent.id) : '';
+        return { kind: 'answer', text: 'Понял про шаг сделки, но не хватает деталей: по какой сделке и на какой шаг. Шаги: подготовка, бронирование, подписание, регистрация, закрыта.' + pick, evidence: [], next: suggestions() };
       }
       return propose([{ op: 'dealStage', id: deal.id, stage: st }],
         { subject: deal.id, title: 'Смена стадии', lines: ['Сделка ' + (deal.title || deal.id) + ': ' + deal.stage + ' → ' + st] });
@@ -251,6 +267,10 @@
         const deal = ent.kind === 'contact' ? dealOf(ent.id) : null;
         const bits = [ent.name];
         if (deal) bits.push('сделка на ' + money(deal.amount) + ', стадия «' + deal.stage + '»');
+        else if (ent.kind === 'contact') {
+          const live = dealsOf(ent.id).filter((x) => x.stage !== 'won' && x.stage !== 'lost');
+          if (live.length > 1) bits.push('открытых сделок — ' + live.length + ': ' + live.map((d) => '«' + (d.title || d.id) + '»').join(', '));
+        }
         return {
           kind: 'answer', text: bits.join(' — ') + '.',
           evidence: deal ? [{ label: 'сделка', value: deal.amount, money: true, query: { from: 'deals', where: [{ field: 'id', op: 'eq', value: deal.id }] } }] : [],
