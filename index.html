@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 00:31</title>
+  <title>WESPACE · сборка 00:40</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='00:31';
+    window.WS_BUILD='00:40';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -6843,11 +6843,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const c = p.c;
     const k = kycOf(c);
     const last = lastTouchOf(p.id);
-    const openReq = (D().requests || []).filter((r) => r.clientId === p.id && ['closed', 'lost'].indexOf(reqStage(r)) < 0).length;
+    // Счётчик открытых заявок убран отсюда вместе со стадией и суммой: это состояние процесса,
+    // а не свойство человека, и в книге клиентов ему не место. «Есть открытая заявка» осталось
+    // фильтром — там оно сужает список, а не занимает строку у каждого.
     const sub = [p.role || '', (c.areas || []).slice(0, 2).join(' · '),
       p.budget ? 'до ' + WS.AED(p.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
     const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
-      (openReq ? '<span class="badge acc">' + I('mail') + openReq + ' ' + plural(openReq, 'заявка', 'заявки', 'заявок') + '</span>' : '') +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
       (c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>');
     return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +

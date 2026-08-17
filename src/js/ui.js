@@ -1145,11 +1145,12 @@
     const c = p.c;
     const k = kycOf(c);
     const last = lastTouchOf(p.id);
-    const openReq = (D().requests || []).filter((r) => r.clientId === p.id && ['closed', 'lost'].indexOf(reqStage(r)) < 0).length;
+    // Счётчик открытых заявок убран отсюда вместе со стадией и суммой: это состояние процесса,
+    // а не свойство человека, и в книге клиентов ему не место. «Есть открытая заявка» осталось
+    // фильтром — там оно сужает список, а не занимает строку у каждого.
     const sub = [p.role || '', (c.areas || []).slice(0, 2).join(' · '),
       p.budget ? 'до ' + WS.AED(p.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
     const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
-      (openReq ? '<span class="badge acc">' + I('mail') + openReq + ' ' + plural(openReq, 'заявка', 'заявки', 'заявок') + '</span>' : '') +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
       (c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>');
     return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +

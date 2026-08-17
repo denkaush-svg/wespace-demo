@@ -1385,6 +1385,13 @@ setTimeout(async () => {
     const listHtml = (doc.querySelector('#app .view') || {}).innerHTML || '';
     check('список клиентов · без стадий сделок', hit(list, stageWords).length === 0, hit(list, stageWords).join(' '));
     check('список клиентов · без кнопки «Сделка»', listHtml.indexOf('>Сделка<') < 0 && !/data-deal=/.test(listHtml));
+    // Ни стадии, ни суммы, ни счётчика заявок: строка списка описывает человека, а не то, на
+    // каком шаге его процесс сегодня. Состояние работы осталось фильтром — там ему и место.
+    const rowBadges = [].slice.call(doc.querySelectorAll('#app .view .feed-row .badge')).map((b) => b.textContent);
+    check('список клиентов · в строке нет состояния процесса',
+      !rowBadges.some((t) => /заявк|сделк/i.test(t)), rowBadges.filter((t) => /заявк|сделк/i.test(t)).join(' '));
+    check('список клиентов · состояние работы доступно фильтром',
+      !!doc.getElementById('cfState') || WS.store.contactsFiltersOpen === false);
     // Взамен — то, по чему клиента ищут: что он ищет, где, на сколько и когда с ним говорили.
     check('список клиентов · показывает районы поиска',
       (dd().clients || []).some((c) => (c.areas || []).length && list.indexOf(c.areas[0]) >= 0));
