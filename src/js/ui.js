@@ -1133,23 +1133,24 @@
     const cur = S().contactType || 'all';
     const q = (S().contactsSearch || '').trim().toLowerCase();
     const cl = D().clients || [];
-    let list = cl.map((c, i) => ({ id: c.id, name: c.name, role: c.goal, budget: c.budget, c: c, transferred: i >= cl.length - 2 }));
+    let list = cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
     if (cur === 'transferred') list = list.filter((p) => p.transferred);
     if (q) list = list.filter((p) => contactHaystack(p.c).indexOf(q) >= 0);
     return list.filter((p) => matchContactsFilters(p.c));
   }
   // Строка списка клиентов. Кнопка «Сделка» и стадия отсюда убраны: список клиентов — это
   // клиентская книга, а не второй вид воронки. Сделки агент смотрит в сделках; здесь ему нужно
-  // найти человека — по тому, что он ищет, как решает и когда с ним говорили.
+  // найти человека и понять, как с ним связаться.
   function contactRow(p) {
     const c = p.c;
     const k = kycOf(c);
     const last = lastTouchOf(p.id);
-    // Счётчик открытых заявок убран отсюда вместе со стадией и суммой: это состояние процесса,
-    // а не свойство человека, и в книге клиентов ему не место. «Есть открытая заявка» осталось
-    // фильтром — там оно сужает список, а не занимает строку у каждого.
-    const sub = [p.role || '', (c.areas || []).slice(0, 2).join(' · '),
-      p.budget ? 'до ' + WS.AED(p.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
+    // Под именем — только то, чем человека находят и с чем к нему обращаются: телефон, язык,
+    // основной канал, когда говорили в последний раз. Что он ищет, в каком районе и на какую
+    // сумму — это запрос, а не свойство человека: оно живёт в заявке, а в книге клиентов
+    // работает фильтрами. Стадия, сумма и счётчик заявок убраны отсюда по той же причине.
+    const sub = [c.phone || '', c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
+      last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
     const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
       (c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>');

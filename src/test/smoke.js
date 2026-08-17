@@ -1392,10 +1392,18 @@ setTimeout(async () => {
       !rowBadges.some((t) => /заявк|сделк/i.test(t)), rowBadges.filter((t) => /заявк|сделк/i.test(t)).join(' '));
     check('список клиентов · состояние работы доступно фильтром',
       !!doc.getElementById('cfState') || WS.store.contactsFiltersOpen === false);
-    // Взамен — то, по чему клиента ищут: что он ищет, где, на сколько и когда с ним говорили.
-    check('список клиентов · показывает районы поиска',
-      (dd().clients || []).some((c) => (c.areas || []).length && list.indexOf(c.areas[0]) >= 0));
-    check('список клиентов · показывает последнее касание', /касание/.test(list));
+    // Строка под именем описывает человека, а не его запрос: ни цели, ни района, ни суммы —
+    // это условия сделки, они живут в заявке, а в книге клиентов работают фильтрами.
+    const rowSubs = [].slice.call(doc.querySelectorAll('#app .view .feed-row .m')).map((e) => e.textContent);
+    const subJoin = rowSubs.join(' | ');
+    check('список клиентов · в строке нет суммы', !/AED|млн/i.test(subJoin), subJoin.slice(0, 120));
+    const briefLeak = (dd().clients || []).filter((c) =>
+      (c.goal && subJoin.indexOf(c.goal) >= 0) || (c.areas || []).some((a) => subJoin.indexOf(a) >= 0)).map((c) => c.name);
+    check('список клиентов · в строке нет запроса (цель, район)', briefLeak.length === 0, briefLeak.join(', '));
+    // Взамен — то, чем человека находят и как к нему обращаются.
+    check('список клиентов · показывает связь и последнее касание',
+      /касание/.test(subJoin) && rowSubs.every((t) => /\+/.test(t) || /WhatsApp|Telegram|Email|Телефон/.test(t)),
+      subJoin.slice(0, 120));
 
     // Блок связи внутри сделки и заявки — про связь, а не про условия страницы, на которой стоит.
     const metaBad = [];
