@@ -143,6 +143,17 @@
       handover: null, paymentPlan: null, serviceCharge: '22 AED/фт²·год', escrow: null,
       occupancy: 'Сдан · договор до марта 2027',
       usp: 'Смежный блок на том же этаже, что и 1204: два юнита берутся одним договором и при желании объединяются в один офис без согласования планировки с DIFC.' },
+    { id: 'o_jvcpark', name: 'Park Terrace JVC, Unit 903', source: 'agency',
+      sourceLabel: 'Инвентарь агентства', area: 'JVC', price: 1240000, size: 74, br: '1BR',
+      address: 'JVC, Park Terrace, District 14, Unit 903', commissionPct: 2,
+      availability: 'available', verified: 'verified', checkedAt: '11 мая 2026',
+      trakheesi: 'ok', madmoun: 'na',
+      attrs: { view: 'park', floor: 9, floors: 16, floorBand: 'high', finish: 'standard', demand: 'mid', prestige: 'mid', metro: false },
+      match: 'JVC, заметно ниже бюджета, окна в парк.',
+      segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Park Terrace · District 14',
+      handover: null, paymentPlan: null, serviceCharge: '13 AED/фт²·год', escrow: null,
+      occupancy: 'Свободна (vacant)',
+      usp: 'Окна выходят в районный парк, а не на соседний фасад: в JVC это редкость, и при пересдаче ставка держится на 8–10% выше соседних юнитов той же площади.' },
   ];
 
   // Reference financial model (spec §12.2) — single source of truth for
@@ -231,7 +242,7 @@
       nextDue: '12 мая', deposit: { kind: 'Бронирование (booking)', amount: 97500, paid: true, at: '12 мая', refundable: false },
       gates: { kyc: true, escrow: true, spa: true },
       prov: { budget: 'confirmed', source: 'confirmed', paymentForm: 'ai', objectType: 'confirmed', goal: 'confirmed' } },
-    { id: 'd_karim', clientId: 'c_partner', objectId: 'o_palmcourt', agent: 'u_lina', amount: 2600000, hot: false, stage: 'req',
+    { id: 'd_karim', clientId: 'c_partner', objectId: null, agent: 'u_lina', amount: 2600000, hot: false, stage: 'req',
       title: 'Резиденция в Downtown через партнёра', sub: 'Downtown · нужен партнёр', tags: ['партнёр'], updated: 'сегодня', createdAt: '14 мая',
       funnel: 'cross', dealType: 'Кросс-продажи', objectType: 'апартаменты', readiness: 'готовый', saleKind: '', side: 'покупатель', goal: 'Покупка резиденции',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: 'u_yusef', companyId: 'co_altura',
@@ -249,7 +260,7 @@
       consideredProjects: ['Palm Court Residence'], stageDays: 0,
       gates: { kyc: true },
       prov: { budget: 'ai', source: 'ai', objectType: 'ai', goal: 'ai' } },
-    { id: 'd_fitout', clientId: 'c_ambig', objectId: 'o_creekline', agent: 'u_lina', amount: 320000, hot: false, stage: 'kp',
+    { id: 'd_fitout', clientId: 'c_ambig', objectId: null, agent: 'u_lina', amount: 320000, hot: false, stage: 'kp',
       title: 'Fit-out офиса в Business Bay', sub: 'Fit-out офиса · Business Bay', tags: ['fit-out'], updated: '3 дня назад', createdAt: '09 мая',
       funnel: 'cross', dealType: 'Кросс-продажи', objectType: 'офис', readiness: 'готовый', saleKind: '', side: 'собственник', goal: 'Отделка под аренду',
       paymentForm: 'Поэтапно', vat: true, source: 'Реферал', partnerAgent: null, companyId: 'co_meydan',
@@ -302,7 +313,7 @@
       assignee: 'u_marina', leadStatus: 'Квалифицирован', temperature: 'hot', nextContact: 'сегодня, 16:00', funding: 'Подтв. средств ✓ · рассрочка застройщика',
       offered: [
         { id: 'o_creekline', state: 'selected' },
-        { id: 'o_palmcourt', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
+        { id: 'o_jvcpark', state: 'rejected', reason: 'JVC не подошёл — хочет ближе к центру' },
         { id: 'o_bayline', state: 'offered' },
       ],
       kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_bayline'] },
@@ -646,7 +657,7 @@
       ],
     },
     {
-      id: 'k_jvc', dealId: null, clientId: 'c_night', companyId: null, objectId: 'o_creekline',
+      id: 'k_jvc', dealId: null, clientId: 'c_night', companyId: null, objectId: null,
       kind: 'lease', number: 'EJARI-2026-1180', signedAt: '02 марта', status: 'active',
       amount: 95000, nextDue: 'уведомление о продлении — до 02 декабря',
       milestones: [

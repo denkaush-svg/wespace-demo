@@ -480,7 +480,10 @@ button { font-family: inherit; cursor: pointer; }
 .cm-empty { display: flex; gap: 9px; font-size: 12px; color: var(--mut); line-height: 1.45; }
 .cm-empty svg { width: 15px; height: 15px; flex: none; color: var(--faint); margin-top: 1px; }
 /* Почему стадия заявки не нажимается — объясняется один раз, под самой лентой. */
-.req-stage-why { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding-top: 11px;
+/* Лента шагов без заголовка: сама цепочка и есть заголовок. */
+.dx-sec-bare { padding-top: 16px; }
+.dx-sec-bare .dx-stepper { margin-top: 0; }
+.req-stage-why { display: flex; gap: 8px; align-items: flex-start; margin-top: 11px; padding-top: 10px;
   border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.5; color: var(--mut); }
 .req-stage-why svg { width: 14px; height: 14px; flex: none; color: var(--acc); margin-top: 1px; }
 .qa-bar { display: flex; flex-wrap: wrap; gap: 7px; padding: 2px 0 8px; margin: 2px 0 2px; }
@@ -904,7 +907,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .wsdoc-brand .wm { font-weight: 800; letter-spacing: .08em; font-size: 14px; }
 .wsdoc-brand .wm span { color: var(--acc); }
 .wsdoc-kick { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.6); }
-.wsdoc-title { font-family: var(--font-disp); font-weight: 800; font-size: 19px; letter-spacing: -.01em; }
+.wsdoc-title { font-family: var(--font-name); font-weight: 800; font-size: 19px; letter-spacing: -.01em; }
 .wsdoc-sub { font-size: 12px; color: rgba(255,255,255,.72); margin-top: 3px; }
 .wsdoc-body { padding: 18px 20px; }
 .wsdoc-body .section-label { margin: 14px 0 8px; }
@@ -1163,7 +1166,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   border: 1.5px solid var(--acc-line); border-radius: 12px; padding: 14px 16px; margin: 2px 0 6px; }
 .rh-main { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 /* Client name = the hero's dominant line (this is a client request). */
-.rh-client { font-size: 20px; font-weight: 800; color: var(--ink); font-family: var(--font-disp); letter-spacing: -.01em; line-height: 1.12; }
+.rh-client { font-size: 20px; font-weight: 800; color: var(--ink); font-family: var(--font-name); letter-spacing: -.01em; line-height: 1.12; }
 /* Object line = what the client wants, a quiet subline under the name. */
 .rh-obj { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); line-height: 1.35; margin-top: 6px; }
 .rh-obj svg { width: 15px; height: 15px; color: var(--acc-ink); flex: 0 0 auto; }
@@ -1458,7 +1461,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .acc[open] > summary::after { content: '\2212'; }
 .acc-body { padding: 0 2px 14px; font-size: 13px; color: var(--mut); line-height: 1.5; max-width: 76ch; }
 .acc-terms { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; }
-.acc-term b { font-family: var(--font-disp); font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: -.01em; display: block; line-height: 1; }
+.acc-term b { font-family: var(--font-name); font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: -.01em; display: block; line-height: 1; }
 .acc-term span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 700; display: block; margin-top: 3px; }
 
 /* Reviews (services page) */
@@ -1503,9 +1506,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .chero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .chero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 55%, rgba(15,17,21,.14)); }
 .chero-content { position: relative; z-index: 2; display: flex; gap: 16px; align-items: center; padding: 16px 20px; flex: 1; }
-.chero-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.chero-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-name); font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .chero-info { flex: 1; min-width: 0; }
-.chero-name { font-family: var(--font-disp); font-size: 22px; font-weight: 800; line-height: 1.1; margin: 0 0 8px; color: #fff; letter-spacing: -.02em; }
+.chero-name { font-family: var(--font-name); font-size: 22px; font-weight: 800; line-height: 1.1; margin: 0 0 8px; color: #fff; letter-spacing: -.02em; }
 .chero-facts { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; max-width: 100%; }
 .chero-fact { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,.86); line-height: 1.3; }
 .chero-fact-icon { display: inline-flex; width: 12px; height: 12px; flex: none; }
@@ -1692,9 +1695,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dhero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
 .dhero-scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(15,17,21,.88), rgba(15,17,21,.5) 58%, rgba(15,17,21,.16)); }
 .dhero-content { position: relative; z-index: 2; display: flex; gap: 12px; align-items: center; padding: 12px 16px; flex: 1; }
-.dhero-av { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-disp); font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
+.dhero-av { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; background: var(--acc); display: grid; place-items: center; font-family: var(--font-name); font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -.02em; box-shadow: 0 2px 8px rgba(0,0,0,.28); }
 .dhero-info { flex: 1; min-width: 0; }
-.dhero-name { font-family: var(--font-disp); font-size: 18px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
+.dhero-name { font-family: var(--font-name); font-size: 18px; font-weight: 800; line-height: 1.12; color: #fff; letter-spacing: -.02em; }
 .dhero-sub { margin-top: 3px; font-size: 12px; color: rgba(255,255,255,.86); }
 /* The deal's essence, edited in place. The label carries the affordance so the line below it can
    stay plain text until touched; only the text node is focusable, so there is one tab stop. */
@@ -1792,7 +1795,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* КП as a client-facing document (modal) */
 .kp-doc { font-size: 13px; }
 .kp-doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-.kp-doc-to { font-family: var(--font-disp); font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+.kp-doc-to { font-family: var(--font-name); font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
 .kp-doc-cli { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
 .kp-tblwrap { overflow-x: auto; }
 .kp-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }

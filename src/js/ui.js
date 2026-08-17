@@ -151,10 +151,7 @@
   function cgDockWelcome() {
     return '<div class="cgdock-welcome">' + I('sparkle') +
       '<div class="cgdock-w-t">Чат с Консьержем</div>' +
-      '<div class="cgdock-w-m">Спросите что угодно, не покидая текущий раздел.</div>' +
-      '<div class="qa-row" style="justify-content:center;margin-top:12px">' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
-      '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button></div></div>';
+      '<div class="cgdock-w-m">Спросите что угодно, не покидая текущий раздел.</div></div>';
   }
   function renderDockMsgs() {
     const c = document.getElementById('cgdockmsgs'); if (!c) return;
@@ -201,9 +198,21 @@
   // It follows the rate on the linked object, because that is the rate shown on the
   // object card; a flat guess here is exactly the discrepancy a broker spots first.
   const DEFAULT_COMM_PCT = 2;
+  // Комиссия сделки. У сделки с несколькими лотами ставка у каждого своя, а брать ставку первого
+  // и умножать на всю сумму — это ровно та ошибка, которую брокер замечает первой. Считаем по лотам,
+  // и только если их цены не складываются в сумму сделки, возвращаемся к ставке ведущего объекта.
   function dealCommission(deal) {
     if (!deal) return 0;
-    const obj = (D().objects || []).find((o) => o.id === deal.objectId);
+    const objs = D().objects || [];
+    const byId = (id) => objs.find((o) => o.id === id);
+    const lots = (deal.lots && deal.lots.length) ? deal.lots.map(byId).filter(Boolean) : [];
+    if (lots.length > 1) {
+      const sum = lots.reduce((a, o) => a + (o.price || 0), 0);
+      if (sum && Math.abs(sum - (deal.amount || 0)) <= 1) {
+        return Math.round(lots.reduce((a, o) => a + (o.price || 0) * ((o.commissionPct || DEFAULT_COMM_PCT) / 100), 0));
+      }
+    }
+    const obj = byId(deal.objectId);
     const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
     return Math.round((deal.amount || 0) * pct / 100);
   }
@@ -532,15 +541,6 @@
       '</div>';
     }
 
-    const qa = [
-      { t: 'Разобрать голосовое', ic: 'mic', scn: 'G1' },
-      { t: 'Подобрать объект', ic: 'building', scn: 'G2' },
-      { t: 'Оценить доходность', ic: 'money', nav: 'calc' },
-      { t: 'Итог показа', ic: 'voice2', scn: 'G3' },
-      { t: 'Холодный лид', ic: 'flame', scn: 'S15' },
-      { t: 'Эффективность', ic: 'trend', nav: 'analytics' },
-    ].map((q) => '<button class="chip" data-' + (q.scn ? 'scn="' + q.scn : 'nav="' + q.nav) + '">' + I(q.ic) + q.t + '</button>').join('');
-
     const spark = a.sparks.map((v, i) => '<i class="' + (i === a.sparks.length - 1 ? 'on' : '') + '" style="height:' + (30 + v * 4) + '%"></i>').join('');
 
     const _overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
@@ -590,7 +590,7 @@
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
-      '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button>' + qa + '</div>' +
+      '<div class="qa-row" style="margin-top:16px"><button class="chip" data-chain="golden" style="border-color:var(--acc);background:var(--acc);color:#fff">' + I('play') + 'Золотой тур · 10 мин</button></div>' +
       // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
       // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
       pulseMyGoals() +
@@ -886,10 +886,6 @@
     return '<div class="cg-main-inner">' +
       heroViz('concierge', 'Консьерж', 'Опишите задачу — начнётся новый диалог. Голосом или текстом; вся история — слева.') +
       cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос — начнётся новый диалог…', 'cgSend', 'cg-hero') +
-      '<div class="qa-row" style="margin-top:14px"><button class="chip" data-scn="G1">' + I('mic') + 'Разобрать голосовое</button>' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
-      '<button class="chip" data-scn="S15">' + I('flame') + 'Холодный лид</button>' +
-      '<button class="chip" data-chain="golden">' + I('play') + 'Золотой тур</button></div>' +
       conciergeWorkshop(st) +
     '</div>';
   }
@@ -992,10 +988,7 @@
   }
   function conciergeThreadEmpty() {
     return '<div class="empty">' + I('sparkle') + '<div style="font-weight:700;color:var(--ink)">Начните диалог</div>' +
-      '<div style="margin-top:6px">Поручите задачу по этой сущности голосом или текстом — или запустите сценарий.</div>' +
-      '<div class="qa-row" style="justify-content:center;margin-top:16px">' +
-      '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать объект</button>' +
-      '<button class="chip" data-scn="S8">' + I('sparkle') + 'Бриф к звонку</button></div></div>';
+      '<div style="margin-top:6px">Поручите задачу по этой сущности голосом или текстом.</div></div>';
   }
 
   // ---------------- CLIENTS & DEALS ----------------
@@ -2949,9 +2942,7 @@
   // Deal-stage workflow lifted onto its own surface card so it reads as a distinct step-line,
   // not grey-on-grey. The whole path lives in the accent family (see .dx-step CSS).
   function dealStepperSection(d) {
-    const s = funnelSteps(d);
-    const cap = 'Шаг ' + (s.idx + 1) + ' из ' + s.cols.length + ' · ' + s.cols[s.idx];
-    return dxSec('trend', 'Этапы сделки', '<span class="dx-step-cap">' + cap + '</span>', dealStepper(d));
+    return '<div class="dx-sec dx-sec-bare">' + dealStepper(d) + '</div>';
   }
   function dealSpec(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return null;
@@ -3279,12 +3270,11 @@
       (lost ? '<div class="dx-lost">' + I('x') + 'Клиент отказался</div>' : '');
   }
   function reqStepperSection(r) {
-    const cur = reqStage(r), path = reqStagePath();
-    const idx = path.indexOf(cur);
-    const cap = cur === 'lost' ? 'Отказ' : 'Шаг ' + (idx + 1) + ' из ' + path.length + ' · ' + reqStageLabel(cur, r);
+    // Одна строка объяснения остаётся: шаги нарисованы, но не нажимаются, и без подсказки это
+    // читается как сломанный элемент, а не как осознанное решение.
     const why = '<div class="req-stage-why">' + I('sparkle') +
-      '<span>Стадия выводится из фактов заявки — подборки, состоявшихся встреч и дочерних сделок. Руками её не двигают: агент отмечает объекты, по которым согласованы условия.</span></div>';
-    return dxSec('trend', 'Ход заявки', '<span class="dx-step-cap">' + cap + '</span>', reqStepper(r) + why);
+      '<span>Стадия выводится из фактов заявки. Агент отмечает объекты, по которым согласованы условия, — остальное следует само.</span></div>';
+    return '<div class="dx-sec dx-sec-bare">' + reqStepper(r) + why + '</div>';
   }
   function requestState(r) {
     return reqStepperSection(r) +

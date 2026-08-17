@@ -66,7 +66,12 @@
   /* System-font stack first (SF on iOS, Segoe on Windows) so the app paints
      instantly offline on a phone — no render-blocking web-font download. */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-disp: -apple-system, BlinkMacSystemFont, "Segoe UI Semibold", "Segoe UI", "Inter", sans-serif;
+  --font-disp: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  /* Имя человека — это текст, а не число. Дисплейный шрифт стенда (Bebas Neue) не знает ни
+     кириллицы, ни строчных: «Karim Aziz» он печатал капителью, «Анна Петрова» проваливалась в
+     запасной шрифт, и рядом это читалось как две разные вёрстки. Bebas остаётся на цифрах.
+     Через var(--font) токен следует за темой, если та переопределит текстовый шрифт. */
+  --font-name: var(--font);
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, monospace;
 
   --ease: cubic-bezier(.2,.7,.2,1);

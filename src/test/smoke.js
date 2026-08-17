@@ -491,12 +491,26 @@ setTimeout(async () => {
       'analytics.pipelineValue=' + dd().analytics.pipelineValue);
 
     // ---- commission follows the linked object's rate, not a flat guess ----
-    const dKarim = dealBy('d_karim');
-    if (dKarim) {
-      const oKarim = dd().objects.find((o) => o.id === dKarim.objectId);
-      const expectComm = Math.round(dKarim.amount * (oKarim.commissionPct || 2) / 100);
-      check('commission · a deal uses its object\'s rate', WS.ui.dealCommission(dKarim) === expectComm,
-        WS.ui.dealCommission(dKarim) + ' vs ' + expectComm);
+    const dVik = dealBy('d_viktor');
+    if (dVik) {
+      const oVik = dd().objects.find((o) => o.id === dVik.objectId);
+      const expectComm = Math.round(dVik.amount * (oVik.commissionPct || 2) / 100);
+      check('commission · a deal uses its object\'s rate', WS.ui.dealCommission(dVik) === expectComm,
+        WS.ui.dealCommission(dVik) + ' vs ' + expectComm);
+    }
+    // Сделка с несколькими лотами: ставка у каждого своя, и брать ставку первого на всю сумму нельзя.
+    const dPort = dealBy('d_rentbiz');
+    if (dPort) {
+      const lots = (dPort.lots || []).map((id) => dd().objects.find((o) => o.id === id)).filter(Boolean);
+      const byLot = Math.round(lots.reduce((a, o) => a + o.price * ((o.commissionPct || 2) / 100), 0));
+      check('commission · многолотовая сделка считается по лотам',
+        WS.ui.dealCommission(dPort) === byLot, WS.ui.dealCommission(dPort) + ' vs ' + byLot);
+    }
+    // Сделка без объекта не должна падать — у неё берётся ставка по умолчанию.
+    const dNoObj = dealBy('d_karim');
+    if (dNoObj) {
+      check('commission · сделка без объекта берёт ставку по умолчанию',
+        WS.ui.dealCommission(dNoObj) === Math.round(dNoObj.amount * 2 / 100), String(WS.ui.dealCommission(dNoObj)));
     }
 
     // ---- every agent referenced by a deal is a real person ----
@@ -896,7 +910,7 @@ setTimeout(async () => {
       WS.ui.requestCard(r.id);
       const view = doc.querySelector('#app .view');
       const body = view.textContent;
-      check('req ' + r.id + ' · лента заявки нарисована', body.indexOf('Ход заявки') >= 0);
+      check('req ' + r.id + ' · лента заявки нарисована', !!view.querySelector('.dx-stepper'));
       // Стадия — следствие фактов, поэтому шаг не нажимается: кнопки и обработчика у него нет.
       const steps = [].slice.call(view.querySelectorAll('.dx-stepper .dx-step'));
       check('req ' + r.id + ' · шагов столько же, сколько в воронке', steps.length === path.length,
@@ -906,15 +920,21 @@ setTimeout(async () => {
       check('req ' + r.id + ' · ровно один текущий шаг',
         view.querySelectorAll('.dx-stepper .dx-step.cur').length === 1);
     });
+    // Текущий шаг читается с самой ленты: заголовка и счётчика над ней больше нет — они не
+    // сообщали ничего, чего не видно по галочкам и подсветке.
+    const curLabel = () => {
+      const el = doc.querySelector('#app .view .dx-stepper .dx-step.cur .l');
+      return el ? el.textContent.trim() : '';
+    };
+    check('req · над лентой нет ни заголовка, ни счётчика шагов',
+      !doc.querySelector('#app .view .dx-step-cap') &&
+      doc.querySelector('#app .view').textContent.indexOf('Ход заявки') < 0);
     // Заявка Виктора: квартира ушла в бронь, оба офиса — в портфель, в подборке пусто → закрыта.
     WS.ui.requestCard('r_viktor');
-    check('req · заявка закрывается, когда подборка исчерпана',
-      /Шаг 6 из 6 · Закрыта/.test(doc.querySelector('#app .view').textContent),
-      doc.querySelector('#app .view .dx-step-cap') ? doc.querySelector('#app .view .dx-step-cap').textContent : '');
+    check('req · заявка закрывается, когда подборка исчерпана', curLabel() === 'Закрыта', curLabel());
     // Заявка Анны: Creekline в сделке, Palm Court отклонён, Bayline ещё открыт → заявка жива.
     WS.ui.requestCard('r_anna');
-    const capA = doc.querySelector('#app .view .dx-step-cap').textContent;
-    check('req · заявка с открытым объектом не закрыта', !/Закрыта/.test(capA), capA);
+    check('req · заявка с открытым объектом не закрыта', curLabel() === 'Переговоры', curLabel());
     // Подпись стадии зависит от стороны сделки, а не от услуги.
     check('req · покупателю подбор, а не КП', /Направлен подбор/.test(doc.querySelector('#app .view').textContent));
   }
@@ -977,6 +997,21 @@ setTimeout(async () => {
       check('css · .' + cls + ' описан', all.indexOf('.' + cls) >= 0);
     });
     check('css · --card-gap задан', /--card-gap\s*:/.test(all));
+    // Дисплейный шрифт стенда — Bebas Neue: без кириллицы и без строчных. Имя человека, набранное
+    // им, печатается капителью на латинице и проваливается в другой шрифт на кириллице. Любое поле
+    // с человеческим именем обязано брать текстовый шрифт, а не дисплейный.
+    {
+      const css = read('css/app.css');
+      const nameSel = ['.chero-avatar', '.chero-name', '.dhero-av', '.dhero-name', '.rh-client',
+                       '.wsdoc-title', '.kp-doc-to', '.acc-term b'];
+      const bad = nameSel.filter((sel) => {
+        const i = css.indexOf(sel + ' {');
+        if (i < 0) return false;
+        return css.slice(i, css.indexOf('}', i)).indexOf('--font-disp') >= 0;
+      });
+      check('css · имена набраны текстовым шрифтом, не дисплейным', bad.length === 0, bad.join(' '));
+      check('css · токен шрифта имён объявлен', /--font-name\s*:/.test(read('css/tokens.css')));
+    }
   }
 
   // ---- the client overview: a feed spans the page, and no two blocks state the same thing ----
