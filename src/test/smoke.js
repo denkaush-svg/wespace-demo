@@ -1246,13 +1246,52 @@ setTimeout(async () => {
       !!head && head.innerHTML.indexOf('data-nav=') >= 0, head ? head.innerHTML.slice(0, 120) : 'нет шапки');
   }
 
-  // ---- a stage that the deal's funnel does not have is refused, not silently applied ----
+  // ---- a step that the deal's contract does not have is refused, not silently applied ----
   {
     const sd = dd().deals.find((d) => d.funnel === 'sale' && d.stage !== 'won' && d.stage !== 'lost');
     const was = sd.stage;
     const bad = sapi.apply([{ op: 'dealStage', id: sd.id, stage: 'exec' }], { confirmed: true });
     check('stage · a stage outside the funnel is refused', !bad || bad.ok === false, JSON.stringify(bad));
     check('stage · the refused change left the deal alone', dd().deals.find((d) => d.id === sd.id).stage === was);
+
+    // Пресейл сделке не принадлежит вовсе: «переведи в показ» — это факт заявки, а стадия
+    // заявки вычисляется. Раньше такой шаг проходил, потому что список стадий был один на всё.
+    const pre = sapi.apply([{ op: 'dealStage', id: sd.id, stage: 'show' }], { confirmed: true });
+    check('stage · пресейл-стадию сделке присвоить нельзя', !pre || pre.ok === false, JSON.stringify(pre));
+    check('stage · отказ не сдвинул сделку', dd().deals.find((d) => d.id === sd.id).stage === was);
+    check('stage · отказ называет договор, а не воронку',
+      pre && /договор/.test(pre.error || ''), (pre || {}).error);
+
+    // Доска стоит на тех же шагах: колонки услуги — объединение её видов договора.
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const cols = [].slice.call(doc.querySelectorAll('#app .kanban .kcol .kh span:first-child')).map((e) => e.textContent.trim());
+    const presale = ['Подбор', 'КП', 'Показ', 'Осмотр', 'Переговоры', 'В работе'];
+    check('доска · в колонках нет пресейл-стадий',
+      cols.length > 0 && !cols.some((c) => presale.indexOf(c) >= 0), cols.join(' | '));
+
+    // И лента на карточке рисует ровно шаги договора этой сделки — ни одним больше.
+    const off = [];
+    (dd().deals || []).forEach((d) => {
+      const want = ((WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || []).filter((k) => k !== 'lost');
+      WS.ui.dealCard(d.id);
+      const n = doc.querySelectorAll('#app .view .dx-stepper .dx-step').length;
+      if (n !== want.length) off.push(d.id + ': ' + n + ' против ' + want.length);
+    });
+    check('сделка · лента рисует шаги своего договора', off.length === 0, off.join(' | '));
+
+    // Оффплан регистрируется в Oqood, вторичка — Title Deed, аренда — Ejari: шаг один, реестр разный.
+    WS.ui.dealCard('d_anna');
+    check('сделка · регистрация названа своим реестром',
+      /Oqood/.test(doc.querySelector('#app .view').textContent),
+      (doc.querySelector('#app .view').textContent.match(/Регистрац[^·\n]{0,20}/) || [])[0]);
+  }
+
+  // ---- Консьерж не делает вид, что умеет двигать стадию заявки ----
+  {
+    const r = WS.agent.ask('переведи сделку Анны в показ');
+    check('консьерж · пресейл-команда не превращается в шаг сделки', r.kind !== 'proposal', r.kind);
+    check('консьерж · объясняет, что стадия заявки вычисляется',
+      /заявк/i.test(r.text || '') && /не выставляется|сама/i.test(r.text || ''), (r.text || '').slice(0, 90));
   }
 
   // ---- the client register never shows a milestone marked internal ----

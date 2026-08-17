@@ -375,10 +375,11 @@
       // Stages belong to a funnel. The spoken vocabulary is global, so «переведи в выполнение работ»
       // would otherwise park a Продажа deal on a stage that funnel has no column for — the deal
       // vanishes from the board with nothing to say where it went.
-      const fn = (WS.FUNNELS || []).find((x) => x.k === (rec.funnel || 'sale'));
-      const allowed = (fn && fn.stages) || [];
+      const kind = WS.contractKindFor ? WS.contractKindFor(rec.funnel || 'sale', rec.readiness) : '';
+      const allowed = (WS.DEAL_STEPS || {})[kind] || [];
       if (allowed.length && allowed.indexOf(o.stage) < 0) {
-        return fail('bad_value', at + 'в воронке «' + ((fn && fn.label) || rec.funnel) + '» нет такой стадии',
+        const label = ((WS.fixtures.CONTRACT_KINDS || {})[kind] || {}).label || kind;
+        return fail('bad_value', at + 'в договоре «' + label + '» нет такого шага',
           { stage: o.stage, available: allowed });
       }
       return { ok: true, tier: 'guarded', summary: 'стадия ' + o.id + ' → ' + o.stage, run: () => { rec.stage = o.stage; } };

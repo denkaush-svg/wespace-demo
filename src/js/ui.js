@@ -1184,10 +1184,11 @@
   // R7: saved deterministic views — same query → same list. Applied on top of the funnel filter.
   const SAVED_VIEWS = [
     { k: 'nocontact', label: 'Без движения сегодня', pred: (d) => d.stageDays >= 1 && !dealClosed(d) },
-    { k: 'nonext', label: 'Без плана действий', pred: (d) => !d.hot && d.stage === 'work' },
+    { k: 'nonext', label: 'Без плана действий', pred: (d) => !dealClosed(d) && !d.nextDue },
     { k: 'commissions', label: 'Ожидаемые комиссии', pred: (d) => !dealClosed(d) && (d.amount || 0) > 0 },
-    // «Без документов» = still on the approach, before anything is drafted: подбор, КП, показ, осмотр.
-    { k: 'nodocs', label: 'Без документов', pred: (d) => ['work', 'pick', 'kp', 'req', 'show', 'visit'].indexOf(d.stage) >= 0 },
+    // «Без документов» = договор ещё не подписан: подготовка и бронь. Дальше документ есть
+    // по определению шага, и вид, который ловил бы там пустоту, ловил бы ошибку данных, а не работу.
+    { k: 'nodocs', label: 'Без документов', pred: (d) => ['prep', 'book'].indexOf(d.stage) >= 0 },
     { k: 'stuck', label: 'Застряли в стадии', pred: (d) => d.stageDays >= 5 },
   ];
   function activeViewPred() { const v = SAVED_VIEWS.find((x) => x.k === S().savedView); return v ? v.pred : null; }
@@ -1298,9 +1299,26 @@
   function funnelOf(d) {
     return (WS.FUNNELS || []).find((x) => x.k === (d && d.funnel)) || (WS.FUNNELS || [])[0] || { k: '', label: '', stages: [] };
   }
+  // Шаги сделки следуют из вида договора, которым она заканчивается, а не из воронки услуги:
+  // в воронке пресейл и договорная работа лежали одним списком, и сделка могла встать на «показ».
+  function dealSteps(d) {
+    const ck = WS.contractKindFor;
+    return (WS.DEAL_STEPS || {})[ck ? ck((d && d.funnel) || 'sale', d && d.readiness) : ''] || [];
+  }
+  // Колонки доски для услуги, у которой видов договора два (продажа: оффплан и вторичка), —
+  // объединение их шагов в порядке общего хребта. «Бронирование» стоит, пока в воронке есть хоть
+  // одна оффплан-сделка, и пустует, когда их нет; прятать колонку по составу доски значило бы
+  // менять её ширину при каждом переносе карточки.
+  function stepsForFunnel(fk) {
+    const DS = WS.DEAL_STEPS || {}, ck = WS.contractKindFor;
+    if (!ck) return [];
+    const seen = {};
+    [DS[ck(fk, 'оффплан')] || [], DS[ck(fk, 'готовый')] || []].forEach((a) => a.forEach((k) => { seen[k] = 1; }));
+    return STAGES.map((s) => s.k).filter((k) => seen[k]);
+  }
   // The path a deal walks. «Проигрыш» is an exit, not a step, so it is off the path: the stepper
   // draws a route, and a route with a dead end drawn as its last milestone reads as the goal.
-  function funnelPath(d) { return (funnelOf(d).stages || []).filter((k) => k !== 'lost'); }
+  function funnelPath(d) { return dealSteps(d).filter((k) => k !== 'lost'); }
   // Terminal state. `closed` = off the board either way; `won` = business we actually earned on.
   // Every money figure must use `dealWon`, every «в работе» figure `!dealClosed` — a lost deal
   // counted as closed revenue is the single most expensive mistake this split can make.
@@ -1311,9 +1329,8 @@
     // R2: board is scoped to the selected funnel; the 4 stage-columns are relabeled as
     // that funnel's milestone projection. Manual move (◀▶) still writes a stage event.
     const fk = S().dealFunnel || 'sale';
-    const funnel = (WS.FUNNELS || []).find((x) => x.k === fk) || (WS.FUNNELS || [])[0];
     const pred = activeViewPred();
-    const stages = (funnel && funnel.stages) || [];
+    const stages = stepsForFunnel(fk);
     const path = stages.filter((k) => k !== 'lost');
     const cols = stages.map((sk) => {
       const colLabel = stageLabel(sk);
@@ -1341,7 +1358,7 @@
     // Nine or ten columns do not fit any screen, so the board scrolls sideways. A scroller with no
     // affordance reads as a board that ends where the viewport does — say how many stages there are.
     const hint = stages.length > 4
-      ? '<div class="kanban-hint">' + I('arrowRight') + 'Стадий в воронке — ' + stages.length + ' · доска прокручивается вбок</div>'
+      ? '<div class="kanban-hint">' + I('arrowRight') + 'Шагов по договору — ' + stages.length + ' · доска прокручивается вбок</div>'
       : '';
     return hint + '<div class="kanban">' + cols + '</div>';
   }
@@ -2556,11 +2573,18 @@
   }
   // Deal card = the DEAL (not the contact). Contacts are one click away.
   // ---- Deal card v2: tabbed shell + funnel-aware stage stepper + context Concierge ----
+  // Шаг регистрации называется по своему реестру: у оффплана Oqood, у вторички Title Deed,
+  // у аренды Ejari. Общее «Регистрация» не говорит агенту, куда именно он идёт и с чем.
+  function stepLabelFor(d, k) {
+    if (k !== 'reg') return stageLabel(k);
+    const ck = WS.contractKindFor;
+    return (WS.REG_LABELS || {})[ck ? ck((d && d.funnel) || 'sale', d && d.readiness) : ''] || stageLabel(k);
+  }
   function funnelSteps(d) {
     const f = funnelOf(d);
     const order = funnelPath(d);
     const idx = Math.max(0, order.indexOf(d.stage));
-    return { cols: order.map(stageLabel), idx: idx, order: order, label: f.label || stageLabel(d.stage), lost: d.stage === 'lost' };
+    return { cols: order.map((k) => stepLabelFor(d, k)), idx: idx, order: order, label: f.label || stageLabel(d.stage), lost: d.stage === 'lost' };
   }
   function dealStepper(d) {
     const s = funnelSteps(d);
@@ -3798,8 +3822,7 @@
   };
   function funnelForType(t) { return FUNNEL_BY_TYPE[t] || 'sale'; }
   function clampStage(funnelKey, stage) {
-    const f = (WS.FUNNELS || []).find((x) => x.k === funnelKey);
-    const list = (f && f.stages) || [];
+    const list = stepsForFunnel(funnelKey);
     if (!list.length) return stage;
     return list.indexOf(stage) >= 0 ? stage : list[0];
   }
@@ -5584,8 +5607,8 @@
     // Stage options belong to ONE funnel — the board the agent is standing on — and «Тип сделки»
     // is preselected to the same service, so the two cannot start out disagreeing. createDeal
     // clamps anyway, because the type select is still free to change afterwards.
-    const curFunnel = (WS.FUNNELS || []).find((x) => x.k === (S().dealFunnel || 'sale')) || (WS.FUNNELS || [])[0] || { stages: [] };
-    const stageOpts = (curFunnel.stages || []).filter((k) => k !== 'lost')
+    const curFunnel = (WS.FUNNELS || []).find((x) => x.k === (S().dealFunnel || 'sale')) || (WS.FUNNELS || [])[0] || { k: 'sale' };
+    const stageOpts = stepsForFunnel(curFunnel.k).filter((k) => k !== 'lost')
       .map((k) => '<option value="' + k + '">' + stageLabel(k) + '</option>').join('');
     const companyOpts = (D().companies || []).map((co) => '<option value="' + co.id + '">' + co.name + '</option>').join('');
     const agentOpts = dealAgentOptions(null);
