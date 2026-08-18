@@ -350,11 +350,14 @@
            needs the microphone granted to it in System Settings, and Chrome
            has both. Which of the three it is decides what the person does
            next, so the message says it. */
+        // A short toast with the one actionable instruction, not a manual.
+        // Which browser it is matters: that determines what the person does next.
         api.toast(WS.voice.canDictate()
-          ? 'Здесь некуда диктовать — откройте Консьержа и нажмите микрофон в строке ввода'
-          : 'Этот браузер не распознаёт речь. В Safari проверьте доступ к микрофону ' +
-            '(Системные настройки → Конфиденциальность → Микрофон), в Firefox диктовки нет — ' +
-            'работает в Chrome. Пока наберите текстом.');
+          ? 'Нажмите микрофон в строке ввода Консьержа'
+          : (typeof window !== 'undefined' && /safari/i.test(String(window.navigator && window.navigator.userAgent))
+              && !/chrome/i.test(String(window.navigator && window.navigator.userAgent))
+              ? 'Safari: разрешите микрофон в Системных настройках → Конфиденциальность → Микрофон'
+              : 'Этот браузер не поддерживает диктовку. Откройте в Chrome или Safari'));
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }

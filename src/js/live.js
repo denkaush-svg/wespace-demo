@@ -597,7 +597,16 @@
     // page loads used to cost the visitor the live Concierge for the whole
     // session; now it costs one retry. Repeated failure still gives up, via
     // noteFailure below.
-    if (cfg.downUntil > Date.now()) throw new Error(cfg.lastError || 'cooldown');
+    /* Refused by US, because the window is still open — not new evidence that
+       the service is down. Marked so `noteFailure` does not count it: counting
+       it re-armed the window on every question, so under any traffic at all the
+       head never came back and the whole session ran on the offline planner.
+       That is the bug this window exists to prevent, reached the long way. */
+    if (cfg.downUntil > Date.now()) {
+      const e = new Error(cfg.lastError || 'cooldown');
+      e.cooldown = true;
+      throw e;
+    }
     if (cfg.downUntil) {
       // The window has passed: forgive the earlier failures and look again.
       cfg.downUntil = 0;
@@ -671,15 +680,27 @@
      the whole meeting. So being down is now a WINDOW, not a verdict: the head
      stays installed, calls during the window fail instantly and cost nothing,
      and the first question after it re-probes and comes back. */
-  function noteFailure(why) {
+  function noteFailure(why, err) {
+    // Our own refusal during the window: not new evidence the service is down.
+    if (err && err.cooldown) return;
+    // Already in standdown: the clock is already running; count the miss but
+    // do not call disable() again — calling it would re-arm the window from
+    // NOW, extending it by exactly one cooldownMs per question asked during it.
+    // That is the bug a twelve-scenario hard-run caught: ten of twelve went to
+    // the offline planner because every rejected question extended the window.
     cfg.lastError = why || 'error';
     cfg.misses += 1;
-    if (cfg.misses >= GIVE_UP_AFTER) disable(why);
+    if (cfg.misses >= GIVE_UP_AFTER && cfg.downUntil < Date.now()) disable(why);
   }
   function disable(why) {
     cfg.ready = false;
     cfg.lastError = why || 'disabled';
-    cfg.downUntil = Date.now() + cfg.cooldownMs;
+    // Start the clock from NOW when the head first fails; do NOT extend it
+    // while traffic is going through the window — that would keep the window
+    // open forever under any load, which is the bug a twelve-scenario run found.
+    // But DO arm it again when we are called after the window has already
+    // expired (e.g. a fresh standdown after a long quiet period).
+    if (cfg.downUntil < Date.now()) cfg.downUntil = Date.now() + cfg.cooldownMs;
   }
 
   WS.live = {
@@ -693,6 +714,8 @@
     get cooldownMs() { return cfg.cooldownMs; },
     set cooldownMs(v) { cfg.cooldownMs = Number(v) || 0; },
     get downFor() { return Math.max(0, cfg.downUntil - Date.now()); },
+    // For tests only: fully resets standdown state without touching the head.
+    resetForTest() { cfg.downUntil = 0; cfg.misses = 0; cfg.lastError = null; },
     get served() { return cfg.served; },
     get lastError() { return cfg.lastError; },
   };

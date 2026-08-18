@@ -416,7 +416,9 @@
           return reply;
         }
       } catch (e) {
-        if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e));
+        // The error travels too: a refusal issued during the stand-down window
+        // must not be counted as fresh evidence that the service is down.
+        if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e), e);
       }
     }
     return ask(clean);

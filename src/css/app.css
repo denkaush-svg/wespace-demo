@@ -1207,10 +1207,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prompt.composer .prompt-top { display: flex; align-items: center; gap: 12px; }
 .prompt.composer .prompt-top input { padding: 6px 0; }
 .prompt.composer .cg-actions .voice { width: 32px; height: 32px; }
-/* The browser has no speech recognition. Shown rather than hidden — the person
-   should see that dictation exists and why it is not available to them here —
-   but visibly not a live control, because pressing it can only ever explain. */
-.prompt .voice.off { opacity: .45; border-style: dashed; cursor: help; }
+/* The browser has no speech recognition. Shown rather than hidden so the
+   person sees the feature and its explanation. cursor:default (not help or
+   not-allowed) because a click DOES do something useful — it shows which
+   browser and setting are needed. cursor:help rendered as a question mark and
+   looked like a broken button; cursor:not-allowed implied clicking is pointless
+   when it is not. */
+.prompt .voice.off { opacity: .45; border-style: dashed; cursor: default; }
 .prompt.composer .cg-actions .voice svg { width: 17px; height: 17px; }
 .prompt.composer .cg-actions .send { width: 34px; height: 34px; }
 .prompt.composer .cg-actions .send svg { width: 17px; height: 17px; }

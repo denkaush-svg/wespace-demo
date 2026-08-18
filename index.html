@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:59</title>
+  <title>WESPACE · сборка 19:58</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:59';
+    window.WS_BUILD='19:58';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1357,10 +1357,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prompt.composer .prompt-top { display: flex; align-items: center; gap: 12px; }
 .prompt.composer .prompt-top input { padding: 6px 0; }
 .prompt.composer .cg-actions .voice { width: 32px; height: 32px; }
-/* The browser has no speech recognition. Shown rather than hidden — the person
-   should see that dictation exists and why it is not available to them here —
-   but visibly not a live control, because pressing it can only ever explain. */
-.prompt .voice.off { opacity: .45; border-style: dashed; cursor: help; }
+/* The browser has no speech recognition. Shown rather than hidden so the
+   person sees the feature and its explanation. cursor:default (not help or
+   not-allowed) because a click DOES do something useful — it shows which
+   browser and setting are needed. cursor:help rendered as a question mark and
+   looked like a broken button; cursor:not-allowed implied clicking is pointless
+   when it is not. */
+.prompt .voice.off { opacity: .45; border-style: dashed; cursor: default; }
 .prompt.composer .cg-actions .voice svg { width: 17px; height: 17px; }
 .prompt.composer .cg-actions .send { width: 34px; height: 34px; }
 .prompt.composer .cg-actions .send svg { width: 17px; height: 17px; }
@@ -14247,7 +14250,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           return reply;
         }
       } catch (e) {
-        if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e));
+        // The error travels too: a refusal issued during the stand-down window
+        // must not be counted as fresh evidence that the service is down.
+        if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e), e);
       }
     }
     return ask(clean);
@@ -15126,7 +15131,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // page loads used to cost the visitor the live Concierge for the whole
     // session; now it costs one retry. Repeated failure still gives up, via
     // noteFailure below.
-    if (cfg.downUntil > Date.now()) throw new Error(cfg.lastError || 'cooldown');
+    /* Refused by US, because the window is still open — not new evidence that
+       the service is down. Marked so `noteFailure` does not count it: counting
+       it re-armed the window on every question, so under any traffic at all the
+       head never came back and the whole session ran on the offline planner.
+       That is the bug this window exists to prevent, reached the long way. */
+    if (cfg.downUntil > Date.now()) {
+      const e = new Error(cfg.lastError || 'cooldown');
+      e.cooldown = true;
+      throw e;
+    }
     if (cfg.downUntil) {
       // The window has passed: forgive the earlier failures and look again.
       cfg.downUntil = 0;
@@ -15200,15 +15214,27 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      the whole meeting. So being down is now a WINDOW, not a verdict: the head
      stays installed, calls during the window fail instantly and cost nothing,
      and the first question after it re-probes and comes back. */
-  function noteFailure(why) {
+  function noteFailure(why, err) {
+    // Our own refusal during the window: not new evidence the service is down.
+    if (err && err.cooldown) return;
+    // Already in standdown: the clock is already running; count the miss but
+    // do not call disable() again — calling it would re-arm the window from
+    // NOW, extending it by exactly one cooldownMs per question asked during it.
+    // That is the bug a twelve-scenario hard-run caught: ten of twelve went to
+    // the offline planner because every rejected question extended the window.
     cfg.lastError = why || 'error';
     cfg.misses += 1;
-    if (cfg.misses >= GIVE_UP_AFTER) disable(why);
+    if (cfg.misses >= GIVE_UP_AFTER && cfg.downUntil < Date.now()) disable(why);
   }
   function disable(why) {
     cfg.ready = false;
     cfg.lastError = why || 'disabled';
-    cfg.downUntil = Date.now() + cfg.cooldownMs;
+    // Start the clock from NOW when the head first fails; do NOT extend it
+    // while traffic is going through the window — that would keep the window
+    // open forever under any load, which is the bug a twelve-scenario run found.
+    // But DO arm it again when we are called after the window has already
+    // expired (e.g. a fresh standdown after a long quiet period).
+    if (cfg.downUntil < Date.now()) cfg.downUntil = Date.now() + cfg.cooldownMs;
   }
 
   WS.live = {
@@ -15222,6 +15248,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     get cooldownMs() { return cfg.cooldownMs; },
     set cooldownMs(v) { cfg.cooldownMs = Number(v) || 0; },
     get downFor() { return Math.max(0, cfg.downUntil - Date.now()); },
+    // For tests only: fully resets standdown state without touching the head.
+    resetForTest() { cfg.downUntil = 0; cfg.misses = 0; cfg.lastError = null; },
     get served() { return cfg.served; },
     get lastError() { return cfg.lastError; },
   };
@@ -15848,11 +15876,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
            needs the microphone granted to it in System Settings, and Chrome
            has both. Which of the three it is decides what the person does
            next, so the message says it. */
+        // A short toast with the one actionable instruction, not a manual.
+        // Which browser it is matters: that determines what the person does next.
         api.toast(WS.voice.canDictate()
-          ? 'Здесь некуда диктовать — откройте Консьержа и нажмите микрофон в строке ввода'
-          : 'Этот браузер не распознаёт речь. В Safari проверьте доступ к микрофону ' +
-            '(Системные настройки → Конфиденциальность → Микрофон), в Firefox диктовки нет — ' +
-            'работает в Chrome. Пока наберите текстом.');
+          ? 'Нажмите микрофон в строке ввода Консьержа'
+          : (typeof window !== 'undefined' && /safari/i.test(String(window.navigator && window.navigator.userAgent))
+              && !/chrome/i.test(String(window.navigator && window.navigator.userAgent))
+              ? 'Safari: разрешите микрофон в Системных настройках → Конфиденциальность → Микрофон'
+              : 'Этот браузер не поддерживает диктовку. Откройте в Chrome или Safari'));
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }

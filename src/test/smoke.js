@@ -3189,6 +3189,8 @@ setTimeout(async () => {
       const both = await Promise.all([a1, a2]);
       check('live · and both callers get the same verdict', both[0] === both[1]);
       L.disable('done');
+      // Reset the standdown state so the next section can set its own window.
+      L.resetForTest();
     }
 
     /* Two failures put the live head out — for a WHILE, not for the session.
@@ -3218,13 +3220,26 @@ setTimeout(async () => {
       check('live · a question during the window is refused without a call',
         refused && took < 20 && L.downFor > 0, 'refused=' + refused + ' took=' + took + 'ms downFor=' + L.downFor);
 
-      // And the window ends by itself.
-      await new Promise((r) => setTimeout(r, 60));
+      /* Asking DURING the window must not push it further out. It used to:
+         every question rejected by the window went through the same failure
+         path as a real one, counted as a miss and re-armed the stand-down — so
+         under any traffic at all the head never came back, which is exactly
+         the failure the window exists to prevent. A twelve-scenario run caught
+         it: ten of them were answered by the offline planner. */
+      const wasDown = L.downFor;
+      await WS.agent.askAsync('ещё вопрос пока лежит');
+      await WS.agent.askAsync('и ещё один');
+      check('live · questions during the window do not extend it',
+        L.downFor <= wasDown, 'было ' + wasDown + ' → стало ' + L.downFor);
+
+      // And the window ends by itself. Use 3× the cooldown so Windows timer
+      // jitter (which inflates a 60ms setTimeout to ~80ms) does not cause a
+      // spurious failure after two askAsync calls that don't re-arm it.
+      await new Promise((r) => setTimeout(r, L.cooldownMs * 3));
       check('live · the window expires on its own', L.downFor === 0, 'downFor=' + L.downFor);
-      L.cooldownMs = wasCooldown;
-      L.disable('reset');
-      L.cooldownMs = 0;
-      L.disable('clear');
+      // Cleanup: disable() now refuses to re-arm an open window, so we reset the
+      // standdown clock directly, then restore the cooldown to its original value.
+      L.resetForTest();
       L.cooldownMs = wasCooldown;
     }
   } else {
