@@ -40,6 +40,13 @@ const SCENARIOS = [
   { name: 'Refuse invented figures', sid: 'a8', mode: 'auto', q: 'какой средний прайс на BI-VILLAGIO в этом квартале' },
   { name: 'ROI mode no unsolicited write', sid: 'a9', mode: 'roi', q: 'разложи по стадиям' },
   { name: 'Next-suggestions present', sid: 'a10', mode: 'auto', q: 'какие сделки ближе всего к закрытию' },
+  /* Виктор Орлов (c_docs) already has r_viktor, whose areas include Dubai Creek
+     Harbour. Asking for a request «по Дубай Крик» must therefore land on the
+     existing one — not a second request, and not the note-and-task workaround
+     the broker was offered, which hands the instruction back to them as a
+     chore. Ch. 04: «Дубли ловятся на входе». */
+  { name: 'Duplicate request → points at the live one', sid: 'a11', mode: 'auto',
+    q: 'можешь пожалуйста создать заявку на Виктора Орлова по Дубай Крик' },
 ];
 
 const serve = http.createServer((req, res) => {
@@ -136,6 +143,11 @@ const serve = http.createServer((req, res) => {
       // Check for next suggestions
       const hasNext = (r.next && r.next.length > 0);
       const nextCount = (r.next || []).length;
+      const nextLabels = (r.next || []).map((n) => String((n && n.label) || ''));
+      // A chip that actually opens a request card — the model's `open` becomes
+      // one of these rather than a jump, so this is where «перейдите по ссылке»
+      // has to show up.
+      const opensRequest = (r.next || []).some((n) => n && n.open === 'request' && n.id);
 
       // Check for speak field (say-aloud)
       const hasSpeak = !!r.speak;
@@ -163,6 +175,8 @@ const serve = http.createServer((req, res) => {
         hasButton: hasProposalButton,
         hasNext: hasNext,
         nextCount: nextCount,
+        nextLabels: nextLabels,
+        opensRequest: opensRequest,
         hasSpeak: hasSpeak,
         isClarifying: isClarifying,
         // Which head answered. An offline fallback produces no data blocks at
@@ -182,7 +196,7 @@ const serve = http.createServer((req, res) => {
     if (!c) bad++;
   };
 
-  const [analytics, stageMove, createKnown, createUnknown, market, task, sayAloud, refuse, roiMode, nextSugg] = results;
+  const [analytics, stageMove, createKnown, createUnknown, market, task, sayAloud, refuse, roiMode, nextSugg, dupReq] = results;
 
   // 1. Analytics should return data blocks, not prose
   ok('Analytics by stage → has data-backed blocks',
@@ -224,9 +238,17 @@ const serve = http.createServer((req, res) => {
   ok('Create request (unknown) → does NOT create a request',
     createUnknown.acts.indexOf('addRequest') < 0 || createUnknown.acts.indexOf('addClient') >= 0,
     'ops=[' + createUnknown.acts.join(',') + ']');
-  ok('  asks about the unknown contact instead of inventing one',
-    createUnknown.isClarifying || /нет в контакт|не наш|не наход|новый контакт|создать конта/i.test(createUnknown.text),
-    'kind=' + createUnknown.kind + ' text=' + createUnknown.text.slice(0, 140));
+  /* Word order carries no meaning here — «в контактах нет» and «нет в
+     контактах» are the same statement, and a question can be put without a
+     question mark («подтвердите, что контакт новый»). Match on the two things
+     that must both be true: the person is named, and their absence is stated. */
+  ok('  names the person and says they are not in the data',
+    /Сюзанн/i.test(createUnknown.text) &&
+    /\bнет\b|не найд|не наход|отсутств|новый контакт|контакт новый/i.test(createUnknown.text),
+    'kind=' + createUnknown.kind + ' text=' + createUnknown.text.slice(0, 160));
+  ok('  and asks for what a подбор cannot be built without',
+    /бюджет|район|спал|тип объект/i.test(createUnknown.text),
+    'text=' + createUnknown.text.slice(0, 160));
 
   // 5. Market questions: figures come from a query, never typed by the model.
   ok('Market insight → data-backed',
@@ -278,6 +300,54 @@ const serve = http.createServer((req, res) => {
   ok('  with at least one suggestion',
     nextSugg.nextCount >= 1,
     'nextCount=' + nextSugg.nextCount);
+
+  /* 11. The request already exists. Three things must hold, and the run the
+         broker reported failed all three: no second request, no busywork
+         proposal standing in for the answer, and a way into the live one. */
+  ok('Duplicate → does not create a second request',
+    dupReq.acts.indexOf('addRequest') < 0,
+    'ops=[' + dupReq.acts.join(',') + ']');
+  ok('  names the existing request',
+    /Bayline|уже (есть|идёт|заведена)|существу/i.test(dupReq.text),
+    'text=' + dupReq.text.slice(0, 160));
+  ok('  offers a way into it, not a chore for the broker',
+    dupReq.opensRequest,
+    'next=' + JSON.stringify(dupReq.nextLabels) + ' ops=[' + dupReq.acts.join(',') + ']');
+  ok('  proposes no note-and-task workaround',
+    dupReq.acts.indexOf('addEvent') < 0 && dupReq.acts.indexOf('addTask') < 0,
+    'ops=[' + dupReq.acts.join(',') + ']');
+
+  /* The prose itself. A stand shown to Dubai agencies is judged on whether it
+     sounds like a colleague — «чтобы было чем подпереть разговор» is an image
+     invented on the spot, and it reads as machine translation. These are the
+     specific tics the prompt bans; the list is short on purpose, because a
+     check that flags ordinary words would just be turned off. */
+  const SLOP = [
+    [/подпереть|подпорк/i, 'выдуманный образ'],
+    [/закрыть боль|боль клиент/i, 'жаргон продаж'],
+    [/бесшовн|под ключ|в моменте/i, 'рекламный штамп'],
+    [/прокачать|зашло|зашёл срез/i, 'разговорный жаргон'],
+    [/\bлид\b|пайплайн|мэтчинг|инсайт|скор(ить|инг клиента)/i, 'англицизм с русским эквивалентом'],
+    [/осуществ(ить|ляет|ление)|произвести расчёт|данным образом/i, 'канцелярит'],
+  ];
+  const proseHits = [];
+  results.forEach((r, i) => {
+    const t = String(r.text || '');
+    SLOP.forEach(([re, why]) => {
+      const m = re.exec(t);
+      if (m) proseHits.push(SCENARIOS[i].sid + ': «' + m[0] + '» — ' + why);
+    });
+  });
+  ok('the prose carries no invented imagery or borrowed jargon',
+    proseHits.length === 0, proseHits.join(' | '));
+
+  // A confirmation line is read by a broker, so it may not be written in the
+  // store's own vocabulary. «событие в contact c_docs» named neither the person
+  // nor what would be written.
+  const cards = results.filter((r) => r.lines.length);
+  ok('every confirmation line is written for a person, not the store',
+    cards.every((r) => r.lines.every((l) => !/\b(contact|deal|request|company)\s+[a-z]_/i.test(l))),
+    JSON.stringify(cards.flatMap((r) => r.lines).slice(0, 4)));
 
   // Every scenario has to have been answered by the live head. One that fell
   // back mid-run is a scenario whose verdict means nothing.

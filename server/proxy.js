@@ -276,6 +276,19 @@ const SYSTEM = [
   'Ты — Консьерж внутри WESPACE: рабочего места брокера коммерческой недвижимости в Дубае.',
   'Отвечаешь брокеру в чате. Пишешь по-русски, живо и коротко — две-четыре фразы, без канцелярита и без списков, если список не просили.',
   '',
+  'ЯЗЫК. Пишешь как коллега-профессионал, а не как рекламный текст и не как перевод с английского.',
+  'Главное правило: не сочиняй образов. Метафора уместна, только если она общеупотребительная;',
+  'придуманная на ходу читается как машинный перевод и сразу выдаёт нечеловека.',
+  'ТАК НЕ ПИШИ: «чтобы было чем подпереть разговор», «закрыть боль клиента», «свежий срез по рынку зашёл»,',
+  '«прокачать воронку», «бесшовно», «в моменте», «под ключ», «Круг данных».',
+  'ПИШИ ПРОСТО: «чтобы было на что опереться в разговоре», «чтобы было что показать клиенту».',
+  'Простой глагол лучше отглагольного существительного: «посчитал», а не «осуществил расчёт»;',
+  '«позвоните», а не «необходимо осуществить звонок».',
+  'Термины бери те, что стоят на экранах стенда: заявка, сделка, лот, стадия, подбор, КП, задаток.',
+  'Английские слова — только там, где русского эквивалента нет в отрасли: escrow, off-plan, DLD, RERA, ROI.',
+  '«Лид», «пайплайн», «мэтчинг», «инсайт» — не пиши, у них есть русские слова.',
+  'Перечитай фразу перед отправкой: сказал бы так живой брокер вслух? Нет — перепиши проще.',
+  '',
   'ЧИСЛА. Все цифры уже посчитаны кодом и лежат в блоке ДАННЫЕ. Бери их оттуда дословно.',
   'Своих чисел не выдумывай никогда — ни округлений, ни оценок, ни «примерно». Если нужного числа в ДАННЫХ нет, так и скажи и предложи, что посчитать.',
   '',
@@ -357,10 +370,27 @@ const SYSTEM = [
   '   {"op":"addClient","obj":{"name":"<Имя Фамилия>","channel":"whatsapp|telegram|crm","tag":"Клиент|Инвестор"}}',
   'Идентификаторы берёшь только из блока ДАННЫЕ. Выдуманный id — ошибка.',
   '',
-  'УТОЧНЕНИЕ ПЕРЕД СОЗДАНИЕМ. Когда просят создать заявку или контакт:',
-  '— clientId должен быть из ДАННЫЕ.контакты. Если клиент не найден — задай ОДИН конкретный вопрос:',
+  'СНАЧАЛА ИЩИ СУЩЕСТВУЮЩЕЕ. Просят завести заявку — сперва посмотри ДАННЫЕ.заявки этого контакта.',
+  'Совпадение — это когда названный район или объект УЖЕ ЕСТЬ в полях районы/предложено живой заявки.',
+  'Просто «у клиента есть другая заявка» совпадением НЕ считается: разный бюджет, другой тип объекта,',
+  'другая цель — это отдельный интерес, и его надо завести. Упомяни существующую одной фразой и заводи новую.',
+  'А вот при совпадении ВТОРУЮ НЕ ЗАВОДИ.',
+  'Назови её словами, открой ссылкой и предложи продолжить в ней. Это ответ, а не отказ:',
+  '  «У Виктора уже идёт заявка «Квартира Bayline + портфель DIFC» — Крик в ней уже есть, выбран Bayline 1603.',
+  '   Открываю её; если это отдельный интерес, скажите — заведу вторую.»',
+  'В open клади {"view":"request","id":"<id этой заявки>"} — брокер должен попасть в неё одним касанием.',
+  'Обходные пути вместо ответа — заметка на контакте, задача «собрать подбор» — не предлагай.',
+  'Это подмена: у брокера просили заявку, а он получает поручение самому себе.',
+  'Заводи вторую заявку, только если брокер подтвердил, что интерес другой.',
+  '',
+  'УТОЧНЕНИЕ ПЕРЕД СОЗДАНИЕМ. Когда заявку всё же надо завести:',
+  '— clientId должен быть из ДАННЫЕ.контакты. Клиента нет — задай ОДИН конкретный вопрос:',
   '  «Анны Петровой в контактах нет — это новый контакт? Тогда создам обоих.»',
-  '— Цель и бюджет необязательны: создай заявку без них, а в next положи подсказки для добавления.',
+  '— Заявка живёт ради подбора, поэтому спроси то, без чего подбор не собрать: бюджет, район, тип объекта.',
+  '  Не назвали — спроси ОДНОЙ фразой про недостающее, перечислив что уже понял.',
+  '  «Заведу на Виктора по Крику. Бюджет и спальни какие? Остальное возьму из его профиля.»',
+  '— Спрашивай один раз и по делу: анкету из пяти полей брокер не заполнит.',
+  '  Назвали бюджет и район — этого хватает, создавай и не переспрашивай.',
   '— Запись в данные и создание новых записей не требует поиска в сети.',
   '  Не вызывай WebSearch, когда выполняешь act.',
   '',
@@ -686,10 +716,14 @@ function cliArgs(external) {
 /* Starts one call and hands back both halves of it: the promise, and the way
    to stop it. Passing a shared object in for the cancel to be written into was
    too clever by half — this is the same thing, spelled out. */
-function startCall(prompt, onDelta, timeoutMs, external) {
+function startCall(prompt, onDelta, timeoutMs, external, onStage) {
+  onStage = onStage || function () {};
   let cancel = () => {};
   // Filled from the CLI's own result event, read by the caller afterwards.
-  const spent = { cost: 0, web: 0 };
+  // `web` is what the API's usage block reports; `tools` is what we counted off
+  // the stream. On the subscription CLI the first stays zero — search runs as a
+  // CLI tool, not a server tool — so the weekly figure has to take the larger.
+  const spent = { cost: 0, web: 0, tools: 0 };
   const promise = new Promise((resolve, reject) => {
     try { fs.mkdirSync(CFG.workDir, { recursive: true }); } catch (e) { /* best effort */ }
 
@@ -730,6 +764,23 @@ function startCall(prompt, onDelta, timeoutMs, external) {
         if (e.type === 'content_block_delta' && e.delta && typeof e.delta.text === 'string') {
           out += e.delta.text;
           onDelta(e.delta.text);
+        }
+        /* The one thing that happens during a call that the page cannot infer
+           from the text arriving: the model went out to the web. Reported as it
+           starts, so the waiting card can say what is actually going on instead
+           of animating a guess. */
+        if (e.type === 'content_block_start' && e.content_block) {
+          const b = e.content_block;
+          const kind = String(b.type || '');
+          if (kind === 'server_tool_use' || kind === 'tool_use') {
+            /* Through the CLI the tool is named `WebSearch`, not the API's
+               `web_search`. Matching only the underscored spelling matched
+               nothing ever: the stand went out to the web, quoted a dated
+               index off a real page, and both the waiting card and the weekly
+               counter recorded that nothing had happened. */
+            const name = String(b.name || '');
+            if (/^web[_-]?(search|fetch)$/i.test(name)) { spent.tools += 1; onStage('web'); }
+          }
         }
         return;
       }
@@ -938,11 +989,12 @@ async function handleAsk(req, res) {
   // before the visitor goes anywhere. The response closes when the connection
   // actually drops.
   const call = startCall(buildPrompt(body), (t) => { if (!aborted) send('delta', { t: t }); },
-    callTimeout(spec), MODES[spec.mode].external);
+    callTimeout(spec), MODES[spec.mode].external,
+    (k) => { if (!aborted) send('stage', { k: k }); });
   res.on('close', () => { if (!res.writableEnded) call.cancel(); });
   try {
     const full = await call.promise;
-    noteCall(call.spent.cost, call.spent.web);
+    noteCall(call.spent.cost, Math.max(call.spent.web, call.spent.tools));
     const parts = splitReply(full);
     if (!aborted) {
       // The resolved ids travel back: an unknown mode falls back here, and the

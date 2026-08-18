@@ -269,6 +269,9 @@ button { font-family: inherit; cursor: pointer; }
 .processing .step.done .dot { background: var(--ok); border-color: var(--ok); }
 .processing .step.done .dot svg { width: 9px; height: 9px; color: #fff; }
 .processing .step.active { color: var(--acc-ink); font-weight: 600; }
+/* What the active step is working through, said in the broker's own units.
+   Sits under the label so a narrow screen wraps it instead of pushing sideways. */
+.processing .step .note { display: block; font-style: normal; font-weight: 400; font-size: 11.5px; color: var(--mut); margin-top: 1px; }
 .processing .step.active .dot { border-color: var(--acc); border-top-color: transparent; animation: spin .7s linear infinite; }
 .processing .skip { font-size: 11.5px; color: var(--acc-2); background: none; border: 0; font-weight: 600; align-self: flex-start; }
 

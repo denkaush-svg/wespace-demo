@@ -216,18 +216,27 @@
       '<button class="btn sm" style="margin-top:8px" data-nav="docs">' + I('eye') + 'Открыть документ</button></div>';
   }
 
-  function processCard(step, activeIdx, done) {
+  /* `skippable` is false for a wait nobody can shorten. The button used to be
+     drawn on every process card, including the one covering a live model call —
+     where the delay is the call itself and the flag it sets is read only by the
+     scripted player. Clicking it did nothing, which is the worst thing a
+     control can do: it teaches that the buttons here are decoration. */
+  function processCard(step, activeIdx, done, skippable) {
     const rows = step.steps.map((s, i) => {
       let cls = 'step', ic = '';
       if (i < activeIdx || done) { cls += ' done'; ic = '<div class="dot">' + I('check') + '</div>'; }
       else if (i === activeIdx) { cls += ' active'; ic = '<div class="dot"></div>'; }
       else { ic = '<div class="dot"></div>'; }
-      return '<div class="' + cls + '">' + ic + '<span>' + s + '</span></div>';
+      const note = (i === activeIdx && !done && step.notes && step.notes[i])
+        ? '<em class="note">' + step.notes[i] + '</em>' : '';
+      return '<div class="' + cls + '">' + ic + '<span>' + s + note + '</span></div>';
     }).join('');
-    const skip = (!done) ? '<button class="skip" data-eng="skip">Пропустить ожидание</button>' : '';
+    const skip = (!done && skippable !== false)
+      ? '<button class="skip" data-eng="skip">Пропустить ожидание</button>' : '';
     return '<div class="msg ai fadeup"><div class="who">' + I('sparkle', '') + ' Консьерж</div>' +
       '<div class="processing"><div class="icon-tile i-acc">' + I('sparkle') + '</div>' +
-      '<div class="steps">' + rows + '</div></div>' + '<div style="margin-top:4px">' + skip + '</div></div>';
+      '<div class="steps">' + rows + '</div></div>' +
+      (skip ? '<div style="margin-top:4px">' + skip + '</div>' : '') + '</div>';
   }
 
   function previewCard(step, rejected, filled) {
@@ -623,11 +632,43 @@
     // The request is kept as a research signal regardless of how it is answered —
     // what brokers actually type is the most useful thing this stand collects.
     (WS.store.signals || (WS.store.signals = [])).push(text);
-    const workMid = pushMsg(processCard({ steps: ['Разбираю запрос', 'Считаю по данным'] }, 1, false), threadId);
-    await delay(560); if (!same()) return;
+    /* What the wait is actually made of.
+
+       Two steps and a timer said nothing about a call that can run a minute:
+       the card looked the same at second two and second fifty. These steps are
+       driven by events that really happen — the workspace is read, the model
+       may go out to the web, the first words arrive — so the card is a report,
+       not an animation. Nothing here advances on a timer.
+
+       The counts are read from the store, so the line says what was genuinely
+       handed over rather than a stock phrase. */
+    const d = (WS.store && WS.store.data) || {};
+    const cnt = (k, forms) => {
+      const v = (d[k] || []).length;
+      return v + ' ' + WS.agent.tools.plural(v, forms);
+    };
+    const trace = {
+      steps: ['Разбираю запрос', 'Смотрю рабочее место', 'Формулирую ответ'],
+      notes: [null, cnt('deals', ['сделка', 'сделки', 'сделок']) + ' · ' +
+        cnt('requests', ['заявка', 'заявки', 'заявок']) + ' · ' +
+        cnt('objects', ['объект', 'объекта', 'объектов']), null],
+    };
+    let at = 1;
+    const workMid = pushMsg(processCard(trace, at, false, false), threadId);
+    const draw = () => updateMsg(workMid, processCard(trace, at, false, false), threadId);
     // The live head streams; the offline one returns at once. Both land in the
     // same message, so the card simply fills in rather than being replaced.
     const reply = await WS.agent.askAsync(text, {
+      onStage: (k) => {
+        if (!same() || k !== 'web') return;
+        // Only shown when it happened. A step that is always there, whether or
+        // not the model went out, is back to being an animation.
+        if (trace.steps.indexOf('Ищу во внешних источниках') < 0) {
+          trace.steps.splice(2, 0, 'Ищу во внешних источниках');
+          trace.notes.splice(2, 0, 'страницы вне стенда · числа пойдут с пометкой источника');
+        }
+        at = 2; draw();
+      },
       onText: (partial) => {
         if (!same() || !partial) return;
         updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);

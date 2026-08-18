@@ -516,7 +516,7 @@
 
   // ---------- transport ----------
 
-  async function stream(text, onText) {
+  async function stream(text, onText, onStage) {
     const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -548,6 +548,9 @@
           raw += data.t;
           // The plan rides at the end of the same text; show only what precedes it.
           if (onText) onText(raw.split('```')[0].trim());
+        } else if (ev[1] === 'stage') {
+          // Something happened server-side that the arriving text does not show.
+          if (onStage && data && data.k) onStage(String(data.k));
         } else if (ev[1] === 'done') {
           done = data;
         } else if (ev[1] === 'error') {
@@ -566,7 +569,7 @@
     // noteFailure below.
     if (!cfg.ready) await probe();
     if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
-    const done = await stream(text, opts && opts.onText);
+    const done = await stream(text, opts && opts.onText, opts && opts.onStage);
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
     const ran = { mode: done.mode || null, depth: done.depth || null };

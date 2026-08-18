@@ -395,6 +395,7 @@
     bedrooms: 'спален', nextContact: 'следующий контакт', leadStatus: 'статус лида',
     temperature: 'температура', funding: 'финансирование',
   };
+  const EVENT_RU = { note: 'Заметка', call: 'Звонок', meet: 'Встреча', msg: 'Сообщение', task: 'Задача' };
   const fieldRu = (f) => FIELD_RU[f] || f;
   const stageRu = (k) => ((WS.ui && WS.ui.stageLabel) ? (WS.ui.stageLabel(k) || k) : k);
   // The record as a person knows it, falling back to the id when it has no name.
@@ -422,11 +423,15 @@
     if (spec.kind === 'event') {
       const txt = String(o.text == null ? '' : o.text).trim();
       if (!txt) return fail('bad_value', at + 'пустой текст события');
-      if (!WS.ui || !WS.ui.feedOwner || !WS.ui.feedOwner(o.scope, o.id)) {
-        return fail('not_found', at + 'нет сущности ' + o.scope + ' ' + o.id);
-      }
+      const owner = (WS.ui && WS.ui.feedOwner) ? WS.ui.feedOwner(o.scope, o.id) : null;
+      if (!owner) return fail('not_found', at + 'нет сущности ' + o.scope + ' ' + o.id);
+      /* «событие в contact c_docs» is the store talking to itself. The line is
+         read by a broker deciding whether to confirm — it has to name the
+         person and say what will be written, like every other line does. */
+      const who = owner.name || owner.title || o.id;
       return {
-        ok: true, tier: 'safe', summary: 'событие в ' + o.scope + ' ' + o.id,
+        ok: true, tier: 'safe',
+        summary: EVENT_RU[o.type || 'note'] + ' · «' + String(who).slice(0, 40) + '» · ' + shown(txt),
         run: () => { WS.ui.addEventEntry(o.scope, o.id, { type: o.type, text: txt, when: o.when, due: o.due, dueWhen: o.dueWhen }); },
       };
     }
