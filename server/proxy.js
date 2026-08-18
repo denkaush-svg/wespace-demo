@@ -86,10 +86,16 @@ const CFG = {
   maxTimeoutMs: Number(process.env.WESPACE_PROXY_MAX_TIMEOUT_MS || 900000),
   /* Silence, not duration, is what tells a wedged call from a working one: the
      CLI streams thinking, tool starts and text throughout, so nothing at all for
-     this long means nobody is home. This is what keeps one of two concurrency
-     slots from being held for the full ceiling by a process that died quietly. */
+     this long means nobody is home. This is what keeps a concurrency slot from
+     being held for the full ceiling by a process that died quietly. */
   stallMs: Number(process.env.WESPACE_PROXY_STALL_MS || 120000),
-  concurrency: Number(process.env.WESPACE_PROXY_CONCURRENCY || 2),
+  /* Raised with the ceiling, and for the same reason. A slot used to come back
+     within 150s whatever happened; a call may now legitimately hold one for ten
+     minutes, so two slots meant a third visitor met «busy» during exactly the
+     long market question the raised ceiling exists to allow. Three is as far as
+     this goes: every call is a CLI process on a subscription shared with two
+     other accounts, and the stand is not entitled to all of it. */
+  concurrency: Number(process.env.WESPACE_PROXY_CONCURRENCY || 3),
   perIpPerMin: Number(process.env.WESPACE_PROXY_IP_PER_MIN || 6),
   perIpBurst: Number(process.env.WESPACE_PROXY_IP_BURST || 3),
   dailyCap: Number(process.env.WESPACE_PROXY_DAILY_CAP || 400),
