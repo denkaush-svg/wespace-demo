@@ -226,12 +226,21 @@
      next question answerable. */
   function orient(text) {
     const know = inventory();
-    const areas = Object.keys((WS.fixtures && WS.fixtures.AREAS) || {});
     const t = lc(text || '');
-    const askedArea = areas.length && /район|аналитик|рынок|цен|доходн|jumeirah|palm|downtown|marina|jbr|sports|hills/i.test(t);
+    /* Which districts this stand can actually speak about — read from the
+       market slice, not from AREAS. AREAS holds the four with the full picture
+       (they also carry inventory); the slice covers nine, five of them
+       illustrative. Naming only the four told a broker that Palm Jumeirah and
+       Downtown are absent when a row for each is right there, which is the same
+       class of mistake as inventing one. */
+    const res = WS.query.run({ from: 'market' });
+    const areas = (res && Array.isArray(res.rows) ? res.rows : [])
+      .map((m) => m.район || m.area || m.name).filter(Boolean);
+    const askedArea = areas.length &&
+      /район|аналитик|рынок|цен|доходн|аренд|jumeirah|palm|downtown|marina|jlt|jbr|arjan|hills/i.test(t);
     const lines = askedArea
-      ? ['По этому району у стенда данных нет. Рынок здесь собран по четырём: ' + areas.join(', ') + '.',
-         'Могу разобрать любой из них — цену за метр, доходность, сроки экспозиции.']
+      ? ['Этого района в срезе стенда нет. Есть: ' + areas.join(', ') + '.',
+         'Могу разобрать любой — цену за метр, доходность, срок экспозиции.']
       : ['Этого в данных стенда нет. Что есть: ' + know.join(', ') + '.',
          'Скажите, что из этого посмотреть.'];
     return {

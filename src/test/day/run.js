@@ -25,9 +25,12 @@ const PORT = 8000;
 const GAP_MS = 11000;              // the proxy refills six tokens a minute
 const TIMEOUT_MS = 190000;
 const API = process.env.WESPACE_TEST_API || 'http://127.0.0.1:8791';
-const OUT = path.join(__dirname, 'results.json');
+// A different question set — re-checking the few a fix was aimed at, without
+// spending forty calls to see three answers.
+const SET = process.env.WESPACE_DAY_SET || 'queries';
+const OUT = path.join(__dirname, SET === 'queries' ? 'results.json' : 'results-' + SET + '.json');
 
-const ALL = JSON.parse(fs.readFileSync(path.join(__dirname, 'queries.json'), 'utf8'));
+const ALL = JSON.parse(fs.readFileSync(path.join(__dirname, SET + '.json'), 'utf8'));
 const from = Number(process.argv[2] || 0);
 const to = Number(process.argv[3] || ALL.length);
 const QUERIES = ALL.slice(from, to);

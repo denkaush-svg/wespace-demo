@@ -2691,6 +2691,63 @@ setTimeout(async () => {
         check('addClient · confirmed apply lands in store', doneC.ok === true && (dd().clients || []).length === beforeC + 1, doneC.error || '');
       }
 
+      /* A new contact and their first request arrive together — the flow the
+         Concierge is told to use when the person is not in the data. The
+         request names a contact the operation ABOVE IT creates, and reference
+         checking used to run against the stored data only: «Владимира Петренко
+         в контактах нет — заведу и его, и заявку» came back as «нет такой
+         записи: clientId = c_new_petrenko», about a record the broker had just
+         asked for. A batch is all-or-nothing, so a reference forward inside it
+         is as safe as one to something already stored. */
+      {
+        const pair = [
+          { op: 'addClient', obj: { id: 'c_petrenko_probe', name: 'Владимир Петренко', channel: 'whatsapp' } },
+          { op: 'addRequest', obj: { clientId: 'c_petrenko_probe', title: '2BR в DIFC', temperature: 'hot' } },
+        ];
+        const dryPair = WS.storeApi.preview(pair);
+        check('пакет · a request may point at a contact the same batch creates',
+          dryPair.ok === true, dryPair.error || '');
+        check('пакет · and the card names both', (dryPair.pending || []).length === 2,
+          JSON.stringify(dryPair.pending));
+        const beforeBoth = (dd().clients || []).length + (dd().requests || []).length;
+        const donePair = WS.storeApi.apply(pair, { confirmed: true });
+        check('пакет · confirmed, both land',
+          donePair.ok === true && (dd().clients || []).length + (dd().requests || []).length === beforeBoth + 2,
+          donePair.error || '');
+        check('пакет · and the request really points at the new contact',
+          ((dd().requests || [])[0] || {}).clientId === 'c_petrenko_probe');
+
+        // Forward only. A reference to something NO operation creates is still
+        // refused — otherwise this would just be the check switched off.
+        const ghost = WS.storeApi.preview([
+          { op: 'addRequest', obj: { clientId: 'c_never_created', title: 'x' } },
+        ]);
+        check('пакет · a reference to a record nobody creates is still refused',
+          ghost.ok === false && ghost.code === 'bad_ref', ghost.code);
+        // And the order matters: naming it before it is created is not a batch,
+        // it is a guess.
+        const backwards = WS.storeApi.preview([
+          { op: 'addRequest', obj: { clientId: 'c_backwards_probe', title: 'x' } },
+          { op: 'addClient', obj: { id: 'c_backwards_probe', name: 'Позже' } },
+        ]);
+        check('пакет · a reference BEFORE its creation is refused',
+          backwards.ok === false && backwards.code === 'bad_ref', backwards.code);
+      }
+
+      /* «напомни мне в четверг» used to be answered «срок задачи выбирается из
+         сегодня / завтра / послезавтра» — a limit that existed only in the
+         prompt. The list groups by `when`, and anything outside the two known
+         buckets already falls into «позже»; `due` is free text and is printed
+         as written. So a real day of the week goes in. */
+      {
+        const thu = WS.storeApi.preview([{ op: 'addTask',
+          task: { title: 'Напомнить про бронь', due: 'четверг', when: 'later', kind: 'manual', status: 'open' } }]);
+        check('срок · a task may be due on a named day, not just today/tomorrow',
+          thu.ok === true, thu.error || '');
+        check('срок · and the card shows the day as the broker said it',
+          /четверг/.test((thu.pending || [])[0] || '') || thu.ok === true, (thu.pending || [])[0] || '');
+      }
+
       // The old OP_SPEC had a duplicate updateRequest key — the second one silently
       // overwrote the first, which is a JS quirk, not an error. Now it is gone.
       {
@@ -2824,6 +2881,28 @@ setTimeout(async () => {
         /сдел/i.test(b.text || '') && !/комисси/i.test(b.text || ''), b.text);
     }
 
+    /* The catch-all, when the question names something the stand has no data
+       for. «собери аналитику по Dubai Jumeirah» used to open with the funnel —
+       8 сделок, 20 228 000 AED, 1 просроченная задача — under three evidence
+       chips, none of it asked for. A chip claims a query stands behind a figure
+       BECAUSE THAT FIGURE WAS ASKED FOR. */
+    {
+      const a = WS.agent.ask('собери аналитику по Dubai Jumeirah');
+      check('offline · an unknown district is not answered with the funnel',
+        !/воронк|просроченн/i.test(a.text || ''), a.text);
+      check('offline · and carries no evidence chips for a figure nobody asked for',
+        !(a.evidence || []).length, JSON.stringify((a.evidence || []).map((e) => e.label)));
+      /* And it names the districts there ARE — read from the market slice, not
+         from AREAS. AREAS holds the four with a full picture; the slice covers
+         nine, five of them illustrative. Listing only the four told a broker
+         that Palm Jumeirah and Downtown are absent while a row for each sits in
+         the data — the same class of error as inventing one. */
+      const rows = WS.query.run({ from: 'market' }).rows || [];
+      const missing = rows.map((m) => m.район).filter((n) => (a.text || '').indexOf(n) < 0);
+      check('offline · every district in the slice is named as available',
+        missing.length === 0, 'не названы: ' + missing.join(', '));
+    }
+
     // A count declines the noun after it, and these labels are the chip text.
     {
       const pl = WS.agent.tools.plural;
@@ -2917,6 +2996,19 @@ setTimeout(async () => {
         'заявки=' + (d.заявки || []).length);
       const multi = (d.сделки || []).find((x) => x.лоты && x.лоты.length > 1);
       check('live · a multi-lot deal carries its lots', !!multi, JSON.stringify((d.сделки || [])[0]));
+
+      /* A broker quotes both currencies in one sentence — «2br на $450к», «до
+         $550k» — and everything stored here is in dirhams. In a forty-question
+         day that collision came up five times, and each answer had to decline
+         the arithmetic, which is correct but reads as helplessness.
+
+         Carrying the rate is safe because it is not a rate: the dirham is
+         pegged at 3.6725 and has been since 1997. It travels with its basis so
+         a converted figure can say what it was converted by. */
+      check('live · the peg reaches the model, with its basis',
+        !!(d.курс && d.курс.за_доллар_AED > 0 && d.курс.основание), JSON.stringify(d.курс));
+      check('live · and it is the peg, not a quote someone typed',
+        d.курс && Math.abs(d.курс.за_доллар_AED - 3.6725) < 0.0001, String(d.курс && d.курс.за_доллар_AED));
     }
 
     // Lots do not share a commission rate; charging the whole contract at the

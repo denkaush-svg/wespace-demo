@@ -352,7 +352,19 @@
     clientId: 'clients', companyId: 'companies', objectId: 'objects',
     dealId: 'deals', requestId: 'requests', assignee: 'users', agent: 'users',
   };
-  function refError(rec, at) {
+  /* `coming` holds what EARLIER operations in the same batch will create.
+
+     Without it, the one flow the Concierge is told to use could never run: a
+     new client and their first request arrive together — «Владимира Петренко в
+     контактах нет — заведу и его, и заявку» — and the request names a contact
+     that does not exist yet, because the operation creating it is one line
+     above in the same all-or-nothing batch. The layer refused, and the person
+     was told «нет такой записи» about a record they had just asked for.
+
+     A batch applies whole or not at all, so a reference forward inside it is
+     as safe as one to a record already stored. A reference to something no
+     operation creates is still refused. */
+  function refError(rec, at, coming) {
     const d = store.data || {};
     const keys = Object.keys(rec || {});
     for (let i = 0; i < keys.length; i++) {
@@ -363,7 +375,8 @@
       // `users` is a map in this store, everything else is a list.
       const exists = coll === 'users'
         ? !!(d.users && d.users[val]) || (d.roster || []).some((u) => u.id === val)
-        : (d[coll] || []).some((x) => x.id === val);
+        : (d[coll] || []).some((x) => x.id === val) ||
+          !!(coming && coming[coll] && coming[coll].indexOf(val) >= 0);
       if (!exists) {
         return fail('bad_ref', at + 'нет такой записи: ' + f + ' = ' + val, { field: f, collection: coll });
       }
@@ -414,7 +427,7 @@
   }
 
   // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
-  function planOp(o, i) {
+  function planOp(o, i, coming) {
     const at = 'операция ' + (i + 1) + ': ';
     if (!o || !o.op) return fail('bad_op', at + 'не указана операция');
     const spec = OP_SPEC[o.op];
@@ -445,7 +458,7 @@
       // A record may point at a contact, a deal or an object. Pointing it at an
       // id that does not exist created a task hanging off nothing — it renders,
       // it just belongs to no one.
-      const badRef = refError(src, at);
+      const badRef = refError(src, at, coming);
       if (badRef) return badRef;
       // The id is ours to assign, not the caller's to invent. Demanding one
       // meant every «поставь задачу на завтра» came back as «нет записи или её
@@ -460,6 +473,8 @@
       return {
         ok: true, tier: addTier,
         summary: (COLL_RU[spec.coll] || spec.coll) + ' · «' + String(label).slice(0, 60) + '»',
+        // What a later operation in this batch may point at.
+        creates: { coll: spec.coll, id: rec.id },
         run: () => { coll.unshift(rec); },
       };
     }
@@ -500,7 +515,7 @@
       const bad = stageRefusal(patch.stage);
       if (bad) return bad;
     }
-    const badPatchRef = refError(patch, at);
+    const badPatchRef = refError(patch, at, coming);
     if (badPatchRef) return badPatchRef;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
@@ -528,11 +543,13 @@
       return fail('stale', 'данные изменились с момента предложения', { revision: store.dataRevision, expected: opts.expectedRevision });
     }
     const plan = [];
+    const coming = {};
     let tier = 'safe';
     for (let i = 0; i < ops.length; i++) {
-      const p = planOp(ops[i], i);
+      const p = planOp(ops[i], i, coming);
       if (!p.ok) return p;                       // nothing has been touched yet
       if (p.tier === 'guarded') tier = 'guarded';
+      if (p.creates) (coming[p.creates.coll] || (coming[p.creates.coll] = [])).push(p.creates.id);
       plan.push(p);
     }
     if (tier === 'guarded' && !opts.confirmed) {
@@ -551,11 +568,13 @@
   function preview(ops) {
     if (!Array.isArray(ops) || !ops.length) return fail('empty', 'нечего применять');
     const plan = [];
+    const coming = {};
     let tier = 'safe';
     for (let i = 0; i < ops.length; i++) {
-      const p = planOp(ops[i], i);
+      const p = planOp(ops[i], i, coming);
       if (!p.ok) return p;
       if (p.tier === 'guarded') tier = 'guarded';
+      if (p.creates) (coming[p.creates.coll] || (coming[p.creates.coll] = [])).push(p.creates.id);
       plan.push(p);
     }
     return { ok: true, tier: tier, revision: store.dataRevision, pending: plan.map((p) => p.summary) };

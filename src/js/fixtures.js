@@ -9,6 +9,18 @@
 
   const tenant = { name: 'Harbour Key Realty LLC', city: 'Dubai', plan: 'Demo tenant' };
 
+  /* Brokers here quote in both currencies in the same breath — «2br на $450к»,
+     «до $550k», «снизить до $2.8 млн» — and every figure this stand holds is in
+     dirhams. Without the rate the Concierge had to refuse the arithmetic in one
+     question out of eight, which is right (inventing a rate is inventing a
+     number) but reads as helplessness.
+
+     The rate is safe to carry precisely because it is not a rate: the dirham
+     has been pegged to the dollar at 3.6725 since 1997, so this is a constant,
+     not a quote that goes stale between demos. It is stored with its basis so
+     an answer can say what it converted by. */
+  const FX = { code: 'USD', perAED: 3.6725, basis: 'официальная привязка дирхама к доллару, с 1997 года' };
+
   const users = {
     agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina',
       // Closed book for the demo period, per horizon. `attribution` is agency-wide and carries no
@@ -1124,7 +1136,7 @@
 
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, roster, clients, objects, AREAS, refModel, market,
+    DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,

@@ -6,4 +6,4 @@ server/OFF
 
 # runtime counter written by the proxy on the server
 server/usage.json
-src/test/day/results.json
+src/test/day/results*.json

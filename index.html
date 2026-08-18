@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 14:38</title>
+  <title>WESPACE · сборка 15:20</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='14:38';
+    window.WS_BUILD='15:20';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2559,6 +2559,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   const tenant = { name: 'Harbour Key Realty LLC', city: 'Dubai', plan: 'Demo tenant' };
 
+  /* Brokers here quote in both currencies in the same breath — «2br на $450к»,
+     «до $550k», «снизить до $2.8 млн» — and every figure this stand holds is in
+     dirhams. Without the rate the Concierge had to refuse the arithmetic in one
+     question out of eight, which is right (inventing a rate is inventing a
+     number) but reads as helplessness.
+
+     The rate is safe to carry precisely because it is not a rate: the dirham
+     has been pegged to the dollar at 3.6725 since 1997, so this is a constant,
+     not a quote that goes stale between demos. It is stored with its basis so
+     an answer can say what it converted by. */
+  const FX = { code: 'USD', perAED: 3.6725, basis: 'официальная привязка дирхама к доллару, с 1997 года' };
+
   const users = {
     agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina',
       // Closed book for the demo period, per horizon. `attribution` is agency-wide and carries no
@@ -3674,7 +3686,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   WS.fixtures = {
     version: 1,
-    DEMO_NOW, tenant, users, roster, clients, objects, AREAS, refModel, market,
+    DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
@@ -4457,7 +4469,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     clientId: 'clients', companyId: 'companies', objectId: 'objects',
     dealId: 'deals', requestId: 'requests', assignee: 'users', agent: 'users',
   };
-  function refError(rec, at) {
+  /* `coming` holds what EARLIER operations in the same batch will create.
+
+     Without it, the one flow the Concierge is told to use could never run: a
+     new client and their first request arrive together — «Владимира Петренко в
+     контактах нет — заведу и его, и заявку» — and the request names a contact
+     that does not exist yet, because the operation creating it is one line
+     above in the same all-or-nothing batch. The layer refused, and the person
+     was told «нет такой записи» about a record they had just asked for.
+
+     A batch applies whole or not at all, so a reference forward inside it is
+     as safe as one to a record already stored. A reference to something no
+     operation creates is still refused. */
+  function refError(rec, at, coming) {
     const d = store.data || {};
     const keys = Object.keys(rec || {});
     for (let i = 0; i < keys.length; i++) {
@@ -4468,7 +4492,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // `users` is a map in this store, everything else is a list.
       const exists = coll === 'users'
         ? !!(d.users && d.users[val]) || (d.roster || []).some((u) => u.id === val)
-        : (d[coll] || []).some((x) => x.id === val);
+        : (d[coll] || []).some((x) => x.id === val) ||
+          !!(coming && coming[coll] && coming[coll].indexOf(val) >= 0);
       if (!exists) {
         return fail('bad_ref', at + 'нет такой записи: ' + f + ' = ' + val, { field: f, collection: coll });
       }
@@ -4519,7 +4544,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   // Returns either a failure, or a plan entry: { ok, tier, summary, run }.
-  function planOp(o, i) {
+  function planOp(o, i, coming) {
     const at = 'операция ' + (i + 1) + ': ';
     if (!o || !o.op) return fail('bad_op', at + 'не указана операция');
     const spec = OP_SPEC[o.op];
@@ -4550,7 +4575,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // A record may point at a contact, a deal or an object. Pointing it at an
       // id that does not exist created a task hanging off nothing — it renders,
       // it just belongs to no one.
-      const badRef = refError(src, at);
+      const badRef = refError(src, at, coming);
       if (badRef) return badRef;
       // The id is ours to assign, not the caller's to invent. Demanding one
       // meant every «поставь задачу на завтра» came back as «нет записи или её
@@ -4565,6 +4590,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       return {
         ok: true, tier: addTier,
         summary: (COLL_RU[spec.coll] || spec.coll) + ' · «' + String(label).slice(0, 60) + '»',
+        // What a later operation in this batch may point at.
+        creates: { coll: spec.coll, id: rec.id },
         run: () => { coll.unshift(rec); },
       };
     }
@@ -4605,7 +4632,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const bad = stageRefusal(patch.stage);
       if (bad) return bad;
     }
-    const badPatchRef = refError(patch, at);
+    const badPatchRef = refError(patch, at, coming);
     if (badPatchRef) return badPatchRef;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
@@ -4633,11 +4660,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       return fail('stale', 'данные изменились с момента предложения', { revision: store.dataRevision, expected: opts.expectedRevision });
     }
     const plan = [];
+    const coming = {};
     let tier = 'safe';
     for (let i = 0; i < ops.length; i++) {
-      const p = planOp(ops[i], i);
+      const p = planOp(ops[i], i, coming);
       if (!p.ok) return p;                       // nothing has been touched yet
       if (p.tier === 'guarded') tier = 'guarded';
+      if (p.creates) (coming[p.creates.coll] || (coming[p.creates.coll] = [])).push(p.creates.id);
       plan.push(p);
     }
     if (tier === 'guarded' && !opts.confirmed) {
@@ -4656,11 +4685,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function preview(ops) {
     if (!Array.isArray(ops) || !ops.length) return fail('empty', 'нечего применять');
     const plan = [];
+    const coming = {};
     let tier = 'safe';
     for (let i = 0; i < ops.length; i++) {
-      const p = planOp(ops[i], i);
+      const p = planOp(ops[i], i, coming);
       if (!p.ok) return p;
       if (p.tier === 'guarded') tier = 'guarded';
+      if (p.creates) (coming[p.creates.coll] || (coming[p.creates.coll] = [])).push(p.creates.id);
       plan.push(p);
     }
     return { ok: true, tier: tier, revision: store.dataRevision, pending: plan.map((p) => p.summary) };
@@ -14007,12 +14038,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      next question answerable. */
   function orient(text) {
     const know = inventory();
-    const areas = Object.keys((WS.fixtures && WS.fixtures.AREAS) || {});
     const t = lc(text || '');
-    const askedArea = areas.length && /район|аналитик|рынок|цен|доходн|jumeirah|palm|downtown|marina|jbr|sports|hills/i.test(t);
+    /* Which districts this stand can actually speak about — read from the
+       market slice, not from AREAS. AREAS holds the four with the full picture
+       (they also carry inventory); the slice covers nine, five of them
+       illustrative. Naming only the four told a broker that Palm Jumeirah and
+       Downtown are absent when a row for each is right there, which is the same
+       class of mistake as inventing one. */
+    const res = WS.query.run({ from: 'market' });
+    const areas = (res && Array.isArray(res.rows) ? res.rows : [])
+      .map((m) => m.район || m.area || m.name).filter(Boolean);
+    const askedArea = areas.length &&
+      /район|аналитик|рынок|цен|доходн|аренд|jumeirah|palm|downtown|marina|jlt|jbr|arjan|hills/i.test(t);
     const lines = askedArea
-      ? ['По этому району у стенда данных нет. Рынок здесь собран по четырём: ' + areas.join(', ') + '.',
-         'Могу разобрать любой из них — цену за метр, доходность, сроки экспозиции.']
+      ? ['Этого района в срезе стенда нет. Есть: ' + areas.join(', ') + '.',
+         'Могу разобрать любой — цену за метр, доходность, срок экспозиции.']
       : ['Этого в данных стенда нет. Что есть: ' + know.join(', ') + '.',
          'Скажите, что из этого посмотреть.'];
     return {
@@ -14576,6 +14616,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // Настоящие имена полей — чтобы модель могла описать запрос, из которого
       // код построит таблицу. В остальном она читает русские ключи выше.
       схема: WS.query.collections(),
+      // Брокер называет суммы и в долларах, и в дирхамах. Курс здесь —
+      // константа (привязка с 1997), а не котировка, поэтому пересчёт по нему
+      // не выдумывание числа. С основанием, чтобы ответ мог его назвать.
+      курс: (WS.fixtures && WS.fixtures.FX)
+        ? { за_доллар_AED: WS.fixtures.FX.perAED, основание: WS.fixtures.FX.basis } : null,
       ревизия: WS.store.dataRevision,
     };
   }
