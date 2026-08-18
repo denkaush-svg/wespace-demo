@@ -34,6 +34,7 @@ const ALL = JSON.parse(fs.readFileSync(path.join(__dirname, SET + '.json'), 'utf
 const from = Number(process.argv[2] || 0);
 const to = Number(process.argv[3] || ALL.length);
 const QUERIES = ALL.slice(from, to);
+const startedAt = new Date().toISOString();
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
 const serve = http.createServer((req, res) => {
@@ -65,6 +66,7 @@ const serve = http.createServer((req, res) => {
   }
 
   const out = [];
+  let servedBefore = await page.evaluate(() => (window.WS.live && window.WS.live.served) || 0);
   for (let i = 0; i < QUERIES.length; i++) {
     if (i) await new Promise((r) => setTimeout(r, GAP_MS));
     const spec = QUERIES[i];
@@ -92,13 +94,30 @@ const serve = http.createServer((req, res) => {
     const got = await page.evaluate(() => {
       const NUMERIC = { table: true, kv: true, bars: true };
       const r = window.WS.engine.lastReply || {};
-      const blocks = (r.blocks || []).map((b) => ({ t: b.t, src: b.src || null, rows: (b.rows || []).length }));
+      /* Keep the CONTENT, not just the shape. Recording «table, src:data, 6
+         rows» said a block was code-computed and nothing about whether the
+         query behind it was the right one: a table of the wrong district, or
+         the wrong filter, is indistinguishable from a correct one in a summary
+         like that. The spec is what the code ran; the rows are what a person
+         reads. Both are needed to judge an answer, and neither can be
+         reconstructed later. */
+      const blocks = (r.blocks || []).map((b) => ({
+        t: b.t, src: b.src || null, n: (b.rows || []).length,
+        head: b.head || null,
+        spec: b.spec || null,
+        source: b.source || null, asOf: b.asOf || null,
+        rows: (b.rows || []).slice(0, 10),
+        text: b.text ? String(b.text).slice(0, 300) : undefined,
+      }));
       return {
         kind: r.kind || null,
         mode: r.mode || null,
         depth: r.depth || null,
-        text: String(r.text || '').slice(0, 700),
-        speak: r.speak ? String(r.speak).slice(0, 300) : null,
+        // Whole, not clipped: the sentence that invents something is as likely
+        // to be the last one as the first, and a truncated record cannot be
+        // re-read after the run.
+        text: String(r.text || ''),
+        speak: r.speak ? String(r.speak) : null,
         blocks: blocks,
         dataBlocks: blocks.filter((b) => b.src === 'data').length,
         webBlocks: blocks.filter((b) => b.src === 'web').length,
@@ -107,6 +126,10 @@ const serve = http.createServer((req, res) => {
         ops: (r.kind === 'proposal' && Array.isArray(r.ops)) ? r.ops.map((o) => String((o && o.op) || '?')) : [],
         opIds: (r.kind === 'proposal' && Array.isArray(r.ops))
           ? r.ops.map((o) => String((o && (o.id || (o.obj && (o.obj.clientId || o.obj.id)))) || '')).filter(Boolean) : [],
+        // The whole operation, not its name. A stage change to the wrong step, a
+        // budget in the wrong currency, a task on the wrong contact — all of
+        // them are `addTask` / `dealStage` in a list of names.
+        opsFull: (r.kind === 'proposal' && Array.isArray(r.ops)) ? r.ops.slice(0, 6) : [],
         lines: (r.lines || []).map((s) => String(s).slice(0, 140)),
         next: (r.next || []).map((n) => String((n && n.label) || '')),
         opens: (r.next || []).filter((n) => n && n.open).map((n) => n.open + (n.id ? ':' + n.id : '')),
@@ -117,13 +140,27 @@ const serve = http.createServer((req, res) => {
 
     got.ms = Date.now() - t0;
     got.answered = answered;
+    /* Which head actually spoke, per scenario — not cumulatively at the end.
+       The live head falls back to the offline planner on any failure, so a
+       restart or a blip mid-run turns the rest of the day into a measurement of
+       the planner's manners, recorded as answered. Checking the total at the
+       end cannot say WHICH ones fell back. */
+    got.live = got.served > servedBefore;
+    servedBefore = got.served;
     out.push(Object.assign({}, spec, { got: got }));
     console.log((answered ? got.kind : 'НЕ ОТВЕТИЛ') + ' · ' + Math.round(got.ms / 1000) + 'с' +
+      (got.live ? '' : ' · ⚠ ОФЛАЙН-ПЛАНИРОВЩИК') +
       (got.ops.length ? ' · ops=[' + got.ops.join(',') + ']' : '') +
       (got.blocks.length ? ' · блоков ' + got.blocks.length + ' (данные ' + got.dataBlocks +
         (got.modelNumeric ? ', МОДЕЛЬ ' + got.modelNumeric : '') + ')' : ''));
 
-    fs.writeFileSync(OUT, JSON.stringify({ errs: errs, results: out }, null, 1));
+    // The manifest says what this file IS. A subset run used to overwrite a
+    // full one under the same name, and nothing recorded that it was a subset —
+    // which is how a forty-question record became a two-question one.
+    fs.writeFileSync(OUT, JSON.stringify({
+      набор: SET, диапазон: [from, to], всего_в_наборе: ALL.length,
+      адрес: API, начат: startedAt, errs: errs, results: out,
+    }, null, 1));
   }
 
   await browser.close();
@@ -132,8 +169,13 @@ const serve = http.createServer((req, res) => {
   console.log('\n=== собрано ' + out.length + ' · записано в ' + OUT + ' ===');
   const noAnswer = out.filter((r) => !r.got.answered);
   const typed = out.filter((r) => r.got.modelNumeric > 0);
+  const fellBack = out.filter((r) => !r.got.live);
   if (noAnswer.length) console.log('БЕЗ ОТВЕТА: ' + noAnswer.map((r) => r.id).join(', '));
   if (typed.length) console.log('ЧИСЛА ОТ МОДЕЛИ: ' + typed.map((r) => r.id).join(', '));
+  if (fellBack.length) console.log('ОТВЕТИЛ ПЛАНИРОВЩИК, НЕ МОДЕЛЬ: ' + fellBack.map((r) => r.id).join(', '));
   if (errs.length) console.log('ОШИБКИ СТРАНИЦЫ: ' + errs.join('; '));
-  process.exit(0);
+  /* A warning printed and then exited zero is a warning nobody acts on: the
+     command succeeded, so a wrapper, a CI step or a tired person reads it as
+     green. Any of these three makes the run's verdict unsafe to trust. */
+  process.exit((noAnswer.length || typed.length || fellBack.length || errs.length) ? 1 : 0);
 })();

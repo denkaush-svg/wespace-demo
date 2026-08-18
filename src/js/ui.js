@@ -723,6 +723,9 @@
     const pop = (kind, html) => st.cgMenu === kind ? '<div class="cg-pop">' + html + '</div>' : '';
     const cv = '<span class="cv">▾</span>';
     const depthSeg = CG_DEPTH.map((x) => '<button class="cg-seg-btn' + (depth === x.k ? ' on' : '') + '" data-cgdepth="' + x.k + '" title="' + x.hint + '">' + x.t + '</button>').join('');
+    // Asked at render time: voice.js loads after this file, so a value captured
+    // at definition would always be «no».
+    const voiceOff = !(WS.voice && WS.voice.canDictate && WS.voice.canDictate());
     return '<div class="prompt composer' + (extraCls ? ' ' + extraCls : '') + '">' +
         chipRow +
         '<div class="prompt-top">' +
@@ -735,7 +738,15 @@
           '<div class="cg-tool-wrap"><button class="cg-tool' + (st.cgMenu === 'ctx' ? ' on' : '') + (ctx.length ? ' has' : '') + '" data-act="cgCtxAdd">' + I('grid') + '<span class="lb">Контекст' + (ctx.length ? ' · ' + ctx.length : '') + '</span>' + cv + '</button>' + pop('ctx', cgContextMenu()) + '</div>' +
           '<div class="cg-actions">' +
             '<div class="cg-seg" role="group" aria-label="Глубина ответа">' + depthSeg + '</div>' +
-            '<button class="voice" data-act="voice" title="Голосом">' + I('mic') + '</button>' +
+            /* Dictation is the browser's own, and not every browser has it:
+               Firefox has no SpeechRecognition at all, and Safari needs the
+               microphone granted to it in System Settings. A button that looks
+               live and answers a press with nothing reads as broken software —
+               which is exactly how it was reported. So the control says what
+               it can do before it is pressed. */
+            '<button class="voice' + (voiceOff ? ' off' : '') + '" data-act="voice" title="' +
+              (voiceOff ? 'Этот браузер не умеет распознавать речь — наберите текстом или откройте в Chrome' : 'Голосом') +
+              '">' + I('mic') + '</button>' +
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
         '</div>' +

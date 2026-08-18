@@ -323,6 +323,13 @@ const serve = http.createServer((req, res) => {
      specific tics the prompt bans; the list is short on purpose, because a
      check that flags ordinary words would just be turned off. */
   const SLOP = [
+    /* «По стенду Марина — самый доходный из «квартирных» районов» in answer to a
+       question about a district. «Стенд» is OUR word for the demo; the broker is
+       looking at their workplace. It reached the answers because the prompt said
+       it fifteen times — I taught it. And a coinage in quotation marks is the
+       model telling you it invented the word. */
+    [/\bстенд\w*/i, 'наше внутреннее слово в ответе брокеру'],
+    [/«квартирн|«жилищн|«денежн/i, 'придуманное слово в кавычках'],
     [/подпереть|подпорк/i, 'выдуманный образ'],
     [/закрыть боль|боль клиент/i, 'жаргон продаж'],
     [/бесшовн|под ключ|в моменте/i, 'рекламный штамп'],

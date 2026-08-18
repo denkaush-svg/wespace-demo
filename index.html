@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:20</title>
+  <title>WESPACE · сборка 18:28</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:20';
+    window.WS_BUILD='18:28';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1357,6 +1357,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prompt.composer .prompt-top { display: flex; align-items: center; gap: 12px; }
 .prompt.composer .prompt-top input { padding: 6px 0; }
 .prompt.composer .cg-actions .voice { width: 32px; height: 32px; }
+/* The browser has no speech recognition. Shown rather than hidden — the person
+   should see that dictation exists and why it is not available to them here —
+   but visibly not a live control, because pressing it can only ever explain. */
+.prompt .voice.off { opacity: .45; border-style: dashed; cursor: help; }
 .prompt.composer .cg-actions .voice svg { width: 17px; height: 17px; }
 .prompt.composer .cg-actions .send { width: 34px; height: 34px; }
 .prompt.composer .cg-actions .send svg { width: 17px; height: 17px; }
@@ -7016,6 +7020,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const pop = (kind, html) => st.cgMenu === kind ? '<div class="cg-pop">' + html + '</div>' : '';
     const cv = '<span class="cv">▾</span>';
     const depthSeg = CG_DEPTH.map((x) => '<button class="cg-seg-btn' + (depth === x.k ? ' on' : '') + '" data-cgdepth="' + x.k + '" title="' + x.hint + '">' + x.t + '</button>').join('');
+    // Asked at render time: voice.js loads after this file, so a value captured
+    // at definition would always be «no».
+    const voiceOff = !(WS.voice && WS.voice.canDictate && WS.voice.canDictate());
     return '<div class="prompt composer' + (extraCls ? ' ' + extraCls : '') + '">' +
         chipRow +
         '<div class="prompt-top">' +
@@ -7028,7 +7035,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           '<div class="cg-tool-wrap"><button class="cg-tool' + (st.cgMenu === 'ctx' ? ' on' : '') + (ctx.length ? ' has' : '') + '" data-act="cgCtxAdd">' + I('grid') + '<span class="lb">Контекст' + (ctx.length ? ' · ' + ctx.length : '') + '</span>' + cv + '</button>' + pop('ctx', cgContextMenu()) + '</div>' +
           '<div class="cg-actions">' +
             '<div class="cg-seg" role="group" aria-label="Глубина ответа">' + depthSeg + '</div>' +
-            '<button class="voice" data-act="voice" title="Голосом">' + I('mic') + '</button>' +
+            /* Dictation is the browser's own, and not every browser has it:
+               Firefox has no SpeechRecognition at all, and Safari needs the
+               microphone granted to it in System Settings. A button that looks
+               live and answers a press with nothing reads as broken software —
+               which is exactly how it was reported. So the control says what
+               it can do before it is pressed. */
+            '<button class="voice' + (voiceOff ? ' off' : '') + '" data-act="voice" title="' +
+              (voiceOff ? 'Этот браузер не умеет распознавать речь — наберите текстом или откройте в Chrome' : 'Голосом') +
+              '">' + I('mic') + '</button>' +
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
         '</div>' +
@@ -15766,7 +15781,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         const box = t.closest ? t.closest('.prompt') : null;
         const input = box ? box.querySelector('input') : null;
         if (WS.voice.canDictate() && input) { WS.voice.dictate(input); break; }
-        api.toast('Диктовка недоступна в этом браузере — наберите текстом');
+        /* Name the cause. «Недоступна» sent a colleague looking for a broken
+           button: Firefox has no SpeechRecognition at all, Safari has it but
+           needs the microphone granted to it in System Settings, and Chrome
+           has both. Which of the three it is decides what the person does
+           next, so the message says it. */
+        api.toast(WS.voice.canDictate()
+          ? 'Здесь некуда диктовать — откройте Консьержа и нажмите микрофон в строке ввода'
+          : 'Этот браузер не распознаёт речь. В Safari проверьте доступ к микрофону ' +
+            '(Системные настройки → Конфиденциальность → Микрофон), в Firefox диктовки нет — ' +
+            'работает в Chrome. Пока наберите текстом.');
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }

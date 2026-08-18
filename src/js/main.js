@@ -345,7 +345,16 @@
         const box = t.closest ? t.closest('.prompt') : null;
         const input = box ? box.querySelector('input') : null;
         if (WS.voice.canDictate() && input) { WS.voice.dictate(input); break; }
-        api.toast('Диктовка недоступна в этом браузере — наберите текстом');
+        /* Name the cause. «Недоступна» sent a colleague looking for a broken
+           button: Firefox has no SpeechRecognition at all, Safari has it but
+           needs the microphone granted to it in System Settings, and Chrome
+           has both. Which of the three it is decides what the person does
+           next, so the message says it. */
+        api.toast(WS.voice.canDictate()
+          ? 'Здесь некуда диктовать — откройте Консьержа и нажмите микрофон в строке ввода'
+          : 'Этот браузер не распознаёт речь. В Safari проверьте доступ к микрофону ' +
+            '(Системные настройки → Конфиденциальность → Микрофон), в Firefox диктовки нет — ' +
+            'работает в Chrome. Пока наберите текстом.');
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }
