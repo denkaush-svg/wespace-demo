@@ -3052,14 +3052,41 @@ setTimeout(async () => {
       L.disable('done');
     }
 
-    // Two failures and the live head steps aside for the rest of the session.
+    /* Two failures put the live head out — for a WHILE, not for the session.
+
+       It used to uninstall itself and nothing ever put it back: a restart
+       during a deploy, or a minute of bad wifi at an agency, and every later
+       question in that session went to the offline planner in silence, until
+       someone reloaded the page. The failure this guards is a demo that
+       quietly stops being a demo. */
     {
+      const wasCooldown = L.cooldownMs;
+      L.cooldownMs = 40;
       WS.agent.setAsyncHead(() => { throw new Error('проверка'); });
       check('live · a live head can be installed', WS.agent.hasAsyncHead() === true);
       L.noteFailure('раз');
       check('live · one hiccup does not cost the session its live head', WS.agent.hasAsyncHead() === true);
       L.noteFailure('два');
-      check('live · a service that stays down is stopped being retried', WS.agent.hasAsyncHead() === false);
+      check('live · after giving up it is out for a while, not uninstalled',
+        WS.agent.hasAsyncHead() === true && L.downFor > 0, 'downFor=' + L.downFor);
+
+      // While it is out, a question costs nothing: it is refused before any
+      // network call, which is the whole point of standing down.
+      let refused = false;
+      const t0 = Date.now();
+      await L.ask('пока лежит').then(() => {}, () => { refused = true; });
+      const took = Date.now() - t0;
+      check('live · a question during the window is refused without a call',
+        refused && took < 20 && L.downFor > 0, 'refused=' + refused + ' took=' + took + 'ms downFor=' + L.downFor);
+
+      // And the window ends by itself.
+      await new Promise((r) => setTimeout(r, 60));
+      check('live · the window expires on its own', L.downFor === 0, 'downFor=' + L.downFor);
+      L.cooldownMs = wasCooldown;
+      L.disable('reset');
+      L.cooldownMs = 0;
+      L.disable('clear');
+      L.cooldownMs = wasCooldown;
     }
   } else {
     check('live head module present', false);

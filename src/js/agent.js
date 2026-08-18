@@ -213,13 +213,33 @@
     };
   }
 
+  /* The catch-all: the question named something this stand does not hold.
+
+     It used to open with the funnel — «Сейчас по вашей воронке: 8 сделок,
+     20 228 000 AED, 1 просроченная задача» — in answer to «собери аналитику по
+     Dubai Jumeirah». Nobody asked for that, and three evidence chips under it
+     dressed an unrelated dump as the answer. The rule the whole stand runs on
+     is that a figure is offered because it was asked for.
+
+     So: say what is missing, and — when the question named a district — say
+     which districts there ARE, because that is the one thing that makes the
+     next question answerable. */
   function orient(text) {
-    const head = answerReadings(['deals_active', 'deals_active_sum', 'tasks_overdue'], 'Сейчас по вашей воронке:');
     const know = inventory();
+    const areas = Object.keys((WS.fixtures && WS.fixtures.AREAS) || {});
+    const t = lc(text || '');
+    const askedArea = areas.length && /район|аналитик|рынок|цен|доходн|jumeirah|palm|downtown|marina|jbr|sports|hills/i.test(t);
+    const lines = askedArea
+      ? ['По этому району у стенда данных нет. Рынок здесь собран по четырём: ' + areas.join(', ') + '.',
+         'Могу разобрать любой из них — цену за метр, доходность, сроки экспозиции.']
+      : ['Этого в данных стенда нет. Что есть: ' + know.join(', ') + '.',
+         'Скажите, что из этого посмотреть.'];
     return {
       kind: 'answer',
-      text: (head ? head.text + ' ' : '') + 'Этого в данных стенда нет, поэтому отвечаю тем, что есть: ' + know.join(', ') + '.',
-      evidence: head ? head.evidence : [],
+      text: lines.join(' '),
+      // No chips: nothing was measured to answer THIS question, and a chip is a
+      // claim that a figure came from a query behind it.
+      evidence: [],
       next: suggestions(),
     };
   }

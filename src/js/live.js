@@ -20,7 +20,10 @@
 (function (WS) {
   const DEFAULT_URL = 'https://wespace.201-51-22-106.sslip.io';
 
-  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0, served: 0 };
+  // Long enough that a dead service is not hammered, short enough that a
+  // restart is invisible to whoever is being shown the stand.
+  const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0, served: 0,
+    downUntil: 0, cooldownMs: 45000 };
   const GIVE_UP_AFTER = 2;
 
   // ?api=… for a demo against another host, ?api=off to force the planner.
@@ -567,6 +570,12 @@
     // page loads used to cost the visitor the live Concierge for the whole
     // session; now it costs one retry. Repeated failure still gives up, via
     // noteFailure below.
+    if (cfg.downUntil > Date.now()) throw new Error(cfg.lastError || 'cooldown');
+    if (cfg.downUntil) {
+      // The window has passed: forgive the earlier failures and look again.
+      cfg.downUntil = 0;
+      cfg.misses = 0;
+    }
     if (!cfg.ready) await probe();
     if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
     const done = await stream(text, opts && opts.onText, opts && opts.onStage);
@@ -625,8 +634,16 @@
     return true;
   }
 
-  // One hiccup should not cost the session its live head, and a service that
-  // is genuinely down should not be retried on every message the visitor types.
+  /* One hiccup should not cost the session its live head, and a service that is
+     genuinely down should not be retried on every message the visitor types.
+
+     But «giving up» used to mean uninstalling the head, and nothing ever put it
+     back: two failures — a restart during a deploy, a minute of bad wifi at an
+     agency — and every remaining question in that session was answered by the
+     offline planner, silently, until the page was reloaded. On a demo that is
+     the whole meeting. So being down is now a WINDOW, not a verdict: the head
+     stays installed, calls during the window fail instantly and cost nothing,
+     and the first question after it re-probes and comes back. */
   function noteFailure(why) {
     cfg.lastError = why || 'error';
     cfg.misses += 1;
@@ -635,7 +652,7 @@
   function disable(why) {
     cfg.ready = false;
     cfg.lastError = why || 'disabled';
-    if (WS.agent && WS.agent.setAsyncHead) WS.agent.setAsyncHead(null);
+    cfg.downUntil = Date.now() + cfg.cooldownMs;
   }
 
   WS.live = {
@@ -643,6 +660,12 @@
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
+    // How long the head stays out after giving up. Configurable because a
+    // deployment may want a different window — and because a test cannot wait
+    // three quarters of a minute to prove the recovery works.
+    get cooldownMs() { return cfg.cooldownMs; },
+    set cooldownMs(v) { cfg.cooldownMs = Number(v) || 0; },
+    get downFor() { return Math.max(0, cfg.downUntil - Date.now()); },
     get served() { return cfg.served; },
     get lastError() { return cfg.lastError; },
   };
