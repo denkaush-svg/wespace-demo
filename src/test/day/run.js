@@ -23,7 +23,10 @@ const puppeteer = require('puppeteer');
 const ROOT = path.join(__dirname, '..', '..', '..');
 const PORT = 8000;
 const GAP_MS = 11000;              // the proxy refills six tokens a minute
-const TIMEOUT_MS = 190000;
+// Must sit ABOVE the proxy's own ceiling (600s for a web or deep call), or the
+// harness gives up first and every record says «did not answer» where the truth
+// was «the server would have». Whoever cuts the call has to be the server.
+const TIMEOUT_MS = Number(process.env.WESPACE_TEST_TIMEOUT_MS || 640000);
 const API = process.env.WESPACE_TEST_API || 'http://127.0.0.1:8791';
 // A different question set — re-checking the few a fix was aimed at, without
 // spending forty calls to see three answers.

@@ -11,6 +11,9 @@
      echo   — returns the prompt it received, so tests can inspect it
      fail   — non-zero exit with a message on stderr
      slow   — writes nothing and hangs, to exercise the timeout
+     drip   — streams a little every 100ms for well over a second, then finishes:
+              a long call that is plainly alive, which the silence guard must
+              leave alone however long it runs
 */
 const MODE = process.env.FAKE_CLI_MODE || 'ok';
 
@@ -34,6 +37,16 @@ function run() {
   // Stays alive and silent: an empty event loop would exit and look like a
   // fast empty answer rather than a hang.
   if (MODE === 'slow') { setTimeout(() => process.exit(0), 60000); return; }
+  if (MODE === 'drip') {
+    let n = 0;
+    const t = setInterval(() => {
+      if (++n <= 12) return delta('шаг ' + n + '. ');
+      clearInterval(t);
+      result('готово');
+      process.exit(0);
+    }, 100);
+    return;
+  }
   if (MODE === 'fail') {
     process.stderr.write('fake failure\n');
     process.exit(2);

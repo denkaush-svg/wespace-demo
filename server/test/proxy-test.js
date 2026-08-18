@@ -567,6 +567,40 @@ async function guardChecks() {
   const err = events(res.body).find((e) => e.event === 'error');
   ok('a hung model is cut off by the timeout', !!err && /timeout/.test(err.data.error || ''), JSON.stringify(err));
   CFG.callTimeoutMs = tWas;
+
+  /* Once the ceiling is measured in minutes it stops being a useful way to
+     notice a dead call: a process that quietly died would sit on one of two
+     slots for the full ten. Silence is the signal instead — and the pair of
+     checks below is the whole point of it, because a guard that cannot tell
+     «quiet» from «slow» would kill exactly the long analytical answers the
+     raised ceiling exists to allow. */
+  {
+    refill();
+    const cWas = CFG.callTimeoutMs;
+    const sWas = CFG.stallMs;
+    CFG.callTimeoutMs = 60000;
+    CFG.stallMs = 400;
+
+    const t0 = Date.now();
+    res = await ask({ text: 'вопрос' }, 'slow');
+    const stalled = events(res.body).find((e) => e.event === 'error');
+    const took = Date.now() - t0;
+    ok('a call that goes quiet is cut by the silence guard, not by the ceiling',
+      !!stalled && /stalled/.test(stalled.data.error || '') && took < 5000,
+      JSON.stringify(stalled) + ' took=' + took);
+    // The old message counted answer text only, so a model deep in thinking or
+    // search reported «0 chars in» — indistinguishable from a corpse, and that
+    // is what sent a whole diagnosis after a CLI wedge that never existed.
+    ok('and the message says what arrived, not just how much text',
+      !!stalled && /events \d+/.test(stalled.data.error || ''), JSON.stringify(stalled));
+
+    res = await ask({ text: 'вопрос' }, 'drip');
+    ok('a call that keeps streaming is left alone though it runs well past that window',
+      /event: done/.test(res.body) && /шаг 12/.test(res.body), res.body.slice(-200));
+
+    CFG.callTimeoutMs = cWas;
+    CFG.stallMs = sWas;
+  }
 }
 
 (async () => {

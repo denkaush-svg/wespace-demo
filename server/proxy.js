@@ -66,9 +66,29 @@ const CFG = {
   // grew and the digest was one fixture away from being cut in half.
   maxDigestChars: 32 * 1024,
 
-  callTimeoutMs: Number(process.env.WESPACE_PROXY_TIMEOUT_MS || 75000),
+  /* Wall-clock is the WRONG primary guard for this, and the old numbers proved
+     it: 75s base / 150s ceiling killed three of twelve hard scenarios at exactly
+     their limit, and because the message counted only answer text they read as
+     «0 chars in» — a live model six web searches deep looked identical to a dead
+     process, and cost an afternoon of chasing a CLI wedge that never existed.
+
+     Measured through this proxy on the installed CLI: trivial 2.5s, heavy
+     reasoning 39s, a market question with 4 searches 51s, with 6 searches 58s —
+     all on an EMPTY digest, with 32KB of stand data still to be added on top. A
+     ceiling that close to the working median clips the tail by construction, and
+     the questions in the tail are exactly the ones worth showing: assemble the
+     materials, work a deal through its steps, compare with what is on the market
+     today. So the ceiling goes far above anything measured, and the job of
+     spotting a genuinely dead call moves to `stallMs` below, which does it in
+     two minutes instead of ten. */
+  callTimeoutMs: Number(process.env.WESPACE_PROXY_TIMEOUT_MS || 300000),
   // The ceiling the depth table cannot exceed, whatever it says.
-  maxTimeoutMs: Number(process.env.WESPACE_PROXY_MAX_TIMEOUT_MS || 150000),
+  maxTimeoutMs: Number(process.env.WESPACE_PROXY_MAX_TIMEOUT_MS || 900000),
+  /* Silence, not duration, is what tells a wedged call from a working one: the
+     CLI streams thinking, tool starts and text throughout, so nothing at all for
+     this long means nobody is home. This is what keeps one of two concurrency
+     slots from being held for the full ceiling by a process that died quietly. */
+  stallMs: Number(process.env.WESPACE_PROXY_STALL_MS || 120000),
   concurrency: Number(process.env.WESPACE_PROXY_CONCURRENCY || 2),
   perIpPerMin: Number(process.env.WESPACE_PROXY_IP_PER_MIN || 6),
   perIpBurst: Number(process.env.WESPACE_PROXY_IP_BURST || 3),
@@ -777,6 +797,9 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
     let sawResult = false;   // a proper `result` event, success or not
     let line = '';
     let settled = false;
+    let events = 0;              // CLI events parsed — the call's sign of life
+    let lastAt = Date.now();     // when this process last said anything at all
+    const t0 = Date.now();
 
     // A deeper answer is allowed longer, from the server's own table — never
     // from a number the caller sent.
@@ -784,20 +807,34 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
        the reason it is stuck — an exhausted window, a refused credential, a
        version notice — to stderr, and killing it on the timer threw that away:
        a hard run spent an afternoon proving, one probe at a time, that the
-       process had produced no bytes at all. So the tail of stderr goes into the
-       error, and so does how much text had arrived — «never started» and
-       «stalled halfway» are different failures. */
-    const timer = setTimeout(() => {
+       process had produced no bytes at all.
+
+       And «chars in» alone is what sent that afternoon down the wrong road: it
+       counts ANSWER text only, so a model that spent its whole budget thinking
+       and searching reported «0 chars in» — the same thing a corpse reports.
+       Every count that separates the two goes in the message now: how long it
+       really ran, how many CLI events arrived, how many searches it made. */
+    const hardMs = Math.min(CFG.maxTimeoutMs, timeoutMs || CFG.callTimeoutMs);
+    const why = (kind) => {
       const tail = errBuf.trim().slice(-240);
-      finish(new Error('timeout after ' + Math.round(
-        Math.min(CFG.maxTimeoutMs, timeoutMs || CFG.callTimeoutMs) / 1000) + 's, ' +
-        out.length + ' chars in' + (tail ? ', stderr: ' + tail : ', stderr empty')));
-    }, Math.min(CFG.maxTimeoutMs, timeoutMs || CFG.callTimeoutMs));
+      return new Error(kind + ' after ' + Math.round((Date.now() - t0) / 1000) + 's' +
+        ' (ceiling ' + Math.round(hardMs / 1000) + 's, silence ' + Math.round(CFG.stallMs / 1000) + 's)' +
+        ', events ' + events + ', web ' + spent.tools + ', ' + out.length + ' chars' +
+        (tail ? ', stderr: ' + tail : ', stderr empty'));
+    };
+    const timer = setTimeout(() => finish(why('timeout')), hardMs);
+    // The guard that actually earns its keep once the ceiling is measured in
+    // minutes: a call still streaming is left alone however long it takes, one
+    // that has gone quiet is cut loose without waiting out the ceiling.
+    const stall = setInterval(() => {
+      if (Date.now() - lastAt >= CFG.stallMs) finish(why('stalled'));
+    }, Math.min(5000, Math.max(250, CFG.stallMs / 4)));
 
     function finish(err) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearInterval(stall);
       try { child.kill('SIGKILL'); } catch (e) { /* already gone */ }
       if (err) reject(err);
       else resolve(result != null && result.length >= out.length ? result : out);
@@ -809,6 +846,7 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
     // authority on what was actually said.
     function handle(ev) {
       if (!ev || typeof ev !== 'object') return;
+      events += 1;
       if (ev.type === 'stream_event' && ev.event) {
         const e = ev.event;
         if (e.type === 'content_block_delta' && e.delta && typeof e.delta.text === 'string') {
@@ -869,6 +907,11 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
     cancel = () => { if (!settled) finish(new Error('client gone')); };
 
     child.stdout.on('data', (chunk) => {
+      /* Liveness is stdout only, deliberately. stderr on this CLI carries
+         warnings, not progress — a wedged process repeating one of them would
+         keep the silence guard fed forever, which is precisely the case the
+         guard exists to catch. */
+      lastAt = Date.now();
       line += chunk.toString('utf8');
       let nl;
       while ((nl = line.indexOf('\n')) >= 0) {
