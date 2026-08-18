@@ -647,33 +647,71 @@
       const v = (d[k] || []).length;
       return v + ' ' + WS.agent.tools.plural(v, forms);
     };
-    const trace = {
-      steps: ['Разбираю запрос', 'Смотрю рабочее место', 'Формулирую ответ'],
-      notes: [null, cnt('deals', ['сделка', 'сделки', 'сделок']) + ' · ' +
-        cnt('requests', ['заявка', 'заявки', 'заявок']) + ' · ' +
-        cnt('objects', ['объект', 'объекта', 'объектов']), null],
-    };
+    const trace = { steps: ['Разбираю запрос', 'Смотрю рабочее место', 'Формулирую ответ'], notes: [] };
+
+    /* The line under the active step changes while the call runs — a still card
+       reads as a hung one, and a minute is a long time to look at one that has
+       not moved. What it must NOT become is a slideshow of invented activity:
+       every line below is a true description of what was actually handed over,
+       so cycling them tells the same truth in more detail rather than narrating
+       work nobody is doing. The elapsed seconds are the honest pulse. */
+    const LOOK = [
+      () => cnt('deals', ['сделка', 'сделки', 'сделок']) + ' — суммы, стадии, сроки шагов',
+      () => cnt('requests', ['заявка', 'заявки', 'заявок']) + ' — что предложено и что клиент выбрал',
+      () => cnt('objects', ['объект', 'объекта', 'объектов']) + ' — цены, площади, комиссия',
+      () => cnt('clients', ['контакт', 'контакта', 'контактов']) + ' и история по ним',
+      () => 'срез по районам Дубая · происхождение каждой величины',
+    ];
+    const WEB_LOOK = [
+      () => 'открываю страницы вне стенда',
+      () => 'сверяю, на какой момент величина',
+      () => 'цена предложения и цена закрытых сделок — разные вещи',
+    ];
+    const started = Date.now();
+    let tick = 0;
     let at = 1;
+    const secs = () => Math.round((Date.now() - started) / 1000) + ' с';
+    function note() {
+      const web = trace.steps[at] === 'Ищу во внешних источниках';
+      const list = web ? WEB_LOOK : LOOK;
+      return list[tick % list.length]() + ' · ' + secs();
+    }
+    const draw = () => {
+      trace.notes = [];
+      trace.notes[at] = note();
+      updateMsg(workMid, processCard(trace, at, false, false), threadId);
+    };
+    trace.notes[at] = note();
     const workMid = pushMsg(processCard(trace, at, false, false), threadId);
-    const draw = () => updateMsg(workMid, processCard(trace, at, false, false), threadId);
+    // Slow enough to be read, quick enough that the card is never still.
+    const beat = setInterval(() => { if (!same()) return; tick++; draw(); }, 2200);
     // The live head streams; the offline one returns at once. Both land in the
     // same message, so the card simply fills in rather than being replaced.
-    const reply = await WS.agent.askAsync(text, {
-      onStage: (k) => {
-        if (!same() || k !== 'web') return;
-        // Only shown when it happened. A step that is always there, whether or
-        // not the model went out, is back to being an animation.
-        if (trace.steps.indexOf('Ищу во внешних источниках') < 0) {
-          trace.steps.splice(2, 0, 'Ищу во внешних источниках');
-          trace.notes.splice(2, 0, 'страницы вне стенда · числа пойдут с пометкой источника');
-        }
-        at = 2; draw();
-      },
-      onText: (partial) => {
-        if (!same() || !partial) return;
-        updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
-      },
-    });
+    let reply;
+    try {
+      reply = await WS.agent.askAsync(text, {
+        onStage: (k) => {
+          if (!same() || k !== 'web') return;
+          // Only shown when it happened. A step that is always there, whether or
+          // not the model went out, is back to being an animation.
+          if (trace.steps.indexOf('Ищу во внешних источниках') < 0) {
+            trace.steps.splice(2, 0, 'Ищу во внешних источниках');
+            at = 2; tick = 0; draw();
+          }
+        },
+        onText: (partial) => {
+          if (!same() || !partial) return;
+          // The first words are the last real event: the card gives way to the
+          // answer itself, so the beat has nothing left to keep alive.
+          clearInterval(beat);
+          updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
+        },
+      });
+    } finally {
+      // Every exit, including a throw: an interval left running would redraw
+      // the waiting card over the answer that replaced it.
+      clearInterval(beat);
+    }
     // The reply is written back to the thread it was asked in, whether or not
     // the agent has since walked to another one — messages are addressed, so
     // this is safe, and returning early left a «Разбираю запрос» card there
