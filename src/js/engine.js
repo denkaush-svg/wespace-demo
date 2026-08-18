@@ -663,7 +663,7 @@
       () => 'срез по районам Дубая · происхождение каждой величины',
     ];
     const WEB_LOOK = [
-      () => 'открываю страницы вне стенда',
+      () => 'открываю страницы вне системы',
       () => 'сверяю, на какой момент величина',
       () => 'цена предложения и цена закрытых сделок — разные вещи',
     ];
@@ -731,7 +731,7 @@
     // log the free request as a research signal (what brokers actually ask)
     (WS.store.signals || (WS.store.signals = [])).push(text);
     updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
-      'Понял поручение.' + ctx + ' В стенде подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
+      'Понял поручение.' + ctx + ' Подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
       (known ? '<button class="chip" data-scn="S8">' + I('sparkle') + 'Подготовить к встрече</button>' +
                '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать / собрать материалы</button>' +
@@ -1032,7 +1032,11 @@
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
+    // Readable and settable: it is conversation state, and the deterministic
+    // head now consults it to tell a reply-to-our-question from a new query.
+    // A getter alone meant a test could not set up that situation at all.
     get lastReply() { return engine.lastReply; },
+    set lastReply(v) { engine.lastReply = v; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     activeThreadId: () => engine.activeThreadId,

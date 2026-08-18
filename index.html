@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:28</title>
+  <title>WESPACE · сборка 18:59</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:28';
+    window.WS_BUILD='18:59';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5562,7 +5562,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       () => 'срез по районам Дубая · происхождение каждой величины',
     ];
     const WEB_LOOK = [
-      () => 'открываю страницы вне стенда',
+      () => 'открываю страницы вне системы',
       () => 'сверяю, на какой момент величина',
       () => 'цена предложения и цена закрытых сделок — разные вещи',
     ];
@@ -5630,7 +5630,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // log the free request as a research signal (what brokers actually ask)
     (WS.store.signals || (WS.store.signals = [])).push(text);
     updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
-      'Понял поручение.' + ctx + ' В стенде подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
+      'Понял поручение.' + ctx + ' Подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
       (known ? '<button class="chip" data-scn="S8">' + I('sparkle') + 'Подготовить к встрече</button>' +
                '<button class="chip" data-scn="G2">' + I('building') + 'Подобрать / собрать материалы</button>' +
@@ -5931,7 +5931,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
+    // Readable and settable: it is conversation state, and the deterministic
+    // head now consults it to tell a reply-to-our-question from a new query.
+    // A getter alone meant a test could not set up that situation at all.
     get lastReply() { return engine.lastReply; },
+    set lastReply(v) { engine.lastReply = v; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     activeThreadId: () => engine.activeThreadId,
@@ -14066,9 +14070,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const askedArea = areas.length &&
       /район|аналитик|рынок|цен|доходн|аренд|jumeirah|palm|downtown|marina|jlt|jbr|arjan|hills/i.test(t);
     const lines = askedArea
-      ? ['Этого района в срезе стенда нет. Есть: ' + areas.join(', ') + '.',
+      ? ['Этого района в нашем срезе рынка нет. Есть: ' + areas.join(', ') + '.',
          'Могу разобрать любой — цену за метр, доходность, срок экспозиции.']
-      : ['Этого в данных стенда нет. Что есть: ' + know.join(', ') + '.',
+      : ['Такого у нас в данных нет. Что есть: ' + know.join(', ') + '.',
          'Скажите, что из этого посмотреть.'];
     return {
       kind: 'answer',
@@ -14176,7 +14180,43 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       return { kind: 'answer', text: 'Открываю. Если нужен другой раздел — скажите какой.', evidence: [], next: suggestions() };
     }
 
+    /* The turn is an ANSWER to a question we asked, not a new question.
+
+       The Concierge asked for a name; the broker typed «Петя Вольный»; and this
+       head — which holds no conversation state — read two words it did not
+       recognise and replied with a catalogue of what data exists. To the person
+       that is the assistant forgetting its own question one line later, which
+       is worse than any wrong answer.
+
+       This head cannot carry out the instruction that was pending (only the
+       live one can), but it can avoid pretending the turn was a query, and say
+       what to do to get back on track. */
+    if (answersAQuestion(text)) {
+      return {
+        kind: 'answer',
+        text: 'Записал: ' + String(text).trim().slice(0, 60) + '. Только я потерял нить — ' +
+          'связь с моделью прервалась, и продолжить начатое я сейчас не могу. ' +
+          'Повторите поручение целиком одной фразой, вместе с этим ответом.',
+        evidence: [],
+        next: suggestions(),
+      };
+    }
+
     return orient(t);
+  }
+
+  /* Does this turn look like a reply to something we just asked, rather than a
+     question of its own? Two signals, and both must hold: the previous reply
+     from the Concierge ended in a question, and this turn is too short and too
+     unlike a query to be one. Names, numbers, «да», a channel — the shapes an
+     answer takes. */
+  function answersAQuestion(text) {
+    const s = String(text == null ? '' : text).trim();
+    if (!s || s.length > 60 || s.split(/\s+/).length > 5) return false;
+    if (/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s)) return false;
+    const prev = (WS.engine && WS.engine.lastReply) || null;
+    const asked = prev && typeof prev.text === 'string' && /\?\s*$/.test(prev.text.trim());
+    return !!asked;
   }
 
   function contactChips() {
@@ -14234,7 +14274,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // through, so swapping the head cannot widen what the Concierge may do.
   function toolSchema() {
     return [
-      { name: 'query', description: 'Посчитать по данным стенда: коллекция, условия, агрегат. Возвращает число и записи, из которых оно получено.', input: { from: 'string', where: 'array', aggregate: 'object' } },
+      { name: 'query', description: 'Посчитать по нашим данным: коллекция, условия, агрегат. Возвращает число и записи, из которых оно получено.', input: { from: 'string', where: 'array', aggregate: 'object' } },
       { name: 'metrics', description: 'Именованные показатели, те же, что на экранах.', input: {} },
       { name: 'findEntity', description: 'Найти контакт или компанию по упоминанию имени в тексте.', input: { text: 'string' } },
       { name: 'propose', description: 'Предложить изменения. Ничего не пишет — возвращает предпросмотр для подтверждения человеком.', input: { ops: 'array' } },
@@ -14576,7 +14616,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return {
       показатели: readings(),
       показатели_экранов: screenMetrics(),
-      контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
+      /* Consent is a legal fact recorded from the person, and it decides
+         whether they may be written to at all. It was in the data and not in
+         the digest, so the Concierge could compose an outreach list with
+         somebody on it who had refused — cheerfully, and with no way to know. */
+      контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget,
+        согласие_на_переписку: c.consent !== false })),
       компании: take('companies', (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
@@ -14600,9 +14645,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       })),
       // Названия и цены брались из полей title/rate, которых у объектов нет —
       // модель получала безымянные строки и отвечала про район вместо дома.
+      /* Whether a figure on this card is still trustworthy. `verified:'expired'`
+         with a checking date six weeks old is the difference between quoting a
+         price and quoting a rumour — and the object under Viktor's live booking
+         is exactly that. Sending the price without its verification let the
+         Concierge propose a booking on data the stand itself marks as stale. */
       объекты: take('objects', (o) => ({
         id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
         спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
+        проверка: o.verified, проверено_когда: o.checkedAt,
         тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
       })),
       // Заявка стала главной сущностью стенда: под ней живут предложенные
@@ -14621,6 +14672,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         спален: r.bedrooms, срок: r.horizon, оплата: r.paymentForm, финансирование: r.funding,
         предложено: (r.offered || []).map((x) => ({ объект: x.id, состояние: x.state, причина: x.reason || null })),
         кп: r.kp && r.kp.formed ? { когда: r.kp.at, объекты: r.kp.objectIds } : null,
+        /* Where the client said two different things and the stand kept both.
+           «Бюджет ≈ 2,0 млн (первое сообщение)» against «до 2,6 млн
+           (уточнение)» — the newer one is used, and the older one is preserved
+           precisely so nobody presents the figure as settled. Without it in the
+           digest the Concierge stated 2,6 as fact, which is the opposite of
+           what keeping the conflict is for. */
+        расхождение: (d.conflicts && d.conflicts[r.id]) ? {
+          поле: d.conflicts[r.id].field,
+          было: d.conflicts[r.id].a, стало: d.conflicts[r.id].b,
+          взято: d.conflicts[r.id].chosen === 'b' ? 'уточнение' : 'первое',
+        } : null,
         заметка: r.note,
       })),
       задачи: take('tasks', (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),

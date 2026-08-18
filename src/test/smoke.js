@@ -2903,6 +2903,34 @@ setTimeout(async () => {
         missing.length === 0, 'не названы: ' + missing.join(', '));
     }
 
+    /* A turn that ANSWERS the question we just asked.
+
+       The Concierge asked for a name, the broker typed «Петя Вольный», and the
+       offline head — which carries no conversation state — read two unfamiliar
+       words and replied with the catalogue of what data exists. To the person
+       that is the assistant forgetting its own question one line later. */
+    {
+      const before = WS.engine.lastReply;
+      WS.engine.lastReply = { kind: 'answer', text: 'Заведу обоих — не хватает только имени. Как записать контакт?' };
+      const named = WS.agent.ask('Петя Вольный');
+      check('ответ на вопрос · a bare name is not answered with the data catalogue',
+        !/Что есть:|контакты — \d/.test(named.text || ''), named.text);
+      check('ответ на вопрос · and the answer says the thread was lost, not that the name is unknown',
+        /нить|прерв|повторите/i.test(named.text || ''), named.text);
+
+      // The guard must not swallow a real short question asked after a question.
+      const stillAsking = WS.agent.ask('сколько сделок');
+      check('ответ на вопрос · a short QUESTION is still answered as one',
+        /сдел/i.test(stillAsking.text || '') && !/потерял нить/i.test(stillAsking.text || ''), stillAsking.text);
+
+      // And with nothing pending, a name is just an unknown query again.
+      WS.engine.lastReply = { kind: 'answer', text: 'Готово.' };
+      const noPending = WS.agent.ask('Петя Вольный');
+      check('ответ на вопрос · with no question pending the guard stays out of the way',
+        !/потерял нить/i.test(noPending.text || ''), noPending.text);
+      WS.engine.lastReply = before;
+    }
+
     // A count declines the noun after it, and these labels are the chip text.
     {
       const pl = WS.agent.tools.plural;
@@ -3005,6 +3033,25 @@ setTimeout(async () => {
          Carrying the rate is safe because it is not a rate: the dirham is
          pegged at 3.6725 and has been since 1997. It travels with its basis so
          a converted figure can say what it was converted by. */
+      /* Three things the stand knows and used to keep to itself. Each one, left
+         out of the digest, let the Concierge be confidently wrong in a way the
+         data could have prevented: propose writing to someone who refused
+         contact, quote a price the stand marks as unverified, or state a budget
+         as settled while a conflict sits recorded beside it. */
+      {
+        const off = (d.контакты || []).filter((c) => c.согласие_на_переписку === false);
+        check('live · consent travels, and someone actually lacks it',
+          off.length > 0, JSON.stringify((d.контакты || []).map((c) => c.согласие_на_переписку)));
+        const stale = (d.объекты || []).filter((o) => o.проверка === 'expired');
+        check('live · verification state travels, and something is expired',
+          stale.length > 0 && !!stale[0].проверено_когда,
+          JSON.stringify(stale.map((o) => o.id + ':' + o.проверка + '@' + o.проверено_когда)));
+        const conf = (d.заявки || []).filter((r) => r.расхождение);
+        check('live · a recorded conflict travels with its request',
+          conf.length > 0 && !!conf[0].расхождение.было && !!conf[0].расхождение.стало,
+          JSON.stringify(conf.map((r) => r.id + ':' + JSON.stringify(r.расхождение))));
+      }
+
       check('live · the peg reaches the model, with its basis',
         !!(d.курс && d.курс.за_доллар_AED > 0 && d.курс.основание), JSON.stringify(d.курс));
       check('live · and it is the peg, not a quote someone typed',

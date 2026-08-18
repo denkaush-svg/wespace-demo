@@ -239,9 +239,9 @@
     const askedArea = areas.length &&
       /район|аналитик|рынок|цен|доходн|аренд|jumeirah|palm|downtown|marina|jlt|jbr|arjan|hills/i.test(t);
     const lines = askedArea
-      ? ['Этого района в срезе стенда нет. Есть: ' + areas.join(', ') + '.',
+      ? ['Этого района в нашем срезе рынка нет. Есть: ' + areas.join(', ') + '.',
          'Могу разобрать любой — цену за метр, доходность, срок экспозиции.']
-      : ['Этого в данных стенда нет. Что есть: ' + know.join(', ') + '.',
+      : ['Такого у нас в данных нет. Что есть: ' + know.join(', ') + '.',
          'Скажите, что из этого посмотреть.'];
     return {
       kind: 'answer',
@@ -349,7 +349,43 @@
       return { kind: 'answer', text: 'Открываю. Если нужен другой раздел — скажите какой.', evidence: [], next: suggestions() };
     }
 
+    /* The turn is an ANSWER to a question we asked, not a new question.
+
+       The Concierge asked for a name; the broker typed «Петя Вольный»; and this
+       head — which holds no conversation state — read two words it did not
+       recognise and replied with a catalogue of what data exists. To the person
+       that is the assistant forgetting its own question one line later, which
+       is worse than any wrong answer.
+
+       This head cannot carry out the instruction that was pending (only the
+       live one can), but it can avoid pretending the turn was a query, and say
+       what to do to get back on track. */
+    if (answersAQuestion(text)) {
+      return {
+        kind: 'answer',
+        text: 'Записал: ' + String(text).trim().slice(0, 60) + '. Только я потерял нить — ' +
+          'связь с моделью прервалась, и продолжить начатое я сейчас не могу. ' +
+          'Повторите поручение целиком одной фразой, вместе с этим ответом.',
+        evidence: [],
+        next: suggestions(),
+      };
+    }
+
     return orient(t);
+  }
+
+  /* Does this turn look like a reply to something we just asked, rather than a
+     question of its own? Two signals, and both must hold: the previous reply
+     from the Concierge ended in a question, and this turn is too short and too
+     unlike a query to be one. Names, numbers, «да», a channel — the shapes an
+     answer takes. */
+  function answersAQuestion(text) {
+    const s = String(text == null ? '' : text).trim();
+    if (!s || s.length > 60 || s.split(/\s+/).length > 5) return false;
+    if (/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s)) return false;
+    const prev = (WS.engine && WS.engine.lastReply) || null;
+    const asked = prev && typeof prev.text === 'string' && /\?\s*$/.test(prev.text.trim());
+    return !!asked;
   }
 
   function contactChips() {
@@ -407,7 +443,7 @@
   // through, so swapping the head cannot widen what the Concierge may do.
   function toolSchema() {
     return [
-      { name: 'query', description: 'Посчитать по данным стенда: коллекция, условия, агрегат. Возвращает число и записи, из которых оно получено.', input: { from: 'string', where: 'array', aggregate: 'object' } },
+      { name: 'query', description: 'Посчитать по нашим данным: коллекция, условия, агрегат. Возвращает число и записи, из которых оно получено.', input: { from: 'string', where: 'array', aggregate: 'object' } },
       { name: 'metrics', description: 'Именованные показатели, те же, что на экранах.', input: {} },
       { name: 'findEntity', description: 'Найти контакт или компанию по упоминанию имени в тексте.', input: { text: 'string' } },
       { name: 'propose', description: 'Предложить изменения. Ничего не пишет — возвращает предпросмотр для подтверждения человеком.', input: { ops: 'array' } },

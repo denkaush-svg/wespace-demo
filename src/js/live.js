@@ -87,7 +87,12 @@
     return {
       показатели: readings(),
       показатели_экранов: screenMetrics(),
-      контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget })),
+      /* Consent is a legal fact recorded from the person, and it decides
+         whether they may be written to at all. It was in the data and not in
+         the digest, so the Concierge could compose an outreach list with
+         somebody on it who had refused — cheerfully, and with no way to know. */
+      контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget,
+        согласие_на_переписку: c.consent !== false })),
       компании: take('companies', (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
@@ -111,9 +116,15 @@
       })),
       // Названия и цены брались из полей title/rate, которых у объектов нет —
       // модель получала безымянные строки и отвечала про район вместо дома.
+      /* Whether a figure on this card is still trustworthy. `verified:'expired'`
+         with a checking date six weeks old is the difference between quoting a
+         price and quoting a rumour — and the object under Viktor's live booking
+         is exactly that. Sending the price without its verification let the
+         Concierge propose a booking on data the stand itself marks as stale. */
       объекты: take('objects', (o) => ({
         id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
         спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
+        проверка: o.verified, проверено_когда: o.checkedAt,
         тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
       })),
       // Заявка стала главной сущностью стенда: под ней живут предложенные
@@ -132,6 +143,17 @@
         спален: r.bedrooms, срок: r.horizon, оплата: r.paymentForm, финансирование: r.funding,
         предложено: (r.offered || []).map((x) => ({ объект: x.id, состояние: x.state, причина: x.reason || null })),
         кп: r.kp && r.kp.formed ? { когда: r.kp.at, объекты: r.kp.objectIds } : null,
+        /* Where the client said two different things and the stand kept both.
+           «Бюджет ≈ 2,0 млн (первое сообщение)» against «до 2,6 млн
+           (уточнение)» — the newer one is used, and the older one is preserved
+           precisely so nobody presents the figure as settled. Without it in the
+           digest the Concierge stated 2,6 as fact, which is the opposite of
+           what keeping the conflict is for. */
+        расхождение: (d.conflicts && d.conflicts[r.id]) ? {
+          поле: d.conflicts[r.id].field,
+          было: d.conflicts[r.id].a, стало: d.conflicts[r.id].b,
+          взято: d.conflicts[r.id].chosen === 'b' ? 'уточнение' : 'первое',
+        } : null,
         заметка: r.note,
       })),
       задачи: take('tasks', (t) => ({ id: t.id, что: t.title, срок: t.due, когда: t.when, статус: t.status })),
