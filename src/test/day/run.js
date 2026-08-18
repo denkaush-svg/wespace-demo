@@ -59,9 +59,18 @@ const serve = http.createServer((req, res) => {
   await page.waitForFunction(() => window.WS && window.WS.live && window.WS.engine, { timeout: 20000 });
   await page.waitForFunction(() => window.WS.live.ready || window.WS.live.lastError, { timeout: 20000 }).catch(() => {});
 
-  const ready = await page.evaluate(() => window.WS.live.ready === true);
-  if (!ready) {
-    console.log('живая голова недоступна — прогон бессмыслен');
+  const boot = await page.evaluate(() => ({
+    ready: window.WS.live.ready === true,
+    url: window.WS.live.url || null,
+    err: window.WS.live.lastError || null,
+  }));
+  if (!boot.ready) {
+    // Say WHICH address and WHAT it answered. A bare «unavailable» sent the
+    // last diagnosis down the wrong path: the proxy was healthy the whole time
+    // and the page had simply resolved a different url than the one being
+    // curl-ed by hand.
+    console.log('живая голова недоступна — прогон бессмыслен · адрес=' + (boot.url || '(нет)') +
+      ' · ' + (boot.err || 'причина не записана') + ' · errs=' + JSON.stringify(errs));
     await browser.close(); serve.close(); process.exit(1);
   }
 
@@ -77,8 +86,16 @@ const serve = http.createServer((req, res) => {
     // confirmed in one scenario would otherwise change the data the next one
     // reads, and forty questions deep nobody could tell which answers were
     // about the fixtures and which about the wreckage of earlier answers.
+    /* The live head's standdown is cleared for the same reason. In front of a
+       visitor the window is right: two failures and the head stops being
+       retried for 45 seconds. In a run it is measurement poison — one timeout
+       and one CLI throw at h01/h05 left the remaining seven scenarios refused
+       without a single network call, and the record read as «the planner
+       answered nine of twelve» when the model was never asked. Each scenario
+       gets its own attempt; a failure is recorded per scenario, not inherited. */
     await page.evaluate((s) => {
       window.WS.storeApi.resetAll && window.WS.storeApi.resetAll();
+      window.WS.live.resetForTest && window.WS.live.resetForTest();
       window.WS.engine.openThread('day-' + s.id, 'День · ' + s.id, 'chat');
       window.WS.store.cgMode = s.mode || 'auto';
       window.WS.store.cgDepth = s.depth || 'think';
@@ -135,6 +152,12 @@ const serve = http.createServer((req, res) => {
         opens: (r.next || []).filter((n) => n && n.open).map((n) => n.open + (n.id ? ':' + n.id : '')),
         report: r.report ? { title: r.report.title, count: r.report.count } : null,
         served: (window.WS.live && window.WS.live.served) || 0,
+        /* WHY a fallback happened. Without it «⚠ офлайн-планировщик» is a bare
+           flag, and a timeout at the 150-second ceiling, a CLI that threw, and a
+           refusal inside the standdown window are three different defects that
+           looked identical in the record — the last run cost an hour to tell
+           them apart by hand. */
+        liveError: (window.WS.live && window.WS.live.lastError) || null,
       };
     });
 
@@ -149,7 +172,7 @@ const serve = http.createServer((req, res) => {
     servedBefore = got.served;
     out.push(Object.assign({}, spec, { got: got }));
     console.log((answered ? got.kind : 'НЕ ОТВЕТИЛ') + ' · ' + Math.round(got.ms / 1000) + 'с' +
-      (got.live ? '' : ' · ⚠ ОФЛАЙН-ПЛАНИРОВЩИК') +
+      (got.live ? '' : ' · ⚠ ОФЛАЙН-ПЛАНИРОВЩИК' + (got.liveError ? ' (' + got.liveError + ')' : '')) +
       (got.ops.length ? ' · ops=[' + got.ops.join(',') + ']' : '') +
       (got.blocks.length ? ' · блоков ' + got.blocks.length + ' (данные ' + got.dataBlocks +
         (got.modelNumeric ? ', МОДЕЛЬ ' + got.modelNumeric : '') + ')' : ''));
@@ -172,7 +195,10 @@ const serve = http.createServer((req, res) => {
   const fellBack = out.filter((r) => !r.got.live);
   if (noAnswer.length) console.log('БЕЗ ОТВЕТА: ' + noAnswer.map((r) => r.id).join(', '));
   if (typed.length) console.log('ЧИСЛА ОТ МОДЕЛИ: ' + typed.map((r) => r.id).join(', '));
-  if (fellBack.length) console.log('ОТВЕТИЛ ПЛАНИРОВЩИК, НЕ МОДЕЛЬ: ' + fellBack.map((r) => r.id).join(', '));
+  if (fellBack.length) {
+    console.log('ОТВЕТИЛ ПЛАНИРОВЩИК, НЕ МОДЕЛЬ: ' +
+      fellBack.map((r) => r.id + (r.got.liveError ? ' (' + r.got.liveError + ')' : '')).join(', '));
+  }
   if (errs.length) console.log('ОШИБКИ СТРАНИЦЫ: ' + errs.join('; '));
   /* A warning printed and then exited zero is a warning nobody acts on: the
      command succeeded, so a wrapper, a CI step or a tired person reads it as

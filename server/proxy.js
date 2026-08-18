@@ -780,8 +780,19 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
 
     // A deeper answer is allowed longer, from the server's own table — never
     // from a number the caller sent.
-    const timer = setTimeout(() => finish(new Error('timeout')),
-      Math.min(CFG.maxTimeoutMs, timeoutMs || CFG.callTimeoutMs));
+    /* A bare «timeout» is the least useful thing this can say. The CLI writes
+       the reason it is stuck — an exhausted window, a refused credential, a
+       version notice — to stderr, and killing it on the timer threw that away:
+       a hard run spent an afternoon proving, one probe at a time, that the
+       process had produced no bytes at all. So the tail of stderr goes into the
+       error, and so does how much text had arrived — «never started» and
+       «stalled halfway» are different failures. */
+    const timer = setTimeout(() => {
+      const tail = errBuf.trim().slice(-240);
+      finish(new Error('timeout after ' + Math.round(
+        Math.min(CFG.maxTimeoutMs, timeoutMs || CFG.callTimeoutMs) / 1000) + 's, ' +
+        out.length + ' chars in' + (tail ? ', stderr: ' + tail : ', stderr empty')));
+    }, Math.min(CFG.maxTimeoutMs, timeoutMs || CFG.callTimeoutMs));
 
     function finish(err) {
       if (settled) return;
