@@ -153,6 +153,9 @@
       askedIn: (meta && meta.askedIn) || '',
       title: (meta && meta.title) || 'Изменение',
       lines: (meta && meta.lines) || dry.pending,
+      // Which key conditions a record being created still lacks. Computed by the
+      // write layer from the record itself, never written here or by the model.
+      missing: dry.missing || [],
       note: dry.tier === 'guarded' ? 'Требует подтверждения — меняются деньги, стадия или владелец.' : 'Применю сразу после подтверждения.',
       next: (meta && meta.next) || suggestions(),
       used: false,

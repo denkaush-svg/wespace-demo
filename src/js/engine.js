@@ -925,6 +925,18 @@
       : '<span class="lvl-tag a1 lvl">безопасное</span>';
     // The live head says something before it proposes; the offline one does not.
     const said = p.text ? '<div style="margin:0 0 9px;line-height:1.5">' + esc(p.text) + '</div>' : '';
+    /* What the new card still needs, on the card that asks to confirm it.
+       A record is opened from one field and that is deliberate — a form is
+       where a conversation stops. But «завёл» with nothing else said leaves the
+       broker to discover a week later that the request has no budget and no
+       district, which is the same gap arriving later and more expensively.
+       The list is the store's, computed from the record, so it cannot drift
+       from what the card itself calls «Ключевые условия». */
+    const gaps = (p.missing || []).length
+      ? '<div class="pb">' + (p.missing || []).map((m) =>
+        '<div class="field"><div class="k">Дозаполнить</div><div class="v"><span class="now">' +
+        esc(m) + '</span></div></div>').join('') + '</div>'
+      : '';
     return '<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('sparkle') + ' Консьерж · предложение</div>' +
       said +
       '<div class="preview"><div class="ph"><div class="icon-tile i-acc">' + I('layers') + '</div>' +
@@ -933,7 +945,7 @@
       // from that posture is not mistaken for the analysis proposing it.
       (p.askedIn ? '<span class="pmode">' + I('sparkle') + 'запрошено вами · ' + esc(p.askedIn) + '</span>' : '') +
       '</div>' + badge + '</div>' +
-      '<div class="pb">' + lines + '</div>' +
+      '<div class="pb">' + lines + '</div>' + gaps +
       '<div class="approval"><div class="note">' + I('shield') + '<span>' + esc(p.note) + '</span></div>' +
       '<div class="acts"><button class="btn sm ghost" data-agcancel="' + p.id + '">Отмена</button>' +
       '<button class="btn primary cta-hint" data-agok="' + p.id + '">' + I('check') + 'Подтвердить</button></div>' +

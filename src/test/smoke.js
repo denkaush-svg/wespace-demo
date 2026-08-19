@@ -2691,6 +2691,83 @@ setTimeout(async () => {
         check('addClient · confirmed apply lands in store', doneC.ok === true && (dd().clients || []).length === beforeC + 1, doneC.error || '');
       }
 
+      /* A record has to be something before it can be filed.
+
+         `addClient {}` used to pass the dry run and land a contact whose card
+         reads as its own internal id — the layer checked that a record was an
+         object and never that it was a record OF anyone. It is the same class
+         of failure as an invented figure: a shape validated and a meaning not.
+
+         The floor is deliberately one field per collection, two where a record
+         has to belong to somebody. Everything past that is a questionnaire,
+         and a questionnaire is where the conversation stops. */
+      {
+        const bare = WS.storeApi.preview([{ op: 'addClient', obj: {} }]);
+        check('addClient · a contact with no name is refused by the dry run',
+          bare.ok === false && bare.code === 'missing_field', JSON.stringify(bare));
+        check('addClient · and the refusal names the field in the broker’s words',
+          /имя/.test(bare.error || ''), bare.error);
+        check('addClient · a blank name counts as no name',
+          WS.storeApi.preview([{ op: 'addClient', obj: { name: '   ' } }]).ok === false);
+
+        const noWho = WS.storeApi.preview([{ op: 'addRequest', obj: { title: 'Что-то в DIFC' } }]);
+        check('addRequest · a request belonging to nobody is refused',
+          noWho.ok === false && noWho.code === 'missing_field', JSON.stringify(noWho));
+        const noWhat = WS.storeApi.preview([{ op: 'addRequest', obj: { clientId: dd().clients[0].id } }]);
+        check('addRequest · and one that says nothing about what is wanted, too',
+          noWhat.ok === false && noWhat.code === 'missing_field', JSON.stringify(noWhat));
+        check('addTask · a task with no title is refused',
+          WS.storeApi.preview([{ op: 'addTask', task: { due: 'завтра' } }]).ok === false);
+
+        // Nothing is written on the way to the refusal — a batch is still whole
+        // or not at all, and the refusal happens before the first run().
+        const n = (dd().clients || []).length;
+        WS.storeApi.apply([{ op: 'addClient', obj: { name: 'Годный Контакт' } },
+          { op: 'addClient', obj: {} }], { confirmed: true });
+        check('a batch with one lame record writes none of it', (dd().clients || []).length === n);
+      }
+
+      /* What the card still needs, said on the card that asks to confirm it.
+
+         The floor above is what a record cannot exist without; this is what it
+         needs to be worth having. The stand already names the set and shows it
+         on the request card as «Ключевые условия», so the Concierge does not get
+         a second list of its own to drift from — it gets that one. */
+      {
+        const cid = (dd().clients || [])[0].id;
+        const thin = WS.storeApi.preview([{ op: 'addRequest', obj: { clientId: cid, title: 'Офис в DIFC' } }]);
+        check('a new request says which key conditions are still empty',
+          thin.ok === true && Array.isArray(thin.missing) && thin.missing.length > 0, JSON.stringify(thin.missing));
+        check('and names them the way the card names them',
+          (thin.missing || []).some((s) => /бюджет/i.test(s)) && (thin.missing || []).some((s) => /район/i.test(s)),
+          JSON.stringify(thin.missing));
+
+        const full = WS.storeApi.preview([{ op: 'addRequest', obj: {
+          clientId: cid, title: 'Офис в DIFC', budget: 2000000, areas: ['DIFC'],
+          dealType: 'Продажа · готовое', paymentForm: '100% оплата', goal: 'Инвестиция', horizon: '1–3 месяца' } }]);
+        check('a request that arrives complete says nothing about gaps',
+          full.ok === true && !(full.missing || []).length, JSON.stringify(full.missing));
+
+        // An edit is not a creation: the gap line belongs to the card being made.
+        const patched = WS.storeApi.preview([{ op: 'updateRequest', id: dd().requests[0].id, patch: { note: 'x' } }]);
+        check('changing a field does not lecture about the other fields',
+          !(patched.missing || []).length, JSON.stringify(patched.missing));
+
+        // And it reaches the broker: the proposal carries it, the card prints it.
+        const prop = WS.agent.tools.propose(
+          [{ op: 'addRequest', obj: { clientId: cid, title: 'Склад в Al Quoz' } }],
+          { title: 'Новая заявка' });
+        check('the proposal carries the gaps, not just the store',
+          prop.kind === 'proposal' && (prop.missing || []).length > 0, JSON.stringify(prop.missing));
+        const html = String(WS.engine.agentCard(prop, 'mGap'));
+        check('and the confirmation card prints them under «Дозаполнить»',
+          html.indexOf('Дозаполнить') >= 0 && /бюджет/i.test(html), html.slice(0, 120));
+        // A change to an existing record must not grow that block.
+        const plain = String(WS.engine.agentCard(WS.agent.tools.propose(
+          [{ op: 'updateRequest', id: dd().requests[0].id, patch: { note: 'y' } }], { title: 'Правка' }), 'mNoGap'));
+        check('an edit’s card has no such block', plain.indexOf('Дозаполнить') < 0);
+      }
+
       /* A new contact and their first request arrive together — the flow the
          Concierge is told to use when the person is not in the data. The
          request names a contact the operation ABOVE IT creates, and reference

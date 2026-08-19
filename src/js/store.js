@@ -320,6 +320,44 @@
     },
   };
 
+  /* What a record cannot exist without, and — separately — what it needs to be
+     worth having.
+
+     `required` is the floor, checked before anything is written. `addClient {}`
+     used to pass the dry run and file a contact whose card read as its own
+     internal id: the layer checked that a record was an object and never that
+     it was a record OF anybody. Same class of failure as an invented figure —
+     a shape validated and a meaning not.
+
+     It is one field per collection, two where a record has to belong to
+     somebody and say what it is about. Past that it stops being a floor and
+     becomes a questionnaire, and a questionnaire is where the conversation
+     ends — which is why `key` below does NOT block anything.
+
+     `key` is what the request card already calls «Ключевые условия» (ui.js
+     `reqKeyCard`). The record is created without them; the preview names the
+     ones still empty, so the broker confirming a new card sees what it is
+     missing then rather than finding out a week later. The list lives here and
+     not in the Concierge so that there is one of it, and it is the card's. */
+  const RECORD_FIELDS = {
+    clients: { required: ['name'], key: ['phone', 'channel'] },
+    // Финансирование и НДС из «Ключевых условий» намеренно не здесь: они
+    // относятся к сделке, которую структурируют, а не к заявке, которую заводят.
+    requests: {
+      required: ['clientId', 'title'],
+      key: ['budget', 'areas', 'dealType', 'paymentForm', 'goal', 'horizon'],
+    },
+    tasks: { required: ['title'], key: ['due'] },
+  };
+  // Пусто — это и не заполнено, и пробелы, и пустой список. «Районы: []» —
+  // это отсутствие районов, а не значение.
+  function blank(v) {
+    if (v == null) return true;
+    if (typeof v === 'string') return !v.trim();
+    if (Array.isArray(v)) return !v.length;
+    return false;
+  }
+
   const OP_SPEC = {
     updateDeal: { coll: 'deals', kind: 'patch' },
     updateRequest: { coll: 'requests', kind: 'patch' },
@@ -397,9 +435,9 @@
     amount: 'сумма', stage: 'стадия', hot: 'горячая', funnel: 'воронка', dealType: 'тип сделки',
     objectType: 'тип объекта', goal: 'цель', paymentForm: 'форма оплаты', vat: 'НДС', source: 'источник',
     agent: 'ответственный', partnerAgent: 'агент партнёра', companyId: 'компания', stageDays: 'дней на стадии',
-    contacts: 'контакты', tags: 'теги', sub: 'подпись', title: 'название', updated: 'обновлено',
+    contacts: 'контакты', clientId: 'контакт', tags: 'теги', sub: 'подпись', title: 'название', updated: 'обновлено',
     note: 'заметка', nextStep: 'следующий шаг', consideredProjects: 'проекты в работе',
-    areas: 'районы', horizon: 'горизонт', viewed: 'просмотрено', budget: 'бюджет', tag: 'метка',
+    areas: 'районы', horizon: 'срок сделки', viewed: 'просмотрено', budget: 'бюджет', tag: 'метка',
     channel: 'канал', lang: 'язык', name: 'имя', phone: 'телефон', psych: 'психотип',
     match: 'соответствие', price: 'цена', verified: 'проверен', checkedAt: 'проверен',
     sourceLabel: 'подпись источника', commissionPct: 'комиссия, %', size: 'площадь', br: 'спален',
@@ -455,6 +493,12 @@
     if (spec.kind === 'add') {
       const src = o.task || o.obj || o.record;
       if (!src || typeof src !== 'object') return fail('bad_record', at + 'нет записи');
+      const fields = RECORD_FIELDS[spec.coll] || {};
+      const need = (fields.required || []).filter((f) => blank(src[f]));
+      if (need.length) {
+        return fail('missing_field', at + 'без этого запись не завести: ' + need.map(fieldRu).join(', '),
+          { fields: need, collection: spec.coll });
+      }
       // A record may point at a contact, a deal or an object. Pointing it at an
       // id that does not exist created a task hanging off nothing — it renders,
       // it just belongs to no one.
@@ -470,9 +514,17 @@
       // Show the entity by a name a person recognises, not by its internal id.
       const label = rec.name || rec.title || (rec.task && rec.task.title) || rec.id;
       const addTier = spec.tier || 'safe';
+      // Said on the card that asks to confirm the record, and said per record:
+      // a batch that opens a contact and their first request has two of these,
+      // and one merged list would not say which gap belongs to which card.
+      const gaps = (fields.key || []).filter((f) => blank(rec[f]));
       return {
         ok: true, tier: addTier,
         summary: (COLL_RU[spec.coll] || spec.coll) + ' · «' + String(label).slice(0, 60) + '»',
+        missing: gaps.length
+          ? (COLL_RU[spec.coll] || spec.coll) + ' «' + String(label).slice(0, 40) + '» — не заполнены: ' +
+            gaps.map(fieldRu).join(', ')
+          : null,
         // What a later operation in this batch may point at.
         creates: { coll: spec.coll, id: rec.id },
         run: () => { coll.unshift(rec); },
@@ -577,7 +629,10 @@
       if (p.creates) (coming[p.creates.coll] || (coming[p.creates.coll] = [])).push(p.creates.id);
       plan.push(p);
     }
-    return { ok: true, tier: tier, revision: store.dataRevision, pending: plan.map((p) => p.summary) };
+    return { ok: true, tier: tier, revision: store.dataRevision, pending: plan.map((p) => p.summary),
+      // Only a record being CREATED carries these. Changing one field is not an
+      // occasion to lecture about the others.
+      missing: plan.map((p) => p.missing).filter(Boolean) };
   }
 
   // ---- task queue mutations (Radar → work queue, batch 2)
