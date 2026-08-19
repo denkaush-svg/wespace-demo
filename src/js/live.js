@@ -19,6 +19,9 @@
    ============================================================ */
 (function (WS) {
   const DEFAULT_URL = 'https://wespace.201-51-22-106.sslip.io';
+  // Every silent drop below is counted. Guarded because a counter must never
+  // be the reason an answer fails to render.
+  const note = (k) => { if (WS.quality) WS.quality.note(k); };
 
   // Long enough that a dead service is not hammered, short enough that a
   // restart is invisible to whoever is being shown the stand.
@@ -498,24 +501,29 @@
     const limit = cap > 0 ? cap : blockCap();
     const out = [];
     list.forEach((b) => {
+      // Not a degradation: the depth ceiling doing exactly its job.
       if (out.length >= limit) return;
-      if (!b || typeof b !== 'object') return;
+      if (!b || typeof b !== 'object') { note('block_shape'); return; }
       const t = String(b.t);
-      if (!BLOCK_ARRAYS[t]) return;
+      if (!BLOCK_ARRAYS[t]) { note('block_shape'); return; }
       // Preferred: the block names its data and the code builds it.
       const built = resolve(b);
       if (built) { out.push(built); return; }
       // A block that meant to be data-backed and could not be is dropped rather
       // than quietly falling back to whatever the model typed alongside it.
-      if (b.from || Array.isArray(b.reads)) return;
-      if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) return;
-      if (b.head != null && !Array.isArray(b.head)) return;
+      if (b.from || Array.isArray(b.reads)) { note('block_no_data'); return; }
+      if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) { note('block_shape'); return; }
+      if (b.head != null && !Array.isArray(b.head)) { note('block_shape'); return; }
       const web = fromWeb(b);
       if (web) { out.push(web); return; }
       // Claimed to come from outside and did not say from where: dropped. The
       // attribution IS the provenance for such a figure — without it the block
       // is an unsourced number wearing a source's authority.
-      if (b.src === 'web') return;
+      if (b.src === 'web') { note('block_unsourced'); return; }
+      // Shown, and marked on screen — but counted, because «сколько таблиц
+      // Консьерж набрал сам» is the measure of how far the answer is from the
+      // rule the whole stand is built on.
+      if (NUMERIC[t]) note('model_numeric');
       out.push(b);
     });
     return out.length ? out : null;
@@ -538,6 +546,11 @@
     // market note worth sending — but it goes with its source attached, and the
     // footer says the document holds both kinds.
     const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data' || b.src === 'web');
+    // A figure the model typed is allowed in the chat, where the mark sits
+    // beside it, and never in a file that leaves the room saying its numbers
+    // came from the workspace. Counted: a document quietly losing its table is
+    // the difference between a записка and a записка with a hole in it.
+    for (let i = blocks.length; i < all.length; i++) note('report_numeric_dropped');
     if (!blocks.length) return null;
     const title = String(r.title || '').slice(0, 120);
     const subtitle = r.subtitle ? String(r.subtitle).slice(0, 200) : '';
@@ -600,8 +613,10 @@
          if its own question had failed. */
       if (p && p.code === 'missing_field' && Array.isArray(p.fields) && p.fields.length) {
         WS.engine.setPendingAction({ ops: ops, need: p.fields, collection: p.collection || null });
+        note('act_parked');
         return { kind: 'answer', text: text, evidence: evidence, next: next };
       }
+      note('act_refused');
       // Any other refusal — say so plainly instead of pretending.
       return {
         kind: 'answer',

@@ -99,6 +99,10 @@ const serve = http.createServer((req, res) => {
     await page.evaluate((s) => {
       window.WS.storeApi.resetAll && window.WS.storeApi.resetAll();
       window.WS.live.resetForTest && window.WS.live.resetForTest();
+      // Per question, so a count belongs to the answer beside it rather than
+      // to the run as a whole — «блок выбросили» is only actionable if you know
+      // WHICH answer lost it.
+      window.WS.quality && window.WS.quality.reset();
       window.WS.engine.openThread('day-' + s.id, 'День · ' + s.id, 'chat');
       window.WS.store.cgMode = s.mode || 'auto';
       window.WS.store.cgDepth = s.depth || 'think';
@@ -183,6 +187,9 @@ const serve = http.createServer((req, res) => {
           return p ? { op: (p.ops[0] || {}).op || null, need: p.need } : null;
         })(),
         liveError: (window.WS.live && window.WS.live.lastError) || null,
+        // What this answer cost in silence: blocks dropped, tables the model
+        // typed itself, a write refused or parked, a fall back to the planner.
+        quality: (window.WS.quality && window.WS.quality.counts()) || {},
       };
     });
 
@@ -201,7 +208,9 @@ const serve = http.createServer((req, res) => {
       (got.live ? '' : ' · ⚠ ОФЛАЙН-ПЛАНИРОВЩИК' + (got.liveError ? ' (' + got.liveError + ')' : '')) +
       (got.ops.length ? ' · ops=[' + got.ops.join(',') + ']' : '') +
       (got.blocks.length ? ' · блоков ' + got.blocks.length + ' (данные ' + got.dataBlocks +
-        (got.modelNumeric ? ', МОДЕЛЬ ' + got.modelNumeric : '') + ')' : ''));
+        (got.modelNumeric ? ', МОДЕЛЬ ' + got.modelNumeric : '') + ')' : '') +
+      (Object.keys(got.quality || {}).length
+        ? ' · тихо: ' + Object.keys(got.quality).map((k) => k + '=' + got.quality[k]).join(' ') : ''));
 
     /* A second turn in the SAME conversation, when the scenario asks for one.
        Half the Concierge's failures only exist across turns — it asks for a
@@ -270,6 +279,18 @@ const serve = http.createServer((req, res) => {
   if (fellBack.length) {
     console.log('ОТВЕТИЛ ПЛАНИРОВЩИК, НЕ МОДЕЛЬ: ' +
       fellBack.map((r) => r.id + (r.got.liveError ? ' (' + r.got.liveError + ')' : '')).join(', '));
+  }
+  /* What the whole run lost without saying so. Printed even when every question
+     answered, because that is exactly the case where nobody would look. */
+  const silent = {};
+  out.forEach((r) => Object.keys(r.got.quality || {}).forEach((k) => {
+    silent[k] = (silent[k] || 0) + r.got.quality[k];
+  }));
+  if (Object.keys(silent).length) {
+    console.log('ТИХИЕ ПОТЕРИ ЗА ПРОГОН: ' +
+      Object.keys(silent).sort().map((k) => k + ' — ' + silent[k]).join(' · '));
+  } else {
+    console.log('ТИХИХ ПОТЕРЬ НЕ БЫЛО.');
   }
   if (errs.length) console.log('ОШИБКИ СТРАНИЦЫ: ' + errs.join('; '));
   /* A warning printed and then exited zero is a warning nobody acts on: the

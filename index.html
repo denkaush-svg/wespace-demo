@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:16</title>
+  <title>WESPACE · сборка 01:19</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:16';
+    window.WS_BUILD='01:19';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -4998,6 +4998,31 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     'deal:d_rentbiz': { label: 'Портфель DIFC · сделка', icon: 'briefcase' },
   };
   function threadMeta(id) { return THREAD_META[id] || { label: id, icon: 'chat' }; }
+  /* ---------- what was quietly thrown away ----------
+
+     Nearly every guard around the Concierge degrades silently, and that is the
+     right behaviour: a visitor gets a plainer answer, never a broken one. The
+     price is that nobody can say how often it happens. «Блок выбросят молча»
+     appears in four comments in this codebase and was never once a number.
+
+     So each drop is counted where it happens — cheap, in memory, never shown to
+     the broker. It is read by the day-run, which records it per question, and
+     by whoever asks whether the stand is answering well rather than merely
+     answering. Names are free-form on purpose: a counter that throws on an
+     unfamiliar key would turn a degradation into an outage, inside the very
+     path that exists to prevent one. */
+  const counts = {};
+  WS.quality = {
+    note(kind) {
+      const k = String(kind || 'unknown');
+      counts[k] = (counts[k] || 0) + 1;
+      return counts[k];
+    },
+    counts() { return Object.assign({}, counts); },
+    reset() { Object.keys(counts).forEach((k) => { delete counts[k]; }); },
+  };
+  const note = (k) => WS.quality.note(k);
+
   function ensureThread(id) {
     if (!engine.threads[id]) { const m = threadMeta(id); engine.threads[id] = { id: id, label: m.label, icon: m.icon, items: [], updatedAt: null, seen: 0 }; }
     return engine.threads[id];
@@ -5394,7 +5419,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const t = activeThread();
     const p = t && t.pending;
     if (!p) return null;
-    if ((t.items || []).length - p.at > PENDING_STALE_AFTER) { t.pending = null; return null; }
+    if ((t.items || []).length - p.at > PENDING_STALE_AFTER) { t.pending = null; note('pending_stale'); return null; }
     return p;
   }
   function setPendingAction(p) {
@@ -13951,6 +13976,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 (function (WS) {
   const money = (v) => (WS.AED ? WS.AED(v) : String(v));
   const lc = (s) => String(s == null ? '' : s).toLowerCase();
+  const note = (k) => { if (WS.quality) WS.quality.note(k); };
 
   // ---------- hands ----------
   // `where` is a conjunction, so «not terminal» is two conditions rather than one negated value.
@@ -14312,6 +14338,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const p = ops && propose(ops, { title: 'Новая запись' });
       if (p && p.kind === 'proposal') {
         if (WS.engine.clearPendingAction) WS.engine.clearPendingAction();
+        note('act_resumed');
         return p;
       }
     }
@@ -14486,6 +14513,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         // must not be counted as fresh evidence that the service is down.
         if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e), e);
       }
+      // Falling through to the planner IS the degradation this whole file is
+      // built to make invisible to a visitor — and therefore the one most worth
+      // counting, because nothing else about the answer will say it happened.
+      note('fallback');
     }
     return ask(clean);
   }
@@ -14785,6 +14816,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const DEFAULT_URL = 'https://wespace.201-51-22-106.sslip.io';
+  // Every silent drop below is counted. Guarded because a counter must never
+  // be the reason an answer fails to render.
+  const note = (k) => { if (WS.quality) WS.quality.note(k); };
 
   // Long enough that a dead service is not hammered, short enough that a
   // restart is invisible to whoever is being shown the stand.
@@ -15264,24 +15298,29 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const limit = cap > 0 ? cap : blockCap();
     const out = [];
     list.forEach((b) => {
+      // Not a degradation: the depth ceiling doing exactly its job.
       if (out.length >= limit) return;
-      if (!b || typeof b !== 'object') return;
+      if (!b || typeof b !== 'object') { note('block_shape'); return; }
       const t = String(b.t);
-      if (!BLOCK_ARRAYS[t]) return;
+      if (!BLOCK_ARRAYS[t]) { note('block_shape'); return; }
       // Preferred: the block names its data and the code builds it.
       const built = resolve(b);
       if (built) { out.push(built); return; }
       // A block that meant to be data-backed and could not be is dropped rather
       // than quietly falling back to whatever the model typed alongside it.
-      if (b.from || Array.isArray(b.reads)) return;
-      if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) return;
-      if (b.head != null && !Array.isArray(b.head)) return;
+      if (b.from || Array.isArray(b.reads)) { note('block_no_data'); return; }
+      if (!BLOCK_ARRAYS[t].every((f) => Array.isArray(b[f]))) { note('block_shape'); return; }
+      if (b.head != null && !Array.isArray(b.head)) { note('block_shape'); return; }
       const web = fromWeb(b);
       if (web) { out.push(web); return; }
       // Claimed to come from outside and did not say from where: dropped. The
       // attribution IS the provenance for such a figure — without it the block
       // is an unsourced number wearing a source's authority.
-      if (b.src === 'web') return;
+      if (b.src === 'web') { note('block_unsourced'); return; }
+      // Shown, and marked on screen — but counted, because «сколько таблиц
+      // Консьерж набрал сам» is the measure of how far the answer is from the
+      // rule the whole stand is built on.
+      if (NUMERIC[t]) note('model_numeric');
       out.push(b);
     });
     return out.length ? out : null;
@@ -15304,6 +15343,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // market note worth sending — but it goes with its source attached, and the
     // footer says the document holds both kinds.
     const blocks = all.filter((b) => !NUMERIC[String(b.t)] || b.src === 'data' || b.src === 'web');
+    // A figure the model typed is allowed in the chat, where the mark sits
+    // beside it, and never in a file that leaves the room saying its numbers
+    // came from the workspace. Counted: a document quietly losing its table is
+    // the difference between a записка and a записка with a hole in it.
+    for (let i = blocks.length; i < all.length; i++) note('report_numeric_dropped');
     if (!blocks.length) return null;
     const title = String(r.title || '').slice(0, 120);
     const subtitle = r.subtitle ? String(r.subtitle).slice(0, 200) : '';
@@ -15366,8 +15410,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
          if its own question had failed. */
       if (p && p.code === 'missing_field' && Array.isArray(p.fields) && p.fields.length) {
         WS.engine.setPendingAction({ ops: ops, need: p.fields, collection: p.collection || null });
+        note('act_parked');
         return { kind: 'answer', text: text, evidence: evidence, next: next };
       }
+      note('act_refused');
       // Any other refusal — say so plainly instead of pretending.
       return {
         kind: 'answer',

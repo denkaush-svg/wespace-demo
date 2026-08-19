@@ -12,7 +12,7 @@ const os = require('os');
 
 process.env.WESPACE_PROXY_ORIGINS = 'https://denkaush-svg.github.io';
 const P = require('../proxy.js');
-const { CFG, splitReply, buildPrompt, takeToken, state, server } = P;
+const { CFG, splitReply, buildPrompt, fitDigest, takeToken, state, server } = P;
 
 const FAKE = path.join(__dirname, 'fake-cli.js');
 CFG.cli = process.execPath;
@@ -87,6 +87,30 @@ function pureChecks() {
 
   r = splitReply('Текст.\n```json\n[1,2,3]\n```');
   ok('a non-object plan is refused', Object.keys(r.plan).length === 0);
+
+  /* The proxy throws things away quietly too, and for the same good reason —
+     a broken plan costs the controls, not the reply. Counted so «стенд отвечает»
+     and «стенд отвечает хорошо» stop being the same statement. */
+  {
+    const was = Object.assign({}, P.state.degraded);
+    const d = (k) => (P.state.degraded[k] || 0) - (was[k] || 0);
+
+    splitReply('Текст.\n```json\n{"say_aloud":"x","read":["a"],"next":[],"выдумка":1}\n```');
+    ok('a field the contract does not have is counted, not only dropped', d('plan_field_dropped') === 3,
+      'got ' + d('plan_field_dropped'));
+
+    splitReply('Просто текст, никакого блока.');
+    ok('an answer that came back with no plan at all is counted', d('no_plan') === 1, 'got ' + d('no_plan'));
+    splitReply('Есть текст.\n```json\n{ сломано }\n```');
+    ok('and so is one whose plan would not parse', d('no_plan') === 2, 'got ' + d('no_plan'));
+
+    const big = { rows: [] };
+    for (let i = 0; i < 400; i++) big.rows.push({ id: 'r' + i, note: 'ю'.repeat(200) });
+    fitDigest(big, 4000);
+    ok('a digest that had to be shortened is counted', d('digest_cut') === 1, 'got ' + d('digest_cut'));
+    fitDigest({ a: 1 }, 4000);
+    ok('and one that fits is not', d('digest_cut') === 1, 'got ' + d('digest_cut'));
+  }
 
   /* An unfinished instruction reaches the model as data, right above the turn
      that is about to answer it. Without it «Пётр Волков» arrives as a turn with

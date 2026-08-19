@@ -132,10 +132,18 @@ const state = {
   dayCount: 0,
   served: 0,
   refused: {},
+  /* What was thrown away rather than refused. Every guard here degrades
+     quietly and should: a broken plan costs the controls, not the reply, and a
+     digest that will not fit is shortened rather than cut mid-record. The price
+     is that «стенд отвечает» and «стенд отвечает хорошо» read as the same
+     statement. These are the difference, and they sit on /health beside the
+     refusals so one curl answers both questions. */
+  degraded: {},
   ips: new Map(), // ip -> { tokens, ts }
 };
 
 function bump(reason) { state.refused[reason] = (state.refused[reason] || 0) + 1; }
+function degrade(reason, n) { state.degraded[reason] = (state.degraded[reason] || 0) + (n || 1); }
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
@@ -520,6 +528,9 @@ function fitDigest(obj, max) {
     cut[worst] = { показано: keep, всего: total[worst] };
     json = JSON.stringify(withNote());
   }
+  // Said once per digest, not once per list: the question is «did the model see
+  // everything», and it did not.
+  degrade('digest_cut');
 
   // Nothing left to shorten and still over — the bulk is not in a list at all.
   // The last resort is a hard cut, and the marker is there so the model can
@@ -1029,9 +1040,13 @@ function splitReply(text) {
       const p = JSON.parse(m[1]);
       if (p && typeof p === 'object' && !Array.isArray(p)) {
         PLAN_FIELDS.forEach((f) => { if (p[f] !== undefined) plan[f] = p[f]; });
-      }
-    } catch (e) { /* narration still stands */ }
-  }
+        // A habit the model keeps, or a field somebody added to the prompt and
+        // not to the whitelist. Both are worth a number rather than silence.
+        const extra = Object.keys(p).filter((f) => PLAN_FIELDS.indexOf(f) < 0).length;
+        if (extra) degrade('plan_field_dropped', extra);
+      } else { degrade('no_plan'); }
+    } catch (e) { degrade('no_plan'); /* narration still stands */ }
+  } else { degrade('no_plan'); }
   return { say: say, plan: plan };
 }
 
@@ -1191,6 +1206,7 @@ const server = http.createServer((req, res) => {
       daily_used: state.dayCount,
       daily_cap: CFG.dailyCap,
       refused: state.refused,
+      degraded: state.degraded,
       // Visible without reading the file, so «is the stand eating the shared
       // subscription» is one curl away rather than a guess.
       week: (() => { const t = weekTotals(); return { calls: t.calls, budget: CFG.weekBudget, web: t.web, usd: Number(t.cost.toFixed(2)), since: t.from }; })(),

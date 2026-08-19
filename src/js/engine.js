@@ -41,6 +41,31 @@
     'deal:d_rentbiz': { label: 'Портфель DIFC · сделка', icon: 'briefcase' },
   };
   function threadMeta(id) { return THREAD_META[id] || { label: id, icon: 'chat' }; }
+  /* ---------- what was quietly thrown away ----------
+
+     Nearly every guard around the Concierge degrades silently, and that is the
+     right behaviour: a visitor gets a plainer answer, never a broken one. The
+     price is that nobody can say how often it happens. «Блок выбросят молча»
+     appears in four comments in this codebase and was never once a number.
+
+     So each drop is counted where it happens — cheap, in memory, never shown to
+     the broker. It is read by the day-run, which records it per question, and
+     by whoever asks whether the stand is answering well rather than merely
+     answering. Names are free-form on purpose: a counter that throws on an
+     unfamiliar key would turn a degradation into an outage, inside the very
+     path that exists to prevent one. */
+  const counts = {};
+  WS.quality = {
+    note(kind) {
+      const k = String(kind || 'unknown');
+      counts[k] = (counts[k] || 0) + 1;
+      return counts[k];
+    },
+    counts() { return Object.assign({}, counts); },
+    reset() { Object.keys(counts).forEach((k) => { delete counts[k]; }); },
+  };
+  const note = (k) => WS.quality.note(k);
+
   function ensureThread(id) {
     if (!engine.threads[id]) { const m = threadMeta(id); engine.threads[id] = { id: id, label: m.label, icon: m.icon, items: [], updatedAt: null, seen: 0 }; }
     return engine.threads[id];
@@ -437,7 +462,7 @@
     const t = activeThread();
     const p = t && t.pending;
     if (!p) return null;
-    if ((t.items || []).length - p.at > PENDING_STALE_AFTER) { t.pending = null; return null; }
+    if ((t.items || []).length - p.at > PENDING_STALE_AFTER) { t.pending = null; note('pending_stale'); return null; }
     return p;
   }
   function setPendingAction(p) {

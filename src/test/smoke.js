@@ -3260,6 +3260,78 @@ setTimeout(async () => {
       if (before) WS.engine.openThread(before, '', '');
     }
 
+    /* ---------- what was quietly thrown away ----------
+
+       Almost every guard in this file degrades silently, and on purpose: a
+       visitor should get a plainer Concierge, never a broken one. The cost is
+       that nobody can say HOW often it happens. «Блок выбросили молча» is in
+       four comments here and was never once a number, and yesterday's honest
+       caveat — that the parking never fired in three live runs — could only be
+       written because I happened to be watching.
+
+       So each drop is counted where it happens. Not shown to the broker: this
+       is for the day-run record and for a health check, where the question is
+       «did the stand answer well» and the only current answer is «it answered». */
+    {
+      const Q = WS.quality;
+      Q.reset();
+      check('quality · the register starts empty', Object.keys(Q.counts()).length === 0);
+
+      L.normBlocks([{ t: 'нетакого', text: 'x' }]);
+      check('quality · a shape the renderer does not know is counted as dropped',
+        Q.counts().block_shape === 1, JSON.stringify(Q.counts()));
+
+      L.normBlocks([{ t: 'table', from: { from: 'нетакойколлекции' }, columns: [{ field: 'x' }] }]);
+      check('quality · a block whose query gave nothing is counted',
+        Q.counts().block_no_data === 1, JSON.stringify(Q.counts()));
+
+      L.normBlocks([{ t: 'table', src: 'web', head: ['a'], rows: [['1']] }]);
+      check('quality · a figure claiming the web with no source named is counted',
+        Q.counts().block_unsourced === 1, JSON.stringify(Q.counts()));
+
+      L.normBlocks([{ t: 'table', head: ['Район'], rows: [['Arjan', '11 600']] }]);
+      check('quality · a table the model typed itself is counted, though it is shown',
+        Q.counts().model_numeric === 1, JSON.stringify(Q.counts()));
+
+      Q.reset();
+      L.normReport({ title: 'Записка', blocks: [{ t: 'p', text: 'вывод' }, { t: 'table', head: ['a'], rows: [['1']] }] });
+      check('quality · a model-typed figure cut from a document is counted',
+        Q.counts().report_numeric_dropped === 1, JSON.stringify(Q.counts()));
+
+      // The write path: refused, parked, resumed, gone stale — four different
+      // outcomes that all used to look like «предложение не появилось».
+      Q.reset();
+      const back = WS.engine.activeThreadId();
+      WS.engine.openThread('probe:quality', 'Счётчики', 'chat');
+      L.toReply('Двигаю.', { act: { op: 'dealStage', id: 'нет_такой', stage: 'won' } });
+      check('quality · a refused write is counted', Q.counts().act_refused === 1, JSON.stringify(Q.counts()));
+      L.toReply('Как записать контакт?', { act: { op: 'addClient', obj: {} } });
+      check('quality · and a parked one is counted apart from it',
+        Q.counts().act_parked === 1 && !Q.counts().act_refused_2, JSON.stringify(Q.counts()));
+      WS.agent.ask('Пётр Волков');
+      check('quality · resuming it is counted too — this is the number that was missing',
+        Q.counts().act_resumed === 1, JSON.stringify(Q.counts()));
+
+      L.toReply('Как записать контакт?', { act: { op: 'addClient', obj: {} } });
+      const th2 = WS.engine.activeThread();
+      for (let i = 0; i < 8; i++) th2.items.push({ id: 'q' + i, html: '<div class="msg me">…</div>' });
+      WS.engine.pendingAction();
+      check('quality · and one that went stale is counted rather than just forgotten',
+        Q.counts().pending_stale === 1, JSON.stringify(Q.counts()));
+      WS.engine.clearPendingAction();
+      if (back) WS.engine.openThread(back, '', '');
+
+      // Counting must not itself become a failure: an unknown name is recorded,
+      // not thrown, because this runs inside the path that answers a visitor.
+      Q.reset();
+      Q.note('что_то_новое'); Q.note('что_то_новое');
+      check('quality · an unfamiliar name is recorded, not refused',
+        Q.counts()['что_то_новое'] === 2, JSON.stringify(Q.counts()));
+      Q.reset();
+      check('quality · and the register can be cleared for a fresh run',
+        Object.keys(Q.counts()).length === 0);
+    }
+
     // What the model still sends under the old names is not what gets shown.
     // The two fields left the contract; reading them anyway would leave the
     // model's own invention on the screen and the change would be cosmetic.

@@ -17,6 +17,7 @@
 (function (WS) {
   const money = (v) => (WS.AED ? WS.AED(v) : String(v));
   const lc = (s) => String(s == null ? '' : s).toLowerCase();
+  const note = (k) => { if (WS.quality) WS.quality.note(k); };
 
   // ---------- hands ----------
   // `where` is a conjunction, so «not terminal» is two conditions rather than one negated value.
@@ -378,6 +379,7 @@
       const p = ops && propose(ops, { title: 'Новая запись' });
       if (p && p.kind === 'proposal') {
         if (WS.engine.clearPendingAction) WS.engine.clearPendingAction();
+        note('act_resumed');
         return p;
       }
     }
@@ -552,6 +554,10 @@
         // must not be counted as fresh evidence that the service is down.
         if (WS.live && WS.live.noteFailure) WS.live.noteFailure(String(e && e.message || e), e);
       }
+      // Falling through to the planner IS the degradation this whole file is
+      // built to make invisible to a visitor — and therefore the one most worth
+      // counting, because nothing else about the answer will say it happened.
+      note('fallback');
     }
     return ask(clean);
   }
