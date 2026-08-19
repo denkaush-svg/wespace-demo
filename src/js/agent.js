@@ -374,7 +374,7 @@
     // Before anything else: the conversation is waiting on one value, and this
     // turn looks like a value. Nothing else it could reasonably be.
     const pend = (WS.engine && WS.engine.pendingAction) ? WS.engine.pendingAction() : null;
-    if (pend && (pend.need || []).length === 1 && looksLikeAValue(text)) {
+    if (pend && (pend.need || []).length === 1 && looksLikeAValue(text, pend.need[0])) {
       const ops = fillPending(pend, String(text).trim());
       const p = ops && propose(ops, { title: 'Новая запись' });
       if (p && p.kind === 'proposal') {
@@ -510,9 +510,19 @@
      like a query. Split out because a parked instruction is its own evidence
      that something was asked, and a better one: it survives the reply object
      being replaced, which `lastReply` does not. */
-  function looksLikeAValue(text) {
+  /* How long an answer may be depends on what was asked for. A name is two
+     words. «Суть запроса одной строкой» is a line by definition — the prompt
+     asks for exactly that — and a cap tuned for names threw «2BR в Business Bay
+     до 1,8 млн» away as too long: the answer in full, to the question just
+     asked. The broker got the inventory of the workspace instead, measured on a
+     live run, because the turn had fallen back to the planner.
+
+     A question is never a value, whatever the field. That half does not move. */
+  const VALUE_WORDS = { title: 12, note: 12, goal: 12 };
+  function looksLikeAValue(text, field) {
     const s = String(text == null ? '' : text).trim();
-    if (!s || s.length > 60 || s.split(/\s+/).length > 5) return false;
+    const words = VALUE_WORDS[field] || 5;
+    if (!s || s.length > (words > 5 ? 120 : 60) || s.split(/\s+/).length > words) return false;
     return !/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s);
   }
   function answersAQuestion(text) {

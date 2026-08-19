@@ -3256,6 +3256,39 @@ setTimeout(async () => {
       check('offline · a stale instruction is not finished from a later answer',
         late.kind !== 'proposal', late.kind);
 
+      /* How long an answer may be depends on what was asked for.
+
+         Measured, not imagined: a live run parked `addRequest` waiting on the
+         title, the turn fell back to the planner, and «2BR в Business Bay до
+         1,8 млн» — the answer in full, to the question just asked — was thrown
+         out for being seven words against a cap tuned for names. The broker got
+         the inventory of the workspace instead. «Суть запроса одной строкой» is
+         a line by definition; the prompt asks for exactly that. */
+      {
+        const cid = dd().clients[0].id;
+        WS.engine.clearPendingAction();
+        L.toReply('Что за запрос?', { act: { op: 'addRequest', obj: { clientId: cid } } });
+        const long = WS.agent.ask('2BR в Business Bay до 1,8 млн');
+        check('offline · a one-line request title is an answer, not an overlong turn',
+          long.kind === 'proposal' && (long.ops || [])[0].obj.title === '2BR в Business Bay до 1,8 млн',
+          JSON.stringify(long.ops || long.text));
+
+        // A name is still a name: the wider cap belongs to the field that asked.
+        WS.engine.clearPendingAction();
+        L.toReply('Как записать контакт?', { act: { op: 'addClient', obj: {} } });
+        const wordy = WS.agent.ask('2BR в Business Bay до 1,8 млн');
+        check('offline · and a phrase is still not filed as somebody’s name',
+          wordy.kind !== 'proposal', wordy.kind);
+
+        // Whatever the field, a question is not a value.
+        WS.engine.clearPendingAction();
+        L.toReply('Что за запрос?', { act: { op: 'addRequest', obj: { clientId: cid } } });
+        const asked = WS.agent.ask('а что там вообще по заявкам сейчас');
+        check('offline · a question is never taken as the missing value',
+          asked.kind !== 'proposal', asked.kind);
+        WS.engine.clearPendingAction();
+      }
+
       WS.engine.clearPendingAction();
       if (before) WS.engine.openThread(before, '', '');
     }

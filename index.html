@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:19</title>
+  <title>WESPACE · сборка 01:32</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:19';
+    window.WS_BUILD='01:32';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -14333,7 +14333,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // Before anything else: the conversation is waiting on one value, and this
     // turn looks like a value. Nothing else it could reasonably be.
     const pend = (WS.engine && WS.engine.pendingAction) ? WS.engine.pendingAction() : null;
-    if (pend && (pend.need || []).length === 1 && looksLikeAValue(text)) {
+    if (pend && (pend.need || []).length === 1 && looksLikeAValue(text, pend.need[0])) {
       const ops = fillPending(pend, String(text).trim());
       const p = ops && propose(ops, { title: 'Новая запись' });
       if (p && p.kind === 'proposal') {
@@ -14469,9 +14469,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      like a query. Split out because a parked instruction is its own evidence
      that something was asked, and a better one: it survives the reply object
      being replaced, which `lastReply` does not. */
-  function looksLikeAValue(text) {
+  /* How long an answer may be depends on what was asked for. A name is two
+     words. «Суть запроса одной строкой» is a line by definition — the prompt
+     asks for exactly that — and a cap tuned for names threw «2BR в Business Bay
+     до 1,8 млн» away as too long: the answer in full, to the question just
+     asked. The broker got the inventory of the workspace instead, measured on a
+     live run, because the turn had fallen back to the planner.
+
+     A question is never a value, whatever the field. That half does not move. */
+  const VALUE_WORDS = { title: 12, note: 12, goal: 12 };
+  function looksLikeAValue(text, field) {
     const s = String(text == null ? '' : text).trim();
-    if (!s || s.length > 60 || s.split(/\s+/).length > 5) return false;
+    const words = VALUE_WORDS[field] || 5;
+    if (!s || s.length > (words > 5 ? 120 : 60) || s.split(/\s+/).length > words) return false;
     return !/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s);
   }
   function answersAQuestion(text) {
