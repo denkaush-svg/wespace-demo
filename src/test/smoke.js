@@ -3151,6 +3151,24 @@ setTimeout(async () => {
         !!named[0] && named[0].open === 'contact', JSON.stringify(named[0]));
       check('agent · a name nobody in the data carries opens nothing',
         !F({ text: 'По Джону Смиту ничего нет.' }).some((n) => n.open === 'contact'));
+
+      /* Two Orlovs. Found by a live run, not by reading: the Concierge answered
+         «завожу Сергея Климова… есть только Сергей Орлов, это другой человек» and
+         the chip under it offered to open ВИКТОРА Орлова — the surname matched
+         him first because he sits earlier in the list. */
+      {
+        const E = WS.agent.tools.findEntity;
+        check('agent · the given name decides which of two namesakes is meant',
+          (E('есть только Сергей Орлов, это другой человек') || {}).id === 'c_owner',
+          JSON.stringify(E('есть только Сергей Орлов, это другой человек')));
+        check('agent · and it still finds the other one when he is the one named',
+          (E('По Виктору Орлову всё готово') || {}).id === 'c_docs',
+          JSON.stringify(E('По Виктору Орлову всё готово')));
+        check('agent · a bare surname two people share picks neither',
+          E('Орлов сегодня не отвечает') === null, JSON.stringify(E('Орлов сегодня не отвечает')));
+        check('agent · and no chip is offered for a person nobody could name',
+          !F({ text: 'Орлов сегодня не отвечает' }).some((n) => n.open === 'contact'));
+      }
     }
 
     // Navigating the moment it answers threw the reply off a phone screen —

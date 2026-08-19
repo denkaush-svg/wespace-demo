@@ -89,20 +89,35 @@
     const w = lc(word);
     return w.length > 3 ? w.slice(0, w.length - 1) : w;
   }
+  /* Whom a sentence is about. Two people share a surname in this workspace —
+     Виктор Орлов and Сергей Орлов — and taking the FIRST name part that matched
+     meant «есть только Сергей Орлов» offered a way into Виктор's card: the
+     surname matched him first because he is earlier in the list.
+
+     So the parts are counted rather than raced. «Сергею Орлову» matches two of
+     one name and one of the other, and the given name is exactly what a person
+     uses to tell them apart. A bare «Орлов» matches one of each, nobody wins,
+     and nothing is claimed — the same rule `dealOf` already follows one screen
+     down: several candidates are not guessed between. */
   function findEntity(text) {
     const t = lc(text);
     const d = WS.store.data;
-    const byName = (list, kind) => {
-      for (let i = 0; i < list.length; i++) {
-        const parts = String(list[i].name || '').split(/\s+/);
-        for (let p = 0; p < parts.length; p++) {
-          const s = stem(parts[p]);
-          if (s.length >= 3 && t.indexOf(s) >= 0) return { kind: kind, id: list[i].id, name: list[i].name };
-        }
-      }
-      return null;
+    const best = (list, kind) => {
+      let top = null;
+      let tie = false;
+      (list || []).forEach((x) => {
+        let hits = 0;
+        String(x.name || '').split(/\s+/).forEach((w) => {
+          const s = stem(w);
+          if (s.length >= 3 && t.indexOf(s) >= 0) hits++;
+        });
+        if (!hits) return;
+        if (!top || hits > top.hits) { top = { kind: kind, id: x.id, name: x.name, hits: hits }; tie = false; }
+        else if (hits === top.hits) tie = true;
+      });
+      return (top && !tie) ? { kind: top.kind, id: top.id, name: top.name } : null;
     };
-    return byName(d.clients || [], 'contact') || byName(d.companies || [], 'company') || null;
+    return best(d.clients, 'contact') || best(d.companies, 'company') || null;
   }
   function dealsOf(clientId) {
     return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);

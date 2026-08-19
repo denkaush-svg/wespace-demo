@@ -151,6 +151,11 @@ const serve = http.createServer((req, res) => {
         // them are `addTask` / `dealStage` in a list of names.
         opsFull: (r.kind === 'proposal' && Array.isArray(r.ops)) ? r.ops.slice(0, 6) : [],
         lines: (r.lines || []).map((s) => String(s).slice(0, 140)),
+        // What the confirmation card says the new record still lacks. Recorded
+        // because the model is told NOT to name these itself — so the record has
+        // to show both what the card said and what the answer said, or there is
+        // no way to see the two lists drifting into one another.
+        missing: (r.missing || []).map((s) => String(s).slice(0, 160)),
         next: (r.next || []).map((n) => String((n && n.label) || '')),
         /* The chips under the answer, which the code now derives from the
            narration instead of taking the model's word for. Without them in the
