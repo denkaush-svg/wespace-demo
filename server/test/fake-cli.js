@@ -26,7 +26,12 @@ function delta(t) { line({ type: 'stream_event', event: { type: 'content_block_d
 function whole(t) { line({ type: 'assistant', message: { content: [{ type: 'text', text: t }] } }); }
 function result(t) { line({ type: 'result', subtype: 'success', result: t }); }
 
+/* Two of these fields left the contract and are kept here on purpose: a model
+   that goes on filling them in from habit is the case the proxy has to swallow,
+   and the whitelist is only tested by something that still sends them. */
 const PLAN = '```json\n' + JSON.stringify({
+  say_aloud: 'Четыре сделки в работе.',
+  open: { view: 'deal', id: 'd_anna' },
   read: ['deals_active', 'deals_active_sum'],
   next: [{ label: 'Просроченные', ask: 'сколько просроченных задач' }],
 }) + '\n```';

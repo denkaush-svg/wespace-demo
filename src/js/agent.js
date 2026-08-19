@@ -37,22 +37,40 @@
     return forms[2];
   }
 
+  /* `anchor` is what makes a figure in an answer attributable to a reading.
+
+     The chips under a reply are captioned «откуда это число», and until now the
+     model chose which ones appeared: it named the readings it claimed to have
+     leaned on and the code re-read them. That proved the figure on the chip was
+     real and proved nothing about the sentence above it — «8 сделок в работе»
+     over a chip reading 12 is two numbers disagreeing under a caption that says
+     they are the same one.
+
+     The code finds them instead, by looking for the reading's own value in the
+     narration. A value alone is a coincidence waiting to happen — every count in
+     this stand is a small number, and «2» is as likely to be a bedroom count as
+     a deal count. So a match also requires the words the figure is counting,
+     written beside it: every pattern here has to appear within a couple of dozen
+     characters of the number, inside its own sentence. That is what separates
+     «2 горячие заявки» from «2 горячие сделки», and what keeps «проверен 12 мая»
+     from being read as a count of objects because the clause began «Объект».
+     The window itself is in live.js, where the matching runs. */
   const READINGS = {
-    deals_active: { label: ['сделка в работе', 'сделки в работе', 'сделок в работе'], q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
-    deals_active_sum: { label: 'на сумму', money: true, q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } } },
-    deals_hot: { label: ['горячая сделка', 'горячие сделки', 'горячих сделок'], q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
-    deals_closed: { label: ['закрытая сделка', 'закрытые сделки', 'закрытых сделок'], q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'won' }], aggregate: { fn: 'count' } } },
-    tasks_open: { label: ['открытая задача', 'открытые задачи', 'открытых задач'], q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
-    tasks_overdue: { label: ['просроченная задача', 'просроченные задачи', 'просроченных задач'], q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
-    clients_total: { label: ['контакт', 'контакта', 'контактов'], q: { from: 'clients', aggregate: { fn: 'count' } } },
-    clients_no_consent: { label: ['контакт без согласия', 'контакта без согласия', 'контактов без согласия'], q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
-    objects_total: { label: ['объект', 'объекта', 'объектов'], q: { from: 'objects', aggregate: { fn: 'count' } } },
-    companies_total: { label: ['компания', 'компании', 'компаний'], q: { from: 'companies', aggregate: { fn: 'count' } } },
+    deals_active: { label: ['сделка в работе', 'сделки в работе', 'сделок в работе'], anchor: [/сделк|сделок/], q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'count' } } },
+    deals_active_sum: { label: 'на сумму', money: true, anchor: [/сделк|сделок|сумм|портфел|объём|объем/], q: { from: 'deals', where: ACTIVE, aggregate: { fn: 'sum', field: 'amount' } } },
+    deals_hot: { label: ['горячая сделка', 'горячие сделки', 'горячих сделок'], anchor: [/горяч/, /сделк|сделок/], q: { from: 'deals', where: [{ field: 'hot', op: 'truthy' }], aggregate: { fn: 'count' } } },
+    deals_closed: { label: ['закрытая сделка', 'закрытые сделки', 'закрытых сделок'], anchor: [/закрыт|выигр|успешн/, /сделк|сделок/], q: { from: 'deals', where: [{ field: 'stage', op: 'eq', value: 'won' }], aggregate: { fn: 'count' } } },
+    tasks_open: { label: ['открытая задача', 'открытые задачи', 'открытых задач'], anchor: [/задач/], q: { from: 'tasks', where: [{ field: 'status', op: 'ne', value: 'done' }], aggregate: { fn: 'count' } } },
+    tasks_overdue: { label: ['просроченная задача', 'просроченные задачи', 'просроченных задач'], anchor: [/просроч/, /задач/], q: { from: 'tasks', where: [{ field: 'when', op: 'eq', value: 'overdue' }], aggregate: { fn: 'count' } } },
+    clients_total: { label: ['контакт', 'контакта', 'контактов'], anchor: [/контакт|клиент/], q: { from: 'clients', aggregate: { fn: 'count' } } },
+    clients_no_consent: { label: ['контакт без согласия', 'контакта без согласия', 'контактов без согласия'], anchor: [/соглас/, /контакт|клиент/], q: { from: 'clients', where: [{ field: 'consent', op: 'falsy' }], aggregate: { fn: 'count' } } },
+    objects_total: { label: ['объект', 'объекта', 'объектов'], anchor: [/объект|лот/], q: { from: 'objects', aggregate: { fn: 'count' } } },
+    companies_total: { label: ['компания', 'компании', 'компаний'], anchor: [/компан|застройщик/], q: { from: 'companies', aggregate: { fn: 'count' } } },
     // Заявка — верх воронки стенда. Без этих чтений цифру по лидам можно было
     // назвать, но нельзя было открыть: «откуда это число» не имело источника.
-    requests_total: { label: ['заявка', 'заявки', 'заявок'], q: { from: 'requests', aggregate: { fn: 'count' } } },
-    requests_hot: { label: ['горячая заявка', 'горячие заявки', 'горячих заявок'], q: { from: 'requests', where: [{ field: 'temperature', op: 'eq', value: 'hot' }], aggregate: { fn: 'count' } } },
-    requests_budget_sum: { label: 'бюджета в заявках', money: true, q: { from: 'requests', aggregate: { fn: 'sum', field: 'budget' } } },
+    requests_total: { label: ['заявка', 'заявки', 'заявок'], anchor: [/заявк|заявок/], q: { from: 'requests', aggregate: { fn: 'count' } } },
+    requests_hot: { label: ['горячая заявка', 'горячие заявки', 'горячих заявок'], anchor: [/горяч/, /заявк|заявок/], q: { from: 'requests', where: [{ field: 'temperature', op: 'eq', value: 'hot' }], aggregate: { fn: 'count' } } },
+    requests_budget_sum: { label: 'бюджета в заявках', money: true, anchor: [/бюджет/, /заявк|заявок/], q: { from: 'requests', aggregate: { fn: 'sum', field: 'budget' } } },
   };
 
   function read(key) {
@@ -184,13 +202,62 @@
   const PRESALE_WORDS = /подбор|кп|предложен|показ|встреч|осмотр|переговор/i;
   const WHEN = [[/послезавтра/, ['послезавтра', 'tomorrow']], [/завтра/, ['завтра', 'tomorrow']], [/сегодня/, ['сегодня', 'today']]];
 
-  function suggestions() {
-    return [
-      { label: 'Сколько сделок в работе', ask: 'сколько сделок в работе и на какую сумму' },
-      { label: 'Просроченные задачи', ask: 'сколько просроченных задач' },
-      { label: 'Контакты без согласия', ask: 'сколько контактов без согласия' },
-    ];
+  /* ---------- follow-ups ----------
+
+     The chips under an answer used to be written by whoever answered: the live
+     model made up its own, three at a time, and nothing checked them. A model
+     that had just been told a district is not in our data would still offer
+     «показать динамику по Марине» as the next step — the chip is a sentence
+     dropped straight back into the composer, so a made-up one is a question
+     built to fail on the turn after.
+
+     The catalogue below is the whole vocabulary, and every entry carries the
+     reading that has to be non-empty for it to be offered. A chip that appears
+     has an answer waiting behind it, which is the only property worth having
+     here. It is not a big list on purpose: three chips is what fits under a
+     reply on a phone, and a menu is not a suggestion. */
+  const FOLLOW_UPS = [
+    { need: 'deals_active', label: 'Сколько сделок в работе', ask: 'сколько сделок в работе и на какую сумму' },
+    { need: 'tasks_overdue', label: 'Просроченные задачи', ask: 'какие задачи просрочены и по кому' },
+    { need: 'requests_hot', label: 'Горячие заявки', ask: 'какие заявки горячие и что по ним дальше' },
+    { need: 'deals_hot', label: 'Горячие сделки', ask: 'какие сделки горячие и что мешает их закрыть' },
+    { need: 'clients_no_consent', label: 'Контакты без согласия', ask: 'кто из контактов без согласия на переписку' },
+    { need: 'requests_total', label: 'Что в заявках', ask: 'что сейчас в заявках и на какой они стадии' },
+    { need: 'objects_total', label: 'Что есть в объектах', ask: 'какие объекты у нас есть и в каких районах' },
+  ];
+
+  /* ctx: { text, quoted, limit }
+       text   — the answer just given; someone named in it gets a way into their card
+       quoted — readings the answer already spoke about, so a chip does not
+                offer back the question that has just been answered
+       limit  — how many chips fit; three under a reply, more only for a test */
+  function followUps(ctx) {
+    const c = ctx || {};
+    const cap = c.limit > 0 ? c.limit : 3;
+    const said = {};
+    (Array.isArray(c.quoted) ? c.quoted : []).forEach((k) => { said[k] = true; });
+    const out = [];
+
+    const ent = c.text ? findEntity(c.text) : null;
+    if (ent) out.push({ label: 'Открыть ' + ent.name, open: ent.kind, id: ent.id });
+
+    for (let i = 0; i < FOLLOW_UPS.length && out.length < cap; i++) {
+      const f = FOLLOW_UPS[i];
+      if (said[f.need]) continue;
+      const r = read(f.need);
+      if (!r || !(Number(r.value) > 0)) continue;
+      out.push({ label: f.label, ask: f.ask });
+    }
+    /* Everything preconditioned away — an empty workspace, or an answer that
+       covered the lot. A reply with no way forward reads as a dead end, so the
+       inventory question is the floor: it is answerable whatever the data. */
+    if (!out.length) out.push({ label: 'Что у нас есть', ask: 'что вообще есть в данных' });
+    return out.slice(0, cap);
   }
+
+  // Kept as the name the rest of this file calls it by: a follow-up with no
+  // answer in front of it and nothing to exclude.
+  function suggestions() { return followUps({}); }
 
   // What the stand actually holds — the honest reply when a question asks for
   // something that is not in the data. Names the fields that DO exist, so the
@@ -209,7 +276,9 @@
       kind: 'answer',
       text: (lead ? lead + ' ' : '') + parts.join(', ') + '.',
       evidence: got.map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count })),
-      next: suggestions(),
+      // Offering back the question just answered is the chip equivalent of not
+      // listening, so what this reply covered is excluded from what it suggests.
+      next: followUps({ quoted: got.map((r) => r.key) }),
     };
   }
 
@@ -456,7 +525,7 @@
 
   WS.agent = {
     ask, askAsync, confirm, setHead, setAsyncHead, hasAsyncHead, openThread, toolSchema, pendingProposal,
-    tools: { read, metrics, findEntity, propose, query: (s) => WS.query.run(s), inventory, plural },
+    tools: { read, metrics, findEntity, propose, query: (s) => WS.query.run(s), inventory, plural, followUps },
     get head() { return head; },
     READINGS,
   };

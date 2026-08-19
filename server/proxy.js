@@ -357,18 +357,19 @@ const SYSTEM = [
   'ЗАПИСЬ. Сам ничего не меняешь. Если просят записать, поставить задачу или сменить стадию — опиши, что сделаешь, и положи это в поле act.',
   'Не пиши «готово» и «записал»: изменение применится только после того, как человек нажмёт подтверждение.',
   'act ставь ТОЛЬКО когда тебя прямо просят что-то изменить, записать, поставить или перевести.',
-  'На вопрос — отвечай без act. Хочешь предложить действие — предложи его текстом или подсказкой в next, а не готовым изменением.',
+  'На вопрос — отвечай без act. Хочешь предложить действие — предложи его словами, а не готовым изменением.',
   '',
   'ФОРМАТ ОТВЕТА — строго два куска подряд:',
   '1) обычный текст ответа брокеру;',
-  '2) блок ```json``` с объектом. Все поля необязательны:',
-  '   read  — массив ключей из ДАННЫЕ.показатели, на которые опирался ответ; под сообщением появятся кнопки «откуда это число»',
+  '2) блок ```json``` с объектом. Полей ровно пять, все необязательны, других не бывает:',
   '   act   — одна операция или массив операций (см. ниже); станет предложением с кнопкой подтверждения',
   '   open  — {"view":"...","id":"..."} чтобы открыть экран или карточку',
-  '   next  — до трёх подсказок вида {"label":"коротко","ask":"фраза, которую подставить в поле ввода"}',
   '   blocks — разметка аналитического ответа (см. ниже); для короткой реплики не нужна',
   '   report — {"title":"...","subtitle":"...","blocks":[...]} если просят отчёт или документ',
   '   say_aloud — одна-две фразы: как ты сказал бы этот ответ вслух, за рулём, без таблиц и списков',
+  'Полей «read» и «next» больше нет. Кнопки «откуда это число» и подсказки под ответом система',
+  'собирает сама: чтения она находит по числам, которые ты назвал в тексте, а подсказки берёт из своего списка.',
+  'Поэтому называй величину в тексте так, как она есть в ДАННЫХ, — по ней и встанет кнопка.',
   '',
   'ГОЛОС. Под ответом есть кнопка «прослушать», она читает say_aloud, а не текст с экрана.',
   'Есть blocks или report — say_aloud обязателен: вслух таблицу не читают, нужна суть словами и главная цифра.',
@@ -454,8 +455,8 @@ const SYSTEM = [
   '  Спросить заодно «и спальни, и канал» — это анкета. Её не заполняют, на ней разговор и кончается.',
   '  ПЛОХО: «Назовите имя, и заодно спальни, если знаете. Канал тоже подскажите.»',
   '  ХОРОШО: «Как записать контакт? Бюджет 3 млн и Крик я понял, остальное добавим потом.»',
-  '— Недостающее клади в next подсказками, а не в вопрос: «добавить спальни», «указать канал».',
-  '  Так брокер добавит, если захочет, а заявка уже будет заведена.',
+  '— Про недостающее скажи одной фразой в конце — «спальни и канал добавим потом» — и заводи.',
+  '  Брокер добавит, если захочет, а заявка уже будет заведена.',
   '— Запись в данные и создание новых записей не требует поиска в сети.',
   '  Не вызывай WebSearch, когда выполняешь act.',
   '',
@@ -727,7 +728,7 @@ function buildPrompt(body) {
       // instruction and asking for it again in another mode is not safety —
       // the change was already inert until a human confirmed the exact diff.
       // It is just a wall between someone and the thing they told you to do.
-      : 'Разбор, а не работа: сам ничего менять не предлагай, подсказки клади в next. ' +
+      : 'Разбор, а не работа: сам ничего менять не предлагай — что стоило бы сделать, скажи словами. ' +
         'Но если брокер прямо велит что-то изменить — выполняй как обычно, через act, и не отправляй его переключать режим.',
     mode.external ? EXTERNAL_RULES
       : 'Внешние источники в этом режиме не подключены. Публичных данных ты сейчас не видишь: не выдавай общее знание за проверенный факт и не ссылайся на источник, которого не открывал.',
@@ -956,6 +957,26 @@ function callModel(prompt, onDelta) { return startCall(prompt, onDelta).promise;
 
 const FENCE = /```(?:json)?\s*([\s\S]*?)```/;
 
+/* The envelope is a whitelist, and it is deliberately short.
+
+   Every field here is a thing only the model can supply: what to say aloud, what
+   to change, what to open, what shape the analysis takes. Two fields used to sit
+   alongside them and did not belong — the readings an answer leaned on, and the
+   follow-up chips under it. Both are properties OF the answer, which means the
+   code holding the answer can work them out, and the model filling them in was
+   inventing where it could have been reading.
+
+   That mattered beyond tidiness. A claimed reading put the caption «откуда это
+   число» over a query the sentence above it never used, and a written-out chip
+   dropped the model's own sentence back into the composer — «показать динамику
+   по Марине» offered by something that had just been told Marina is not in our
+   data. Both are computed in the page now, from the text and from the store.
+
+   Unknown names are dropped here rather than downstream, so a habit the model
+   keeps costs nothing and a field somebody adds to the prompt without adding it
+   here fails loudly on the first call instead of quietly on the hundredth. */
+const PLAN_FIELDS = ['act', 'open', 'blocks', 'report', 'say_aloud'];
+
 /* Splits the model's answer into what to say and what to do. The narration is
    whatever precedes the fenced block; a missing or broken block costs the
    controls, not the reply. */
@@ -966,7 +987,9 @@ function splitReply(text) {
   if (m) {
     try {
       const p = JSON.parse(m[1]);
-      if (p && typeof p === 'object' && !Array.isArray(p)) plan = p;
+      if (p && typeof p === 'object' && !Array.isArray(p)) {
+        PLAN_FIELDS.forEach((f) => { if (p[f] !== undefined) plan[f] = p[f]; });
+      }
     } catch (e) { /* narration still stands */ }
   }
   return { say: say, plan: plan };

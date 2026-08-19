@@ -65,8 +65,19 @@ function refill() { state.ips.clear(); state.dayCount = 0; }
 // ---------- pure ----------
 
 function pureChecks() {
-  let r = splitReply('Текст ответа.\n```json\n{"read":["a"]}\n```');
-  ok('splitReply separates narration from plan', r.say === 'Текст ответа.' && r.plan.read[0] === 'a', JSON.stringify(r));
+  let r = splitReply('Текст ответа.\n```json\n{"say_aloud":"вслух"}\n```');
+  ok('splitReply separates narration from plan', r.say === 'Текст ответа.' && r.plan.say_aloud === 'вслух', JSON.stringify(r));
+
+  /* The envelope is a whitelist, not a suggestion. Two fields — the readings an
+     answer leaned on and the follow-up chips — are computed by the page from
+     the answer itself now, so a model still filling them in from habit must not
+     reach the browser: what arrives under a name the contract knows is used,
+     and everything else is dropped here rather than downstream. */
+  r = splitReply('Текст.\n```json\n{"say_aloud":"вслух","read":["deals_active"],' +
+    '"next":[{"label":"x","ask":"y"}],"выдумка":1,"act":{"op":"addTask","task":{"title":"т"}}}\n```');
+  ok('the envelope keeps only the fields the contract names',
+    !('read' in r.plan) && !('next' in r.plan) && !('выдумка' in r.plan), JSON.stringify(r.plan));
+  ok('and keeps the ones it does', r.plan.say_aloud === 'вслух' && !!r.plan.act, JSON.stringify(r.plan));
 
   r = splitReply('Просто текст без блока.');
   ok('splitReply keeps a reply that has no plan', r.say === 'Просто текст без блока.' && Object.keys(r.plan).length === 0);
@@ -241,7 +252,13 @@ async function modelChecks() {
   ok('the answer streams in pieces', deltas.length >= 2, 'deltas=' + deltas.length);
   ok('the stream ends with the assembled reply', !!done && done.data.say.indexOf('четыре сделки') >= 0,
     done ? done.data.say : '(no done)');
-  ok('the plan arrives parsed', !!done && done.data.plan.read.indexOf('deals_active') >= 0);
+  ok('the plan arrives parsed',
+    !!done && /четыре сделки/i.test(done.data.plan.say_aloud || '') && done.data.plan.open.id === 'd_anna',
+    JSON.stringify(done && done.data.plan));
+  // End to end, not just in splitReply: what the model kept sending under the
+  // two retired names does not reach the browser.
+  ok('and carries none of what left the contract',
+    !!done && !('read' in done.data.plan) && !('next' in done.data.plan), JSON.stringify(done && done.data.plan));
   ok('the narration is free of the fenced block', !!done && done.data.say.indexOf('```') < 0);
 
   // A process that died is a failed call even if it streamed a sentence first.

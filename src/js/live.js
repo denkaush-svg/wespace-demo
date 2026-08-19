@@ -237,20 +237,6 @@
 
   // ---------- what comes back ----------
 
-  function normNext(list) {
-    if (!Array.isArray(list)) return null;
-    const out = [];
-    for (let i = 0; i < list.length && out.length < 3; i++) {
-      const n = list[i];
-      if (!n || typeof n !== 'object') continue;
-      const label = String(n.label || '').slice(0, 40);
-      if (!label) continue;
-      if (n.ask) out.push({ label: label, ask: String(n.ask).slice(0, 200) });
-      else if (n.open && n.id) out.push({ label: label, open: String(n.open), id: String(n.id) });
-    }
-    return out.length ? out : null;
-  }
-
   // Chips are re-read here rather than taken from the model, so a figure it
   // invented has nowhere to land.
   function evidenceFor(keys) {
@@ -259,7 +245,94 @@
       // The revision travels with the figure. Without it the chip re-ran the
       // query at whatever the data had become, and an answer could disagree
       // with its own evidence without either side saying so.
-      .map((r) => ({ label: r.label, value: r.value, money: r.money, query: r.query, count: r.count, revision: r.revision }));
+      .map((r) => ({ key: r.key, label: r.label, value: r.value, money: r.money, query: r.query, count: r.count, revision: r.revision }));
+  }
+
+  /* ---------- which chips an answer has earned ----------
+
+     Re-reading the keys the model named kept a made-up FIGURE off a chip; it did
+     nothing about a made-up CLAIM. «Опираюсь на deals_active» under a sentence
+     quoting some other number is a caption pointing at the wrong query, and the
+     caption is «откуда это число».
+
+     So the keys are found here instead of taken. A reading earns its chip when
+     its own value is written in the narration and the words it counts are in the
+     same sentence — the value alone is a coincidence in a stand where most
+     counts are single digits. A figure the model invented matches no reading and
+     brings no chip, which is the honest outcome and also the visible one: an
+     answer full of numbers and bare of chips is a reply worth re-reading. */
+
+  // Group separators as the stand's own formatter prints them (ru-RU uses a
+  // non-breaking space), and a decimal tail so «8,1%» is read as 8.1 rather
+  // than as an 8 sitting next to a 1.
+  const NUM = /\d[\d    ]*(?:[.,]\d+)?/g;
+  const SEP = /[    ]/g;
+  /* Digits that are plainly not a count of anything: a date and a clock. Both
+     are everywhere in this trade — «проверен 12 мая», «срок сегодня в 16:00» —
+     and a «12» of that kind, in a clause that also happens to say «объект», is
+     how a chip reading «12 объектов» lands under an answer that never counted
+     them. Measured on the recorded run, not imagined: that exact chip appeared. */
+  const MONTH = /^[\s ]*(?:янв|фев|мар|апр|ма[йя]|июн|июл|авг|сен|окт|ноя|дек)/i;
+  /* How close the words have to be. A count is written against the thing it
+     counts — «8 сделок», «объекты — 12», «на сумму 20 228 000» — so the anchor
+     is looked for beside the figure rather than anywhere in the sentence. The
+     whole sentence proved far too generous: one clause naming an object and the
+     next carrying a date was enough to caption a chip. */
+  const NEAR = 24;
+
+  // Where the figure's own sentence starts and ends, so a window never reaches
+  // across a full stop into a clause about something else.
+  const STOP = /[.!?…;\n]/;
+  function sentenceBounds(s, at) {
+    let from = 0;
+    let to = s.length;
+    for (let i = at; i >= 0; i--) { if (STOP.test(s[i])) { from = i + 1; break; } }
+    for (let i = at; i < s.length; i++) { if (STOP.test(s[i])) { to = i; break; } }
+    return [from, to];
+  }
+
+  const EVIDENCE_CAP = 4;
+
+  function evidenceFrom(text) {
+    const s = String(text == null ? '' : text);
+    if (!/\d/.test(s)) return [];
+    // Read once per key, not once per figure: a reading is a query, and an
+    // answer carrying a dozen numbers would otherwise re-run all thirteen of
+    // them a dozen times over.
+    const vals = {};
+    Object.keys(WS.agent.READINGS).forEach((k) => {
+      const spec = WS.agent.READINGS[k];
+      // A reading with nothing to anchor it cannot be told apart from a
+      // coincidence, so it is never claimed rather than claimed on a guess.
+      if (!Array.isArray(spec.anchor) || !spec.anchor.length) return;
+      const r = WS.agent.tools.read(k);
+      if (r) vals[k] = Number(r.value);
+    });
+
+    const seen = {};
+    const found = [];
+    let m;
+    NUM.lastIndex = 0;
+    while ((m = NUM.exec(s)) && found.length < EVIDENCE_CAP) {
+      const raw = m[0];
+      const at = m.index;
+      const after = s.slice(at + raw.length);
+      if (MONTH.test(after)) continue;                      // a date, not a count
+      if (s[at - 1] === ':' || after[0] === ':') continue;   // a clock, not a count
+      const v = Number(raw.replace(SEP, '').replace(',', '.'));
+      if (!isFinite(v)) continue;
+
+      const bounds = sentenceBounds(s, at);
+      const win = s.slice(Math.max(bounds[0], at - NEAR),
+        Math.min(bounds[1], at + raw.length + NEAR)).toLowerCase();
+      Object.keys(vals).forEach((k) => {
+        if (seen[k] || vals[k] !== v || found.length >= EVIDENCE_CAP) return;
+        if (!WS.agent.READINGS[k].anchor.every((re) => re.test(win))) return;
+        seen[k] = true;
+        found.push(k);
+      });
+    }
+    return evidenceFor(found);
   }
 
   // A screen the model wants shown becomes a chip, not a jump. Navigating the
@@ -481,10 +554,19 @@
     const text = String(say || '').trim();
     const blocks = normBlocks(plan.blocks, ran && DEPTH_BLOCKS[ran.depth]);
     const report = normReport(plan.report);
-    const evidence = evidenceFor(plan.read);
-    let next = normNext(plan.next);
+    /* Neither of these comes from the model any more. It said which readings it
+       leaned on and wrote its own follow-up chips; both were invention with a
+       control's authority, and both are things the code can work out from the
+       answer it is holding. What the model still sends under those names has
+       already been dropped at the proxy — this is where they stopped being read. */
+    const evidence = evidenceFrom(text);
+    let next = WS.agent.tools.followUps({ text: text, quoted: evidence.map((e) => e.key) });
     const chip = openChip(plan.open);
-    if (chip) next = [chip].concat(next || []).slice(0, 3);
+    // The card the model asked to open leads; a catalogue chip pointing at the
+    // same record would be the same button printed twice.
+    if (chip) {
+      next = [chip].concat(next.filter((n) => !(n.open === chip.open && n.id === chip.id))).slice(0, 3);
+    }
 
     if (plan.act) {
       const ops = Array.isArray(plan.act) ? plan.act : [plan.act];
@@ -704,7 +786,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normNext, normBlocks, normReport, normSay, evidenceFor, noteFailure, disable, composer,
+    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

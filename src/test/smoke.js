@@ -2956,12 +2956,125 @@ setTimeout(async () => {
       L.evidenceFor(['deals_active', 'выдуманный_показатель']).length === 1);
     check('live · evidence survives a non-array', L.evidenceFor('deals_active').length === 0);
 
-    check('live · follow-ups are capped at three',
-      (L.normNext([1, 2, 3, 4, 5].map((i) => ({ label: 'п' + i, ask: 'в' + i }))) || []).length === 3);
-    check('live · a malformed follow-up is dropped',
-      (L.normNext([{ ask: 'нет метки' }, { label: 'есть', ask: 'да' }, null]) || []).length === 1);
-    check('live · a follow-up with no action is dropped',
-      L.normNext([{ label: 'пусто' }]) === null);
+    /* A chip is DERIVED from the answer, not declared by the model.
+
+       The model used to name the readings it had leaned on, and the code
+       re-read them — so a chip proved the figure behind it was real and proved
+       nothing about the sentence above it. «8 сделок в работе» over a chip
+       reading 12 is two numbers disagreeing under one caption, and the caption
+       says «откуда это число».
+
+       Now the code looks for the reading's own value in the narration, anchored
+       by the word it counts. A figure the model invented matches nothing and
+       gets no chip; a figure it took from the data brings its query with it. */
+    {
+      const val = (k) => WS.query.run(WS.agent.READINGS[k].q).value;
+      const active = val('deals_active');
+      const overdue = val('tasks_overdue');
+
+      const got = L.evidenceFrom('Сейчас ' + active + ' сделки в работе. Просроченных задач — ' + overdue + '.');
+      check('live · a figure quoted in the answer brings its own chip',
+        got.some((e) => e.key === 'deals_active') && got.some((e) => e.key === 'tasks_overdue'),
+        JSON.stringify(got.map((e) => e.key)));
+      check('live · and the chip carries the query and the revision it was measured at',
+        got.length > 0 && got.every((e) => !!e.query && e.revision != null));
+
+      /* The three below were all found by running this over the recorded live
+         answers rather than by imagining them, and every one of them was
+         invisible to a test written from the nominative form alone. */
+
+      // Russian drops a vowel in the genitive plural: сделка → сделок. An
+      // anchor of «сделк» matches «сделки» and misses «8 сделок» — which is how
+      // a broker actually writes it, and how the model wrote it in the run.
+      check('live · a count is recognised in the case an answer is written in',
+        L.evidenceFrom('В работе ' + active + ' сделок на ' + WS.AED(val('deals_active_sum')) + '.')
+          .map((e) => e.key).join(',') === 'deals_active,deals_active_sum',
+        JSON.stringify(L.evidenceFrom('В работе ' + active + ' сделок.').map((e) => e.key)));
+
+      // A date beside a noun is not a count of that noun. «Объект Creekline
+      // 1208 проверен 12 мая» put a chip reading «12 объектов» under an answer
+      // that had counted nothing at all.
+      check('live · a date is not a count, however close the noun sits',
+        !L.evidenceFrom('Объект проверен ' + val('objects_total') + ' мая.')
+          .some((e) => e.key === 'objects_total'),
+        JSON.stringify(L.evidenceFrom('Объект проверен ' + val('objects_total') + ' мая.')));
+      check('live · and neither is a time on the clock',
+        !L.evidenceFrom('Срок по задаче сегодня в ' + val('tasks_open') + ':00.')
+          .some((e) => e.key === 'tasks_open'));
+      // Same sentence, one clause away: the words have to sit beside the figure.
+      check('live · a noun two clauses away does not caption a figure',
+        !L.evidenceFrom('Объект проверен и подтверждён агентством в срок, отгрузка ' + val('objects_total') + ' штук груза')
+          .some((e) => e.key === 'objects_total'));
+
+      check('live · a number that is nobody’s reading gets no chip',
+        L.evidenceFrom('Bayline 1603 стоит посмотреть.').length === 0);
+      check('live · a figure the model invented matches nothing',
+        L.evidenceFrom('Сделок в работе — 987654.').length === 0);
+      // The anchor is what stops a coincidence from becoming provenance: the
+      // count of deals and the count of anything else are the same digits.
+      check('live · a bare number with nothing to say what it counts is not evidence',
+        L.evidenceFrom('Их ' + active + ', остальное потом.').length === 0);
+      check('live · the same figure under another noun is not this reading',
+        !L.evidenceFrom('Показал ' + active + ' объектов на Крике.').some((e) => e.key === 'deals_active'));
+      // Money is printed by the stand's own formatter, so that is the form an
+      // answer quoting it will be written in.
+      check('live · a sum is recognised in the form the stand prints it',
+        L.evidenceFrom('Портфель сделок — ' + WS.AED(val('deals_active_sum')) + '.')
+          .some((e) => e.key === 'deals_active_sum'));
+      // Two readings, one value: neither can be told apart, so neither is shown.
+      // Guessing between them puts a caption over the wrong query.
+      {
+        const R = WS.agent.READINGS;
+        const same = Object.keys(R).filter((k) => val(k) === active);
+        if (same.length > 1) {
+          check('live · a value two readings share brings no chip unless the words separate them',
+            L.evidenceFrom('Итого ' + active + '.').length === 0);
+        } else {
+          check('live · a value two readings share brings no chip unless the words separate them', true);
+        }
+      }
+
+      // Every reading, phrased the way an answer would phrase it. Doubles as
+      // proof that the anchors match the labels the chips themselves print.
+      const many = Object.keys(WS.agent.READINGS).map((k) => {
+        const r = WS.agent.tools.read(k);
+        return r ? (r.money ? WS.AED(r.value) : r.value) + ' ' + r.label + '.' : '';
+      }).filter(Boolean).join(' ');
+      const lots = L.evidenceFrom(many);
+      check('live · every reading is recognisable in its own words', lots.length >= 4, String(lots.length));
+      check('live · chips are capped so an answer is not buried under them', lots.length <= 4, String(lots.length));
+    }
+
+    /* Follow-ups are built here too, from what this stand can actually answer.
+
+       A chip the model wrote put its own sentence back into the composer — and
+       a model that had just been told Marina is not in the data would cheerfully
+       offer «показать динамику по Marina» as the next step. Every chip below
+       comes from a catalogue whose entries carry a precondition against the
+       store, so a chip that appears has an answer waiting behind it. */
+    {
+      const F = WS.agent.tools.followUps;
+      const ups = F({});
+      check('agent · an answer always offers a way forward', ups.length > 0 && ups.length <= 3);
+      check('agent · every follow-up is either a question or a card',
+        ups.every((n) => !!n.label && (typeof n.ask === 'string' ? !!n.ask : (!!n.open && !!n.id !== undefined))));
+
+      // The precondition is the point: offered when there is something to show,
+      // absent when there is not. Holds whichever way the fixtures fall.
+      const all = F({ limit: 30 });
+      const overdue = WS.query.run(WS.agent.READINGS.tasks_overdue.q).value;
+      check('agent · a follow-up is offered only when it has an answer behind it',
+        all.some((n) => /просроч/i.test(n.ask || '')) === (overdue > 0), 'overdue=' + overdue);
+
+      // Someone the answer names is one touch from their card.
+      const named = F({ text: 'По Виктору Орлову всё готово, документы собраны.' });
+      check('agent · a person the answer names becomes a way into their card',
+        named.some((n) => n.open === 'contact' && n.id === 'c_docs'), JSON.stringify(named));
+      check('agent · and that card comes first, before the standing questions',
+        !!named[0] && named[0].open === 'contact', JSON.stringify(named[0]));
+      check('agent · a name nobody in the data carries opens nothing',
+        !F({ text: 'По Джону Смиту ничего нет.' }).some((n) => n.open === 'contact'));
+    }
 
     // Navigating the moment it answers threw the reply off a phone screen —
     // the person was still reading it. It offers, they decide.
@@ -2976,6 +3089,21 @@ setTimeout(async () => {
       const bad = L.toReply('Текст.', { open: { view: 'нет_такого_экрана', id: 'x' } });
       check('live · an unknown screen is ignored',
         !(bad.next || []).some((n) => n.open === 'нет_такого_экрана'));
+    }
+
+    // What the model still sends under the old names is not what gets shown.
+    // The two fields left the contract; reading them anyway would leave the
+    // model's own invention on the screen and the change would be cosmetic.
+    {
+      const r = L.toReply('Текст без чисел.', {
+        read: ['deals_active'],
+        next: [{ label: 'Выдумка', ask: 'спроси меня об этом' }],
+      });
+      check('live · a reading the model claims but never quotes brings no chip',
+        !(r.evidence || []).length, JSON.stringify(r.evidence));
+      check('live · a follow-up the model wrote is not the one shown',
+        !(r.next || []).some((n) => n.label === 'Выдумка'), JSON.stringify(r.next));
+      check('live · but the answer still offers a way forward', (r.next || []).length > 0);
     }
 
     // A write instruction from the model is a proposal, never a write.
