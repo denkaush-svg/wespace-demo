@@ -77,6 +77,14 @@ const serve = http.createServer((req, res) => {
     await browser.close(); serve.close(); process.exit(1);
   }
 
+  /* WHICH server answered, on screen and not only in the manifest.
+
+     A stale proxy left running on the default local port for thirty hours ate a
+     whole re-check: the run reported live answers, the numbers looked plausible,
+     and every one of them came from a build two features old. The address is the
+     first thing that makes a run's result mean anything. */
+  console.log('прогон против ' + API + ' · набор «' + SET + '» · вопросов ' + QUERIES.length + '\n');
+
   const out = [];
   let servedBefore = await page.evaluate(() => (window.WS.live && window.WS.live.served) || 0);
   for (let i = 0; i < QUERIES.length; i++) {
