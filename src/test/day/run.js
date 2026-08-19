@@ -174,12 +174,21 @@ const serve = http.createServer((req, res) => {
            refusal inside the standdown window are three different defects that
            looked identical in the record — the last run cost an hour to tell
            them apart by hand. */
+        /* Whether this turn left an unfinished instruction parked on the
+           conversation. Read after the turn, so it says what the NEXT one will
+           be resumed from — without it the record cannot tell a resumed
+           instruction from the transcript being re-read luckily. */
+        parked: (() => {
+          const p = window.WS.engine.pendingAction && window.WS.engine.pendingAction();
+          return p ? { op: (p.ops[0] || {}).op || null, need: p.need } : null;
+        })(),
         liveError: (window.WS.live && window.WS.live.lastError) || null,
       };
     });
 
     got.ms = Date.now() - t0;
     got.answered = answered;
+
     /* Which head actually spoke, per scenario — not cumulatively at the end.
        The live head falls back to the offline planner on any failure, so a
        restart or a blip mid-run turns the rest of the day into a measurement of
@@ -193,6 +202,52 @@ const serve = http.createServer((req, res) => {
       (got.ops.length ? ' · ops=[' + got.ops.join(',') + ']' : '') +
       (got.blocks.length ? ' · блоков ' + got.blocks.length + ' (данные ' + got.dataBlocks +
         (got.modelNumeric ? ', МОДЕЛЬ ' + got.modelNumeric : '') + ')' : ''));
+
+    /* A second turn in the SAME conversation, when the scenario asks for one.
+       Half the Concierge's failures only exist across turns — it asks for a
+       name and then does not know what the name was for — and a harness that
+       opens a fresh thread per question cannot see any of them. The thread is
+       not reopened and the workspace is not reset between the two: that is the
+       whole point of the exchange.
+
+       It runs AFTER the first turn has been counted and printed. Placed before,
+       it stole `servedBefore` from under the first turn's own verdict, and three
+       runs that had plainly reached the model were recorded as the planner. */
+    if (spec.follow && answered) {
+      await new Promise((r) => setTimeout(r, GAP_MS));
+      process.stdout.write('   ↳ «' + spec.follow.slice(0, 40) + '» … ');
+      const t1 = Date.now();
+      await page.evaluate((f) => {
+        window.__seen = window.WS.engine.lastReply;
+        window.WS.router.routePrompt(f);
+      }, spec.follow);
+      const ok2 = await page.waitForFunction(
+        () => window.WS.engine.lastReply && window.WS.engine.lastReply !== window.__seen,
+        { timeout: TIMEOUT_MS },
+      ).then(() => true, () => false);
+      got.then = await page.evaluate(() => {
+        const r = window.WS.engine.lastReply || {};
+        return {
+          kind: r.kind || null,
+          text: String(r.text || ''),
+          ops: (r.kind === 'proposal' && Array.isArray(r.ops)) ? r.ops.slice(0, 6) : [],
+          lines: (r.lines || []).map((s) => String(s).slice(0, 140)),
+          missing: (r.missing || []).map((s) => String(s).slice(0, 160)),
+          // Whether the mechanism under test actually fired, rather than the
+          // transcript carrying the exchange on its own. Without this the
+          // record cannot tell a resumed instruction from a lucky re-derivation.
+          parked: !!(window.WS.engine.pendingAction && window.WS.engine.pendingAction()),
+          served: (window.WS.live && window.WS.live.served) || 0,
+        };
+      });
+      got.then.answered = ok2;
+      got.then.ms = Date.now() - t1;
+      got.then.live = got.then.served > servedBefore;
+      servedBefore = got.then.served;
+      console.log((ok2 ? got.then.kind : 'НЕ ОТВЕТИЛ') + ' · ' + Math.round(got.then.ms / 1000) + 'с' +
+        (got.then.live ? '' : ' · ⚠ ОФЛАЙН-ПЛАНИРОВЩИК') +
+        (got.then.ops.length ? ' · ops=[' + got.then.ops.map((o) => o.op).join(',') + ']' : ''));
+    }
 
     // The manifest says what this file IS. A subset run used to overwrite a
     // full one under the same name, and nothing recorded that it was a subset —

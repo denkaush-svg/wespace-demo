@@ -417,6 +417,38 @@
   }
   function activeThread() { return engine.threads[engine.activeThreadId] || null; }
 
+  /* ---------- an instruction the broker started and has not finished ----------
+
+     It is held on the CONVERSATION, because that is its scope: threads here are
+     per deal, per object, per lead, and a name given in one of them answers the
+     question asked in that one. A single global slot would have carried an
+     answer across to whatever the agent walked into next.
+
+     Nothing here is invented by the model. The operation it means to run is
+     parked exactly as it sent it, minus the field the write layer refused it
+     for — so what resumes is the instruction itself, not a retelling.
+
+     And it goes stale. Three exchanges later a short reply is about something
+     else, and taking it as the missing name would file a stranger. Absent beats
+     stale: forgetting costs one repeated question, guessing costs a record. */
+  const PENDING_STALE_AFTER = 6;   // messages, so three exchanges
+
+  function pendingAction() {
+    const t = activeThread();
+    const p = t && t.pending;
+    if (!p) return null;
+    if ((t.items || []).length - p.at > PENDING_STALE_AFTER) { t.pending = null; return null; }
+    return p;
+  }
+  function setPendingAction(p) {
+    const t = activeThread() || ensureThread(engine.activeThreadId || 'general');
+    t.pending = p ? Object.assign({}, p, { at: (t.items || []).length }) : null;
+  }
+  function clearPendingAction() {
+    const t = activeThread();
+    if (t) t.pending = null;
+  }
+
   function startChain(chainId) {
     const c = WS.chainById(chainId);
     if (c) startScenario(c.scenarios[0], chainId);
@@ -1051,6 +1083,7 @@
     set lastReply(v) { engine.lastReply = v; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
+    pendingAction, setPendingAction, clearPendingAction,
     activeThreadId: () => engine.activeThreadId,
     session: () => engine.session, financeCard, shortlistCard };
 })(window.WS = window.WS || {});

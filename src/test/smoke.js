@@ -3186,6 +3186,80 @@ setTimeout(async () => {
         !(bad.next || []).some((n) => n.open === 'нет_такого_экрана'));
     }
 
+    /* ---------- a half-given instruction survives the turn ----------
+
+       The Concierge asked «как записать контакт?», the broker typed «Пётр
+       Волков», and nothing on this side knew what that answer was FOR. The live
+       head could sometimes reconstruct it from the transcript; the offline one
+       said «потерял нить» one line after asking its own question, which reads
+       as the assistant forgetting what it just said.
+
+       So an unfinished instruction is state, held on the conversation it
+       belongs to. It is not a new thing for the model to invent: it sends the
+       operation it means to run even when a field is still missing, the write
+       layer refuses it by the floor it already enforces, and THAT refusal —
+       which names the operation, the collection and the missing field — is what
+       gets parked. What resumes is the exact operation, not a paraphrase. */
+    {
+      const before = WS.engine.activeThreadId();
+      WS.engine.openThread('probe:pending', 'Незавершённое', 'chat');
+
+      const r = L.toReply('Как записать контакт?', { act: { op: 'addClient', obj: { channel: 'whatsapp' } } });
+      const p = WS.engine.pendingAction();
+      check('live · an instruction missing one field is parked, not lost',
+        !!p && p.need.indexOf('name') >= 0 && p.ops[0].op === 'addClient', JSON.stringify(p));
+      check('live · the half-built record is kept, so nothing is asked twice',
+        !!p && p.ops[0].obj.channel === 'whatsapp', JSON.stringify(p && p.ops));
+      // The broker is asked a question, not shown a store error. The refusal is
+      // how the code learned what is missing; it is not news to the person.
+      check('live · and the reply stays the question the model asked',
+        r.kind === 'answer' && r.text === 'Как записать контакт?', JSON.stringify(r.text));
+
+      // A refusal for any other reason is still said plainly — parking it would
+      // leave the Concierge waiting for an answer to a question it never asked.
+      WS.engine.clearPendingAction();
+      const bad = L.toReply('Двигаю.', { act: { op: 'dealStage', id: 'нет_такой', stage: 'won' } });
+      check('live · a refusal that is not a missing field is not parked',
+        WS.engine.pendingAction() === null, JSON.stringify(WS.engine.pendingAction()));
+      check('live · and it is still said out loud', /не выйдет/i.test(bad.text || ''), bad.text);
+
+      /* The offline planner can finish it too — this is the turn that used to
+         produce «связь с моделью прервалась, повторите поручение целиком».
+
+         `lastReply` is set to a question on purpose: without it the old
+         «потерял нить» branch cannot fire at all, and a test that passes with
+         the feature removed measures nothing. With it, the two behaviours are
+         genuinely competing for the same turn. */
+      const prevReply = WS.engine.lastReply;
+      WS.engine.lastReply = { kind: 'answer', text: 'Как записать контакт?', evidence: [], next: [] };
+      L.toReply('Как записать контакт?', { act: { op: 'addClient', obj: { channel: 'whatsapp' } } });
+      const armed = !!WS.engine.pendingAction();
+      const done = WS.agent.ask('Пётр Волков');
+      check('offline · the pending instruction is finished from a bare answer',
+        done.kind === 'proposal' && (done.ops || [])[0].obj.name === 'Пётр Волков', JSON.stringify(done.ops || done.text));
+      check('offline · and it no longer says it lost the thread',
+        !/потерял нить/i.test(done.text || ''), done.text);
+      check('live · a finished instruction stops being pending',
+        armed && WS.engine.pendingAction() === null, 'armed=' + armed);
+      WS.engine.lastReply = prevReply;
+
+      // Stale is worse than absent: an answer three exchanges later is about
+      // something else, and filling a name from it would write a stranger.
+      L.toReply('Как записать контакт?', { act: { op: 'addClient', obj: {} } });
+      const th = WS.engine.activeThread();
+      const heldBefore = !!WS.engine.pendingAction();
+      for (let i = 0; i < 8; i++) th.items.push({ id: 'x' + i, html: '<div class="msg me">…</div>' });
+      check('live · a pending instruction goes stale rather than waiting forever',
+        heldBefore && WS.engine.pendingAction() === null, 'held=' + heldBefore);
+      // And a stale one is not quietly finished by the next short turn either.
+      const late = WS.agent.ask('Пётр Волков');
+      check('offline · a stale instruction is not finished from a later answer',
+        late.kind !== 'proposal', late.kind);
+
+      WS.engine.clearPendingAction();
+      if (before) WS.engine.openThread(before, '', '');
+    }
+
     // What the model still sends under the old names is not what gets shown.
     // The two fields left the contract; reading them anyway would leave the
     // model's own invention on the screen and the change would be cosmetic.

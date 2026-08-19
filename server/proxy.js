@@ -456,6 +456,10 @@ const SYSTEM = [
   '  Её не заполняют, на ней разговор и кончается.',
   '  ПЛОХО: «Назовите имя, и заодно спальни, если знаете. Канал тоже подскажите.»',
   '  ХОРОШО: «Как записать контакт? Бюджет 3 млн и Крик я понял, остальное добавим потом.»',
+  '— НЕ ХВАТАЕТ ОБЯЗАТЕЛЬНОГО — всё равно пришли act с тем, что уже собрал, а вопрос задай текстом.',
+  '  Система придержит операцию за этим разговором и достроит её ответом брокера.',
+  '  Так ему не придётся повторять поручение целиком, а тебе — собирать его заново.',
+  '  Пустую запись это не заведёт: слой записи её не пропустит, он и придержит.',
   '— Чего не хватает карточке для полноты, система напишет САМА на карточке подтверждения,',
   '  строкой «Дозаполнить». Сам эти поля не перечисляй и не выспрашивай — получится два',
   '  списка, и они разойдутся. Одной фразой скажи, что остальное добавим, и заводи.',
@@ -694,6 +698,37 @@ function focusText(body) {
   return out.join('\n');
 }
 
+/* An instruction this conversation is already holding, one field short.
+
+   The page parks it when the write layer refuses an operation for a field that
+   is not there yet, and hands it back on the next turn. Without it a one-word
+   reply — «Пётр Волков» — arrives as a turn with no subject, and the model has
+   to re-derive the whole instruction from the transcript or ask again. Asking
+   again is what a broker reads as not listening.
+
+   Values, never instructions: the operation is clipped and quoted, and the
+   rules above it do not move because of anything inside it. */
+function pendingText(body) {
+  const p = body && body.pending;
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return '';
+  const need = (Array.isArray(p['ждём']) ? p['ждём'] : [])
+    .slice(0, 3).map((f) => clip(f, 40).trim()).filter(Boolean);
+  let ops = '';
+  try { ops = clip(JSON.stringify(p['операция']), 1200); } catch (e) { ops = ''; }
+  if (!need.length || !ops || ops === 'undefined') return '';
+  return [
+    '=== НЕЗАВЕРШЁННОЕ ПОРУЧЕНИЕ ===',
+    'В этом разговоре ты уже начал операцию, и ей не хватает: ' + need.join(', ') + '.',
+    'Вот она целиком, как ты её прислал: ' + ops,
+    'Ответ брокера ниже — скорее всего, это и есть недостающее значение.',
+    'Подставь его и верни act ЦЕЛИКОМ, со всеми полями, что уже собраны.',
+    'Не спрашивай второй раз и не начинай сбор заново — для брокера это выглядит так,',
+    'будто ты забыл собственный вопрос через строку.',
+    'Если ответ явно про другое — брось начатое и отвечай на то, что спросили.',
+    '=== КОНЕЦ ===',
+  ].join('\n');
+}
+
 function buildPrompt(body) {
   const call = resolveCall(body);
   const mode = MODES[call.mode];
@@ -749,6 +784,9 @@ function buildPrompt(body) {
     '',
     scope,
     hist ? '=== ПРЕДЫДУЩИЕ РЕПЛИКИ ===\n' + hist + '\n=== КОНЕЦ ===\n' : '',
+    // Immediately above the question, because it is about to be read as an
+    // answer to it rather than as a question of its own.
+    pendingText(body),
     '=== ВОПРОС БРОКЕРА ===',
     text,
     '=== КОНЕЦ ВОПРОСА ===',

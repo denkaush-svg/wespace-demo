@@ -159,7 +159,12 @@
 
   function propose(ops, meta) {
     const dry = WS.storeApi.preview(ops);
-    if (!dry.ok) return { kind: 'error', text: dry.error, code: dry.code, next: suggestions() };
+    // The refusal travels with WHAT was refused. Without the field and the
+    // collection, an unfinished instruction can only be reported, not resumed.
+    if (!dry.ok) {
+      return { kind: 'error', text: dry.error, code: dry.code, next: suggestions(),
+        fields: dry.fields || null, collection: dry.collection || null };
+    }
     propSeq++;
     const id = 'pr' + propSeq;
     const p = {
@@ -340,9 +345,42 @@
     };
   }
 
+  /* Finishes an instruction this conversation already holds.
+
+     This is the turn that used to read «связь с моделью прервалась, повторите
+     поручение целиком» — the Concierge asking for a name and then, one line
+     later, not knowing what the name was for. It does not need the model: the
+     operation is parked whole, one field short, and the broker just said the
+     field.
+
+     Only when exactly one thing is missing. Two would mean deciding which of
+     them the answer is, and that is a guess about a record. */
+  function fillPending(pend, value) {
+    const ops = JSON.parse(JSON.stringify(pend.ops || []));
+    const field = pend.need[0];
+    for (let i = 0; i < ops.length; i++) {
+      const rec = ops[i].task || ops[i].obj || ops[i].record;
+      if (!rec || typeof rec !== 'object') continue;
+      if (rec[field] == null || String(rec[field]).trim() === '') { rec[field] = value; return ops; }
+    }
+    return null;
+  }
+
   function deterministicHead(text) {
     const t = lc(text).trim();
     const ent = findEntity(t);
+
+    // Before anything else: the conversation is waiting on one value, and this
+    // turn looks like a value. Nothing else it could reasonably be.
+    const pend = (WS.engine && WS.engine.pendingAction) ? WS.engine.pendingAction() : null;
+    if (pend && (pend.need || []).length === 1 && looksLikeAValue(text)) {
+      const ops = fillPending(pend, String(text).trim());
+      const p = ops && propose(ops, { title: 'Новая запись' });
+      if (p && p.kind === 'proposal') {
+        if (WS.engine.clearPendingAction) WS.engine.clearPendingAction();
+        return p;
+      }
+    }
 
     // outward action — the channel is not wired, so produce the artifact itself
     if (RE.send.test(t)) {
@@ -466,10 +504,17 @@
      from the Concierge ended in a question, and this turn is too short and too
      unlike a query to be one. Names, numbers, «да», a channel — the shapes an
      answer takes. */
-  function answersAQuestion(text) {
+  /* The shape half: a name, a number, «да», a channel — short, and not built
+     like a query. Split out because a parked instruction is its own evidence
+     that something was asked, and a better one: it survives the reply object
+     being replaced, which `lastReply` does not. */
+  function looksLikeAValue(text) {
     const s = String(text == null ? '' : text).trim();
     if (!s || s.length > 60 || s.split(/\s+/).length > 5) return false;
-    if (/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s)) return false;
+    return !/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s);
+  }
+  function answersAQuestion(text) {
+    if (!looksLikeAValue(text)) return false;
     const prev = (WS.engine && WS.engine.lastReply) || null;
     const asked = prev && typeof prev.text === 'string' && /\?\s*$/.test(prev.text.trim());
     return !!asked;

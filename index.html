@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:00</title>
+  <title>WESPACE · сборка 18:16</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:00';
+    window.WS_BUILD='18:16';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5374,6 +5374,38 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function activeThread() { return engine.threads[engine.activeThreadId] || null; }
 
+  /* ---------- an instruction the broker started and has not finished ----------
+
+     It is held on the CONVERSATION, because that is its scope: threads here are
+     per deal, per object, per lead, and a name given in one of them answers the
+     question asked in that one. A single global slot would have carried an
+     answer across to whatever the agent walked into next.
+
+     Nothing here is invented by the model. The operation it means to run is
+     parked exactly as it sent it, minus the field the write layer refused it
+     for — so what resumes is the instruction itself, not a retelling.
+
+     And it goes stale. Three exchanges later a short reply is about something
+     else, and taking it as the missing name would file a stranger. Absent beats
+     stale: forgetting costs one repeated question, guessing costs a record. */
+  const PENDING_STALE_AFTER = 6;   // messages, so three exchanges
+
+  function pendingAction() {
+    const t = activeThread();
+    const p = t && t.pending;
+    if (!p) return null;
+    if ((t.items || []).length - p.at > PENDING_STALE_AFTER) { t.pending = null; return null; }
+    return p;
+  }
+  function setPendingAction(p) {
+    const t = activeThread() || ensureThread(engine.activeThreadId || 'general');
+    t.pending = p ? Object.assign({}, p, { at: (t.items || []).length }) : null;
+  }
+  function clearPendingAction() {
+    const t = activeThread();
+    if (t) t.pending = null;
+  }
+
   function startChain(chainId) {
     const c = WS.chainById(chainId);
     if (c) startScenario(c.scenarios[0], chainId);
@@ -6008,6 +6040,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     set lastReply(v) { engine.lastReply = v; },
     openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
+    pendingAction, setPendingAction, clearPendingAction,
     activeThreadId: () => engine.activeThreadId,
     session: () => engine.session, financeCard, shortlistCard };
 })(window.WS = window.WS || {});
@@ -14060,7 +14093,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   function propose(ops, meta) {
     const dry = WS.storeApi.preview(ops);
-    if (!dry.ok) return { kind: 'error', text: dry.error, code: dry.code, next: suggestions() };
+    // The refusal travels with WHAT was refused. Without the field and the
+    // collection, an unfinished instruction can only be reported, not resumed.
+    if (!dry.ok) {
+      return { kind: 'error', text: dry.error, code: dry.code, next: suggestions(),
+        fields: dry.fields || null, collection: dry.collection || null };
+    }
     propSeq++;
     const id = 'pr' + propSeq;
     const p = {
@@ -14241,9 +14279,42 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     };
   }
 
+  /* Finishes an instruction this conversation already holds.
+
+     This is the turn that used to read «связь с моделью прервалась, повторите
+     поручение целиком» — the Concierge asking for a name and then, one line
+     later, not knowing what the name was for. It does not need the model: the
+     operation is parked whole, one field short, and the broker just said the
+     field.
+
+     Only when exactly one thing is missing. Two would mean deciding which of
+     them the answer is, and that is a guess about a record. */
+  function fillPending(pend, value) {
+    const ops = JSON.parse(JSON.stringify(pend.ops || []));
+    const field = pend.need[0];
+    for (let i = 0; i < ops.length; i++) {
+      const rec = ops[i].task || ops[i].obj || ops[i].record;
+      if (!rec || typeof rec !== 'object') continue;
+      if (rec[field] == null || String(rec[field]).trim() === '') { rec[field] = value; return ops; }
+    }
+    return null;
+  }
+
   function deterministicHead(text) {
     const t = lc(text).trim();
     const ent = findEntity(t);
+
+    // Before anything else: the conversation is waiting on one value, and this
+    // turn looks like a value. Nothing else it could reasonably be.
+    const pend = (WS.engine && WS.engine.pendingAction) ? WS.engine.pendingAction() : null;
+    if (pend && (pend.need || []).length === 1 && looksLikeAValue(text)) {
+      const ops = fillPending(pend, String(text).trim());
+      const p = ops && propose(ops, { title: 'Новая запись' });
+      if (p && p.kind === 'proposal') {
+        if (WS.engine.clearPendingAction) WS.engine.clearPendingAction();
+        return p;
+      }
+    }
 
     // outward action — the channel is not wired, so produce the artifact itself
     if (RE.send.test(t)) {
@@ -14367,10 +14438,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      from the Concierge ended in a question, and this turn is too short and too
      unlike a query to be one. Names, numbers, «да», a channel — the shapes an
      answer takes. */
-  function answersAQuestion(text) {
+  /* The shape half: a name, a number, «да», a channel — short, and not built
+     like a query. Split out because a parked instruction is its own evidence
+     that something was asked, and a better one: it survives the reply object
+     being replaced, which `lastReply` does not. */
+  function looksLikeAValue(text) {
     const s = String(text == null ? '' : text).trim();
     if (!s || s.length > 60 || s.split(/\s+/).length > 5) return false;
-    if (/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s)) return false;
+    return !/[?]|как|что|сколько|почему|когда|где|кто|покажи|дай|собери|сравни/i.test(s);
+  }
+  function answersAQuestion(text) {
+    if (!looksLikeAValue(text)) return false;
     const prev = (WS.engine && WS.engine.lastReply) || null;
     const asked = prev && typeof prev.text === 'string' && /\?\s*$/.test(prev.text.trim());
     return !!asked;
@@ -14915,6 +14993,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       .filter((m) => m.text || (m.blocks && m.blocks.length));
   }
 
+  /* What this conversation is waiting on. Sent as data like everything else, so
+     the model finishes the instruction it already sent instead of re-deriving it
+     from a transcript — and so a one-word answer stops being a turn with no
+     subject. The keys are Russian for the same reason the digest's are. */
+  function pendingAction() {
+    const p = (WS.engine && WS.engine.pendingAction) ? WS.engine.pendingAction() : null;
+    if (!p || !Array.isArray(p.need) || !p.need.length) return null;
+    return { операция: p.ops, ждём: p.need };
+  }
+
   // Which conversation this is. Threads are per deal, per object, per lead, and
   // the model was answering every one of them as if it were the general chat.
   function scope() {
@@ -15263,8 +15351,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // carried out — and the card says it came from there, so a change made
       // while reading a report is not mistaken for the report's own doing.
       const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next, askedIn: askedMode(ran && ran.mode) });
-      if (p && p.kind === 'proposal') { p.text = text; return p; }
-      // The store refused the dry run — say so plainly instead of pretending.
+      if (p && p.kind === 'proposal') {
+        // Whatever was outstanding in this conversation has just been carried
+        // out; leaving it parked would have the Concierge waiting on an answer
+        // to a question that is already behind it.
+        if (WS.engine.clearPendingAction) WS.engine.clearPendingAction();
+        p.text = text;
+        return p;
+      }
+      /* Refused for a field that is not there yet. That is not news to the
+         broker — the model is asking for it in the same breath — so the reply
+         stays the question, and the operation is parked to be finished with the
+         answer. Reporting a store error here would make the Concierge look as
+         if its own question had failed. */
+      if (p && p.code === 'missing_field' && Array.isArray(p.fields) && p.fields.length) {
+        WS.engine.setPendingAction({ ops: ops, need: p.fields, collection: p.collection || null });
+        return { kind: 'answer', text: text, evidence: evidence, next: next };
+      }
+      // Any other refusal — say so plainly instead of pretending.
       return {
         kind: 'answer',
         text: text + (p && p.text ? ' Записать не выйдет: ' + p.text : ''),
@@ -15320,8 +15424,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope() },
-        composer())),
+      body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
+        pending: pendingAction() }, composer())),
     });
     if (!res.ok || !res.body) throw new Error('http ' + res.status);
 
@@ -15474,7 +15578,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer,
+    ask, probe, install, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

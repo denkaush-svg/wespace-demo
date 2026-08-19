@@ -88,6 +88,27 @@ function pureChecks() {
   r = splitReply('Текст.\n```json\n[1,2,3]\n```');
   ok('a non-object plan is refused', Object.keys(r.plan).length === 0);
 
+  /* An unfinished instruction reaches the model as data, right above the turn
+     that is about to answer it. Without it «Пётр Волков» arrives as a turn with
+     no subject and the whole instruction has to be re-derived. */
+  {
+    const p = buildPrompt({ text: 'Пётр Волков', digest: {}, history: [],
+      pending: { 'операция': [{ op: 'addClient', obj: { channel: 'whatsapp' } }], 'ждём': ['name'] } });
+    ok('an unfinished instruction reaches the prompt', p.indexOf('НЕЗАВЕРШЁННОЕ ПОРУЧЕНИЕ') >= 0);
+    ok('and carries the operation as it was sent', p.indexOf('"op":"addClient"') >= 0 && p.indexOf('whatsapp') >= 0);
+    ok('and sits above the question it is about to be answered by',
+      p.indexOf('НЕЗАВЕРШЁННОЕ') < p.indexOf('=== ВОПРОС БРОКЕРА ==='));
+
+    const none = buildPrompt({ text: 'вопрос', digest: {}, history: [] });
+    ok('no unfinished instruction, no section', none.indexOf('НЕЗАВЕРШЁННОЕ') < 0);
+    // Caller-controlled, like everything else the browser sends.
+    const junk = buildPrompt({ text: 'вопрос', digest: {}, history: [], pending: { 'ждём': ['name'] } });
+    ok('a half-formed one is dropped rather than half-quoted', junk.indexOf('НЕЗАВЕРШЁННОЕ') < 0);
+    const huge = buildPrompt({ text: 'вопрос', digest: {}, history: [],
+      pending: { 'операция': [{ op: 'addClient', obj: { note: 'ю'.repeat(4000) } }], 'ждём': ['name'] } });
+    ok('and a giant one is clipped, not forwarded whole', huge.indexOf('ю'.repeat(1300)) < 0);
+  }
+
   const long = 'я'.repeat(CFG.maxText + 500);
   const p = buildPrompt({ text: long, digest: { a: 1 }, history: [] });
   ok('the question is clipped to its ceiling', p.indexOf('я'.repeat(CFG.maxText + 1)) < 0);

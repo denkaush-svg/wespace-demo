@@ -227,6 +227,16 @@
       .filter((m) => m.text || (m.blocks && m.blocks.length));
   }
 
+  /* What this conversation is waiting on. Sent as data like everything else, so
+     the model finishes the instruction it already sent instead of re-deriving it
+     from a transcript — and so a one-word answer stops being a turn with no
+     subject. The keys are Russian for the same reason the digest's are. */
+  function pendingAction() {
+    const p = (WS.engine && WS.engine.pendingAction) ? WS.engine.pendingAction() : null;
+    if (!p || !Array.isArray(p.need) || !p.need.length) return null;
+    return { операция: p.ops, ждём: p.need };
+  }
+
   // Which conversation this is. Threads are per deal, per object, per lead, and
   // the model was answering every one of them as if it were the general chat.
   function scope() {
@@ -575,8 +585,24 @@
       // carried out — and the card says it came from there, so a change made
       // while reading a report is not mistaken for the report's own doing.
       const p = WS.agent.tools.propose(ops, { title: 'Изменение по просьбе', next: next, askedIn: askedMode(ran && ran.mode) });
-      if (p && p.kind === 'proposal') { p.text = text; return p; }
-      // The store refused the dry run — say so plainly instead of pretending.
+      if (p && p.kind === 'proposal') {
+        // Whatever was outstanding in this conversation has just been carried
+        // out; leaving it parked would have the Concierge waiting on an answer
+        // to a question that is already behind it.
+        if (WS.engine.clearPendingAction) WS.engine.clearPendingAction();
+        p.text = text;
+        return p;
+      }
+      /* Refused for a field that is not there yet. That is not news to the
+         broker — the model is asking for it in the same breath — so the reply
+         stays the question, and the operation is parked to be finished with the
+         answer. Reporting a store error here would make the Concierge look as
+         if its own question had failed. */
+      if (p && p.code === 'missing_field' && Array.isArray(p.fields) && p.fields.length) {
+        WS.engine.setPendingAction({ ops: ops, need: p.fields, collection: p.collection || null });
+        return { kind: 'answer', text: text, evidence: evidence, next: next };
+      }
+      // Any other refusal — say so plainly instead of pretending.
       return {
         kind: 'answer',
         text: text + (p && p.text ? ' Записать не выйдет: ' + p.text : ''),
@@ -632,8 +658,8 @@
     const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope() },
-        composer())),
+      body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
+        pending: pendingAction() }, composer())),
     });
     if (!res.ok || !res.body) throw new Error('http ' + res.status);
 
@@ -786,7 +812,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer,
+    ask, probe, install, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
