@@ -152,6 +152,15 @@ const serve = http.createServer((req, res) => {
         opsFull: (r.kind === 'proposal' && Array.isArray(r.ops)) ? r.ops.slice(0, 6) : [],
         lines: (r.lines || []).map((s) => String(s).slice(0, 140)),
         next: (r.next || []).map((n) => String((n && n.label) || '')),
+        /* The chips under the answer, which the code now derives from the
+           narration instead of taking the model's word for. Without them in the
+           record there is no way to tell «the model quoted a measured figure and
+           it was recognised» from «it quoted one and nothing caught it» — and
+           the second is the failure this derivation can actually have. */
+        // Money is written the way the chip writes it, or the record reads
+        // «20228000 на сумму» for something the screen shows as «20 228 000 AED».
+        evidence: (r.evidence || []).map((e) =>
+          (e.money ? window.WS.AED(e.value) : String(e.value)) + ' ' + String(e.label)),
         opens: (r.next || []).filter((n) => n && n.open).map((n) => n.open + (n.id ? ':' + n.id : '')),
         report: r.report ? { title: r.report.title, count: r.report.count } : null,
         served: (window.WS.live && window.WS.live.served) || 0,
