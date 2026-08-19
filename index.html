@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:32</title>
+  <title>WESPACE · сборка 02:46</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:32';
+    window.WS_BUILD='02:46';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -15610,9 +15610,32 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      the whole meeting. So being down is now a WINDOW, not a verdict: the head
      stays installed, calls during the window fail instantly and cost nothing,
      and the first question after it re-probes and comes back. */
+  /* Which of the four things went wrong, because they are four different
+     repairs and the record used to hold one line for all of them.
+
+     `Failed to fetch` is the browser's word for everything that happened before
+     a response existed — an expired certificate, a refused connection, a socket
+     the pool reused after it had quietly died. Twelve hard scenarios lost four
+     answers to the offline planner under exactly that string, and it named
+     nothing. What told them apart in the end was arithmetic on the server's own
+     counters, which is not a thing anyone should have to do twice. */
+  function reasonFor(why, err) {
+    const s = String(why == null ? '' : why);
+    if (/^http \d/.test(s)) return 'fallback_http';              // the server answered, and refused
+    if (/stream ended/i.test(s)) return 'fallback_cut';          // it answered and stopped mid-reply
+    if (/^offline$|^health/i.test(s)) return 'fallback_offline'; // the probe said no before we asked
+    // fetch itself rejected: nothing was ever accepted on the other side.
+    if (err && (err.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(s))) {
+      return 'fallback_no_reach';
+    }
+    return 'fallback_model';
+  }
+
   function noteFailure(why, err) {
-    // Our own refusal during the window: not new evidence the service is down.
+    // Our own refusal during the window: not new evidence the service is down,
+    // and counting it would inflate whichever reason armed the window.
     if (err && err.cooldown) return;
+    note(reasonFor(why, err));
     // Already in standdown: the clock is already running; count the miss but
     // do not call disable() again — calling it would re-arm the window from
     // NOW, extending it by exactly one cooldownMs per question asked during it.

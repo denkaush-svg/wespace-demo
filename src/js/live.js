@@ -803,9 +803,32 @@
      the whole meeting. So being down is now a WINDOW, not a verdict: the head
      stays installed, calls during the window fail instantly and cost nothing,
      and the first question after it re-probes and comes back. */
+  /* Which of the four things went wrong, because they are four different
+     repairs and the record used to hold one line for all of them.
+
+     `Failed to fetch` is the browser's word for everything that happened before
+     a response existed — an expired certificate, a refused connection, a socket
+     the pool reused after it had quietly died. Twelve hard scenarios lost four
+     answers to the offline planner under exactly that string, and it named
+     nothing. What told them apart in the end was arithmetic on the server's own
+     counters, which is not a thing anyone should have to do twice. */
+  function reasonFor(why, err) {
+    const s = String(why == null ? '' : why);
+    if (/^http \d/.test(s)) return 'fallback_http';              // the server answered, and refused
+    if (/stream ended/i.test(s)) return 'fallback_cut';          // it answered and stopped mid-reply
+    if (/^offline$|^health/i.test(s)) return 'fallback_offline'; // the probe said no before we asked
+    // fetch itself rejected: nothing was ever accepted on the other side.
+    if (err && (err.name === 'TypeError' || /failed to fetch|networkerror|load failed/i.test(s))) {
+      return 'fallback_no_reach';
+    }
+    return 'fallback_model';
+  }
+
   function noteFailure(why, err) {
-    // Our own refusal during the window: not new evidence the service is down.
+    // Our own refusal during the window: not new evidence the service is down,
+    // and counting it would inflate whichever reason armed the window.
     if (err && err.cooldown) return;
+    note(reasonFor(why, err));
     // Already in standdown: the clock is already running; count the miss but
     // do not call disable() again — calling it would re-arm the window from
     // NOW, extending it by exactly one cooldownMs per question asked during it.

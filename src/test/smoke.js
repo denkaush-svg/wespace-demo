@@ -3354,6 +3354,37 @@ setTimeout(async () => {
       WS.engine.clearPendingAction();
       if (back) WS.engine.openThread(back, '', '');
 
+      /* «Ответил планировщик» is a fact; WHY is the thing that gets fixed.
+
+         Twelve hard scenarios, four of them silently answered by the planner,
+         and the whole record said «Failed to fetch» — the browser's word for
+         everything from a dead certificate to a socket the connection pool
+         reused after it had died. A request refused by the server, a stream cut
+         mid-flight and a request that never left the machine are three
+         different repairs, and they were one line. */
+      Q.reset();
+      L.noteFailure('http 503');
+      check('quality · a server that answered and refused is counted as that',
+        Q.counts().fallback_http === 1, JSON.stringify(Q.counts()));
+      L.noteFailure('stream ended without a reply');
+      check('quality · a stream cut before the reply is its own reason',
+        Q.counts().fallback_cut === 1, JSON.stringify(Q.counts()));
+      L.noteFailure('Failed to fetch', new TypeError('Failed to fetch'));
+      check('quality · and a request that never reached the server is its own too',
+        Q.counts().fallback_no_reach === 1, JSON.stringify(Q.counts()));
+      L.noteFailure('cli:overloaded');
+      check('quality · anything else is the model itself',
+        Q.counts().fallback_model === 1, JSON.stringify(Q.counts()));
+      // Our own refusal inside the stand-down window is not evidence of anything
+      // and must not inflate the reason it was armed for.
+      {
+        const e = new Error('cooldown'); e.cooldown = true;
+        L.noteFailure('cooldown', e);
+      }
+      check('quality · a refusal we issued ourselves is not counted as a failure',
+        !Q.counts().fallback_cooldown && Q.counts().fallback_model === 1, JSON.stringify(Q.counts()));
+      L.resetForTest();
+
       // Counting must not itself become a failure: an unknown name is recorded,
       // not thrown, because this runs inside the path that answers a visitor.
       Q.reset();

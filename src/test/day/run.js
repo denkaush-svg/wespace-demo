@@ -56,6 +56,20 @@ const serve = http.createServer((req, res) => {
   const page = await browser.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e)));
+
+  /* What Chrome actually says when a request dies.
+
+     The page only ever sees «Failed to fetch» — one string covering an expired
+     certificate, a refused connection, and a socket the pool reused after it had
+     died. Four answers of twelve were lost under it and it named none of them.
+     The browser knows: `net::ERR_CONNECTION_RESET` and `net::ERR_CERT_DATE_INVALID`
+     are different repairs. This is the only place that can ask it. */
+  let netFails = [];
+  page.on('requestfailed', (r) => {
+    const u = r.url();
+    if (u.indexOf('/ask') < 0 && u.indexOf('/health') < 0) return;   // page assets are not the story
+    netFails.push(((r.failure() || {}).errorText || 'неизвестно') + ' · ' + u.split('/').pop());
+  });
   await page.setViewport({ width: 1440, height: 1000 });
   await page.goto('http://127.0.0.1:' + PORT + '/index.html?api=' + encodeURIComponent(API),
     { waitUntil: 'load' });
@@ -92,6 +106,7 @@ const serve = http.createServer((req, res) => {
     const spec = QUERIES[i];
     process.stdout.write(spec.id + ' · ' + spec.q.slice(0, 48) + ' … ');
     const t0 = Date.now();
+    netFails = [];
 
     // Each question in its own thread AND against a clean workspace: a write
     // confirmed in one scenario would otherwise change the data the next one
@@ -203,6 +218,8 @@ const serve = http.createServer((req, res) => {
 
     got.ms = Date.now() - t0;
     got.answered = answered;
+    // Chrome's own verdict on any request that died during this question.
+    got.net = netFails.slice();
 
     /* Which head actually spoke, per scenario — not cumulatively at the end.
        The live head falls back to the offline planner on any failure, so a
@@ -218,7 +235,8 @@ const serve = http.createServer((req, res) => {
       (got.blocks.length ? ' · блоков ' + got.blocks.length + ' (данные ' + got.dataBlocks +
         (got.modelNumeric ? ', МОДЕЛЬ ' + got.modelNumeric : '') + ')' : '') +
       (Object.keys(got.quality || {}).length
-        ? ' · тихо: ' + Object.keys(got.quality).map((k) => k + '=' + got.quality[k]).join(' ') : ''));
+        ? ' · тихо: ' + Object.keys(got.quality).map((k) => k + '=' + got.quality[k]).join(' ') : '') +
+      (got.net.length ? ' · СЕТЬ: ' + got.net.join(' | ') : ''));
 
     /* A second turn in the SAME conversation, when the scenario asks for one.
        Half the Concierge's failures only exist across turns — it asks for a
