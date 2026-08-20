@@ -31,6 +31,10 @@
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    // Chat and documents are two settings because they are two decisions: the
+    // broker reads the chat, the client reads the document. `auto` on the
+    // document means «follow whoever it is for», which is the usual answer.
+    cgLang: 'ru', cgDocLang: 'auto',
     capture: {}, dealFunnel: 'sale', contractId: null, dealsFilter: {}, savedView: null,
     // Where the user came from. A card opened from another card has to return to it, and the
     // hard-coded «Назад к сделкам» on every card could only ever return to a list.
@@ -169,6 +173,7 @@
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
+    store.cgLang = 'ru'; store.cgDocLang = 'auto';
     store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
     store.navStack = []; store.navHere = null;

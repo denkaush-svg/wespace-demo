@@ -97,8 +97,12 @@
          whether they may be written to at all. It was in the data and not in
          the digest, so the Concierge could compose an outreach list with
          somebody on it who had refused — cheerfully, and with no way to know. */
+      /* And the language they read in — for the same reason, one step further
+         on. It was on the card, on screen, in the search index, and not here:
+         the Concierge composed for a client without knowing which language
+         reaches them. */
       контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget,
-        согласие_на_переписку: c.consent !== false })),
+        согласие_на_переписку: c.consent !== false, язык: c.lang || null })),
       компании: take('companies', (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
@@ -579,7 +583,20 @@
   function toReply(say, plan, ran) {
     const text = String(say || '').trim();
     const blocks = normBlocks(plan.blocks, ran && DEPTH_BLOCKS[ran.depth]);
-    const report = normReport(plan.report);
+    /* Checked against what the SERVER ordered, not against a recomputation
+       here: the page and the prompt could disagree, and the one the model was
+       actually told is the only one it can be held to.
+
+       A file in a language nobody asked for is not a document with a defect —
+       it is the wrong document, and it is the one artefact here that leaves the
+       room unaccompanied. So it is refused rather than marked, and said out
+       loud: silently dropping it would leave a broker who asked for a КП
+       looking at a reply that says it was assembled. */
+    const want = ran && ran.doc;
+    const wrote = plan.report ? langOf(reportProse(plan.report)) : null;
+    const wrongLang = (want && wrote && wrote !== want) ? wrote : null;
+    if (wrongLang) note('report_wrong_lang');
+    const report = wrongLang ? null : normReport(plan.report);
     /* Neither of these comes from the model any more. It said which readings it
        leaned on and wrote its own follow-up chips; both were invention with a
        control's authority, and both are things the code can work out from the
@@ -627,10 +644,15 @@
         evidence: evidence, next: next,
       };
     }
-    if (!text && !blocks && !report) return null;
+    if (!text && !blocks && !report && !wrongLang) return null;
     const made = report ? WS.report.create(report) : null;
     return {
-      kind: 'answer', text: text, blocks: blocks, evidence: evidence, next: next,
+      kind: 'answer',
+      text: text + (wrongLang
+        ? ' Документ собрался на ' + (LANG_RU[wrongLang] || 'другом языке') +
+          ', а нужен на ' + (LANG_RU[want] || want) + ' — не отдаю его. Попросите ещё раз.'
+        : ''),
+      blocks: blocks, evidence: evidence, next: next,
       speak: normSay(plan.say_aloud),
       report: made ? { id: made.id, title: made.title, name: made.name, count: report.blocks.length } : null,
     };
@@ -670,6 +692,124 @@
     return k && k !== 'auto' && WS.ui && WS.ui.cgModeLabel ? WS.ui.cgModeLabel(k) : '';
   }
 
+  /* ---------- which language this answer is written in ----------
+
+     Everything else about a document was computed and this was not, so the
+     model computed it: asked for a КП inside a conversation held entirely in
+     Russian, it produced one in German. Not a lapse — a gap. The prompt bound
+     the language of the CHAT reply and told it of the file only that the file
+     goes to the client without them. Given a recipient and no language, «не
+     по-русски» is a defensible reading, and after that the choice is a toss.
+
+     The rule is a ladder, and every rung is a fact somebody put in the
+     workspace rather than a preference of ours:
+
+       asked   — the person typed the language into the request. Theirs.
+       setting — they set it for their documents. Also theirs.
+       contact — the recipient's card says what they read.
+       market  — a named client with no language: English, the working language
+                 of the trade here. Guessing the broker's own would send a
+                 Russian КП to somebody who never asked for one.
+       broker  — nobody was named, so the document is a note to self, and it is
+                 written in the language the conversation is in.                */
+
+  function langCode(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase().slice(0, 2);
+    return (s === 'ru' || s === 'en' || s === 'ar') ? s : null;
+  }
+
+  // Said out loud in the request: it decides this document and does not outlive
+  // it — which is what makes it safe to obey without a control anywhere.
+  const ASKED = [
+    [/по-?англ|на англ|in english/i, 'en'],
+    [/по-?русск|на русск|in russian/i, 'ru'],
+    [/по-?арабск|на арабск|in arabic/i, 'ar'],
+  ];
+  function askedLang(text) {
+    const s = String(text == null ? '' : text);
+    for (let i = 0; i < ASKED.length; i++) if (ASKED[i][0].test(s)) return ASKED[i][1];
+    return null;
+  }
+
+  const CYR = /[Ѐ-ӿ]/;
+  function chatLang(text) {
+    const set = langCode((WS.store || {}).cgLang);
+    if (set) return set;
+    // «Авто» can only honestly mean the language of the question: somebody
+    // typing in Russian is not asking to be answered in English.
+    return CYR.test(String(text == null ? '' : text)) ? 'ru' : 'en';
+  }
+
+  function langs(text) {
+    const chat = chatLang(text);
+    const asked = askedLang(text);
+    if (asked) return { chat: chat, doc: asked, why: 'asked', who: '' };
+    const set = langCode((WS.store || {}).cgDocLang);
+    if (set) return { chat: chat, doc: set, why: 'setting', who: '' };
+    const ent = WS.agent.tools.findEntity(String(text == null ? '' : text));
+    if (ent && ent.kind === 'contact') {
+      const c = ((WS.store.data || {}).clients || []).filter((x) => x.id === ent.id)[0];
+      const code = c && langCode(c.lang);
+      return { chat: chat, doc: code || 'en', why: code ? 'contact' : 'market', who: ent.name };
+    }
+    return { chat: chat, doc: chat, why: 'broker', who: '' };
+  }
+
+  /* ---------- and what came back ----------
+
+     A rule in a prompt is a request; this is the measurement. Scripts settle it
+     outright — Cyrillic, Arabic — and for the Latin ones, which look identical
+     from a distance, function words do: `der die und für` against `the of and
+     for`. Cheap, deterministic, and it names the language it found, so the
+     refusal can say what the document actually came back in.
+
+     It abstains rather than guesses. Under forty letters there is nothing to
+     read, and a Latin document with no function words at all — a page of names
+     and prices — is not evidence of anything.                                */
+  const SCRIPTS = { ru: /[Ѐ-ӿ]/g, ar: /[؀-ۿ]/g, la: /[a-z]/gi };
+  const WORDS = {
+    en: /\b(the|of|and|to|in|for|with|is|are|this|from|we|you)\b/gi,
+    de: /\b(der|die|das|und|für|mit|von|ist|nicht|ein|eine|den|dem|auf|sich|wir)\b/gi,
+    fr: /\b(le|la|les|des|et|pour|avec|est|dans|une|du|sur|nous|vous)\b/gi,
+    es: /\b(el|los|las|de|y|para|con|es|en|una|del|por|nuestro)\b/gi,
+  };
+  const LANG_MIN_LETTERS = 40;
+  const LANG_MIN_WORDS = 2;
+  function langOf(text) {
+    const s = String(text == null ? '' : text);
+    const n = (re) => (s.match(re) || []).length;
+    const ru = n(SCRIPTS.ru), ar = n(SCRIPTS.ar), la = n(SCRIPTS.la);
+    const letters = ru + ar + la;
+    if (letters < LANG_MIN_LETTERS) return null;
+    // A share, not a count: a Russian document names «Business Bay» and a
+    // Dubai document in any language is full of Latin proper nouns.
+    if (ru / letters > 0.3) return 'ru';
+    if (ar / letters > 0.3) return 'ar';
+    if (la / letters < 0.6) return null;
+    const en = n(WORDS.en);
+    let other = null, top = 0;
+    ['de', 'fr', 'es'].forEach((k) => { const c = n(WORDS[k]); if (c > top) { top = c; other = k; } });
+    if (top >= LANG_MIN_WORDS && top > en) return other;
+    return en >= LANG_MIN_WORDS ? 'en' : null;
+  }
+  const LANG_RU = { ru: 'русском', en: 'английском', ar: 'арабском', de: 'немецком', fr: 'французском', es: 'испанском' };
+
+  /* Only what the MODEL wrote. The cells of a data-backed table are ours, and
+     they are Russian whatever language the document is in — measure those and
+     every English document reads as Russian and is refused, which is a guard
+     firing on the correct answer. */
+  const PROSE = { p: true, h: true, note: true };
+  function reportProse(r) {
+    if (!r || typeof r !== 'object') return '';
+    const out = [String(r.title || ''), String(r.subtitle || '')];
+    (Array.isArray(r.blocks) ? r.blocks : []).forEach((b) => {
+      if (!b || typeof b !== 'object') return;
+      if (PROSE[String(b.t)] && b.text) out.push(String(b.text));
+      if (String(b.t) === 'list' && Array.isArray(b.items)) out.push(b.items.join(' '));
+    });
+    return out.join(' ');
+  }
+
   // ---------- transport ----------
 
   async function stream(text, onText, onStage) {
@@ -695,7 +835,7 @@
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
-        pending: pendingAction() }, composer())),
+        pending: pendingAction(), lang: langs(text) }, composer())),
     });
   }
 
@@ -789,7 +929,7 @@
     }
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
-    const ran = { mode: done.mode || null, depth: done.depth || null };
+    const ran = { mode: done.mode || null, depth: done.depth || null, doc: done.doc || null };
     const reply = toReply(done.say, done.plan || {}, ran);
     if (!reply) throw new Error('empty reply');
     reply.mode = ran.mode;
@@ -899,7 +1039,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer,
+    ask, probe, install, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

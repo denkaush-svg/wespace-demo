@@ -3748,6 +3748,145 @@ setTimeout(async () => {
   }
 
   // ============================================================
+  //  Language. The one parameter of a document nobody computed. The prompt
+  //  bound the language of the CHAT reply and told the model of the file only
+  //  that it goes to the client without them — recipient named, language not.
+  //  Asked for a КП in a Russian conversation, it wrote one in German.
+  //
+  //  In Dubai the answer is not one language anyway: the selling layer follows
+  //  the client, English by default; a note for the broker follows the chat.
+  //  That is a fact about WHO reads the document — which the code holds and the
+  //  model does not. Both halves are tested: the ladder that decides before the
+  //  call, and the check on what came back.
+  // ============================================================
+  if (WS.live && WS.live.langs) {
+    const L = WS.live;
+    const st = WS.store;
+
+    // ---- what the model is told ----
+    {
+      const dg = L.digest();
+      check('язык · a contact carries the language they read in',
+        (dg.контакты || []).some((c) => c.язык === 'EN') && (dg.контакты || []).some((c) => c.язык === 'RU'),
+        JSON.stringify((dg.контакты || []).map((c) => c.id + ':' + c.язык)));
+    }
+
+    // ---- who reads it decides what it is written in ----
+    {
+      const was = { chat: st.cgLang, doc: st.cgDocLang };
+      st.cgLang = 'ru'; st.cgDocLang = 'auto';
+
+      const en = L.langs('собери КП для Karim Aziz');
+      check('язык · a document for a client who reads English is English',
+        en.doc === 'en' && en.why === 'contact', JSON.stringify(en));
+      check('язык · and the chat stays Russian while it is not',
+        en.chat === 'ru', JSON.stringify(en));
+
+      const ru = L.langs('собери КП для Игоря Лебедева');
+      check('язык · and Russian for a client who reads Russian',
+        ru.doc === 'ru' && ru.why === 'contact', JSON.stringify(ru));
+
+      const own = L.langs('собери отчёт по воронке');
+      check('язык · a note nobody was named for is for the broker, in the chat language',
+        own.doc === 'ru' && own.why === 'broker', JSON.stringify(own));
+
+      const asked = L.langs('собери КП для Игоря Лебедева на английском');
+      check('язык · asking outright outranks the card',
+        asked.doc === 'en' && asked.why === 'asked', JSON.stringify(asked));
+
+      st.cgDocLang = 'en';
+      const set = L.langs('собери отчёт по воронке');
+      check('язык · the setting outranks the fallback to the chat',
+        set.doc === 'en' && set.why === 'setting', JSON.stringify(set));
+      const still = L.langs('собери КП для Игоря Лебедева на русском');
+      check('язык · and the setting still yields to an outright request',
+        still.doc === 'ru' && still.why === 'asked', JSON.stringify(still));
+      st.cgDocLang = 'auto';
+
+      st.cgLang = 'auto';
+      check('язык · «Авто» answers in the language the question was typed in',
+        L.langs('сколько сделок в работе').chat === 'ru' &&
+        L.langs('how many deals are running').chat === 'en',
+        JSON.stringify([L.langs('сколько сделок в работе').chat, L.langs('how many deals are running').chat]));
+
+      st.cgLang = was.chat; st.cgDocLang = was.doc;
+    }
+
+    // ---- and what came back ----
+    {
+      const de = 'Sehr geehrte Damen und Herren, hiermit übersenden wir Ihnen das Angebot für die Büroflächen mit den Konditionen.';
+      const en = 'The proposal below covers the office space in Business Bay with the rent and the service charge for the first year.';
+      const ru = 'Коммерческое предложение по офисам в Business Bay: ставка, площадь и условия оплаты на первый год.';
+      check('язык · German is recognised as German', L.langOf(de) === 'de', String(L.langOf(de)));
+      check('язык · English as English', L.langOf(en) === 'en', String(L.langOf(en)));
+      check('язык · Russian as Russian', L.langOf(ru) === 'ru', String(L.langOf(ru)));
+      // A verdict from four words is a coin toss with a straight face — and the
+      // dangerous fragment is not the one with no evidence in it but the one
+      // with just enough: three function words and no document.
+      check('язык · too little text is not a verdict', L.langOf('Bayline 1603') === null, String(L.langOf('Bayline 1603')));
+      check('язык · nor is a fragment, however English it looks',
+        L.langOf('The rent and the area') === null, String(L.langOf('The rent and the area')));
+    }
+
+    // ---- a document in a language nobody asked for is not handed over ----
+    {
+      const german = { title: 'Angebot', blocks: [{ t: 'p', text: 'Sehr geehrte Damen und Herren, hiermit übersenden wir Ihnen das Angebot für die Büroflächen mit den Konditionen.' }] };
+      WS.quality.reset();
+      const bad = L.toReply('Собрал КП.', { report: german }, { doc: 'ru' });
+      check('язык · a document in the wrong language is refused, not offered',
+        !!bad && !bad.report, JSON.stringify(bad && bad.report));
+      check('язык · and the broker is told, in both languages by name',
+        !!bad && /немецк/i.test(bad.text) && /русск/i.test(bad.text), bad && bad.text);
+      check('язык · the refusal is counted, not silent',
+        WS.quality.counts().report_wrong_lang === 1, JSON.stringify(WS.quality.counts()));
+
+      const good = L.toReply('Собрал записку.', {
+        report: { title: 'Записка по воронке', blocks: [{ t: 'p', text: 'Коммерческое предложение по офисам в Business Bay: ставка, площадь и условия оплаты на первый год.' }] },
+      }, { doc: 'ru' });
+      check('язык · a document in the ordered language goes through', !!good && !!good.report);
+
+      const unchecked = L.toReply('Собрал КП.', { report: german }, {});
+      check('язык · with nothing ordered nothing is blocked', !!unchecked && !!unchecked.report);
+
+      /* The trap this check exists for. What the model sends for a data-backed
+         table is a QUERY — from, field, stage, amount — and query identifiers
+         are English by construction, whatever language the document is in.
+         Measure the machinery along with the prose and a Russian note made of
+         four tables reads as English and is refused: a guard firing on the
+         correct answer, which is worse than no guard. */
+      {
+        const spec = () => ({
+          t: 'table', from: { from: 'deals', where: [{ field: 'stage', op: 'ne', value: 'lost' }], limit: 8 },
+          columns: [{ field: 'title', label: 'Сделка' }, { field: 'amount', label: 'Сумма', money: true }],
+        });
+        const russian = {
+          title: 'Записка по воронке',
+          blocks: [{ t: 'p', text: 'Ниже разбор по сделкам в работе: сумма портфеля, стадии и что мешает закрыть ближайшие.' }]
+            .concat([spec(), spec(), spec(), spec()]),
+        };
+        const kept = L.toReply('Собрал записку.', { report: russian }, { doc: 'ru' });
+        check('язык · the query behind a table is machinery, not the document’s language',
+          !!kept && !!kept.report, kept && kept.text);
+      }
+
+      /* And the mirror of it: cells filled from our data are OUR strings,
+         Russian whatever the document is written in. */
+      const mixed = {
+        title: 'Commercial proposal',
+        blocks: [
+          { t: 'p', text: 'The proposal below covers the office space in Business Bay with the rent and the service charge for the first year.' },
+          { t: 'table', from: { from: 'deals', limit: 3 }, columns: [{ field: 'title', label: 'Deal' }, { field: 'amount', label: 'Amount', money: true }] },
+        ],
+      };
+      const out = L.toReply('Собрал КП.', { report: mixed }, { doc: 'en' });
+      check('язык · Russian cells from our own data do not make an English document Russian',
+        !!out && !!out.report && out.report.count === 2, JSON.stringify(out && out.report));
+    }
+  } else {
+    check('live · language module present', false);
+  }
+
+  // ============================================================
   //  Voice. Both halves belong to the browser, so both are faked here — what
   //  is being tested is the wiring: that dictation reaches the composer and
   //  survives a re-render, and that a spoken answer is the answer's own.
