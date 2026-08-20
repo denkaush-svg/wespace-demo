@@ -4,7 +4,7 @@
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 23; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает.
+  const SCHEMA = 24; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает. 23→24: tasks[].dealId / tasks[].requestId — область задачи (сделка → заявка → контакт); без неё у двух сделок одного клиента был общий список задач.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -314,7 +314,8 @@
     },
     tasks: {
       safe: ['title', 'due', 'kind', 'assignee'],
-      guarded: ['status', 'when'],
+      // Область задачи — структурное поле: от неё зависит, в какой карточке задача видна.
+      guarded: ['status', 'when', 'dealId', 'requestId'],
     },
     // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
     // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
@@ -407,6 +408,28 @@
      A batch applies whole or not at all, so a reference forward inside it is
      as safe as one to a record already stored. A reference to something no
      operation creates is still refused. */
+  /* Ссылка может указывать на существующую запись и всё равно быть неверной: задача
+     с клиентом одного человека и сделкой другого пройдёт проверку ссылок и осядет
+     в двух карточках по-разному — в сделке видна, у клиента нет. Область задачи и есть
+     то, ради чего вводились эти поля, поэтому согласованность проверяется здесь. */
+  function scopeError(rec, at) {
+    const d = store.data || {};
+    const owner = (coll, id) => {
+      const x = (d[coll] || []).find((y) => y.id === id);
+      return x ? x.clientId : undefined;
+    };
+    if (!rec || !rec.clientId) return null;
+    const pairs = [['dealId', 'deals'], ['requestId', 'requests']];
+    for (let i = 0; i < pairs.length; i++) {
+      const [field, coll] = pairs[i];
+      if (!rec[field]) continue;
+      const own = owner(coll, rec[field]);
+      if (own && own !== rec.clientId) {
+        return fail('bad_scope', at + field + ' указывает на запись другого клиента', { field: field, collection: coll });
+      }
+    }
+    return null;
+  }
   function refError(rec, at, coming) {
     const d = store.data || {};
     const keys = Object.keys(rec || {});
@@ -509,6 +532,8 @@
       // it just belongs to no one.
       const badRef = refError(src, at, coming);
       if (badRef) return badRef;
+      const badScope = scopeError(src, at);
+      if (badScope) return badScope;
       // The id is ours to assign, not the caller's to invent. Demanding one
       // meant every «поставь задачу на завтра» came back as «нет записи или её
       // id» — the model was following the contract it was given and the layer

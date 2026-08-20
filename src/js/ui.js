@@ -1318,8 +1318,20 @@
     return '<div class="funnel-switch">' + btns + '</div>';
   }
   // Deal filters (budget / source) — combined with the funnel + saved-view predicate on the board.
+  // Всё, по чему агент ищет сделку вслух: имя клиента, название, суть, объект и его проект.
+  // Лоты входят наравне с основным объектом — многолотовую сделку ищут по любому из них.
+  function dealSearchHay(d) {
+    const c = D().clients.find((x) => x.id === d.clientId);
+    const ids = (d.lots && d.lots.length ? d.lots : [d.objectId]).filter(Boolean);
+    const objs = ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    return [d.title, d.sub, d.goal, c && c.name]
+      .concat(objs.map((o) => o.name)).concat(objs.map((o) => o.project))
+      .filter(Boolean).join(' ').toLowerCase();
+  }
   function dealExtraPred(d) {
     const from = parseInt(S().dealBudFrom, 10) || 0, to = parseInt(S().dealBudTo, 10) || 0, src = S().dealSrc || 'all';
+    const q = (S().dealSearch || '').trim().toLowerCase();
+    if (q && dealSearchHay(d).indexOf(q) < 0) return false;
     if (src !== 'all' && d.source !== src) return false;
     if ((S().dealObjType || 'all') !== 'all' && d.objectType !== S().dealObjType) return false;
     if ((S().dealReadiness || 'all') !== 'all' && d.readiness !== S().dealReadiness) return false;
@@ -1331,7 +1343,8 @@
   }
   function dealFilterCount() {
     return ['dealSrc', 'dealObjType', 'dealReadiness', 'dealAgent']
-      .filter((k) => S()[k] && S()[k] !== 'all').length + ((S().dealBudFrom || S().dealBudTo) ? 1 : 0);
+      .filter((k) => S()[k] && S()[k] !== 'all').length + ((S().dealBudFrom || S().dealBudTo) ? 1 : 0)
+      + ((S().dealSearch || '').trim() ? 1 : 0);
   }
   function dealFilterBar() {
     const src = S().dealSrc || 'all';
@@ -1352,7 +1365,11 @@
     const readiness = [['all', 'Любая', 'Готовность']].concat(uniq((d) => d.readiness).sort().map((t) => [t, t, '']));
     const agents = [['all', 'Все агенты', 'Агент']].concat(uniq((d) => d.agent).map((a) => [a, agentName(a), '']));
     const isMgr = S().role === 'manager';
-    return '<div class="qa-row deal-filters">' + budget + '<span class="df-sep"></span>' + srcChips + '</div>' +
+    // Поиска по сделкам не было вовсе — а он первое, чем агент пользуется, когда сделок больше экрана.
+    const search = '<div class="prompt obj-search" style="flex:1 1 220px;min-width:180px"><span class="ico">' + I('search') + '</span>' +
+      '<input id="dealSearch" placeholder="Поиск: клиент, сделка, объект…" autocomplete="off" value="' + escAttr(S().dealSearch || '') + '"></div>';
+    return '<div class="qa-row deal-filters">' + search + budget + '</div>' +
+      '<div class="qa-row deal-filters">' + srcChips + '</div>' +
       '<div class="qa-row deal-filters deal-filters-2">' +
       selOf('dealObjType', S().dealObjType || 'all', objTypes) +
       selOf('dealReadiness', S().dealReadiness || 'all', readiness) +
@@ -1366,7 +1383,7 @@
   function dealHot(d) {
     if (d.hot) return true;
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
-    return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
+    return tasksOfDeal(d).some((t) => t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
   // ============================================================================================
   // Сводная воронка руководителя идёт по всей книге, а не по одним сделкам: половина работы
@@ -2680,6 +2697,16 @@
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
   const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
   const CONTACT_RATINGS = ['A', 'B', 'C'];
+  // Область задачи — первое попадание: есть сделка → задача сделки; иначе заявка → задача заявки;
+  // иначе задача по контакту. Клиентская задача законна: касания и поздравления не относятся
+  // ни к какой сделке, и требовать привязку значило бы запретить половину работы по удержанию.
+  function tasksOfDeal(d) { return (D().tasks || []).filter((t) => t.dealId === d.id); }
+  function tasksOfRequest(r) { return (D().tasks || []).filter((t) => t.requestId === r.id); }
+  function taskScopeLabel(t) {
+    if (t.dealId) { const d = D().deals.find((x) => x.id === t.dealId); return d ? 'сделка · ' + d.title : 'сделка'; }
+    if (t.requestId) { const r = (D().requests || []).find((x) => x.id === t.requestId); return r ? 'заявка · ' + r.title : 'заявка'; }
+    return 'клиент';
+  }
   function dealContacts(d) {
     if (Array.isArray(d.contacts) && d.contacts.length) return d.contacts;
     if (d.clientId) return [{ clientId: d.clientId, role: 'Покупатель', rating: 'A', primary: true }];
@@ -2742,6 +2769,8 @@
     if (rec.primary) d.contacts.forEach((x) => { if (x !== rec) x.primary = false; });
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId; // keep the deal's primary client in sync
+    // Правка участника пережила только перерисовку карточки: без save() она исчезала на F5.
+    WS.storeApi.save();
     WS.storeApi.toast(isNew ? 'Контакт добавлен к сделке' : 'Контакт обновлён', 'ok');
     dealCard(dealId);
   }
@@ -2753,6 +2782,7 @@
     if (removed && removed.primary && d.contacts.length) d.contacts[0].primary = true;
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId;
+    WS.storeApi.save();
     WS.storeApi.toast('Контакт убран из сделки');
     dealCard(dealId);
   }
@@ -2924,7 +2954,7 @@
     }
     if (tab === 'history') return dealHistoryTab(d);
     if (tab === 'tasks') {
-      const list = (D().tasks || []).filter((t) => t.clientId === d.clientId);
+      const list = tasksOfDeal(d);
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
@@ -3237,7 +3267,7 @@
     if (!dealClosed(d)) {
       const cf = (D().conflicts || {})[d.id];
       const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
-      const overdue = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done' && t.when === 'overdue').length;
+      const overdue = tasksOfDeal(d).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
       let block = '';
       if (c.consent === false) block = 'от клиента нет согласия на связь — адресные отправки заблокированы';
       else if (/просроч/i.test(d.nextDue || '')) block = 'касание просрочено';
@@ -3311,7 +3341,7 @@
       hero: dealHero2(d),
       acts: entityActionBar(dealActions(d)),
       state: dealState(d),
-      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + tasksOfDeal(d).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
@@ -3666,7 +3696,7 @@
   }
   function requestTabContent(r, tab) {
     if (tab === 'tasks') {
-      const list = (D().tasks || []).filter((t) => t.clientId === r.clientId);
+      const list = tasksOfRequest(r);
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по заявке пока нет</div>';
       return dxSec('check', 'Задачи по заявке · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
@@ -3686,7 +3716,7 @@
       hero: requestHero2(r),
       acts: entityActionBar(requestActions(r)),
       state: requestState(r),
-      tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
+      tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + tasksOfRequest(r).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
     };
@@ -4365,6 +4395,10 @@
       WS.storeApi.addTask({
         id: entry.taskId,
         clientId: scope === 'contact' ? id : (owner.clientId || null),
+        // Область задачи — та же, в чью ленту пишем. Без неё у двух сделок одного клиента
+        // оказывался общий список задач, и «ближайшая задача по сделке» лгала.
+        dealId: scope === 'deal' ? id : null,
+        requestId: scope === 'request' ? id : null,
         title: txt,
         due: o.due || 'сегодня',
         when: o.dueWhen || 'today',
@@ -5821,10 +5855,13 @@
       return dxSec('clock', 'История задачи', '', '<div class="feed">' + rows + '</div>');
     }
     // essence (суть задачи)
-    const taskDeal = (D().deals || []).find((d) => d.clientId === t.clientId);
+    // Сделку брали как первую сделку клиента — у клиента с тремя сделками показывалась случайная.
+    // Теперь у задачи есть область, и угадывать не нужно: нет ссылки — нет строки.
+    const taskDeal = t.dealId ? (D().deals || []).find((d) => d.id === t.dealId) : null;
     const prio = t.when === 'overdue' ? 'высокий' : t.when === 'today' ? 'средний' : 'обычный';
     const key = dxSec('checkCircle', 'Суть задачи', '', '<div class="dfields">' +
       dfPair('Что сделать', t.title) + dfPair('Клиент', c.name || '—') +
+      dfPair('Область', taskScopeLabel(t)) +
       (taskDeal ? dfPair('Сделка', dealActionWord(taskDeal) + ' · ' + WS.AED(taskDeal.amount)) : '') +
       dfPair('Тип', kindLabel) + dfPair('Приоритет', prio) +
       dfPair('Срок', t.due) + dfPair('Исполнитель', asg) + dfPair('Статус', t.status === 'done' ? 'выполнено' : (t.when === 'overdue' ? 'просрочено' : 'в работе')) + '</div>' +
@@ -5862,12 +5899,33 @@
     openModal('Переназначить задачу', '<p style="margin-bottom:12px">«' + t.title + '» — выберите исполнителя:</p>' + opts,
       '<button class="btn" data-act="closeModal">Отмена</button>');
   }
+  // Область новой задачи берётся с того экрана, откуда её ставят: из карточки сделки — по сделке,
+  // из карточки заявки — по заявке, отовсюду ещё — по клиенту. Спрашивать об этом отдельным полем
+  // значит спрашивать о том, что уже видно.
+  function newTaskScope() {
+    const st = S();
+    if (st.view === 'dealDetail' && st.dealId) {
+      const d = D().deals.find((x) => x.id === st.dealId);
+      if (d) return { dealId: d.id, clientId: d.clientId, label: 'по сделке · ' + d.title };
+    }
+    if (st.view === 'requestDetail' && st.requestId) {
+      const r = (D().requests || []).find((x) => x.id === st.requestId);
+      if (r) return { requestId: r.id, clientId: r.clientId, label: 'по заявке · ' + r.title };
+    }
+    return null;
+  }
   function openNewTask() {
+    const sc = newTaskScope();
+    S().taskScopeDraft = sc;
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '">' + c.name + '</option>').join('');
     const kindOpts = [['manual', 'Ручная задача'], ['call', 'Звонок'], ['touch', 'Касание'], ['doc', 'Документ'], ['kp', 'КП']]
       .map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
     const teamOpts = TEAM.map((m) => '<option value="' + m.id + '"' + (m.id === 'u_marina' ? ' selected' : '') + '>' + m.name + (m.id === 'u_marina' ? ' (я)' : '') + '</option>').join('');
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' +
+    const scopeLine = sc
+      ? '<div class="note" style="margin:0 0 10px">' + I('briefcase') + ' Задача ' + escAttr(sc.label) +
+        ' — она не появится в других сделках этого клиента.</div>'
+      : '';
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' + scopeLine +
       '<div class="form-grid">' +
       '<label class="fld"><span>Что сделать</span><input id="ntTitle" type="text" placeholder="Например: перезвонить по КП"></label>' +
       pickerField('ntClient', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
@@ -5884,14 +5942,21 @@
     const when = g('ntWhen') || 'today';
     const assignee = g('ntAssignee') || 'u_marina';
     const assignedOut = assignee && assignee !== 'u_marina';
+    // Область наследуется с экрана, но клиента в форме можно поменять. Если поменяли на другого —
+    // область снимается: задача, привязанная к сделке чужого человека, врала бы в обеих карточках.
+    const draft = S().taskScopeDraft || null;
+    const picked = g('ntClient') || (draft && draft.clientId) || 'c_anna';
+    const sc = (draft && draft.clientId && draft.clientId !== picked) ? null : draft;
     WS.storeApi.addTask({
       id: 'tm_' + Math.round(performance.now()),
-      clientId: g('ntClient') || 'c_anna',
+      clientId: picked,
+      dealId: (sc && sc.dealId) || null,
+      requestId: (sc && sc.requestId) || null,
       title: title, kind: g('ntKind') || 'manual', assignee: assignee,
       when: when, due: when === 'tomorrow' ? 'завтра' : 'сегодня',
       why: assignedOut ? 'Назначено от: Марина Волкова' : 'Задача добавлена вручную',
     });
-    closeModal();
+    closeModal();   // он же снимает черновик области
     WS.storeApi.toast(assignedOut ? 'Задача назначена: ' + (TEAM.find((m) => m.id === assignee) || {}).name : 'Задача добавлена в очередь', 'ok');
   }
 
@@ -6409,6 +6474,7 @@
     if (f) setTimeout(() => f.focus(), 0);
   }
   function closeModal() {
+    S().taskScopeDraft = null;   // черновик области принадлежит открытой форме и с ней же умирает
     const m = document.getElementById('modal');
     if (m && m.classList.contains('show')) {
       m.classList.remove('show');
@@ -6509,7 +6575,9 @@
         '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
         '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · предложено объектов: ' + ((r.offered || []).length) + '</div></div>' + I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">активных заявок нет</div>';
-    return head('Заявки', 'Два потока: активные заявки клиентов (клик по строке — карточка заявки со сделками и показанными объектами) и входящие обращения из каналов, которые ещё нужно разобрать. «Разобрать» запускает Консьержа — разобранная заявка становится сделкой.',
+    // Прежний текст утверждал «разобранная заявка становится сделкой» — это противоречит принятой
+    // 17.08 модели: заявка живёт дальше и порождает столько сделок, сколько договоров.
+    return head('Заявки', 'Два потока: входящие обращения из каналов, которые ещё нужно разобрать, и заявки в работе. «Разобрать» запускает Консьержа. Заявка не превращается в сделку, а порождает их: по каждому договору свою, и живёт, пока в подборке остаются объекты в работе.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
       '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
@@ -7516,7 +7584,7 @@
 
   WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
     openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
+    docsOfDeal, docsOfRequest, docScope, tasksOfDeal, tasksOfRequest, taskScopeLabel, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,

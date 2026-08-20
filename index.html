@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:06</title>
+  <title>WESPACE · сборка 19:32</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:06';
+    window.WS_BUILD='19:32';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3502,9 +3502,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // Personal tasks / touches (resolve relative to demo clock).
   const tasks = [
+    // Область задачи: сделка → заявка → контакт, первое непустое. Касание относится к человеку,
+    // а не к сделке, поэтому у него области нет — и это законно, а не пропуск.
     { id: 't_anna_touch', clientId: 'c_anna', title: 'Следующее касание — Анна Петрова', due: 'сегодня', when: 'today', kind: 'touch' },
-    { id: 't_igor_kp', clientId: 'c_overdue', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
-    { id: 't_viktor_doc', clientId: 'c_docs', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
+    { id: 't_igor_kp', clientId: 'c_overdue', requestId: 'r_igor', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
+    { id: 't_viktor_doc', clientId: 'c_docs', dealId: 'd_viktor', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
   ];
 
   // Upcoming events.
@@ -3752,7 +3754,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
               note: 'Голосовое из WhatsApp: инвест-квартира до 2 млн, Business Bay и Creek Harbour.' } },
             { op: 'updateClient', id: 'c_anna', patch: { horizon: '1–3 месяца' } },
             { op: 'clearInbox', id: 'in_anna_vn' },
-            { op: 'addTask', task: { id: 't_g1_pick', clientId: 'c_anna', title: 'Подобрать Анне 3 объекта', due: 'сегодня', when: 'today', kind: 'touch', scenario: 'G2', why: 'Заявка создана из голосового, обещан подбор сегодня' } },
+            { op: 'addTask', task: { id: 't_g1_pick', clientId: 'c_anna', requestId: 'r_anna', title: 'Подобрать Анне 3 объекта', due: 'сегодня', when: 'today', kind: 'touch', scenario: 'G2', why: 'Заявка создана из голосового, обещан подбор сегодня' } },
           ],
           next: 'G2', nextLabel: 'Продолжить: подбор и КП (G2)' },
       ],
@@ -3788,7 +3790,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
               kp: { formed: true, at: '08 мая', objectIds: ['o_creekline', 'o_baycentral'] } } },
             { op: 'setObject', id: 'o_bayline', patch: { flagged: true } },
             { op: 'removeTask', id: 't_g1_pick' },
-            { op: 'addTask', task: { id: 't_g2_follow', clientId: 'c_anna', title: 'Напоминание после КП — Анна', due: 'завтра', when: 'tomorrow', kind: 'touch', scenario: 'G3', why: 'КП отправлено, ждём реакции по трём объектам' } },
+            { op: 'addTask', task: { id: 't_g2_follow', clientId: 'c_anna', requestId: 'r_anna', title: 'Напоминание после КП — Анна', due: 'завтра', when: 'tomorrow', kind: 'touch', scenario: 'G3', why: 'КП отправлено, ждём реакции по трём объектам' } },
           ],
           next: 'G3', nextLabel: 'Продолжить: итог показа (G3)' },
       ],
@@ -3826,7 +3828,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
                 ] } }],
             3: [{ op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'В переговорах', temperature: 'hot',
                   note: 'После показа Creekline 1208: объект подтверждён, возражение по первому платежу.' } }],
-            5: [{ op: 'addTask', task: { id: 't_g3_call', clientId: 'c_anna', title: 'Звонок Анне — график платежей', due: 'завтра, после обеда', when: 'tomorrow', kind: 'call', scenario: null, why: 'После показа: выбран Creekline, возражение по первому платежу' } }],
+            5: [{ op: 'addTask', task: { id: 't_g3_call', clientId: 'c_anna', dealId: 'd_anna', title: 'Звонок Анне — график платежей', due: 'завтра, после обеда', when: 'tomorrow', kind: 'call', scenario: null, why: 'После показа: выбран Creekline, возражение по первому платежу' } }],
           },
           branch: { label: 'Две подходящие заявки', text: 'Если у клиента 2 открытые заявки — Консьерж задаёт уточняющий вопрос и ничего не записывает.' } },
         { type: 'result', title: 'Заявка обновлена', rollback: true, artifact: { id: 'request:r_anna', label: 'Открыть обновлённую заявку' }, events: [
@@ -3923,7 +3925,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           branch: { label: 'Нет обязательного поля', text: 'Экспорт PDF и внешний шаг заблокированы до заполнения обязательного поля.' },
           result: { title: 'Версия зафиксирована', artifact: { id: 'doc:booking', label: 'Открыть документ' },
             events: ['Версия v1 зафиксирована', 'Источники подтверждены', 'Создан ручной шаг: подпись/регистрация'],
-            effects: [{ op: 'addTask', task: { id: 't_s4_manual', clientId: 'c_docs', title: 'Ручной шаг: подпись и регистрация договора', due: 'завтра', when: 'tomorrow', kind: 'manual', scenario: 'S4', why: 'Договор готов, внешняя подпись/регистрация — вручную (владелец назначен)' } }],
+            effects: [{ op: 'addTask', task: { id: 't_s4_manual', clientId: 'c_docs', dealId: 'd_viktor', title: 'Ручной шаг: подпись и регистрация договора', due: 'завтра', when: 'tomorrow', kind: 'manual', scenario: 'S4', why: 'Договор готов, внешняя подпись/регистрация — вручную (владелец назначен)' } }],
             next: 'S5', nextLabel: 'Открыть рабочий день (S5)', branchNote: 'Нет обязательного поля — экспорт заблокирован.' } },
       ] },
     { id: 'S5', code: 'S5', group: 'support', durationMinutes: 3, title: 'Ролевая рабочая очередь: агент и руководитель',
@@ -4128,7 +4130,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 23; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает.
+  const SCHEMA = 24; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает. 23→24: tasks[].dealId / tasks[].requestId — область задачи (сделка → заявка → контакт); без неё у двух сделок одного клиента был общий список задач.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -4438,7 +4440,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     },
     tasks: {
       safe: ['title', 'due', 'kind', 'assignee'],
-      guarded: ['status', 'when'],
+      // Область задачи — структурное поле: от неё зависит, в какой карточке задача видна.
+      guarded: ['status', 'when', 'dealId', 'requestId'],
     },
     // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
     // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
@@ -4531,6 +4534,28 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      A batch applies whole or not at all, so a reference forward inside it is
      as safe as one to a record already stored. A reference to something no
      operation creates is still refused. */
+  /* Ссылка может указывать на существующую запись и всё равно быть неверной: задача
+     с клиентом одного человека и сделкой другого пройдёт проверку ссылок и осядет
+     в двух карточках по-разному — в сделке видна, у клиента нет. Область задачи и есть
+     то, ради чего вводились эти поля, поэтому согласованность проверяется здесь. */
+  function scopeError(rec, at) {
+    const d = store.data || {};
+    const owner = (coll, id) => {
+      const x = (d[coll] || []).find((y) => y.id === id);
+      return x ? x.clientId : undefined;
+    };
+    if (!rec || !rec.clientId) return null;
+    const pairs = [['dealId', 'deals'], ['requestId', 'requests']];
+    for (let i = 0; i < pairs.length; i++) {
+      const [field, coll] = pairs[i];
+      if (!rec[field]) continue;
+      const own = owner(coll, rec[field]);
+      if (own && own !== rec.clientId) {
+        return fail('bad_scope', at + field + ' указывает на запись другого клиента', { field: field, collection: coll });
+      }
+    }
+    return null;
+  }
   function refError(rec, at, coming) {
     const d = store.data || {};
     const keys = Object.keys(rec || {});
@@ -4633,6 +4658,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       // it just belongs to no one.
       const badRef = refError(src, at, coming);
       if (badRef) return badRef;
+      const badScope = scopeError(src, at);
+      if (badScope) return badScope;
       // The id is ours to assign, not the caller's to invent. Demanding one
       // meant every «поставь задачу на завтра» came back as «нет записи или её
       // id» — the model was following the contract it was given and the layer
@@ -7752,8 +7779,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return '<div class="funnel-switch">' + btns + '</div>';
   }
   // Deal filters (budget / source) — combined with the funnel + saved-view predicate on the board.
+  // Всё, по чему агент ищет сделку вслух: имя клиента, название, суть, объект и его проект.
+  // Лоты входят наравне с основным объектом — многолотовую сделку ищут по любому из них.
+  function dealSearchHay(d) {
+    const c = D().clients.find((x) => x.id === d.clientId);
+    const ids = (d.lots && d.lots.length ? d.lots : [d.objectId]).filter(Boolean);
+    const objs = ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+    return [d.title, d.sub, d.goal, c && c.name]
+      .concat(objs.map((o) => o.name)).concat(objs.map((o) => o.project))
+      .filter(Boolean).join(' ').toLowerCase();
+  }
   function dealExtraPred(d) {
     const from = parseInt(S().dealBudFrom, 10) || 0, to = parseInt(S().dealBudTo, 10) || 0, src = S().dealSrc || 'all';
+    const q = (S().dealSearch || '').trim().toLowerCase();
+    if (q && dealSearchHay(d).indexOf(q) < 0) return false;
     if (src !== 'all' && d.source !== src) return false;
     if ((S().dealObjType || 'all') !== 'all' && d.objectType !== S().dealObjType) return false;
     if ((S().dealReadiness || 'all') !== 'all' && d.readiness !== S().dealReadiness) return false;
@@ -7765,7 +7804,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function dealFilterCount() {
     return ['dealSrc', 'dealObjType', 'dealReadiness', 'dealAgent']
-      .filter((k) => S()[k] && S()[k] !== 'all').length + ((S().dealBudFrom || S().dealBudTo) ? 1 : 0);
+      .filter((k) => S()[k] && S()[k] !== 'all').length + ((S().dealBudFrom || S().dealBudTo) ? 1 : 0)
+      + ((S().dealSearch || '').trim() ? 1 : 0);
   }
   function dealFilterBar() {
     const src = S().dealSrc || 'all';
@@ -7786,7 +7826,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const readiness = [['all', 'Любая', 'Готовность']].concat(uniq((d) => d.readiness).sort().map((t) => [t, t, '']));
     const agents = [['all', 'Все агенты', 'Агент']].concat(uniq((d) => d.agent).map((a) => [a, agentName(a), '']));
     const isMgr = S().role === 'manager';
-    return '<div class="qa-row deal-filters">' + budget + '<span class="df-sep"></span>' + srcChips + '</div>' +
+    // Поиска по сделкам не было вовсе — а он первое, чем агент пользуется, когда сделок больше экрана.
+    const search = '<div class="prompt obj-search" style="flex:1 1 220px;min-width:180px"><span class="ico">' + I('search') + '</span>' +
+      '<input id="dealSearch" placeholder="Поиск: клиент, сделка, объект…" autocomplete="off" value="' + escAttr(S().dealSearch || '') + '"></div>';
+    return '<div class="qa-row deal-filters">' + search + budget + '</div>' +
+      '<div class="qa-row deal-filters">' + srcChips + '</div>' +
       '<div class="qa-row deal-filters deal-filters-2">' +
       selOf('dealObjType', S().dealObjType || 'all', objTypes) +
       selOf('dealReadiness', S().dealReadiness || 'all', readiness) +
@@ -7800,7 +7844,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealHot(d) {
     if (d.hot) return true;
     if ((d.tags || []).some((t) => /просроч|ждёт|горит/i.test(t))) return true;
-    return D().tasks.some((t) => t.clientId === d.clientId && t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
+    return tasksOfDeal(d).some((t) => t.status !== 'done' && (t.when === 'overdue' || t.when === 'today'));
   }
   // ============================================================================================
   // Сводная воронка руководителя идёт по всей книге, а не по одним сделкам: половина работы
@@ -9114,6 +9158,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
   const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
   const CONTACT_RATINGS = ['A', 'B', 'C'];
+  // Область задачи — первое попадание: есть сделка → задача сделки; иначе заявка → задача заявки;
+  // иначе задача по контакту. Клиентская задача законна: касания и поздравления не относятся
+  // ни к какой сделке, и требовать привязку значило бы запретить половину работы по удержанию.
+  function tasksOfDeal(d) { return (D().tasks || []).filter((t) => t.dealId === d.id); }
+  function tasksOfRequest(r) { return (D().tasks || []).filter((t) => t.requestId === r.id); }
+  function taskScopeLabel(t) {
+    if (t.dealId) { const d = D().deals.find((x) => x.id === t.dealId); return d ? 'сделка · ' + d.title : 'сделка'; }
+    if (t.requestId) { const r = (D().requests || []).find((x) => x.id === t.requestId); return r ? 'заявка · ' + r.title : 'заявка'; }
+    return 'клиент';
+  }
   function dealContacts(d) {
     if (Array.isArray(d.contacts) && d.contacts.length) return d.contacts;
     if (d.clientId) return [{ clientId: d.clientId, role: 'Покупатель', rating: 'A', primary: true }];
@@ -9176,6 +9230,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (rec.primary) d.contacts.forEach((x) => { if (x !== rec) x.primary = false; });
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId; // keep the deal's primary client in sync
+    // Правка участника пережила только перерисовку карточки: без save() она исчезала на F5.
+    WS.storeApi.save();
     WS.storeApi.toast(isNew ? 'Контакт добавлен к сделке' : 'Контакт обновлён', 'ok');
     dealCard(dealId);
   }
@@ -9187,6 +9243,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (removed && removed.primary && d.contacts.length) d.contacts[0].primary = true;
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId;
+    WS.storeApi.save();
     WS.storeApi.toast('Контакт убран из сделки');
     dealCard(dealId);
   }
@@ -9358,7 +9415,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     if (tab === 'history') return dealHistoryTab(d);
     if (tab === 'tasks') {
-      const list = (D().tasks || []).filter((t) => t.clientId === d.clientId);
+      const list = tasksOfDeal(d);
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по этой сделке пока нет</div>';
       return dxSec('check', 'Задачи сделки · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
@@ -9671,7 +9728,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!dealClosed(d)) {
       const cf = (D().conflicts || {})[d.id];
       const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
-      const overdue = (D().tasks || []).filter((t) => t.clientId === d.clientId && t.status !== 'done' && t.when === 'overdue').length;
+      const overdue = tasksOfDeal(d).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
       let block = '';
       if (c.consent === false) block = 'от клиента нет согласия на связь — адресные отправки заблокированы';
       else if (/просроч/i.test(d.nextDue || '')) block = 'касание просрочено';
@@ -9745,7 +9802,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       hero: dealHero2(d),
       acts: entityActionBar(dealActions(d)),
       state: dealState(d),
-      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === d.clientId).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + tasksOfDeal(d).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
@@ -10100,7 +10157,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function requestTabContent(r, tab) {
     if (tab === 'tasks') {
-      const list = (D().tasks || []).filter((t) => t.clientId === r.clientId);
+      const list = tasksOfRequest(r);
       const rows = list.map(taskRow).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по заявке пока нет</div>';
       return dxSec('check', 'Задачи по заявке · ' + list.length, '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>', rows);
     }
@@ -10120,7 +10177,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       hero: requestHero2(r),
       acts: entityActionBar(requestActions(r)),
       state: requestState(r),
-      tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + (D().tasks || []).filter((t) => t.clientId === r.clientId).length], ['history', 'История']],
+      tabs: [['docs', 'Документы'], ['tasks', 'Задачи · ' + tasksOfRequest(r).length], ['history', 'История']],
       render: function (tab) { return requestTabContent(r, tab); },
       concierge: entityConcierge('Поручите Консьержу по заявке — «собрать КП», «подобрать объекты», «бриф к звонку»…', 'request:' + r.id, r.title, 'mail'),
     };
@@ -10799,6 +10856,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       WS.storeApi.addTask({
         id: entry.taskId,
         clientId: scope === 'contact' ? id : (owner.clientId || null),
+        // Область задачи — та же, в чью ленту пишем. Без неё у двух сделок одного клиента
+        // оказывался общий список задач, и «ближайшая задача по сделке» лгала.
+        dealId: scope === 'deal' ? id : null,
+        requestId: scope === 'request' ? id : null,
         title: txt,
         due: o.due || 'сегодня',
         when: o.dueWhen || 'today',
@@ -12255,10 +12316,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       return dxSec('clock', 'История задачи', '', '<div class="feed">' + rows + '</div>');
     }
     // essence (суть задачи)
-    const taskDeal = (D().deals || []).find((d) => d.clientId === t.clientId);
+    // Сделку брали как первую сделку клиента — у клиента с тремя сделками показывалась случайная.
+    // Теперь у задачи есть область, и угадывать не нужно: нет ссылки — нет строки.
+    const taskDeal = t.dealId ? (D().deals || []).find((d) => d.id === t.dealId) : null;
     const prio = t.when === 'overdue' ? 'высокий' : t.when === 'today' ? 'средний' : 'обычный';
     const key = dxSec('checkCircle', 'Суть задачи', '', '<div class="dfields">' +
       dfPair('Что сделать', t.title) + dfPair('Клиент', c.name || '—') +
+      dfPair('Область', taskScopeLabel(t)) +
       (taskDeal ? dfPair('Сделка', dealActionWord(taskDeal) + ' · ' + WS.AED(taskDeal.amount)) : '') +
       dfPair('Тип', kindLabel) + dfPair('Приоритет', prio) +
       dfPair('Срок', t.due) + dfPair('Исполнитель', asg) + dfPair('Статус', t.status === 'done' ? 'выполнено' : (t.when === 'overdue' ? 'просрочено' : 'в работе')) + '</div>' +
@@ -12296,12 +12360,33 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openModal('Переназначить задачу', '<p style="margin-bottom:12px">«' + t.title + '» — выберите исполнителя:</p>' + opts,
       '<button class="btn" data-act="closeModal">Отмена</button>');
   }
+  // Область новой задачи берётся с того экрана, откуда её ставят: из карточки сделки — по сделке,
+  // из карточки заявки — по заявке, отовсюду ещё — по клиенту. Спрашивать об этом отдельным полем
+  // значит спрашивать о том, что уже видно.
+  function newTaskScope() {
+    const st = S();
+    if (st.view === 'dealDetail' && st.dealId) {
+      const d = D().deals.find((x) => x.id === st.dealId);
+      if (d) return { dealId: d.id, clientId: d.clientId, label: 'по сделке · ' + d.title };
+    }
+    if (st.view === 'requestDetail' && st.requestId) {
+      const r = (D().requests || []).find((x) => x.id === st.requestId);
+      if (r) return { requestId: r.id, clientId: r.clientId, label: 'по заявке · ' + r.title };
+    }
+    return null;
+  }
   function openNewTask() {
+    const sc = newTaskScope();
+    S().taskScopeDraft = sc;
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '">' + c.name + '</option>').join('');
     const kindOpts = [['manual', 'Ручная задача'], ['call', 'Звонок'], ['touch', 'Касание'], ['doc', 'Документ'], ['kp', 'КП']]
       .map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
     const teamOpts = TEAM.map((m) => '<option value="' + m.id + '"' + (m.id === 'u_marina' ? ' selected' : '') + '>' + m.name + (m.id === 'u_marina' ? ' (я)' : '') + '</option>').join('');
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' +
+    const scopeLine = sc
+      ? '<div class="note" style="margin:0 0 10px">' + I('briefcase') + ' Задача ' + escAttr(sc.label) +
+        ' — она не появится в других сделках этого клиента.</div>'
+      : '';
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Обычная задача. Можно оставить на себя или назначить другому сотруднику — он увидит её у себя.</p>' + scopeLine +
       '<div class="form-grid">' +
       '<label class="fld"><span>Что сделать</span><input id="ntTitle" type="text" placeholder="Например: перезвонить по КП"></label>' +
       pickerField('ntClient', 'Клиент', clientOpts, 'Поиск по имени клиента…') +
@@ -12318,14 +12403,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const when = g('ntWhen') || 'today';
     const assignee = g('ntAssignee') || 'u_marina';
     const assignedOut = assignee && assignee !== 'u_marina';
+    // Область наследуется с экрана, но клиента в форме можно поменять. Если поменяли на другого —
+    // область снимается: задача, привязанная к сделке чужого человека, врала бы в обеих карточках.
+    const draft = S().taskScopeDraft || null;
+    const picked = g('ntClient') || (draft && draft.clientId) || 'c_anna';
+    const sc = (draft && draft.clientId && draft.clientId !== picked) ? null : draft;
     WS.storeApi.addTask({
       id: 'tm_' + Math.round(performance.now()),
-      clientId: g('ntClient') || 'c_anna',
+      clientId: picked,
+      dealId: (sc && sc.dealId) || null,
+      requestId: (sc && sc.requestId) || null,
       title: title, kind: g('ntKind') || 'manual', assignee: assignee,
       when: when, due: when === 'tomorrow' ? 'завтра' : 'сегодня',
       why: assignedOut ? 'Назначено от: Марина Волкова' : 'Задача добавлена вручную',
     });
-    closeModal();
+    closeModal();   // он же снимает черновик области
     WS.storeApi.toast(assignedOut ? 'Задача назначена: ' + (TEAM.find((m) => m.id === assignee) || {}).name : 'Задача добавлена в очередь', 'ok');
   }
 
@@ -12843,6 +12935,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (f) setTimeout(() => f.focus(), 0);
   }
   function closeModal() {
+    S().taskScopeDraft = null;   // черновик области принадлежит открытой форме и с ней же умирает
     const m = document.getElementById('modal');
     if (m && m.classList.contains('show')) {
       m.classList.remove('show');
@@ -12943,7 +13036,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
         '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · предложено объектов: ' + ((r.offered || []).length) + '</div></div>' + I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">активных заявок нет</div>';
-    return head('Заявки', 'Два потока: активные заявки клиентов (клик по строке — карточка заявки со сделками и показанными объектами) и входящие обращения из каналов, которые ещё нужно разобрать. «Разобрать» запускает Консьержа — разобранная заявка становится сделкой.',
+    // Прежний текст утверждал «разобранная заявка становится сделкой» — это противоречит принятой
+    // 17.08 модели: заявка живёт дальше и порождает столько сделок, сколько договоров.
+    return head('Заявки', 'Два потока: входящие обращения из каналов, которые ещё нужно разобрать, и заявки в работе. «Разобрать» запускает Консьержа. Заявка не превращается в сделку, а порождает их: по каждому договору свою, и живёт, пока в подборке остаются объекты в работе.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Заявка голосом (G1)</button>') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Активные заявки клиентов · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
       '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Входящие · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
@@ -13950,7 +14045,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
     openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
-    docsOfDeal, docsOfRequest, docScope, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
+    docsOfDeal, docsOfRequest, docScope, tasksOfDeal, tasksOfRequest, taskScopeLabel, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
@@ -16471,7 +16566,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
       case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
       case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' }; api.emit(); break;
-      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; api.emit(); break;
+      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSearch = ''; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
       case 'endTour': store.tour = { active: false, scenarioId: null, stepIndex: 0 }; api.emit(); break;
@@ -16603,6 +16698,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (el && el.id === 'docSearch') { store.docSearch = el.value; api.emit(); }
     if (el && el.id === 'netSearchInput') { store.netSearch = el.value; api.emit(); }
     if (el && (el.id === 'dealBudFrom' || el.id === 'dealBudTo')) { store[el.id] = el.value.replace(/[^0-9]/g, ''); api.emit(); }
+    if (el && el.id === 'dealSearch') { store.dealSearch = el.value; api.emit(); }
     if (el && el.dataset && el.dataset.val && el.closest && el.closest('#valForm')) WS.ui.valInput(el);
     // matching params — budget inputs re-rank live (focus survives render); yield label updates live
     if (el && (el.id === 'm_min' || el.id === 'm_max') && store.match) { store.match[el.id === 'm_min' ? 'min' : 'max'] = parseInt(el.value, 10) || 0; api.emit(); }

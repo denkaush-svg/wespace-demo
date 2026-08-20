@@ -332,7 +332,7 @@
       case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
       case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
       case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' }; api.emit(); break;
-      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; api.emit(); break;
+      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSearch = ''; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
       case 'endTour': store.tour = { active: false, scenarioId: null, stepIndex: 0 }; api.emit(); break;
@@ -464,6 +464,7 @@
     if (el && el.id === 'docSearch') { store.docSearch = el.value; api.emit(); }
     if (el && el.id === 'netSearchInput') { store.netSearch = el.value; api.emit(); }
     if (el && (el.id === 'dealBudFrom' || el.id === 'dealBudTo')) { store[el.id] = el.value.replace(/[^0-9]/g, ''); api.emit(); }
+    if (el && el.id === 'dealSearch') { store.dealSearch = el.value; api.emit(); }
     if (el && el.dataset && el.dataset.val && el.closest && el.closest('#valForm')) WS.ui.valInput(el);
     // matching params — budget inputs re-rank live (focus survives render); yield label updates live
     if (el && (el.id === 'm_min' || el.id === 'm_max') && store.match) { store.match[el.id === 'm_min' ? 'min' : 'max'] = parseInt(el.value, 10) || 0; api.emit(); }

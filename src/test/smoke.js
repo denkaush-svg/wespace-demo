@@ -4143,6 +4143,88 @@ setTimeout(async () => {
     }
   }
 
+
+  // ---- Волна 1: область задачи, сохранение участников, поиск по сделкам --------------------
+  {
+    // Область задачи. Два клиента с двумя сделками — самый частый случай, на котором ломалась
+    // прежняя привязка «по клиенту»: задача одной сделки показывалась во второй.
+    const sib = dd().deals.filter((d) => d.clientId === 'c_docs');
+    check('область · у c_docs больше одной сделки (иначе проверка ничего не значит)', sib.length >= 2,
+      'сделок: ' + sib.length);
+    const dViktor = dd().deals.find((d) => d.id === 'd_viktor');
+    const dRent = dd().deals.find((d) => d.id === 'd_rentbiz');
+    if (dViktor && dRent) {
+      const a = WS.ui.tasksOfDeal(dViktor).map((t) => t.id);
+      const b = WS.ui.tasksOfDeal(dRent).map((t) => t.id);
+      check('область · задача сделки видна в своей сделке', a.indexOf('t_viktor_doc') >= 0, 'a=' + a.join(','));
+      check('область · и не видна в сестринской сделке того же клиента', b.indexOf('t_viktor_doc') < 0, 'b=' + b.join(','));
+      check('область · списки задач двух сестёр не пересекаются',
+        a.every((id) => b.indexOf(id) < 0), 'a=' + a.join(',') + ' b=' + b.join(','));
+    }
+    const rIgor = (dd().requests || []).find((r) => r.id === 'r_igor');
+    if (rIgor) {
+      const rt = WS.ui.tasksOfRequest(rIgor).map((t) => t.id);
+      check('область · задача заявки видна в своей заявке', rt.indexOf('t_igor_kp') >= 0, 'rt=' + rt.join(','));
+    }
+    // Клиентская задача законна и области не имеет — требовать привязку значило бы запретить касания.
+    const touch = dd().tasks.find((t) => t.id === 't_anna_touch');
+    check('область · касание остаётся задачей по контакту, без сделки и заявки',
+      !!touch && !touch.dealId && !touch.requestId);
+    check('область · подпись области читается словом',
+      WS.ui.taskScopeLabel({ dealId: 'd_viktor' }).indexOf('сделка') === 0 &&
+      WS.ui.taskScopeLabel({}) === 'клиент');
+  }
+  {
+    // Слой записи не пускает задачу, у которой клиент один, а сделка — другого человека:
+    // ссылки обе существуют, но пара бессмысленна, и в двух карточках она читалась бы по-разному.
+    const bad = WS.storeApi.preview([{ op: 'addTask', task: {
+      id: 't_scope_bad', clientId: 'c_anna', dealId: 'd_viktor', title: 'Чужая сделка', due: 'сегодня', when: 'today' } }]);
+    check('область · задача на сделку чужого клиента отклоняется',
+      bad && bad.ok === false, 'ответ: ' + JSON.stringify(bad && (bad.reason || bad.error || bad.ok)));
+    const good = WS.storeApi.preview([{ op: 'addTask', task: {
+      id: 't_scope_ok', clientId: 'c_docs', dealId: 'd_viktor', title: 'Своя сделка', due: 'сегодня', when: 'today' } }]);
+    check('область · задача на свою сделку проходит', good && good.ok !== false,
+      'ответ: ' + JSON.stringify(good && (good.reason || good.error || good.ok)));
+  }
+  {
+    // Область снимается, если в форме поменяли клиента: задача, привязанная к сделке чужого
+    // человека, врала бы и в его карточке, и в карточке настоящего владельца сделки.
+    const src = read('js/ui.js');
+    const i = src.indexOf('function createTaskFromForm(');
+    const fn = i < 0 ? '' : src.slice(i, i + 1600);
+    check('область · смена клиента в форме снимает унаследованную область',
+      fn.indexOf('draft.clientId !== picked') > 0);
+    // И сценарные задачи получают область — иначе новый путь создания обходит правило.
+    const sc = read('js/scenarios.js');
+    check('область · сценарная задача по подбору привязана к заявке',
+      sc.indexOf("id: 't_g1_pick', clientId: 'c_anna', requestId: 'r_anna'") > 0);
+    check('область · сценарная задача по договору привязана к сделке',
+      sc.indexOf("id: 't_s4_manual', clientId: 'c_docs', dealId: 'd_viktor'") > 0);
+  }
+  {
+    // Правки участника не переживали перезагрузку: обе операции меняли данные и перерисовывали
+    // карточку, но не сохраняли. Сторожим сам вызов — это ровно тот дефект, что был.
+    const src = read('js/ui.js');
+    const fn = (name) => { const i = src.indexOf('function ' + name + '('); return i < 0 ? '' : src.slice(i, i + 1400); };
+    check('участники · сохранение участника вызывает save()', fn('saveDealContact').indexOf('storeApi.save()') > 0);
+    check('участники · открепление участника вызывает save()', fn('removeDealContact').indexOf('storeApi.save()') > 0);
+  }
+  {
+    // Поиска по сделкам не было вовсе. Проверяем, что он сужает выборку и что сброс её возвращает.
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'table'; WS.store.dealSearch = '';
+    WS.router.go('clients');
+    const countRows = () => (doc.getElementById('main').innerHTML.match(/data-deal="/g) || []).length;
+    const all = countRows();
+    WS.store.dealSearch = 'DIFC'; WS.storeApi.emit();
+    const narrowed = countRows();
+    check('поиск · строка поиска сужает список сделок', narrowed > 0 && narrowed < all,
+      'без поиска ' + all + ', с «DIFC» ' + narrowed);
+    WS.store.dealSearch = 'зззнесуществует'; WS.storeApi.emit();
+    check('поиск · запрос без совпадений не оставляет строк', countRows() === 0);
+    WS.store.dealSearch = ''; WS.storeApi.emit();
+    check('поиск · сброс возвращает полный список', countRows() === all, 'снова ' + countRows() + ' из ' + all);
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

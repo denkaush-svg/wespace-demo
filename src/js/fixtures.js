@@ -945,9 +945,11 @@
 
   // Personal tasks / touches (resolve relative to demo clock).
   const tasks = [
+    // Область задачи: сделка → заявка → контакт, первое непустое. Касание относится к человеку,
+    // а не к сделке, поэтому у него области нет — и это законно, а не пропуск.
     { id: 't_anna_touch', clientId: 'c_anna', title: 'Следующее касание — Анна Петрова', due: 'сегодня', when: 'today', kind: 'touch' },
-    { id: 't_igor_kp', clientId: 'c_overdue', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
-    { id: 't_viktor_doc', clientId: 'c_docs', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
+    { id: 't_igor_kp', clientId: 'c_overdue', requestId: 'r_igor', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
+    { id: 't_viktor_doc', clientId: 'c_docs', dealId: 'd_viktor', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
   ];
 
   // Upcoming events.
