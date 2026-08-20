@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>План работ по стенду: что сделано, что делаем, чем заканчиваем</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+  /* ============================================================
+     Voshod-Lite — screen HTML stylesheet for md2html
+     Derived from voshod-brand/tokens.css + voshod-document.css.
+     Target: pandoc HTML5 output, viewed in browser, max 880px column.
+     Not for client deliverables — those go through Voshod PDF kit.
+     ============================================================ */
+
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Regular.ttf');
+    font-weight:400;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Medium.ttf');
+    font-weight:500;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Bold.ttf');
+    font-weight:700;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-ExtraBold.ttf');
+    font-weight:800;font-style:normal;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Regular.ttf');
+    font-weight:400;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Medium.ttf');
+    font-weight:500;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Bold.ttf');
+    font-weight:700;font-display:swap;}
+
+  :root{
+    --ink:#111112;
+    --paper:#EEEEEE; --paper2:#F8F8F8; --paper3:#FFFFFF;
+    --green:#33B76E; --green-soft:#D5EDDF; --green-deep:#20402A;
+    --red:#D84520; --red-soft:#FBE3DC;
+    --amber-soft:#FAEFCC;
+    --line:#D9D9D9;
+    --mute:#6E6E6E;
+    --maxw:880px;
+  }
+
+  *{box-sizing:border-box;}
+  html{background:var(--paper);}
+  body{margin:0 auto;max-width:var(--maxw);padding:42px 32px 64px;
+    background:var(--paper);color:var(--ink);
+    font-family:'Manrope',-apple-system,system-ui,sans-serif;
+    font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  main,.md2html-main{max-width:var(--maxw);margin:0 auto;}
+
+  /* ---- pandoc title block ---- */
+  header#title-block-header{border-bottom:1px solid var(--line);
+    padding-bottom:18px;margin-bottom:28px;}
+  header h1.title{font-weight:700;font-size:32px;line-height:1.1;
+    letter-spacing:-.02em;margin:0;}
+  header .subtitle{font-size:15px;color:var(--mute);margin-top:6px;}
+  header p.author,header p.date{font-family:'JBMono';font-weight:500;
+    font-size:11px;letter-spacing:.10em;text-transform:uppercase;
+    color:var(--mute);margin:6px 0 0;}
+
+  /* ---- TOC ---- */
+  nav#TOC{background:var(--paper2);border:1px solid var(--line);
+    border-radius:8px;padding:14px 18px;margin:0 0 32px;font-size:13.5px;}
+  nav#TOC::before{content:'СОДЕРЖАНИЕ';display:block;
+    font-family:'JBMono';font-weight:500;font-size:10px;
+    letter-spacing:.14em;color:var(--mute);margin-bottom:8px;}
+  nav#TOC ul{list-style:none;padding-left:0;margin:0;}
+  nav#TOC ul ul{padding-left:14px;margin-top:4px;}
+  nav#TOC li{margin:3px 0;padding-left:0;}
+  nav#TOC li::before{content:none;}
+  nav#TOC a{color:var(--ink);text-decoration:none;}
+  nav#TOC a:hover{color:var(--green-deep);text-decoration:underline;}
+
+  /* ---- headings ---- */
+  h1,h2,h3,h4,h5,h6{font-weight:700;letter-spacing:-.015em;
+    color:var(--ink);line-height:1.2;margin:32px 0 12px;}
+  h1{font-size:26px;}
+  h2{font-size:21px;display:flex;align-items:center;gap:10px;
+    padding-bottom:8px;border-bottom:1px solid var(--line);}
+  h2::before{content:'';display:inline-block;width:8px;height:8px;
+    background:var(--green);transform:rotate(45deg);flex:none;}
+  h3{font-size:17px;}
+  h4{font-size:13px;color:var(--mute);font-weight:500;
+    text-transform:uppercase;letter-spacing:.08em;
+    font-family:'JBMono';margin-top:22px;}
+  h5,h6{font-size:14px;}
+  h1:first-child,h2:first-child,h3:first-child{margin-top:0;}
+
+  /* ---- paragraphs / inline ---- */
+  p{margin:0 0 12px;}
+  a{color:var(--green-deep);text-decoration:underline;
+    text-decoration-color:var(--green);text-underline-offset:2px;}
+  a:hover{color:var(--green);}
+  strong{font-weight:700;color:var(--ink);}
+  em{font-style:italic;}
+  hr{border:0;border-top:1px solid var(--line);margin:28px 0;}
+
+  /* ---- lists ---- */
+  ul,ol{margin:0 0 14px;padding-left:0;list-style:none;}
+  ul>li,ol>li{position:relative;padding-left:22px;margin:5px 0;}
+  ul>li::before{content:'';position:absolute;left:4px;top:9px;
+    width:6px;height:6px;background:var(--green);transform:rotate(45deg);}
+  ol{counter-reset:ol;}
+  ol>li{counter-increment:ol;}
+  ol>li::before{content:counter(ol)'.';position:absolute;left:0;top:0;
+    font-family:'JBMono';font-weight:700;font-size:12.5px;
+    color:var(--green-deep);min-width:18px;}
+  li>ul,li>ol{margin:5px 0 2px;}
+
+  /* ---- task list ---- */
+  ul.task-list>li{padding-left:26px;}
+  ul.task-list>li::before{content:none;}
+  ul.task-list input[type=checkbox]{position:absolute;left:0;top:6px;
+    accent-color:var(--green);width:14px;height:14px;}
+
+  /* ---- blockquote / callout ---- */
+  blockquote{background:var(--paper3);border-left:3px solid var(--green);
+    padding:12px 16px;margin:14px 0 18px;color:#3a3a3b;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);border-radius:0 4px 4px 0;}
+  blockquote p:last-child{margin-bottom:0;}
+
+  /* ---- executive summary (pandoc fenced div ::: exec-summary) ---- */
+  .exec-summary{background:var(--green-soft);border:1px solid var(--green);
+    border-radius:10px;padding:20px 24px 18px;margin:0 0 30px;}
+  .exec-summary::before{content:'РЕЗЮМЕ ДЛЯ РУКОВОДИТЕЛЯ';display:block;
+    font-family:'JBMono';font-weight:700;font-size:10px;letter-spacing:.14em;
+    color:var(--green-deep);margin-bottom:12px;}
+  .exec-summary>:first-of-type{margin-top:0;}
+  .exec-summary>:last-child{margin-bottom:0;}
+  .exec-summary p,.exec-summary li{color:#20402A;}
+  .exec-summary strong{color:var(--ink);}
+
+  /* ---- decision / fork block (pandoc fenced div ::: fork) ---- */
+  .fork{background:var(--paper3);border:1px solid var(--line);
+    border-left:4px solid var(--red);border-radius:0 8px 8px 0;
+    padding:16px 20px 12px;margin:16px 0 20px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .fork::before{content:'РАЗВИЛКА';display:block;
+    font-family:'JBMono';font-weight:700;font-size:10px;letter-spacing:.14em;
+    color:var(--red);margin-bottom:10px;}
+  .fork.resolved{border-left-color:var(--green);}
+  .fork.resolved::before{content:'РЕШЕНО';color:var(--green-deep);}
+  .fork>:first-of-type{margin-top:0;}
+  .fork>:last-child{margin-bottom:0;}
+  /* label the four required parts when authored as **Риск:** / **Критичность:** / **Рекомендация:** / **Критерии:** */
+  .fork p>strong:first-child{color:var(--ink);font-family:'JBMono';
+    font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;}
+
+  /* ---- code ---- */
+  code{font-family:'JBMono';font-weight:500;font-size:13px;
+    background:var(--paper3);border:1px solid var(--line);
+    padding:1px 6px;border-radius:3px;color:var(--ink);}
+  pre{background:var(--ink);color:var(--paper);padding:14px 18px;
+    border-radius:8px;overflow-x:auto;margin:14px 0 18px;
+    font-family:'JBMono';font-size:12.5px;line-height:1.5;}
+  pre code{background:transparent;border:0;padding:0;
+    color:var(--paper);font-size:inherit;font-weight:400;}
+
+  /* ---- tables ---- */
+  table{border-collapse:separate;border-spacing:0;width:100%;
+    margin:14px 0 22px;background:var(--paper3);border-radius:8px;
+    overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);
+    font-size:13.5px;}
+  thead th{background:var(--ink);color:var(--paper);
+    font-family:'JBMono';font-weight:500;font-size:11px;
+    letter-spacing:.10em;text-transform:uppercase;text-align:left;
+    padding:11px 14px;border:0;}
+  tbody td{padding:10px 14px;border-top:1px solid var(--line);
+    vertical-align:top;}
+  tbody tr:first-child td{border-top:0;}
+  tbody tr:hover{background:var(--paper2);}
+
+  /* table cell color modifiers — use raw HTML <td class="pos"> in MD */
+  td.pos,th.pos{background:var(--green-soft);color:var(--green-deep);}
+  td.neg,th.neg{background:var(--red-soft);color:var(--red);}
+  td.warn,th.warn{background:var(--amber-soft);color:#7a5a0c;}
+  td.mute,th.mute{color:var(--mute);}
+
+  /* ---- details/summary (collapsible) ---- */
+  details{background:var(--paper3);border:1px solid var(--line);
+    border-radius:6px;padding:10px 14px;margin:10px 0 14px;}
+  details>summary{font-weight:700;cursor:pointer;list-style:none;
+    display:flex;align-items:center;gap:10px;color:var(--ink);}
+  details>summary::-webkit-details-marker{display:none;}
+  details>summary::before{content:'\25B8';color:var(--green);
+    font-size:11px;transition:transform .15s ease;}
+  details[open]>summary::before{transform:rotate(90deg);}
+  details>:not(summary){margin-top:10px;}
+
+  /* ---- images ---- */
+  img{max-width:100%;height:auto;border-radius:4px;
+    display:block;margin:12px 0;}
+
+  /* ---- inline tags / chips (raw HTML <span class="tag">) ---- */
+  .tag{display:inline-block;font-family:'JBMono';font-weight:500;
+    font-size:11px;letter-spacing:.04em;
+    background:var(--green-soft);color:var(--green-deep);
+    padding:2px 8px;border-radius:3px;margin:0 2px;
+    vertical-align:1px;}
+  .tag.neg{background:var(--red-soft);color:var(--red);}
+  .tag.warn{background:var(--amber-soft);color:#7a5a0c;}
+  .tag.mute{background:var(--paper2);color:var(--mute);border:1px solid var(--line);}
+
+  /* ---- meta footer (injected by md2html.sh) ---- */
+  .md2html-footer{margin:48px 0 0;
+    padding:14px 0 0;border-top:1px solid var(--line);
+    font-family:'JBMono';font-weight:500;font-size:10px;
+    letter-spacing:.10em;text-transform:uppercase;color:var(--mute);
+    display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+  .md2html-footer .brand{color:var(--green);}
+
+  /* ---- mobile ---- */
+  @media (max-width:640px){
+    /* the padding lives on body, so trimming main alone left 64px of the screen
+       spent on margins */
+    body{padding:24px 16px 48px;font-size:14.5px;}
+    main,.md2html-main{padding:0;font-size:14.5px;}
+    h1{font-size:23px;} h2{font-size:18px;} h3{font-size:16px;}
+    /* A table of four or five columns has a min-content width well past 390px,
+       and a width:100% table does not shrink below it — it pushes the whole page
+       sideways instead, which is what a reader sees as "the file is broken". The
+       table keeps its shape and scrolls on its own. */
+    table{display:block;width:max-content;max-width:100%;
+      overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:12.5px;}
+    thead th,tbody td{padding:8px 10px;}
+    th,td{overflow-wrap:break-word;}
+    pre{font-size:11.5px;}
+    nav#TOC{font-size:13px;padding:12px 14px;}
+    .md2html-footer{font-size:11px;gap:10px;}
+  }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">План работ по стенду: что сделано, что делаем, чем
+заканчиваем</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a
+href="#план-работ-по-стенду-что-сделано-что-делаем-чем-заканчиваем"
+id="toc-план-работ-по-стенду-что-сделано-что-делаем-чем-заканчиваем">План
+работ по стенду: что сделано, что делаем, чем заканчиваем</a>
+<ul>
+<li><a href="#откуда-взялась-эта-работа"
+id="toc-откуда-взялась-эта-работа">Откуда взялась эта работа</a></li>
+<li><a href="#три-волны-и-почему-именно-такой-порядок"
+id="toc-три-волны-и-почему-именно-такой-порядок">Три волны и почему
+именно такой порядок</a></li>
+<li><a href="#что-уже-сделано" id="toc-что-уже-сделано">Что уже
+сделано</a></li>
+<li><a href="#волна-2-поверхность" id="toc-волна-2-поверхность">Волна 2:
+поверхность</a></li>
+<li><a href="#волна-3-глубина" id="toc-волна-3-глубина">Волна 3:
+глубина</a></li>
+<li><a href="#что-мы-сознательно-не-трогаем"
+id="toc-что-мы-сознательно-не-трогаем">Что мы сознательно не
+трогаем</a></li>
+<li><a href="#что-ждёт-не-кода-а-решения"
+id="toc-что-ждёт-не-кода-а-решения">Что ждёт не кода, а решения</a></li>
+<li><a href="#откуда-взято-каждое-решение"
+id="toc-откуда-взято-каждое-решение">Откуда взято каждое
+решение</a></li>
+<li><a href="#где-мы-сейчас" id="toc-где-мы-сейчас">Где мы
+сейчас</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1
+id="план-работ-по-стенду-что-сделано-что-делаем-чем-заканчиваем">План
+работ по стенду: что сделано, что делаем, чем заканчиваем</h1>
+<p>Дата: 21 августа 2026.</p>
+<p>Это единственный документ, который нужно открыть, чтобы понять
+состояние работы. Остальные три — справочники, куда он ссылается: <a
+href="2026-08-20-partner-comments-adjudication.md">разбор комментариев
+партнёра</a> (что мы приняли и что отклонили), <a
+href="2026-08-20-lifecycle-and-change-scope.md">объём изменений</a> (что
+именно меняем, 47 пунктов), <a
+href="2026-08-20-decisions-vocabularies-and-structures.md">решения</a>
+(словари, структуры, макеты — то, из чего пишется код).</p>
+<hr />
+<h2 id="откуда-взялась-эта-работа">Откуда взялась эта работа</h2>
+<p>13 августа партнёр подписал одну воронку из девяти стадий. 17 августа
+мы разделили работу на две сущности — заявку и сделку — и не провели его
+через это решение. 19 августа он прислал разбор стенда: четыре файла,
+тридцать пять замечаний, из них главное — «заявка не должна включать
+подбор и показы».</p>
+<p>Спор оказался в основном про названия. Его таймлайн 1 и 2 ложится на
+нашу заявку и сделку один в один, включая границу между ними. Из
+тридцати пяти замечаний <strong>девятнадцать берём как есть, одиннадцать
+— с изменением, четыре не берём, одно наполовину.</strong></p>
+<p>Отсюда весь объём: 47 пунктов, разложенных на три волны.</p>
+<hr />
+<h2 id="три-волны-и-почему-именно-такой-порядок">Три волны и почему
+именно такой порядок</h2>
+<p>Волны разделены <strong>по риску, а не по темам.</strong> Первая
+чинит то, что сейчас неправда, и разблокирует остальное. Вторая
+перекладывает поверхность. Третья достраивает то, чего нет вовсе.</p>
+<table>
+<thead>
+<tr>
+<th>Волна</th>
+<th>Что в ней</th>
+<th>Риск</th>
+<th>Состояние</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Подготовка</td>
+<td>Словари, структуры, сценарии, макеты — то, из чего пишется код</td>
+<td>—</td>
+<td><strong>Закрыта</strong></td>
+</tr>
+<tr>
+<td>1 · Основание</td>
+<td>Область задачи, слой записи, живые дефекты</td>
+<td>Низкий: чинит, не меняет</td>
+<td><strong>Сделана</strong></td>
+</tr>
+<tr>
+<td>2 · Поверхность</td>
+<td>Карточка сделки, разделы, доска, список</td>
+<td>Средний: трогает то, что работает</td>
+<td>Следующая</td>
+</tr>
+<tr>
+<td>3 · Глубина</td>
+<td>Отношения, сопровождение, лоты, предложения, роли</td>
+<td>Высокий: новые сущности</td>
+<td>После</td>
+</tr>
+</tbody>
+</table>
+<p>Между волнами — полный прогон проверочной базы, сборка HTML и ваш
+просмотр. Волна не начинается, пока предыдущая не зелёная.</p>
+<hr />
+<h2 id="что-уже-сделано">Что уже сделано</h2>
+<h3 id="подготовка-закрыты-словари-и-структуры">Подготовка: закрыты
+словари и структуры</h3>
+<p>Написаны все четыре словаря с таблицами перехода со старых значений —
+стадия отношений, каналы связи, роли участников, влияние участника,
+статус объекта, плюс карта «стадия → отсек доски». Описаны семь
+структур: повод касания, событие «факт против итога», состояние лота,
+коммерческое предложение, завершение сделки, три вида привязки задачи.
+Разобраны четыре сценария и четыре макета.</p>
+<p>Смысл этого шага один: <strong>проверку нельзя написать против кода,
+который она проверяет.</strong> Пока значения живут только в коде, любая
+проверка подтверждает саму себя.</p>
+<h3 id="волна-1-у-задачи-появилась-область">Волна 1: у задачи появилась
+область</h3>
+<p>Задача несла только ссылку на клиента. У Анны три сделки — «ближайшая
+задача по сделке» называла случайную из трёх. Теперь задача несёт
+область: <strong>сделка → заявка → контакт, первое непустое.</strong>
+Задача без сделки законна: поздравление принадлежит человеку, а не
+транзакции.</p>
+<p>Слой записи отклоняет задачу, у которой клиент один, а сделка —
+другого человека. Обе ссылки существуют, проверка ссылок такое
+пропускала, и запись читалась по-разному в двух карточках.</p>
+<p>Попутно найдены и починены три живых дефекта: правки участников
+сделки <strong>не сохранялись вовсе</strong> (менялись в памяти и
+исчезали при перезагрузке); поиска по сделкам не было; шапка раздела
+заявок утверждала «разобранная заявка становится сделкой» — прямое
+противоречие принятой модели, и партнёр сделал из этого текста вывод о
+нашей архитектуре.</p>
+<h3 id="кросс-модельная-сверка-21-августа">Кросс-модельная сверка 21
+августа</h3>
+<p>Вторая модель прочитала спеку и код независимо и дала тридцать
+замечаний. Проверены все; подтвердилось двенадцать, остальные отклонены
+как неточные. Что подтвердилось и закрыто в тот же день:</p>
+<ul>
+<li><strong>Область проверялась только на создании.</strong> Поля ссылок
+изменяемы через слой записи — вторым вызовом задачу можно было
+перевесить на сделку чужого клиента в обход проверки.</li>
+<li><strong>Задача с обеими ссылками показывалась дважды</strong> — и в
+сделке, и в заявке, с подписью «сделка».</li>
+<li><strong>Разговор на карточке контакта уходил в случайную
+сделку.</strong> Тот же дефект угадывания, что и у ближайшей задачи,
+только в Консьерже.</li>
+<li><strong>Календарь показывал объект первой сделки</strong> для задачи
+второй.</li>
+<li><strong>Спека разошлась сама с собой в трёх местах.</strong> Список
+объёма писался до того, как словари были закрыты, и устарел: роли
+(«восемь сохраняются» — на деле «ЛПР» уходит из ролей), статус объекта
+(«меняет смысл» — на деле не трогается, добавляется второе поле), стадии
+отношений (пять значений вместо четырёх плюс признак успеха).
+Исправлено, и записано правило: при расхождении главнее решения.</li>
+<li><strong>Пять принятых обещаний не имели номера в объёме</strong> и
+тихо выпали бы: убрать шапку на «Сделках», источники в выпадающий
+список, колонки списка, не сбрасывать выбор воронки, архивирование
+вместо удаления. Добавлены пунктами 41–47.</li>
+<li><strong>Проверки были слабее, чем назывались.</strong> Часть стояла
+под условием «если фикстура нашлась» — переименование фикстуры унесло бы
+проверку молча. Поиск проверялся присваиванием в состояние мимо
+обработчика ввода. Правило «первое попадание» вообще не проверялось: на
+задаче с одной ссылкой любой порядок разбора даёт один ответ.
+Переписаны.</li>
+</ul>
+<p><strong>Состояние проверочной базы: 1202 проверки, 0
+отказов.</strong> Каждая новая проверка показана красной на внесённом
+дефекте и зелёной после отката.</p>
+<hr />
+<h2 id="волна-2-поверхность">Волна 2: поверхность</h2>
+<p>Здесь стенд начинает выглядеть иначе — это то, что вы сможете
+посмотреть и оценить.</p>
+<ol type="1">
+<li><strong>Карточка сделки перекладывается.</strong> Сверху сквозной
+путь от первого контакта до подписания, с нарисованной границей: пресейл
+— пройденный участок, доступен только для чтения. Слева неподвижная
+колонка со справкой и участниками, справа прокручиваемая рабочая
+область, снизу одна строка ввода вместо двух кнопок Консьержа.</li>
+<li><strong>Разделы переименовываются</strong> — «Заявки» становятся
+«Входящими», «Договоры» — «Сопровождением». Слово «заявка» живёт не
+только в меню: оно в заголовке карточки, кнопках, хлебных крошках,
+ленте, подсказках Консьержа и настройках. Переименование одного пункта
+меню результата не даст.</li>
+<li><strong>Доска сделок переводится на четыре укрупнённых
+отсека</strong> вместо десяти колонок. Отсеки уже в коде —
+переиспользуются. Новое здесь одно: неизвестная стадия перестаёт молча
+падать в первый отсек и попадает в список нарушителей.</li>
+<li><strong>Список сделок достраивается</strong> — фильтр по стадиям,
+колонки «стадия · срок · ответственный · ближайшая задача», источники в
+выпадающий список, выбор воронки не сбрасывается при переключении.</li>
+<li><strong>Консьерж получает область.</strong> Сейчас он ставит задачу
+только на контакт: он не знает, в каком треде его позвали. Это трогает и
+живой путь модели, поэтому идёт отдельным пунктом с прогоном живого
+сценария, а не попутной правкой.</li>
+</ol>
+<p><strong>Чем заканчивается волна 2:</strong> вся база зелёная (включая
+переписанные утверждения, которые сейчас закрепляют ровно то, что мы
+меняем), собран <code>index.html</code>, снят визуальный прогон на трёх
+ширинах, и вы смотрите стенд глазами.</p>
+<hr />
+<h2 id="волна-3-глубина">Волна 3: глубина</h2>
+<p>То, чего в стенде нет вовсе. Здесь появляются новые сущности, поэтому
+она последняя.</p>
+<ul>
+<li><strong>Отношения с клиентом</strong> — стадия на контакте, признак
+«был успех», единая лента отношений, портфель клиента на карточке.</li>
+<li><strong>Движок поводов</strong> — день рождения, годовщина сделки,
+истечение договора, движение цены в районе. Повод становится
+предложением, предложение — новой заявкой. Это и есть петля
+возврата.</li>
+<li><strong>Сопровождение</strong> — раздел, где живёт и договор, и
+клиент после него.</li>
+<li><strong>Лоты</strong> — пер-лотовое состояние (своя регистрация,
+свой срок, своя ставка), частичный отказ от лота с четырьмя исходами,
+пересчёт суммы сделки и комиссии.</li>
+<li><strong>Предложения</strong> — список версий, отправка клиенту,
+редактирование копии, а не снимка.</li>
+<li><strong>Завершение сделки</strong> кнопкой; успех порождает ровно
+один договор.</li>
+<li><strong>Участники</strong> — роли, пересекающие стол, канал у
+каждого, связь с компанией, влияние словом вместо букв.</li>
+<li><strong>Учёт</strong> — дата конверсии, итог при закрытии задачи,
+разделение записи ленты на факт и итог.</li>
+</ul>
+<hr />
+<h2 id="что-мы-сознательно-не-трогаем">Что мы сознательно не
+трогаем</h2>
+<p>Чтобы не было вопроса «а это вы забыли или решили»: массив лотов
+формы не меняет — его читают десять мест кода и восемь проверок.
+Существующий статус объекта не переосмысляется. Режим «Таблица» не
+удаляется, хотя партнёр просил: на телефоне канбан не читается, и список
+— единственный рабочий вид. Фильтр «Готовность» остаётся: оффплан против
+готового — это трёхлетний цикл против трёхнедельного, для брокера Дубая
+первый вопрос, а не последний.</p>
+<hr />
+<h2 id="что-ждёт-не-кода-а-решения">Что ждёт не кода, а решения</h2>
+<p><strong>Партнёр не подтверждал компромисс «данные две, поверхность
+одна».</strong> Единственное, что он действительно подписал, — гибрид от
+13 августа с одной воронкой. Разделение на две сущности сделано 17
+августа без него, компромисс предложен нами и в наших же документах.
+Пока согласия нет, вся волна 2 делается под риск повторного спора. Это
+не повод её не делать — но это причина показать ему макет до того, как
+поверхность будет переложена целиком.</p>
+<p><strong>Владелец Form B не назначен.</strong> Спека 17 августа
+относит его и к заявке, и к сделке. Развести можно только ответом
+брокера. До ответа наследование документов не реализуется; остальное от
+него не зависит.</p>
+<p><strong>Ни одного полевого интервью в Дубае не проведено.</strong>
+Шесть вопросов остаются без ответа, из них один структурный: может ли
+один договор охватывать несколько юнитов. Пер-юнитная регистрация
+подтверждена, пер-юнитный договор — нет. Если ответ окажется «нет»,
+модель лотов придётся пересобрать.</p>
+<hr />
+<h2 id="откуда-взято-каждое-решение">Откуда взято каждое решение</h2>
+<p>Наследование — не проверка. Ниже помечено, что выведено в этой
+работе, что принято раньше и живёт по инерции, и что прошло через
+независимого критика.</p>
+<table>
+<thead>
+<tr>
+<th>Решение</th>
+<th>Происхождение</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Две сущности: заявка и сделка</td>
+<td><strong>Унаследовано</strong> из спеки 17 августа · оспорено
+партнёром 19-го · подтверждено разбором: меняется кратность (1:N
+кандидатов → 1:1 договор), одной строкой это не живёт</td>
+</tr>
+<tr>
+<td>Граница между ними — «условия согласованы»</td>
+<td><strong>Выведено сейчас</strong>, из его же файла 12 августа, где
+подбор стоит после квалификации</td>
+</tr>
+<tr>
+<td>«Данные две, поверхность одна»</td>
+<td><strong>Выведено нами</strong> · критиком проверено ·
+<strong>партнёром не подтверждено</strong> — открытый риск выше</td>
+</tr>
+<tr>
+<td>Сделка может нести несколько лотов</td>
+<td><strong>Унаследовано</strong> · подтверждено его собственным макетом
+(«Объекты сделки · 2 лота») · зависит от неотвеченного вопроса про один
+договор на несколько юнитов</td>
+</tr>
+<tr>
+<td>Отношения — состояние контакта, а не сущность</td>
+<td><strong>Выведено сейчас</strong> через брейншторм · критиком
+подтверждено</td>
+</tr>
+<tr>
+<td>Область задачи: сделка → заявка → контакт</td>
+<td><strong>Выведено сейчас</strong> из дефекта, найденного в коде</td>
+</tr>
+<tr>
+<td>Отсеки доски (четыре)</td>
+<td><strong>Унаследовано</strong> из кода · записано в спеку 21 августа,
+чтобы проверка не подтверждала сама себя</td>
+</tr>
+<tr>
+<td>Уровни риска для автономности агента</td>
+<td><strong>Унаследовано</strong> из ревизии CRM v3 · не переоценивалось
+в этой работе</td>
+</tr>
+</tbody>
+</table>
+<p>Последняя строка — единственная, где наследование не перепроверялось.
+Если волна 3 упрётся в вопрос «что агент делает сам, а что подтверждает
+человек», её надо будет прогнать через критика отдельно.</p>
+<hr />
+<h2 id="где-мы-сейчас">Где мы сейчас</h2>
+<p>Подготовка закрыта, волна 1 сделана и проверена, кросс-модельная
+сверка прошла и её находки закрыты. Следующий шаг — волна 2. Она ждёт
+одного вашего решения: делать её сразу или сначала показать партнёру
+спеку и макет карточки.</p>
+<footer class="md2html-footer">
+  <span class="brand">VOS&#8217;HOD INTELLIGENCE &middot; md2html</span>
+  <span>auto-generated &middot; mirror of source .md &middot; do not edit by hand</span>
+</footer>
+<script type="module">
+  // Render Mermaid diagrams if any `.mermaid` blocks are present (harmless if none).
+  if (document.querySelector('pre.mermaid, div.mermaid')) {
+    // pandoc emits <pre class="mermaid"><code>…</code></pre>; unwrap <code> so Mermaid reads clean source.
+    document.querySelectorAll('pre.mermaid > code').forEach(function (c) {
+      c.parentElement.textContent = c.textContent;
+    });
+    import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')
+      .then(function (m) { m.default.initialize({ startOnLoad: true, securityLevel: 'loose' }); })
+      .catch(function () { /* offline: diagram stays as text, no breakage */ });
+  }
+</script>
+</body>
+</html>
