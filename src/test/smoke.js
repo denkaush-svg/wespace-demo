@@ -3385,6 +3385,61 @@ setTimeout(async () => {
         !Q.counts().fallback_cooldown && Q.counts().fallback_model === 1, JSON.stringify(Q.counts()));
       L.resetForTest();
 
+      /* A request that never left is worth one more try, and only that one.
+
+         Diagnosed, not guessed: twelve hard scenarios lost an answer to
+         `net::ERR_NETWORK_CHANGED` — Chrome dropping an in-flight request
+         because the machine's network changed under it. On a phone at an agency
+         that is Wi-Fi handing over to LTE, which happens constantly.
+
+         The retry is safe precisely because nothing was accepted on the other
+         side. The proxy's own counters proved it: `daily_used` rises on every
+         ACCEPTED request, before the model runs, and it matched `served`
+         exactly. So a second attempt costs no model call and can duplicate no
+         write. A failure AFTER the server has the call is a different animal
+         and is not retried — the model has already run, and the shared
+         five-hour window is the thing being protected. */
+      {
+        Q.reset();
+        const realFetch = win.fetch;
+        const asked = [];
+        const health = () => Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+
+        win.fetch = (url) => {
+          const u = String(url);
+          if (/\/health$/.test(u)) return health();
+          asked.push(u);
+          return Promise.reject(new TypeError('Failed to fetch'));
+        };
+        L.resetForTest();
+        await L.ask('вопрос').then(() => null, (e) => e);
+        check('live · a request that never reached the server is tried once more',
+          asked.length === 2, 'попыток ' + asked.length);
+        check('live · and the second try is the last one',
+          Q.counts().retry_no_reach === 1, JSON.stringify(Q.counts()));
+
+        // The server answered — it has the call, and the model may already have
+        // run. Asking again would spend the shared window twice for one question.
+        asked.length = 0;
+        Q.reset();
+        win.fetch = (url) => {
+          const u = String(url);
+          if (/\/health$/.test(u)) return health();
+          asked.push(u);
+          return Promise.resolve({ ok: false, status: 503, body: null });
+        };
+        L.resetForTest();
+        await L.ask('вопрос').then(() => null, (e) => e);
+        check('live · a server that answered and refused is not asked twice',
+          asked.length === 1, 'попыток ' + asked.length);
+        check('live · and nothing about it is recorded as a retry',
+          !Q.counts().retry_no_reach, JSON.stringify(Q.counts()));
+
+        win.fetch = realFetch;
+        L.resetForTest();
+        Q.reset();
+      }
+
       // Counting must not itself become a failure: an unknown name is recorded,
       // not thrown, because this runs inside the path that answers a visitor.
       Q.reset();

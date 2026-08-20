@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 02:46</title>
+  <title>WESPACE · сборка 13:30</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='02:46';
+    window.WS_BUILD='13:30';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -14835,6 +14835,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const cfg = { url: '', ready: false, checking: false, lastError: null, misses: 0, served: 0,
     downUntil: 0, cooldownMs: 45000 };
   const GIVE_UP_AFTER = 2;
+  // Long enough that a network handover has settled, short enough that the
+  // waiting card does not become a wait.
+  const RETRY_PAUSE_MS = 1200;
 
   // ?api=… for a demo against another host, ?api=off to force the planner.
   // The parameter picks from a list rather than accepting a URL: everything the
@@ -15477,14 +15480,35 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // ---------- transport ----------
 
   async function stream(text, onText, onStage) {
-    const res = await fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
+    let res;
+    try {
+      res = await fetchAsk(text);
+    } catch (e) {
+      /* Nothing was accepted on the other side. That is not a guess: the
+         proxy's `daily_used` rises on every ACCEPTED request, before the model
+         runs, and it matched `served` exactly across the run that lost four
+         answers — so those four never arrived. Marked here, and only here,
+         because everything thrown below this line happens after the server has
+         the call. */
+      e.reached = false;
+      throw e;
+    }
+    if (!res.ok || !res.body) throw new Error('http ' + res.status);
+    return readStream(res, onText, onStage);
+  }
+
+  function fetchAsk(text) {
+    return fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
         pending: pendingAction() }, composer())),
     });
-    if (!res.ok || !res.body) throw new Error('http ' + res.status);
+  }
 
+  // Everything past the response headers: the server has the call from here on,
+  // so a failure below is never retried.
+  async function readStream(res, onText, onStage) {
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
@@ -15544,7 +15568,32 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     if (!cfg.ready) await probe();
     if (!cfg.ready) throw new Error(cfg.lastError || 'offline');
-    const done = await stream(text, opts && opts.onText, opts && opts.onStage);
+    /* One more attempt when the request never left, and never otherwise.
+
+       Diagnosed rather than guessed: the answer this run lost went to
+       `net::ERR_NETWORK_CHANGED` — Chrome dropping an in-flight request because
+       the machine's network changed under it. On the phone this stand is shown
+       on, that is Wi-Fi handing over to LTE, and it costs a visitor the live
+       Concierge for that question with nothing on screen to say so.
+
+       Safe only because nothing was accepted on the other side, which the
+       proxy's counters establish rather than assume. A failure after the server
+       has the call is left alone: the model may already have run, and the
+       shared five-hour window is exactly what all these guards protect. */
+    let done;
+    try {
+      done = await stream(text, opts && opts.onText, opts && opts.onStage);
+    } catch (e) {
+      if (e && e.reached === false) {
+        note('retry_no_reach');
+        // A moment for a handover to settle. Retrying into the same dead second
+        // is not a second attempt, it is the same one twice.
+        await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
+        done = await stream(text, opts && opts.onText, opts && opts.onStage);
+      } else {
+        throw e;
+      }
+    }
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
     const ran = { mode: done.mode || null, depth: done.depth || null };
