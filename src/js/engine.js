@@ -930,11 +930,26 @@
 
   // The file is offered, never pushed: a download that starts by itself in a
   // demo reads as something going wrong.
+  /* Why the document is in the language it is in, in the words a broker would
+     use about it. The reason travels as an id from the server; spelling it out
+     is this side's job, and it matters that the sentence names WHOSE account
+     the choice is on — «на английском» alone reads as the Concierge deciding
+     for itself, which is the thing that went wrong. */
+  const DOC_LANG_RU = { ru: 'на русском', en: 'на английском', ar: 'на арабском' };
+  const DOC_WHY_RU = {
+    asked: 'вы попросили',
+    setting: 'так в настройках',
+    contact: 'так читает получатель',
+    market: 'язык получателя не записан',
+    broker: 'документ для вас',
+  };
   function reportCard(rp) {
     if (!rp) return '';
+    const lang = rp.lang ? ' · ' + (DOC_LANG_RU[rp.lang] || rp.lang) +
+      (DOC_WHY_RU[rp.why] ? ', ' + DOC_WHY_RU[rp.why] : '') : '';
     return '<div class="rp"><div class="rp-i">' + I('doc') + '</div>' +
       '<div class="rp-t"><b>' + esc(rp.title) + '</b><span>' + esc(rp.name) + ' · ' +
-      rp.count + ' блоков</span></div>' +
+      rp.count + ' блоков' + esc(lang) + '</span></div>' +
       '<div class="rp-a"><button class="btn sm" data-rpopen="' + esc(rp.id) + '">Открыть</button>' +
       '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
   }

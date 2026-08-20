@@ -1239,7 +1239,7 @@ async function handleAsk(req, res) {
       // The resolved ids travel back: an unknown mode falls back here, and the
       // page must show what actually answered, not what it hoped it had asked.
       send('done', { say: parts.say, plan: parts.plan, ms: Date.now() - started, model: CFG.model,
-        mode: spec.mode, depth: spec.depth, doc: spec.doc });
+        mode: spec.mode, depth: spec.depth, doc: spec.doc, chat: spec.chat, docWhy: spec.why });
       state.served += 1;
     }
   } catch (e) {

@@ -3882,6 +3882,60 @@ setTimeout(async () => {
       check('язык · Russian cells from our own data do not make an English document Russian',
         !!out && !!out.report && out.report.count === 2, JSON.stringify(out && out.report));
     }
+
+    /* ---- and the settings row is a control, not a picture of one ----
+
+       It offered «Русский · English · Авто» and every button was wired to the
+       same feature stub: a person could set it, see it take, and change
+       nothing. A promise the interface does not keep is worse than an absent
+       control, because it is the one the presenter points at. */
+    {
+      const was = { chat: st.cgLang, doc: st.cgDocLang, view: st.view };
+      // Found, not assumed: a missing control is a failed check, never an
+      // exception that takes the two hundred checks after it down with it.
+      const press = (sel) => {
+        const el = doc.querySelector(sel);
+        if (el) el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        return !!el;
+      };
+      WS.router.go('settings');
+      check('язык · the row writes to the workspace, not to a stub',
+        !!doc.querySelector('[data-cglang="en"]') && !!doc.querySelector('[data-cgdoclang="auto"]'));
+      check('язык · and the document language is a row of its own',
+        !!doc.querySelector('[data-cgdoclang="en"]') && !!doc.querySelector('[data-cgdoclang="ru"]'));
+      const auto = doc.querySelector('[data-cgdoclang="auto"]');
+      check('язык · what is set shows as set',
+        !!auto && (auto.className || '').indexOf('on') >= 0, auto && auto.className);
+
+      check('язык · pressing it changes what the Concierge is actually asked for',
+        press('[data-cglang="en"]') && st.cgLang === 'en' && L.langs('сколько сделок в работе').chat === 'en',
+        st.cgLang + ' / ' + L.langs('сколько сделок в работе').chat);
+
+      WS.router.go('settings');
+      check('язык · and the document row overrides the recipient’s card',
+        press('[data-cgdoclang="ar"]') && st.cgDocLang === 'ar' && L.langs('собери КП для Игоря Лебедева').doc === 'ar',
+        st.cgDocLang + ' / ' + L.langs('собери КП для Игоря Лебедева').doc);
+
+      st.cgLang = was.chat; st.cgDocLang = was.doc;
+      WS.router.go(was.view || 'start');
+    }
+
+    // ---- and a document not in the language of the conversation says so ----
+    {
+      const english = { title: 'Commercial proposal', blocks: [{ t: 'p', text: 'The proposal below covers the office space in Business Bay with the rent and the service charge for the first year.' }] };
+      const other = L.toReply('Собрал КП.', { report: english }, { doc: 'en', chat: 'ru', docWhy: 'contact' });
+      check('язык · a document not in the chat’s language is marked with its own',
+        !!other && !!other.report && other.report.lang === 'en' && other.report.why === 'contact',
+        JSON.stringify(other && other.report));
+      const card = WS.engine.agentCard(other, 'm_lang_test');
+      check('язык · and the card says which language and on whose account',
+        /английск/i.test(card) && /получател/i.test(card), card.slice(card.indexOf('rp-t'), card.indexOf('rp-t') + 220));
+
+      const russian = { title: 'Записка', blocks: [{ t: 'p', text: 'Ниже разбор по сделкам в работе: сумма портфеля, стадии и что мешает закрыть ближайшие.' }] };
+      const same = L.toReply('Собрал записку.', { report: russian }, { doc: 'ru', chat: 'ru', docWhy: 'broker' });
+      check('язык · a document in the language of the conversation is not marked at all',
+        !!same && !!same.report && !same.report.lang, JSON.stringify(same && same.report));
+    }
   } else {
     check('live · language module present', false);
   }

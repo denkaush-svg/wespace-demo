@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:06</title>
+  <title>WESPACE · сборка 18:47</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:06';
+    window.WS_BUILD='18:47';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5892,11 +5892,26 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // The file is offered, never pushed: a download that starts by itself in a
   // demo reads as something going wrong.
+  /* Why the document is in the language it is in, in the words a broker would
+     use about it. The reason travels as an id from the server; spelling it out
+     is this side's job, and it matters that the sentence names WHOSE account
+     the choice is on — «на английском» alone reads as the Concierge deciding
+     for itself, which is the thing that went wrong. */
+  const DOC_LANG_RU = { ru: 'на русском', en: 'на английском', ar: 'на арабском' };
+  const DOC_WHY_RU = {
+    asked: 'вы попросили',
+    setting: 'так в настройках',
+    contact: 'так читает получатель',
+    market: 'язык получателя не записан',
+    broker: 'документ для вас',
+  };
   function reportCard(rp) {
     if (!rp) return '';
+    const lang = rp.lang ? ' · ' + (DOC_LANG_RU[rp.lang] || rp.lang) +
+      (DOC_WHY_RU[rp.why] ? ', ' + DOC_WHY_RU[rp.why] : '') : '';
     return '<div class="rp"><div class="rp-i">' + I('doc') + '</div>' +
       '<div class="rp-t"><b>' + esc(rp.title) + '</b><span>' + esc(rp.name) + ' · ' +
-      rp.count + ' блоков</span></div>' +
+      rp.count + ' блоков' + esc(lang) + '</span></div>' +
       '<div class="rp-a"><button class="btn sm" data-rpopen="' + esc(rp.id) + '">Открыть</button>' +
       '<button class="btn sm primary" data-rpsave="' + esc(rp.id) + '">' + I('download') + 'Скачать</button></div></div>';
   }
@@ -13314,6 +13329,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const sw = (on) => '<button class="switch' + (on ? ' on' : '') + '" data-act="cgFeatureStub"><i></i></button>';
     const rowc = (ic, t, d, ctl) => '<div class="cap-toggle" style="margin-bottom:8px"><span>' + I(ic) + '<span><b style="color:var(--ink)">' + t + '</b><div style="font-size:11.5px;color:var(--mut);font-weight:400">' + d + '</div></span></span>' + ctl + '</div>';
     const seg = (opts, sel) => '<div class="seg" style="display:inline-flex">' + opts.map((o) => '<button class="' + (o === sel ? 'on' : '') + '" data-act="cgFeatureStub">' + o + '</button>').join('') + '</div>';
+    // The same control, wired. The row beside it is a picture of a setting; a
+    // language row that is a picture is how a КП left for a client in a
+    // language nobody had asked for.
+    const segLive = (attr, opts, cur) => '<div class="seg" style="display:inline-flex">' +
+      opts.map((o) => '<button class="' + (o[0] === cur ? 'on' : '') + '" data-' + attr + '="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
     const card = (title, inner) => '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 12px">' + title + '</div>' + inner + '</div>';
 
     const account = card('Аккаунт',
@@ -13336,7 +13356,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const cgStyle = card('Стиль общения с Консьержем',
       '<div class="settings-row"><div class="dk">Тон</div>' + seg(['Деловой', 'Дружелюбный', 'Краткий'], 'Деловой') + '</div>' +
       '<div class="settings-row"><div class="dk">Длина ответов</div>' + seg(['Кратко', 'Обычно', 'Подробно'], 'Обычно') + '</div>' +
-      '<div class="settings-row"><div class="dk">Язык общения</div>' + seg(['Русский', 'English', 'Авто'], 'Русский') + '</div>' +
+      '<div class="settings-row"><div class="dk">Язык общения</div>' +
+        segLive('cglang', [['ru', 'Русский'], ['en', 'English'], ['auto', 'Авто']], S().cgLang || 'ru') + '</div>' +
+      '<div class="settings-row"><div class="dk">Язык документов</div>' +
+        segLive('cgdoclang', [['auto', 'По получателю'], ['ru', 'Русский'], ['en', 'English'], ['ar', 'العربية']], S().cgDocLang || 'auto') + '</div>' +
+      '<div style="font-size:11.5px;color:var(--mut);margin:-2px 0 4px;line-height:1.5">Язык КП, досье и отчётов — отдельно от языка чата: читает их клиент, а не вы. <b style="color:var(--ink)">По получателю</b> — как записано в его карточке; языка там нет — английский, рабочий язык рынка. Записка «для себя» пишется на языке разговора. Разово язык можно назвать прямо в запросе: «собери КП по-английски».</div>' +
       '<div class="settings-row"><div class="dk">Стартовый режим Консьержа</div>' + seg(['Авто', 'Инвест-анализ', 'Подбор'], 'Авто') + '</div>' +
       '<div style="font-size:11.5px;color:var(--mut);margin:-2px 0 4px;line-height:1.5">С какого режима Консьерж начинает новый диалог — режим можно сменить прямо в чате перед запросом. <b style="color:var(--ink)">Авто</b> — определит задачу сам по формулировке · <b style="color:var(--ink)">Инвест-анализ</b> — доходность, payment plan, ROI и сценарии выхода · <b style="color:var(--ink)">Подбор</b> — матчинг объектов под клиента с обоснованием «почему этот».</div>' +
       '<div style="margin-top:6px">' +
@@ -15466,7 +15490,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         : ''),
       blocks: blocks, evidence: evidence, next: next,
       speak: normSay(plan.say_aloud),
-      report: made ? { id: made.id, title: made.title, name: made.name, count: report.blocks.length } : null,
+      /* A document in a language other than the conversation's is marked with
+         it, and with whose account it is on. Only then: the mark exists so the
+         broker notices a КП going out in English before they forward it, and a
+         label on every Russian note would be the noise that hides it. */
+      report: made ? {
+        id: made.id, title: made.title, name: made.name, count: report.blocks.length,
+        lang: (want && ran && ran.chat && want !== ran.chat) ? want : null,
+        why: (ran && ran.docWhy) || null,
+      } : null,
     };
   }
 
@@ -15741,7 +15773,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
-    const ran = { mode: done.mode || null, depth: done.depth || null, doc: done.doc || null };
+    const ran = { mode: done.mode || null, depth: done.depth || null,
+      doc: done.doc || null, chat: done.chat || null, docWhy: done.docWhy || null };
     const reply = toReply(done.say, done.plan || {}, ran);
     if (!reply) throw new Error('empty reply');
     reply.mode = ran.mode;
@@ -16228,7 +16261,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-cglang],[data-cgdoclang],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -16324,6 +16357,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.cgmode) { store.cgMode = d.cgmode; store.cgMenu = null; return api.emit(); }
     if (d.cgatt) { const p = d.cgatt.split('~~'); store.cgCtx = store.cgCtx || []; store.cgCtx.push({ icon: p[0], label: p[1], att: true }); store.cgMenu = null; return api.emit(); }
     if (d.cgdepth) { store.cgDepth = d.cgdepth; return api.emit(); }
+    if (d.cglang) { store.cgLang = d.cglang; return api.emit(); }
+    if (d.cgdoclang) { store.cgDocLang = d.cgdoclang; return api.emit(); }
     if (d.dfconfirm) { const p = d.dfconfirm.split(':'); const dl = store.data.deals.find((x) => x.id === p[0]); if (dl) { dl.prov = dl.prov || {}; dl.prov[p[1]] = 'confirmed'; } api.toast('Поле подтверждено', 'ok'); return WS.ui.dealCard(p[0]); }
     // Расхождение живёт и на сделке (сумма), и на заявке (бюджет) — запись выбирается по id,
     // а не по предположению, что это всегда сделка.
