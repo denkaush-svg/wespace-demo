@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 19:32</title>
+  <title>WESPACE · сборка 01:56</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='19:32';
+    window.WS_BUILD='01:56';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -4394,7 +4394,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       } else if (e.op === 'addClient') {
         if (!d.clients.some((c) => c.id === e.obj.id)) d.clients.unshift(e.obj);
       } else if (e.op === 'addTask') {
-        if (!d.tasks.some((t) => t.id === e.task.id)) d.tasks.unshift(e.task);
+        if (!d.tasks.some((t) => t.id === e.task.id)) d.tasks.unshift(stripBadScope(e.task));
       } else if (e.op === 'removeTask') {
         d.tasks = d.tasks.filter((t) => t.id !== e.id);
       } else if (e.op === 'clearInbox') {
@@ -4725,6 +4725,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     }
     const badPatchRef = refError(patch, at, coming);
     if (badPatchRef) return badPatchRef;
+    // Область проверяется и на изменении, не только на создании: `dealId` и `requestId`
+    // изменяемы через этот слой, поэтому задачу можно было перевесить на сделку другого
+    // клиента вторым вызовом — создание защищено, обход шёл мимо. Проверяется результат
+    // слияния, а не патч: клиент чаще всего лежит в записи, а в патче только ссылка.
+    const badPatchScope = scopeError(Object.assign({}, rec, patch), at);
+    if (badPatchScope) return badPatchScope;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
     for (let k = 0; k < keys.length; k++) {
@@ -4826,8 +4832,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // surface, where a re-render would replace the node under their cursor.
   function touch(opts) { store.dataRevision++; save(); if (!opts || opts.render !== false) emit(); }
 
+  // Прямой путь создания — им пользуются интерфейс, сценарии и события, минуя слой предпросмотра.
+  // Отказать здесь нельзя: сценарий не умеет обработать отказ и молча потеряет задачу. Поэтому
+  // противоречащая ссылка снимается, а задача остаётся: у неё станет областью шире, чем задумано,
+  // но она не будет врать в двух карточках одновременно.
+  function stripBadScope(t) {
+    const owner = (coll, id) => { const x = (store.data[coll] || []).find((y) => y.id === id); return x ? x.clientId : undefined; };
+    if (!t.clientId) return t;
+    if (t.dealId && owner('deals', t.dealId) !== undefined && owner('deals', t.dealId) !== t.clientId) delete t.dealId;
+    if (t.requestId && owner('requests', t.requestId) !== undefined && owner('requests', t.requestId) !== t.clientId) delete t.requestId;
+    return t;
+  }
   function addTask(task) {
-    const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
+    const t = stripBadScope(Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task));
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
     store.dataRevision++; save(); emit();
   }
@@ -8830,8 +8847,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
-    const dealForC = D().deals.find((x) => x.clientId === id);
-    const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
+    // Разговор на карточке контакта принадлежит контакту. Прежде тред брался у первой
+    // найденной сделки клиента: у Анны их три, и работа по человеку молча оседала
+    // в случайной из них. Тот же дефект, что был у ближайшей задачи и у карточки задачи.
+    const clientTid = 'contact:' + id;
     const k = kycOf(c);
     const dealsCount = D().deals.filter((x) => x.clientId === id).length;
     // KYC, the preferred channel and the language now live in the compact hero — repeating them as
@@ -8847,7 +8866,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       state: clientOps(c),
       tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
-      concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
+      concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', clientTid, c.name, 'users'),
     };
   }
   function clientCard(id) { S().clientId = id; WS.router.go('clientDetail'); }
@@ -9162,7 +9181,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // иначе задача по контакту. Клиентская задача законна: касания и поздравления не относятся
   // ни к какой сделке, и требовать привязку значило бы запретить половину работы по удержанию.
   function tasksOfDeal(d) { return (D().tasks || []).filter((t) => t.dealId === d.id); }
-  function tasksOfRequest(r) { return (D().tasks || []).filter((t) => t.requestId === r.id); }
+  // Задача с обеими ссылками разрешается в сделку — значит в заявке её быть не должно,
+  // иначе подпись говорит «сделка», а список заявки показывает ту же строку у себя.
+  function tasksOfRequest(r) { return (D().tasks || []).filter((t) => !t.dealId && t.requestId === r.id); }
   function taskScopeLabel(t) {
     if (t.dealId) { const d = D().deals.find((x) => x.id === t.dealId); return d ? 'сделка · ' + d.title : 'сделка'; }
     if (t.requestId) { const r = (D().requests || []).find((x) => x.id === t.requestId); return r ? 'заявка · ' + r.title : 'заявка'; }
@@ -11739,6 +11760,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // day index within the demo week (Mon..Sun = 0..6; demo «сегодня» = Чт 14 мая = 3)
   function calDayIdx(w) { w = w || ''; return /просроч/.test(w) ? 1 : /вчера|ранее/.test(w) ? 2 : /сегодня/.test(w) ? 3 : /завтра/.test(w) ? 4 : 5; }
   function objOfClient(cid) { const d = D().deals.find((x) => x.clientId === cid); return d ? d.objectId : null; }
+  // Объект берётся у области задачи, а не у первой сделки клиента: задача второй сделки
+  // рисовалась в календаре с объектом первой. У заявки объект не один, у поздравления его нет —
+  // в обоих случаях пусто, и это честнее, чем приписать первый попавшийся. Единственное следствие:
+  // такая задача не показывается в фильтре по конкретному объекту, где ей и не место.
+  function objOfDeal(id) { const d = D().deals.find((x) => x.id === id); return d ? d.objectId : null; }
+  function objOfTask(t) { return t.dealId ? objOfDeal(t.dealId) : null; }
   function calendarActivities() {
     const acts = [];
     const cn = (id) => { const c = D().clients.find((x) => x.id === id); return c ? c.name : ''; };
@@ -11759,7 +11786,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const dir = t.assignedBy ? 'in' : t.assignee ? (done ? 'agent' : 'out') : 'me';
       const who = t.assignedBy ? 'от: ' + tn(t.assignedBy) : t.assignee ? 'назначено: ' + tn(t.assignee) : 'моя';
       push({ id: t.id, type: 'задача', when: t.due, dir: dir,
-        clientId: t.clientId, objectId: objOfClient(t.clientId),
+        clientId: t.clientId, objectId: objOfTask(t),
         title: t.title, sub: who + (cn(t.clientId) ? ' · ' + cn(t.clientId) : '') + (done ? ' · выполнено' : ''),
         open: t.scenario ? { scn: t.scenario } : { client: t.clientId } });
     });
@@ -11768,8 +11795,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         clientId: i.clientId, objectId: objOfClient(i.clientId),
         title: (cn(i.clientId) || 'Клиент') + ' — входящее', sub: (i.channel || 'сообщение') + ' · ' + (i.text || '').slice(0, 42), open: { nav: 'concierge' } });
     });
-    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: objOfClient('c_overdue'), title: 'Обещано КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { request: 'r_igor' } });
-    push({ id: 'cm_assign_omar', type: 'задача', when: 'сегодня', dir: 'in', clientId: 'c_docs', objectId: objOfClient('c_docs'), title: 'Подготовить документы к сделке Виктора', sub: 'от: Омар Рахман (руководитель)', open: { deal: 'd_viktor' } });
+    // Объект берётся у того, что строка открывает. У заявки объект не один — пусто; у задачи по сделке
+    // Виктора это объект именно её, а не первой сделки клиента, у которого их две.
+    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: null, title: 'Обещано КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { request: 'r_igor' } });
+    push({ id: 'cm_assign_omar', type: 'задача', when: 'сегодня', dir: 'in', clientId: 'c_docs', objectId: objOfDeal('d_viktor'), title: 'Подготовить документы к сделке Виктора', sub: 'от: Омар Рахман (руководитель)', open: { deal: 'd_viktor' } });
     return acts;
   }
   function activityRow(a) {
@@ -14051,7 +14080,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});
 

@@ -4151,28 +4151,41 @@ setTimeout(async () => {
     const sib = dd().deals.filter((d) => d.clientId === 'c_docs');
     check('область · у c_docs больше одной сделки (иначе проверка ничего не значит)', sib.length >= 2,
       'сделок: ' + sib.length);
+    // Именованные фикстуры проверяются отдельной строкой, а не условием вокруг проверок:
+    // условие молча уносит с собой всё, что внутри, и база остаётся зелёной без единой проверки.
     const dViktor = dd().deals.find((d) => d.id === 'd_viktor');
     const dRent = dd().deals.find((d) => d.id === 'd_rentbiz');
-    if (dViktor && dRent) {
-      const a = WS.ui.tasksOfDeal(dViktor).map((t) => t.id);
-      const b = WS.ui.tasksOfDeal(dRent).map((t) => t.id);
-      check('область · задача сделки видна в своей сделке', a.indexOf('t_viktor_doc') >= 0, 'a=' + a.join(','));
-      check('область · и не видна в сестринской сделке того же клиента', b.indexOf('t_viktor_doc') < 0, 'b=' + b.join(','));
-      check('область · списки задач двух сестёр не пересекаются',
-        a.every((id) => b.indexOf(id) < 0), 'a=' + a.join(',') + ' b=' + b.join(','));
-    }
     const rIgor = (dd().requests || []).find((r) => r.id === 'r_igor');
-    if (rIgor) {
-      const rt = WS.ui.tasksOfRequest(rIgor).map((t) => t.id);
-      check('область · задача заявки видна в своей заявке', rt.indexOf('t_igor_kp') >= 0, 'rt=' + rt.join(','));
-    }
+    check('область · фикстуры на месте: d_viktor, d_rentbiz, r_igor', !!dViktor && !!dRent && !!rIgor,
+      'd_viktor=' + !!dViktor + ' d_rentbiz=' + !!dRent + ' r_igor=' + !!rIgor);
+    const a = dViktor ? WS.ui.tasksOfDeal(dViktor).map((t) => t.id) : [];
+    const b = dRent ? WS.ui.tasksOfDeal(dRent).map((t) => t.id) : [];
+    check('область · задача сделки видна в своей сделке', a.indexOf('t_viktor_doc') >= 0, 'a=' + a.join(','));
+    check('область · и не видна в сестринской сделке того же клиента', b.indexOf('t_viktor_doc') < 0, 'b=' + b.join(','));
+    check('область · списки задач двух сестёр не пересекаются',
+      a.length > 0 && a.every((id) => b.indexOf(id) < 0), 'a=' + a.join(',') + ' b=' + b.join(','));
+    const rt = rIgor ? WS.ui.tasksOfRequest(rIgor).map((t) => t.id) : [];
+    check('область · задача заявки видна в своей заявке', rt.indexOf('t_igor_kp') >= 0, 'rt=' + rt.join(','));
     // Клиентская задача законна и области не имеет — требовать привязку значило бы запретить касания.
     const touch = dd().tasks.find((t) => t.id === 't_anna_touch');
     check('область · касание остаётся задачей по контакту, без сделки и заявки',
       !!touch && !touch.dealId && !touch.requestId);
     check('область · подпись области читается словом',
       WS.ui.taskScopeLabel({ dealId: 'd_viktor' }).indexOf('сделка') === 0 &&
+      WS.ui.taskScopeLabel({ requestId: 'r_igor' }).indexOf('заявка') === 0 &&
       WS.ui.taskScopeLabel({}) === 'клиент');
+    // Правило «первое попадание» проверяется на задаче с ОБЕИМИ ссылками — иначе оно не проверено
+    // вовсе: на задаче с одной ссылкой любой порядок разбора даёт один и тот же ответ.
+    const both = { id: 't_scope_both', clientId: 'c_docs', dealId: 'd_viktor', requestId: 'r_igor',
+      title: 'Обе ссылки', due: 'сегодня', when: 'today', status: 'open' };
+    dd().tasks.unshift(both);
+    check('область · при обеих ссылках побеждает сделка',
+      WS.ui.taskScopeLabel(both).indexOf('сделка') === 0, 'подпись: ' + WS.ui.taskScopeLabel(both));
+    check('область · и такая задача показывается в победившей сделке',
+      WS.ui.tasksOfDeal(dViktor || { id: 'd_viktor' }).map((t) => t.id).indexOf('t_scope_both') >= 0);
+    check('область · и такая задача не показывается ещё и в заявке',
+      WS.ui.tasksOfRequest(rIgor || { id: 'r_igor' }).map((t) => t.id).indexOf('t_scope_both') < 0);
+    dd().tasks = dd().tasks.filter((t) => t.id !== 't_scope_both');
   }
   {
     // Слой записи не пускает задачу, у которой клиент один, а сделка — другого человека:
@@ -4183,8 +4196,33 @@ setTimeout(async () => {
       bad && bad.ok === false, 'ответ: ' + JSON.stringify(bad && (bad.reason || bad.error || bad.ok)));
     const good = WS.storeApi.preview([{ op: 'addTask', task: {
       id: 't_scope_ok', clientId: 'c_docs', dealId: 'd_viktor', title: 'Своя сделка', due: 'сегодня', when: 'today' } }]);
-    check('область · задача на свою сделку проходит', good && good.ok !== false,
+    check('область · задача на свою сделку проходит', good && good.ok === true,
       'ответ: ' + JSON.stringify(good && (good.reason || good.error || good.ok)));
+    const badReq = WS.storeApi.preview([{ op: 'addTask', task: {
+      id: 't_scope_badreq', clientId: 'c_docs', requestId: 'r_igor', title: 'Чужая заявка', due: 'сегодня', when: 'today' } }]);
+    check('область · задача на заявку чужого клиента тоже отклоняется',
+      badReq && badReq.ok === false, 'ответ: ' + JSON.stringify(badReq && (badReq.reason || badReq.error || badReq.ok)));
+    // Изменение — второй путь к тому же нарушению: поля области изменяемы, и проверка на создании
+    // ловит только первый вызов. Задача заводится своей, а вторым вызовом переводится на чужую сделку.
+    const move = WS.storeApi.preview([{ op: 'updateTask', id: 't_anna_touch', patch: { dealId: 'd_viktor' } }]);
+    check('область · перевод задачи на сделку чужого клиента изменением отклоняется',
+      move && move.ok === false, 'ответ: ' + JSON.stringify(move && (move.reason || move.error || move.ok)));
+    const moveOk = WS.storeApi.preview([{ op: 'updateTask', id: 't_viktor_doc', patch: { dealId: 'd_rentbiz' } }]);
+    check('область · перевод между своими сделками изменением проходит', moveOk && moveOk.ok === true,
+      'ответ: ' + JSON.stringify(moveOk && (moveOk.reason || moveOk.error || moveOk.ok)));
+    const moveReq = WS.storeApi.preview([{ op: 'updateTask', id: 't_viktor_doc', patch: { requestId: 'r_igor' } }]);
+    check('область · перевод задачи на заявку чужого клиента изменением тоже отклоняется',
+      moveReq && moveReq.ok === false, 'ответ: ' + JSON.stringify(moveReq && (moveReq.reason || moveReq.error || moveReq.ok)));
+    // Прямой путь создания идёт мимо предпросмотра — им пользуются интерфейс, сценарии и события.
+    // Отказать там нельзя (сценарий потеряет задачу молча), поэтому противоречащая ссылка снимается.
+    WS.storeApi.addTask({ id: 't_scope_direct', clientId: 'c_anna', dealId: 'd_viktor', requestId: 'r_igor', title: 'Прямая' });
+    const made = dd().tasks.find((t) => t.id === 't_scope_direct');
+    check('область · прямое создание снимает ссылку на чужую сделку, задачу не теряя',
+      !!made && !made.dealId && !made.requestId, made ? 'dealId=' + made.dealId + ' requestId=' + made.requestId : 'задачи нет');
+    WS.storeApi.addTask({ id: 't_scope_direct_ok', clientId: 'c_docs', dealId: 'd_viktor', title: 'Своя прямая' });
+    const madeOk = dd().tasks.find((t) => t.id === 't_scope_direct_ok');
+    check('область · и не трогает верную ссылку', !!madeOk && madeOk.dealId === 'd_viktor');
+    dd().tasks = dd().tasks.filter((t) => t.id !== 't_scope_direct' && t.id !== 't_scope_direct_ok');
   }
   {
     // Область снимается, если в форме поменяли клиента: задача, привязанная к сделке чужого
@@ -4204,10 +4242,22 @@ setTimeout(async () => {
   {
     // Правки участника не переживали перезагрузку: обе операции меняли данные и перерисовывали
     // карточку, но не сохраняли. Сторожим сам вызов — это ровно тот дефект, что был.
-    const src = read('js/ui.js');
-    const fn = (name) => { const i = src.indexOf('function ' + name + '('); return i < 0 ? '' : src.slice(i, i + 1400); };
-    check('участники · сохранение участника вызывает save()', fn('saveDealContact').indexOf('storeApi.save()') > 0);
-    check('участники · открепление участника вызывает save()', fn('removeDealContact').indexOf('storeApi.save()') > 0);
+    // Проверяем не текст исходника, а то, что правка доехала до хранилища: дефект был ровно в том,
+    // что данные менялись в памяти, карточка перерисовывалась, а перезагрузка всё возвращала назад.
+    const KEY = 'wespace_demo_state';
+    const persisted = () => { try { return JSON.parse(win.localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } };
+    const dealOf = (blob, id) => ((blob.data || {}).deals || []).find((d) => d.id === id);
+    const target = dd().deals.find((d) => Array.isArray(d.contacts) && d.contacts.length >= 2);
+    check('участники · есть сделка с двумя участниками (иначе проверка ничего не значит)', !!target,
+      'сделок с участниками: ' + dd().deals.filter((d) => (d.contacts || []).length >= 2).length);
+    if (target) {
+      const before = (dealOf(persisted(), target.id) || { contacts: [] }).contacts || [];
+      const wasLive = target.contacts.length;
+      WS.ui.removeDealContact(target.id, target.contacts.length - 1);
+      const after = (dealOf(persisted(), target.id) || { contacts: [] }).contacts || [];
+      check('участники · открепление переживает перезагрузку', after.length === wasLive - 1,
+        'в памяти было ' + wasLive + ', в хранилище стало ' + after.length + ' (до операции ' + before.length + ')');
+    }
   }
   {
     // Поиска по сделкам не было вовсе. Проверяем, что он сужает выборку и что сброс её возвращает.
@@ -4215,14 +4265,68 @@ setTimeout(async () => {
     WS.router.go('clients');
     const countRows = () => (doc.getElementById('main').innerHTML.match(/data-deal="/g) || []).length;
     const all = countRows();
-    WS.store.dealSearch = 'DIFC'; WS.storeApi.emit();
+    // Через настоящее поле, а не присваиванием в состояние: обработчик ввода — это ровно то,
+    // что добавлено, и присваивание проходит мимо него.
+    const type = (v) => {
+      const el = doc.getElementById('dealSearch');
+      if (!el) return false;
+      el.value = v;
+      el.dispatchEvent(new win.Event('input', { bubbles: true }));
+      return true;
+    };
+    check('поиск · поле ввода есть на странице сделок', type('DIFC'));
     const narrowed = countRows();
-    check('поиск · строка поиска сужает список сделок', narrowed > 0 && narrowed < all,
+    check('поиск · ввод в поле сужает список сделок', narrowed > 0 && narrowed < all,
       'без поиска ' + all + ', с «DIFC» ' + narrowed);
-    WS.store.dealSearch = 'зззнесуществует'; WS.storeApi.emit();
+    check('поиск · введённое доехало до состояния', WS.store.dealSearch === 'DIFC', 'в состоянии: ' + WS.store.dealSearch);
+    type('зззнесуществует');
     check('поиск · запрос без совпадений не оставляет строк', countRows() === 0);
-    WS.store.dealSearch = ''; WS.storeApi.emit();
-    check('поиск · сброс возвращает полный список', countRows() === all, 'снова ' + countRows() + ' из ' + all);
+    // Сброс — настоящая кнопка. Она обязана и появиться от одного поиска, и убрать его:
+    // фильтр, который нельзя снять кнопкой «сбросить», оставляет пустой экран без объяснения.
+    const clr = doc.querySelector('[data-act="clearDealFilters"]');
+    check('поиск · один запрос уже показывает кнопку сброса', !!clr);
+    if (clr) clr.click();
+    check('поиск · общий сброс фильтров чистит и поиск', WS.store.dealSearch === '' && countRows() === all,
+      'строк ' + countRows() + ' из ' + all + ', запрос «' + WS.store.dealSearch + '»');
+  }
+  {
+    // Разговор на карточке контакта принадлежит контакту, а не первой попавшейся его сделке.
+    const spec = WS.ui.clientSpec ? WS.ui.clientSpec('c_docs') : null;
+    check('тред · Консьерж на карточке контакта открывает тред контакта',
+      !!spec && String(spec.concierge || '').indexOf('contact:c_docs') > 0,
+      'сделок у c_docs: ' + dd().deals.filter((d) => d.clientId === 'c_docs').length);
+    check('тред · и не тред какой-либо сделки', !!spec && String(spec.concierge || '').indexOf('data-thread="deal:') < 0);
+    check('тред · такой идентификатор относится Консьержем к группе «по клиентам»',
+      WS.ui.threadGroup && WS.ui.threadGroup('contact:c_docs') === 'byContact',
+      'группа: ' + (WS.ui.threadGroup && WS.ui.threadGroup('contact:c_docs')));
+    // Календарь берёт объект у области задачи: задача второй сделки рисовалась с объектом первой.
+    const acts = WS.ui.calendarActivities ? WS.ui.calendarActivities() : [];
+    const av = acts.find((x) => x.id === 't_viktor_doc');
+    const dv = dd().deals.find((d) => d.id === 'd_viktor');
+    check('календарь · объект задачи берётся у её сделки, а не у первой сделки клиента',
+      !!av && !!dv && !!dv.objectId && av.objectId === dv.objectId,
+      av ? 'у задачи ' + av.objectId + ', у сделки ' + (dv && dv.objectId) : 'активности нет');
+    // Та же строка была захардкожена в календаре: открывает сделку Виктора, а объект брала у клиента.
+    // Совпадение объектов ничего не доказывает, пока сделка Виктора у клиента первая, — поэтому
+    // проверяем на переставленном порядке: именно так дефект и вернулся бы незамеченным.
+    const order = dd().deals.slice();
+    dd().deals = order.filter((d) => d.clientId !== 'c_docs').concat(order.filter((d) => d.clientId === 'c_docs').reverse());
+    const firstOfDocs = dd().deals.find((d) => d.clientId === 'c_docs');
+    const omar = (WS.ui.calendarActivities() || []).find((x) => x.id === 'cm_assign_omar');
+    check('календарь · порядок сделок клиента переставлен (иначе проверка ниже ничего не значит)',
+      !!firstOfDocs && firstOfDocs.id !== 'd_viktor', 'первая сделка c_docs теперь ' + (firstOfDocs && firstOfDocs.id));
+    check('календарь · назначенная руководителем задача показывает объект той сделки, которую открывает',
+      !!omar && !!dv && !!dv.objectId && omar.objectId === dv.objectId,
+      omar ? 'у строки ' + omar.objectId + ', у сделки d_viktor ' + (dv && dv.objectId) : 'строки нет');
+    dd().deals = order;
+    const at = acts.find((x) => x.id === 't_anna_touch');
+    check('календарь · у клиентского касания объекта нет', !!at && !at.objectId,
+      at ? 'objectId=' + at.objectId : 'активности нет');
+  }
+  {
+    // Версия схемы: подъём 23 → 24 и есть то, что доставляет новые поля тем, кто уже открывал стенд.
+    // Прежняя проверка требовала «не ниже 7» и пропустила бы откат подъёма.
+    check('схема · версия не ниже 24 (подъём волны 1 на месте)', WS.store.schema >= 24, 'схема: ' + WS.store.schema);
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));

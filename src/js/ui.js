@@ -2369,8 +2369,10 @@
   }
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
-    const dealForC = D().deals.find((x) => x.clientId === id);
-    const dealTid = dealForC ? 'deal:' + dealForC.id : 'general';
+    // Разговор на карточке контакта принадлежит контакту. Прежде тред брался у первой
+    // найденной сделки клиента: у Анны их три, и работа по человеку молча оседала
+    // в случайной из них. Тот же дефект, что был у ближайшей задачи и у карточки задачи.
+    const clientTid = 'contact:' + id;
     const k = kycOf(c);
     const dealsCount = D().deals.filter((x) => x.clientId === id).length;
     // KYC, the preferred channel and the language now live in the compact hero — repeating them as
@@ -2386,7 +2388,7 @@
       state: clientOps(c),
       tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
-      concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', dealTid, c.name + ' · сделка', 'users'),
+      concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', clientTid, c.name, 'users'),
     };
   }
   function clientCard(id) { S().clientId = id; WS.router.go('clientDetail'); }
@@ -2701,7 +2703,9 @@
   // иначе задача по контакту. Клиентская задача законна: касания и поздравления не относятся
   // ни к какой сделке, и требовать привязку значило бы запретить половину работы по удержанию.
   function tasksOfDeal(d) { return (D().tasks || []).filter((t) => t.dealId === d.id); }
-  function tasksOfRequest(r) { return (D().tasks || []).filter((t) => t.requestId === r.id); }
+  // Задача с обеими ссылками разрешается в сделку — значит в заявке её быть не должно,
+  // иначе подпись говорит «сделка», а список заявки показывает ту же строку у себя.
+  function tasksOfRequest(r) { return (D().tasks || []).filter((t) => !t.dealId && t.requestId === r.id); }
   function taskScopeLabel(t) {
     if (t.dealId) { const d = D().deals.find((x) => x.id === t.dealId); return d ? 'сделка · ' + d.title : 'сделка'; }
     if (t.requestId) { const r = (D().requests || []).find((x) => x.id === t.requestId); return r ? 'заявка · ' + r.title : 'заявка'; }
@@ -5278,6 +5282,12 @@
   // day index within the demo week (Mon..Sun = 0..6; demo «сегодня» = Чт 14 мая = 3)
   function calDayIdx(w) { w = w || ''; return /просроч/.test(w) ? 1 : /вчера|ранее/.test(w) ? 2 : /сегодня/.test(w) ? 3 : /завтра/.test(w) ? 4 : 5; }
   function objOfClient(cid) { const d = D().deals.find((x) => x.clientId === cid); return d ? d.objectId : null; }
+  // Объект берётся у области задачи, а не у первой сделки клиента: задача второй сделки
+  // рисовалась в календаре с объектом первой. У заявки объект не один, у поздравления его нет —
+  // в обоих случаях пусто, и это честнее, чем приписать первый попавшийся. Единственное следствие:
+  // такая задача не показывается в фильтре по конкретному объекту, где ей и не место.
+  function objOfDeal(id) { const d = D().deals.find((x) => x.id === id); return d ? d.objectId : null; }
+  function objOfTask(t) { return t.dealId ? objOfDeal(t.dealId) : null; }
   function calendarActivities() {
     const acts = [];
     const cn = (id) => { const c = D().clients.find((x) => x.id === id); return c ? c.name : ''; };
@@ -5298,7 +5308,7 @@
       const dir = t.assignedBy ? 'in' : t.assignee ? (done ? 'agent' : 'out') : 'me';
       const who = t.assignedBy ? 'от: ' + tn(t.assignedBy) : t.assignee ? 'назначено: ' + tn(t.assignee) : 'моя';
       push({ id: t.id, type: 'задача', when: t.due, dir: dir,
-        clientId: t.clientId, objectId: objOfClient(t.clientId),
+        clientId: t.clientId, objectId: objOfTask(t),
         title: t.title, sub: who + (cn(t.clientId) ? ' · ' + cn(t.clientId) : '') + (done ? ' · выполнено' : ''),
         open: t.scenario ? { scn: t.scenario } : { client: t.clientId } });
     });
@@ -5307,8 +5317,10 @@
         clientId: i.clientId, objectId: objOfClient(i.clientId),
         title: (cn(i.clientId) || 'Клиент') + ' — входящее', sub: (i.channel || 'сообщение') + ' · ' + (i.text || '').slice(0, 42), open: { nav: 'concierge' } });
     });
-    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: objOfClient('c_overdue'), title: 'Обещано КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { request: 'r_igor' } });
-    push({ id: 'cm_assign_omar', type: 'задача', when: 'сегодня', dir: 'in', clientId: 'c_docs', objectId: objOfClient('c_docs'), title: 'Подготовить документы к сделке Виктора', sub: 'от: Омар Рахман (руководитель)', open: { deal: 'd_viktor' } });
+    // Объект берётся у того, что строка открывает. У заявки объект не один — пусто; у задачи по сделке
+    // Виктора это объект именно её, а не первой сделки клиента, у которого их две.
+    push({ id: 'cm_kp_igor', type: 'сообщение', when: 'вчера', dir: 'outgoing', clientId: 'c_overdue', objectId: null, title: 'Обещано КП — Игорь Лебедев', sub: 'WhatsApp · исходящее', open: { request: 'r_igor' } });
+    push({ id: 'cm_assign_omar', type: 'задача', when: 'сегодня', dir: 'in', clientId: 'c_docs', objectId: objOfDeal('d_viktor'), title: 'Подготовить документы к сделке Виктора', sub: 'от: Омар Рахман (руководитель)', open: { deal: 'd_viktor' } });
     return acts;
   }
   function activityRow(a) {
@@ -7590,6 +7602,6 @@
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

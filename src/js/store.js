@@ -268,7 +268,7 @@
       } else if (e.op === 'addClient') {
         if (!d.clients.some((c) => c.id === e.obj.id)) d.clients.unshift(e.obj);
       } else if (e.op === 'addTask') {
-        if (!d.tasks.some((t) => t.id === e.task.id)) d.tasks.unshift(e.task);
+        if (!d.tasks.some((t) => t.id === e.task.id)) d.tasks.unshift(stripBadScope(e.task));
       } else if (e.op === 'removeTask') {
         d.tasks = d.tasks.filter((t) => t.id !== e.id);
       } else if (e.op === 'clearInbox') {
@@ -599,6 +599,12 @@
     }
     const badPatchRef = refError(patch, at, coming);
     if (badPatchRef) return badPatchRef;
+    // Область проверяется и на изменении, не только на создании: `dealId` и `requestId`
+    // изменяемы через этот слой, поэтому задачу можно было перевесить на сделку другого
+    // клиента вторым вызовом — создание защищено, обход шёл мимо. Проверяется результат
+    // слияния, а не патч: клиент чаще всего лежит в записи, а в патче только ссылка.
+    const badPatchScope = scopeError(Object.assign({}, rec, patch), at);
+    if (badPatchScope) return badPatchScope;
     const rules = WRITABLE[spec.coll] || { safe: [], guarded: [] };
     let tier = 'safe';
     for (let k = 0; k < keys.length; k++) {
@@ -700,8 +706,19 @@
   // surface, where a re-render would replace the node under their cursor.
   function touch(opts) { store.dataRevision++; save(); if (!opts || opts.render !== false) emit(); }
 
+  // Прямой путь создания — им пользуются интерфейс, сценарии и события, минуя слой предпросмотра.
+  // Отказать здесь нельзя: сценарий не умеет обработать отказ и молча потеряет задачу. Поэтому
+  // противоречащая ссылка снимается, а задача остаётся: у неё станет областью шире, чем задумано,
+  // но она не будет врать в двух карточках одновременно.
+  function stripBadScope(t) {
+    const owner = (coll, id) => { const x = (store.data[coll] || []).find((y) => y.id === id); return x ? x.clientId : undefined; };
+    if (!t.clientId) return t;
+    if (t.dealId && owner('deals', t.dealId) !== undefined && owner('deals', t.dealId) !== t.clientId) delete t.dealId;
+    if (t.requestId && owner('requests', t.requestId) !== undefined && owner('requests', t.requestId) !== t.clientId) delete t.requestId;
+    return t;
+  }
   function addTask(task) {
-    const t = Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task);
+    const t = stripBadScope(Object.assign({ status: 'open', when: 'today', kind: 'manual', due: 'сегодня' }, task));
     if (!store.data.tasks.some((x) => x.id === t.id)) store.data.tasks.unshift(t);
     store.dataRevision++; save(); emit();
   }
