@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Закрытые решения: словари, структуры, сценарии, макеты</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+  /* ============================================================
+     Voshod-Lite — screen HTML stylesheet for md2html
+     Derived from voshod-brand/tokens.css + voshod-document.css.
+     Target: pandoc HTML5 output, viewed in browser, max 880px column.
+     Not for client deliverables — those go through Voshod PDF kit.
+     ============================================================ */
+
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Regular.ttf');
+    font-weight:400;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Medium.ttf');
+    font-weight:500;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-Bold.ttf');
+    font-weight:700;font-style:normal;font-display:swap;}
+  @font-face{font-family:'Manrope';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/Manrope-ExtraBold.ttf');
+    font-weight:800;font-style:normal;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Regular.ttf');
+    font-weight:400;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Medium.ttf');
+    font-weight:500;font-display:swap;}
+  @font-face{font-family:'JBMono';
+    src:url('file:///C:/Users/Lenovo/Documents/vozhod-brand/fonts-ttf/JetBrainsMono-Bold.ttf');
+    font-weight:700;font-display:swap;}
+
+  :root{
+    --ink:#111112;
+    --paper:#EEEEEE; --paper2:#F8F8F8; --paper3:#FFFFFF;
+    --green:#33B76E; --green-soft:#D5EDDF; --green-deep:#20402A;
+    --red:#D84520; --red-soft:#FBE3DC;
+    --amber-soft:#FAEFCC;
+    --line:#D9D9D9;
+    --mute:#6E6E6E;
+    --maxw:880px;
+  }
+
+  *{box-sizing:border-box;}
+  html{background:var(--paper);}
+  body{margin:0 auto;max-width:var(--maxw);padding:42px 32px 64px;
+    background:var(--paper);color:var(--ink);
+    font-family:'Manrope',-apple-system,system-ui,sans-serif;
+    font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  main,.md2html-main{max-width:var(--maxw);margin:0 auto;}
+
+  /* ---- pandoc title block ---- */
+  header#title-block-header{border-bottom:1px solid var(--line);
+    padding-bottom:18px;margin-bottom:28px;}
+  header h1.title{font-weight:700;font-size:32px;line-height:1.1;
+    letter-spacing:-.02em;margin:0;}
+  header .subtitle{font-size:15px;color:var(--mute);margin-top:6px;}
+  header p.author,header p.date{font-family:'JBMono';font-weight:500;
+    font-size:11px;letter-spacing:.10em;text-transform:uppercase;
+    color:var(--mute);margin:6px 0 0;}
+
+  /* ---- TOC ---- */
+  nav#TOC{background:var(--paper2);border:1px solid var(--line);
+    border-radius:8px;padding:14px 18px;margin:0 0 32px;font-size:13.5px;}
+  nav#TOC::before{content:'СОДЕРЖАНИЕ';display:block;
+    font-family:'JBMono';font-weight:500;font-size:10px;
+    letter-spacing:.14em;color:var(--mute);margin-bottom:8px;}
+  nav#TOC ul{list-style:none;padding-left:0;margin:0;}
+  nav#TOC ul ul{padding-left:14px;margin-top:4px;}
+  nav#TOC li{margin:3px 0;padding-left:0;}
+  nav#TOC li::before{content:none;}
+  nav#TOC a{color:var(--ink);text-decoration:none;}
+  nav#TOC a:hover{color:var(--green-deep);text-decoration:underline;}
+
+  /* ---- headings ---- */
+  h1,h2,h3,h4,h5,h6{font-weight:700;letter-spacing:-.015em;
+    color:var(--ink);line-height:1.2;margin:32px 0 12px;}
+  h1{font-size:26px;}
+  h2{font-size:21px;display:flex;align-items:center;gap:10px;
+    padding-bottom:8px;border-bottom:1px solid var(--line);}
+  h2::before{content:'';display:inline-block;width:8px;height:8px;
+    background:var(--green);transform:rotate(45deg);flex:none;}
+  h3{font-size:17px;}
+  h4{font-size:13px;color:var(--mute);font-weight:500;
+    text-transform:uppercase;letter-spacing:.08em;
+    font-family:'JBMono';margin-top:22px;}
+  h5,h6{font-size:14px;}
+  h1:first-child,h2:first-child,h3:first-child{margin-top:0;}
+
+  /* ---- paragraphs / inline ---- */
+  p{margin:0 0 12px;}
+  a{color:var(--green-deep);text-decoration:underline;
+    text-decoration-color:var(--green);text-underline-offset:2px;}
+  a:hover{color:var(--green);}
+  strong{font-weight:700;color:var(--ink);}
+  em{font-style:italic;}
+  hr{border:0;border-top:1px solid var(--line);margin:28px 0;}
+
+  /* ---- lists ---- */
+  ul,ol{margin:0 0 14px;padding-left:0;list-style:none;}
+  ul>li,ol>li{position:relative;padding-left:22px;margin:5px 0;}
+  ul>li::before{content:'';position:absolute;left:4px;top:9px;
+    width:6px;height:6px;background:var(--green);transform:rotate(45deg);}
+  ol{counter-reset:ol;}
+  ol>li{counter-increment:ol;}
+  ol>li::before{content:counter(ol)'.';position:absolute;left:0;top:0;
+    font-family:'JBMono';font-weight:700;font-size:12.5px;
+    color:var(--green-deep);min-width:18px;}
+  li>ul,li>ol{margin:5px 0 2px;}
+
+  /* ---- task list ---- */
+  ul.task-list>li{padding-left:26px;}
+  ul.task-list>li::before{content:none;}
+  ul.task-list input[type=checkbox]{position:absolute;left:0;top:6px;
+    accent-color:var(--green);width:14px;height:14px;}
+
+  /* ---- blockquote / callout ---- */
+  blockquote{background:var(--paper3);border-left:3px solid var(--green);
+    padding:12px 16px;margin:14px 0 18px;color:#3a3a3b;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);border-radius:0 4px 4px 0;}
+  blockquote p:last-child{margin-bottom:0;}
+
+  /* ---- executive summary (pandoc fenced div ::: exec-summary) ---- */
+  .exec-summary{background:var(--green-soft);border:1px solid var(--green);
+    border-radius:10px;padding:20px 24px 18px;margin:0 0 30px;}
+  .exec-summary::before{content:'РЕЗЮМЕ ДЛЯ РУКОВОДИТЕЛЯ';display:block;
+    font-family:'JBMono';font-weight:700;font-size:10px;letter-spacing:.14em;
+    color:var(--green-deep);margin-bottom:12px;}
+  .exec-summary>:first-of-type{margin-top:0;}
+  .exec-summary>:last-child{margin-bottom:0;}
+  .exec-summary p,.exec-summary li{color:#20402A;}
+  .exec-summary strong{color:var(--ink);}
+
+  /* ---- decision / fork block (pandoc fenced div ::: fork) ---- */
+  .fork{background:var(--paper3);border:1px solid var(--line);
+    border-left:4px solid var(--red);border-radius:0 8px 8px 0;
+    padding:16px 20px 12px;margin:16px 0 20px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .fork::before{content:'РАЗВИЛКА';display:block;
+    font-family:'JBMono';font-weight:700;font-size:10px;letter-spacing:.14em;
+    color:var(--red);margin-bottom:10px;}
+  .fork.resolved{border-left-color:var(--green);}
+  .fork.resolved::before{content:'РЕШЕНО';color:var(--green-deep);}
+  .fork>:first-of-type{margin-top:0;}
+  .fork>:last-child{margin-bottom:0;}
+  /* label the four required parts when authored as **Риск:** / **Критичность:** / **Рекомендация:** / **Критерии:** */
+  .fork p>strong:first-child{color:var(--ink);font-family:'JBMono';
+    font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;}
+
+  /* ---- code ---- */
+  code{font-family:'JBMono';font-weight:500;font-size:13px;
+    background:var(--paper3);border:1px solid var(--line);
+    padding:1px 6px;border-radius:3px;color:var(--ink);}
+  pre{background:var(--ink);color:var(--paper);padding:14px 18px;
+    border-radius:8px;overflow-x:auto;margin:14px 0 18px;
+    font-family:'JBMono';font-size:12.5px;line-height:1.5;}
+  pre code{background:transparent;border:0;padding:0;
+    color:var(--paper);font-size:inherit;font-weight:400;}
+
+  /* ---- tables ---- */
+  table{border-collapse:separate;border-spacing:0;width:100%;
+    margin:14px 0 22px;background:var(--paper3);border-radius:8px;
+    overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);
+    font-size:13.5px;}
+  thead th{background:var(--ink);color:var(--paper);
+    font-family:'JBMono';font-weight:500;font-size:11px;
+    letter-spacing:.10em;text-transform:uppercase;text-align:left;
+    padding:11px 14px;border:0;}
+  tbody td{padding:10px 14px;border-top:1px solid var(--line);
+    vertical-align:top;}
+  tbody tr:first-child td{border-top:0;}
+  tbody tr:hover{background:var(--paper2);}
+
+  /* table cell color modifiers — use raw HTML <td class="pos"> in MD */
+  td.pos,th.pos{background:var(--green-soft);color:var(--green-deep);}
+  td.neg,th.neg{background:var(--red-soft);color:var(--red);}
+  td.warn,th.warn{background:var(--amber-soft);color:#7a5a0c;}
+  td.mute,th.mute{color:var(--mute);}
+
+  /* ---- details/summary (collapsible) ---- */
+  details{background:var(--paper3);border:1px solid var(--line);
+    border-radius:6px;padding:10px 14px;margin:10px 0 14px;}
+  details>summary{font-weight:700;cursor:pointer;list-style:none;
+    display:flex;align-items:center;gap:10px;color:var(--ink);}
+  details>summary::-webkit-details-marker{display:none;}
+  details>summary::before{content:'\25B8';color:var(--green);
+    font-size:11px;transition:transform .15s ease;}
+  details[open]>summary::before{transform:rotate(90deg);}
+  details>:not(summary){margin-top:10px;}
+
+  /* ---- images ---- */
+  img{max-width:100%;height:auto;border-radius:4px;
+    display:block;margin:12px 0;}
+
+  /* ---- inline tags / chips (raw HTML <span class="tag">) ---- */
+  .tag{display:inline-block;font-family:'JBMono';font-weight:500;
+    font-size:11px;letter-spacing:.04em;
+    background:var(--green-soft);color:var(--green-deep);
+    padding:2px 8px;border-radius:3px;margin:0 2px;
+    vertical-align:1px;}
+  .tag.neg{background:var(--red-soft);color:var(--red);}
+  .tag.warn{background:var(--amber-soft);color:#7a5a0c;}
+  .tag.mute{background:var(--paper2);color:var(--mute);border:1px solid var(--line);}
+
+  /* ---- meta footer (injected by md2html.sh) ---- */
+  .md2html-footer{margin:48px 0 0;
+    padding:14px 0 0;border-top:1px solid var(--line);
+    font-family:'JBMono';font-weight:500;font-size:10px;
+    letter-spacing:.10em;text-transform:uppercase;color:var(--mute);
+    display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+  .md2html-footer .brand{color:var(--green);}
+
+  /* ---- mobile ---- */
+  @media (max-width:640px){
+    /* the padding lives on body, so trimming main alone left 64px of the screen
+       spent on margins */
+    body{padding:24px 16px 48px;font-size:14.5px;}
+    main,.md2html-main{padding:0;font-size:14.5px;}
+    h1{font-size:23px;} h2{font-size:18px;} h3{font-size:16px;}
+    /* A table of four or five columns has a min-content width well past 390px,
+       and a width:100% table does not shrink below it — it pushes the whole page
+       sideways instead, which is what a reader sees as "the file is broken". The
+       table keeps its shape and scrolls on its own. */
+    table{display:block;width:max-content;max-width:100%;
+      overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:12.5px;}
+    thead th,tbody td{padding:8px 10px;}
+    th,td{overflow-wrap:break-word;}
+    pre{font-size:11.5px;}
+    nav#TOC{font-size:13px;padding:12px 14px;}
+    .md2html-footer{font-size:11px;gap:10px;}
+  }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Закрытые решения: словари, структуры, сценарии,
+макеты</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#закрытые-решения-словари-структуры-сценарии-макеты"
+id="toc-закрытые-решения-словари-структуры-сценарии-макеты">Закрытые
+решения: словари, структуры, сценарии, макеты</a>
+<ul>
+<li><a href="#1-словари" id="toc-1-словари">1. Словари</a></li>
+<li><a href="#2-структуры" id="toc-2-структуры">2. Структуры</a></li>
+<li><a href="#3-сценарии" id="toc-3-сценарии">3. Сценарии</a></li>
+<li><a href="#4-макеты" id="toc-4-макеты">4. Макеты</a></li>
+<li><a href="#5-миграция-хранилища" id="toc-5-миграция-хранилища">5.
+Миграция хранилища</a></li>
+<li><a href="#6-план-проверок" id="toc-6-план-проверок">6. План
+проверок</a></li>
+<li><a href="#7-уточнения-после-приёмки-спеки"
+id="toc-7-уточнения-после-приёмки-спеки">7. Уточнения после приёмки
+спеки</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="закрытые-решения-словари-структуры-сценарии-макеты">Закрытые
+решения: словари, структуры, сценарии, макеты</h1>
+<p>Дата: 20 августа 2026. Статус: <strong>готово к
+реализации.</strong></p>
+<p>Этот документ закрывает всё, что сверка перед реализацией пометила
+как недоопределённое (см. <a
+href="2026-08-20-lifecycle-and-change-scope.md">2026-08-20-lifecycle-and-change-scope.md</a>,
+раздел 5.4). Правило: <strong>ни одного пункта, где реализатору пришлось
+бы угадывать.</strong> Где решение принято нами, а не выведено из кода
+или из рынка, это сказано прямо.</p>
+<p>Все названия полей даны в том виде, в каком они лягут в данные. Все
+словари даны полностью, вместе с таблицей перехода со старых
+значений.</p>
+<hr />
+<h2 id="1-словари">1. Словари</h2>
+<h3 id="11-стадия-отношений-с-клиентом">1.1. Стадия отношений с
+клиентом</h3>
+<p>Живёт на контакте. <strong>Вычисляется по умолчанию, правится
+вручную;</strong> ручное значение побеждает и помечается как ручное,
+иначе первая же пересборка сотрёт решение агента.</p>
+<table>
+<thead>
+<tr>
+<th>Значение</th>
+<th>Когда выводится</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>new</code> · новый</td>
+<td>заявок нет ни одной</td>
+</tr>
+<tr>
+<td><code>active</code> · в работе</td>
+<td>есть открытая заявка, живая сделка или действующий договор</td>
+</tr>
+<tr>
+<td><code>dormant</code> · спящий</td>
+<td>открытой работы нет, последнее касание старше порога</td>
+</tr>
+<tr>
+<td><code>lost</code> · потерян</td>
+<td>открытой работы нет, последняя заявка закрыта отказом, успехов не
+было</td>
+</tr>
+</tbody>
+</table>
+<p>Порог «спящего» — <strong>90 дней</strong>, вынесен в настройки.
+Число взято как рабочее и подлежит калибровке на живых данных;
+выдумывать точное значение оснований нет.</p>
+<p><strong>Отдельно от стадии — признак <code>hasWon</code></strong>
+(был ли хоть один успех). Он не стадия, а факт биографии, и выводится из
+наличия выигранной сделки или договора. Именно пара «спящий + был успех»
+и есть цель удержания: это не потерянный лид, а клиент, о котором
+забыли.</p>
+<p><strong>Не конфликтует с существующим фильтром контактов.</strong>
+Сейчас в фильтре есть вычисляемое состояние из трёх значений — открытая
+работа, всё закрыто, ещё не начинали. Оно переводится на новый словарь
+один в один: <code>open → active</code>, <code>none → new</code>,
+<code>done → dormant | lost</code> (по наличию отказа). Второго
+источника правды не заводим.</p>
+<h3 id="12-каналы-связи">1.2. Каналы связи</h3>
+<p>Один словарь на всё: контакт, участник сделки, лента событий.</p>
+<p><code>whatsapp</code> · <code>telegram</code> · <code>email</code> ·
+<code>call</code></p>
+<p>Три из четырёх уже используются в данных (<code>whatsapp</code>,
+<code>email</code>, <code>call</code>); <code>telegram</code> уже
+предлагается в настройках каналов, но в данных не встречается —
+добавляется без миграции.</p>
+<p><strong>Порталы площадок (Property Finder, Bayut) каналом связи не
+считаются</strong> — это источник обращения, а не способ связи с
+человеком; они живут в поле источника заявки.</p>
+<h3 id="13-роли-участников-сделки">1.3. Роли участников сделки</h3>
+<p>Сейчас справочник состоит из восьми ролей, и все восемь описывают
+<strong>сторону клиента</strong>. Партнёр просит роли, которые
+пересекают стол. Новый справочник — двенадцать ролей в трёх группах;
+группа нужна для порядка в списке и для подсказки, чью сторону человек
+представляет.</p>
+<p><strong>Сторона клиента (8):</strong> Клиент · Со-покупатель ·
+Инвестор · Супруг · Представитель по доверенности · Юрист клиента ·
+Финансист клиента · Референт</p>
+<p><strong>Другая сторона (2):</strong> Собственник · Менеджер
+девелопера</p>
+<p><strong>Посредники (2):</strong> Агент-партнёр · Ипотечный брокер</p>
+<p><strong>Переход со старых значений:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Было</th>
+<th>Стало</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Покупатель</td>
+<td>Клиент</td>
+</tr>
+<tr>
+<td>ЛПР</td>
+<td>Клиент, а влияние = <code>ЛПР</code></td>
+</tr>
+<tr>
+<td>Супруг — со-решение</td>
+<td>Супруг</td>
+</tr>
+<tr>
+<td>Юрист сделки</td>
+<td>Юрист клиента</td>
+</tr>
+<tr>
+<td>Представитель</td>
+<td>Представитель по доверенности</td>
+</tr>
+<tr>
+<td>Со-покупатель · Инвестор · Референт</td>
+<td>без изменений</td>
+</tr>
+</tbody>
+</table>
+<p>Строка «ЛПР» из ролей <strong>убирается намеренно</strong>: это не
+роль, а мера влияния, и держать её в обоих словарях значит позволить
+участнику быть «ЛПР по роли и исполнителем по влиянию». Партнёрское
+«Клиент-ЛПР» раскладывается ровно на эту пару.</p>
+<p><strong>Участник со стороны, отличной от клиента, не может быть
+основным контактом сделки.</strong> Основной — это тот, чьё решение мы
+ведём; менеджер девелопера основным быть не может. Сейчас код при
+назначении основного синхронизирует клиента сделки только если у
+участника есть ссылка на контакт, и молча оставляет прежнего в шапке.
+Правило закрывает эту дыру явно.</p>
+<h3 id="14-влияние-участника">1.4. Влияние участника</h3>
+<p><code>ЛПР</code> · <code>влияет</code> · <code>исполнитель</code> —
+тот же словарь, что уже используется у контактов компаний. Буквенная
+шкала уходит.</p>
+<p><strong>Переход:</strong> <code>A → ЛПР</code>,
+<code>B → влияет</code>, <code>C → исполнитель</code>.</p>
+<p><strong>Важно для вёрстки:</strong> сейчас влияние рисуется буквой в
+круге 22 на 22 пикселя, и класс оформления собирается из самого
+значения. Слово туда не поместится и класс сломается — значок становится
+подписью-пилюлей, а класс берётся из ключа, а не из отображаемого
+текста.</p>
+<h3 id="15-статус-объекта-в-подборке">1.5. Статус объекта в
+подборке</h3>
+<p><strong>Текущие состояния не заменяются.</strong> От них зависят
+четыре механизма: сбор коммерческого предложения, вычисляемая стадия
+заявки, право создать сделку и профиль предпочтений клиента. Вместо
+замены — разделение на два поля.</p>
+<p><strong>Поле первое — решение клиента</strong> (остаётся как есть):
+<code>offered</code> · <code>selected</code> ·
+<code>rejected</code>.</p>
+<p><strong>Поле второе — чей ход</strong> (новое): <code>client</code> ·
+<code>us</code>. Выводится по умолчанию, правится вручную. По умолчанию:
+после отправки подборки ход клиента; после ответа клиента ход наш; при
+отказе ход ничей и поле не показывается.</p>
+<p><strong>Что видит агент</strong> — подписи по словарю партнёра:</p>
+<table>
+<thead>
+<tr>
+<th>Решение · чей ход</th>
+<th>Подпись</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>offered</code> · <code>client</code></td>
+<td>Ждём обратную связь</td>
+</tr>
+<tr>
+<td><code>offered</code> · <code>us</code></td>
+<td>За нами — подготовить ответ</td>
+</tr>
+<tr>
+<td><code>selected</code></td>
+<td>Акцептован, работаем</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>Отказ</td>
+</tr>
+<tr>
+<td>объект в живой сделке</td>
+<td>В сделке</td>
+</tr>
+<tr>
+<td>объект в выигранной сделке</td>
+<td>Сделка закрыта</td>
+</tr>
+</tbody>
+</table>
+<p>Две последние строки — производные от сделок, они и сейчас так
+работают и не меняются.</p>
+<hr />
+<h2 id="2-структуры">2. Структуры</h2>
+<h3 id="21-повод-касания">2.1. Повод касания</h3>
+<p>Новая коллекция <code>cues</code>. Порождается движком поводов, живёт
+до решения агента.</p>
+<table>
+<thead>
+<tr>
+<th>Поле</th>
+<th>Смысл</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>идентификатор</td>
+</tr>
+<tr>
+<td><code>contactId</code></td>
+<td>к кому касание</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>time</code> · <code>event</code> · <code>state</code> — откуда
+взялся повод</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>ключ повода: <code>birthday</code>, <code>deal_anniversary</code>,
+<code>handover</code>, <code>lease_90d</code>, <code>silence</code>,
+<code>match_object</code>, <code>rent_index</code>,
+<code>new_launch</code>, <code>payment_due</code>,
+<code>milestone_near</code></td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>одна строка, что предлагается сделать</td>
+</tr>
+<tr>
+<td><code>why</code></td>
+<td>одна строка, на каком основании — обязательна, повод без основания
+не показывается</td>
+</tr>
+<tr>
+<td><code>dueAt</code></td>
+<td>когда касание уместно</td>
+</tr>
+<tr>
+<td><code>payload</code></td>
+<td>ссылки на предмет: <code>objectId</code>, <code>contractId</code>,
+<code>milestoneKey</code></td>
+</tr>
+<tr>
+<td><code>draft</code></td>
+<td>черновик текста сообщения</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>proposed</code> · <code>accepted</code> ·
+<code>dismissed</code> · <code>done</code></td>
+</tr>
+<tr>
+<td><code>createdAt</code></td>
+<td>когда порождён</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Правило одного повода.</strong> На пару «контакт + причина»
+живёт не больше одного повода в состоянии <code>proposed</code>. Новый
+не порождается, пока прежний не закрыт — иначе к концу недели у клиента
+шесть одинаковых напоминаний.</p>
+<p><strong>Тишина после отказа.</strong> Отклонённый повод той же
+причины не повторяется 30 дней. Число рабочее, вынесено в настройки.</p>
+<p><strong>Принять повод — значит создать задачу.</strong> Задача
+получает <code>contactId</code> и, если повод пришёл от договора, ссылку
+на договор. Сам повод переходит в <code>accepted</code> и исчезает из
+очереди предложений.</p>
+<h3 id="22-событие-факт-и-итог">2.2. Событие: факт и итог</h3>
+<p>Запись ленты сейчас несёт время, порядок, канал, вид, автора и текст.
+Добавляются два вида и одно состояние.</p>
+<ul>
+<li><strong><code>fact</code> — факт контакта.</strong> Позвонили,
+написали, встретились. Пишется <strong>автоматически и сразу</strong>:
+это наблюдаемое событие, модель здесь не ошибается.</li>
+<li><strong><code>outcome</code> — итог контакта.</strong> О чём
+договорились, что решено, что дальше. Пишется <strong>только
+черновиком</strong>: содержание разговора модель додумывает, и её
+догадка иначе ляжет в историю как факт, на который потом обопрётся
+другой ответ.</li>
+</ul>
+<p>Итог несёт <code>state</code>: <code>draft</code> ·
+<code>confirmed</code> · <code>rejected</code>, и <code>factId</code> —
+ссылку на факт, к которому он относится. Неподтверждённый итог виден в
+ленте бледным, с двумя кнопками, и <strong>не участвует ни в одном
+выводе</strong>: ни в справке по сделке, ни в следующем шаге, ни в
+ответах Консьержа.</p>
+<p>Существующие виды записей (<code>raw</code>, <code>ai</code>,
+<code>note</code>) не трогаются.</p>
+<h3 id="23-состояние-лота">2.3. Состояние лота</h3>
+<p><strong>Массив лотов не меняет форму.</strong> Он остаётся списком
+ссылок на объекты: его читают около десяти мест кода и восемь проверок,
+и смена формы без переходника дала бы не ошибку, а тихие пустые
+выборки.</p>
+<p>Пер-лотовое состояние заводится <strong>отдельной картой на
+сделке</strong>, ключом по объекту:</p>
+<table>
+<thead>
+<tr>
+<th>Поле</th>
+<th>Смысл</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stage</code></td>
+<td>свой шаг этого лота, если отличается от шага сделки</td>
+</tr>
+<tr>
+<td><code>regNo</code></td>
+<td>номер регистрации (Oqood или Title Deed)</td>
+</tr>
+<tr>
+<td><code>regAt</code></td>
+<td>дата регистрации</td>
+</tr>
+<tr>
+<td><code>commissionPct</code></td>
+<td>ставка по этому лоту, если отличается от ставки объекта</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td><code>returned</code> · <code>rejected</code> ·
+<code>replaced</code> · <code>blocked</code> — если лот вышел из
+сделки</td>
+</tr>
+<tr>
+<td><code>exitReason</code></td>
+<td>почему вышел, свободным текстом</td>
+</tr>
+<tr>
+<td><code>exitAt</code></td>
+<td>когда вышел</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Отсутствие записи — это не пусто, а «как у сделки».</strong>
+Лот без своей записи наследует шаг сделки и ставку объекта. Так карта
+остаётся пустой в обычном случае и не требует миграции существующих
+сделок.</p>
+<p><strong>Комиссия сделки считается по лотам</strong>, а не по ставке
+первого лота на всю сумму, как сейчас. Итог в шапке остаётся, но
+раскрывается построчно.</p>
+<h3 id="24-коммерческое-предложение">2.4. Коммерческое предложение</h3>
+<p>Новая коллекция <code>offers</code> — предложения по сделке или по
+заявке.</p>
+<table>
+<thead>
+<tr>
+<th>Поле</th>
+<th>Смысл</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>идентификатор</td>
+</tr>
+<tr>
+<td><code>requestId</code> / <code>dealId</code></td>
+<td>чьё предложение; ровно одно из двух</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>номер версии, растёт с каждой отправкой</td>
+</tr>
+<tr>
+<td><code>objectIds</code></td>
+<td>что предложено</td>
+</tr>
+<tr>
+<td><code>terms</code></td>
+<td>условия на момент версии</td>
+</tr>
+<tr>
+<td><code>body</code></td>
+<td>текст, редактируемый перед отправкой</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>draft</code> · <code>sent</code></td>
+</tr>
+<tr>
+<td><code>sentTo</code></td>
+<td>кому отправлено, ссылка на участника</td>
+</tr>
+<tr>
+<td><code>sentAt</code></td>
+<td>когда</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Неизменяемый снимок остаётся неизменяемым.</strong> При
+создании сделки фиксируется версия с условиями, и карточка прямо
+объявляет её неизменяемой. Правка предложения <strong>создаёт новую
+версию</strong>, а не меняет снимок: иначе исчезнет то, на основании
+чего сделка была заведена.</p>
+<p><strong>Отправка в демо-стенде имитируется</strong> — фиксируется
+факт, адресат и время, само сообщение не уходит. Отправка блокируется
+без согласия у адресата, тем же правилом, что и любая адресная
+рассылка.</p>
+<p><strong>Раздел «Документы» — это библиотека шаблонов и
+архив.</strong> Список предложений по сделке живёт в карточке сделки и в
+библиотеку не переезжает.</p>
+<h3 id="25-завершение-сделки-и-рождение-договора">2.5. Завершение сделки
+и рождение договора</h3>
+<p>Два разных момента, и их нельзя складывать в одну кнопку.</p>
+<p><strong>Договор рождается на шаге «Подписание».</strong> Как только
+сделка доходит до подписания, создаётся ровно один договор. Операция
+единая и повторно ничего не создаёт: если договор с этой сделкой уже
+есть, второй не появляется.</p>
+<p>Договор собирается из сделки: вид договора выводится из услуги и
+готовности (<code>оффплан → SPA</code>,
+<code>вторичка → Title Deed</code>, <code>аренда → Ejari</code>), сумма
+— сумма договора сделки, стороны — клиент и компания, объект — лоты
+сделки, вехи и график платежей — из шаблона по виду договора, комиссия —
+из расчёта по лотам. Всё, что шаблон не может знать (номера, точные
+даты), остаётся пустым и подсвечивается как незаполненное.</p>
+<p><strong>Сделка закрывается кнопкой «Завершить сделку»</strong> с
+двумя исходами.</p>
+<ul>
+<li><strong>Успех</strong> — стадия <code>won</code>. Условие:
+вознаграждение получено. Если договор ещё не создан (сделка без стадии
+подписания — так бывает у услуг), он создаётся здесь же.</li>
+<li><strong>Проигрыш</strong> — стадия <code>lost</code>, все лоты
+освобождаются по правилу частичного отказа (§3.4).</li>
+</ul>
+<p>Ручной перенос стадии в <code>won</code> мимо кнопки остаётся
+возможным — доска и Консьерж двигают стадии, — но <strong>создание
+договора привязано к событию смены стадии, а не к нажатию
+кнопки</strong>, поэтому любой путь даёт один и тот же результат.</p>
+<h3 id="26-задача-три-вида-привязки">2.6. Задача: три вида привязки</h3>
+<p>Задача получает две необязательные ссылки — на сделку и на заявку —
+рядом с существующей ссылкой на контакт. Ссылка на сделку в справочнике
+связей уже есть, добавить нужно в записываемые поля.</p>
+<p><strong>Область задачи выводится по правилу первого
+попадания:</strong> есть ссылка на сделку → задача по сделке; иначе есть
+ссылка на заявку → задача по заявке; иначе задача по контакту.</p>
+<p><strong>Задача без сделки — законна.</strong> Касания, поздравления,
+общие дела по человеку не относятся ни к какой сделке, и требовать
+ссылку значило бы запретить половину работы по удержанию.</p>
+<p><strong>Что где показывается:</strong> вкладка сделки — только задачи
+этой сделки; вкладка заявки — только задачи этой заявки; карточка
+клиента — все три вида, сгруппированные по области; Пульс — всё, с
+пометкой области.</p>
+<p><strong>Все три пути создания задачи получают область.</strong>
+Задача из ленты сделки — со ссылкой на сделку; задача из карточки заявки
+— со ссылкой на заявку; задача от Консьержа — с той областью, которую он
+определил, а если не определил, то по контакту. Правка одних только
+исходных данных дефект не закрывает.</p>
+<p><strong>Миграция существующих задач:</strong> три задачи в исходных
+данных получают область по своему очевидному владельцу — задача о
+проверке черновика договора уходит к сделке, задача о коммерческом
+предложении к заявке, задача о следующем касании остаётся по
+контакту.</p>
+<hr />
+<h2 id="3-сценарии">3. Сценарии</h2>
+<h3 id="31-передача-сделки-партнёру">3.1. Передача сделки партнёру</h3>
+<p>Различаем две разные операции, которые сейчас смешаны в одном
+поле.</p>
+<p><strong>Передать сделку</strong> — меняется ответственный. Агент
+выбирает, кому передаёт, указывает причину, подтверждает. Что
+происходит: ответственный меняется; открытые задачи по этой сделке
+переназначаются новому; в ленте появляется запись «сделка передана: кто
+→ кому, причина»; прежний ответственный сохраняет доступ на чтение — он
+отвечал перед клиентом и должен видеть, чем кончилось. Пакет передачи,
+который уже собирается автоматически, показывается принимающему первым
+экраном.</p>
+<p><strong>Привлечь партнёра</strong> — ответственный не меняется,
+заполняется агент-партнёр и условия разделения вознаграждения. Это
+со-брокеридж, а не передача.</p>
+<p>Обе операции доступны из карточки сделки. Разница названа в
+интерфейсе словами, а не оттенком: «передать» и «привлечь» — разные
+кнопки с разными последствиями.</p>
+<h3 id="32-итог-при-закрытии-задачи">3.2. Итог при закрытии задачи</h3>
+<p>Кнопка «Выполнить» открывает короткую форму из двух полей:
+<strong>что вышло</strong> (свободный текст) и <strong>следующий
+шаг</strong> (предложение Консьержа, предзаполнено, правится или
+отклоняется).</p>
+<p><strong>Закрыть без комментария можно.</strong> Обязательное поле
+здесь — прямой путь к тому, что агент перестанет закрывать задачи вовсе,
+и мы потеряем и комментарий, и сам факт закрытия.</p>
+<p>Комментарий пишется в ленту как <strong>итог в состоянии
+«подтверждён»</strong> — его написал человек, а не модель, и
+подтверждать нечего. Возврат задачи в работу комментарий не стирает.</p>
+<h3 id="33-список-сделок-без-следующего-шага">3.3. Список сделок без
+следующего шага</h3>
+<p>Инвариант из требования партнёра — «сделок без запланированных
+событий быть не должно» — превращается не в предупреждение, а в
+<strong>разбираемый список</strong>.</p>
+<p><strong>Нарушение:</strong> сделка не в терминальной стадии, и по ней
+нет ни одной открытой задачи со сроком сегодня или позже, и нет
+запланированного события.</p>
+<p><strong>Где живёт:</strong> блок в Пульсе «Без следующего шага · N» —
+список строк, клик открывает сделку. У руководителя тот же список по
+всей команде, с ответственным в строке. Пустой список блок не
+рисует.</p>
+<p>Предупреждение без списка бесполезно: агент видит, что что-то не так,
+и не знает, где именно.</p>
+<h3 id="34-частичный-отказ-от-лота">3.4. Частичный отказ от лота</h3>
+<p>Из строки лота в карточке сделки — «Вывести из сделки», затем выбор
+исхода и причина. Исход обязателен: автоматически вернуть лот в подбор
+нельзя, потому что причины разные и последствия у них разные.</p>
+<table>
+<thead>
+<tr>
+<th>Исход</th>
+<th>Что происходит</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Вернуть в подбор</td>
+<td>лот выходит из сделки, в подборке заявки снова доступен, ход —
+наш</td>
+</tr>
+<tr>
+<td>Отклонить</td>
+<td>лот выходит из сделки, в подборке помечен отказом клиента</td>
+</tr>
+<tr>
+<td>Заменить</td>
+<td>лот выходит, сразу открывается выбор объекта на замену</td>
+</tr>
+<tr>
+<td>Заблокировать</td>
+<td>лот остаётся в сделке, но помечен как непредлагаемый — юридический
+дефект, обременение</td>
+</tr>
+</tbody>
+</table>
+<p>Во всех случаях: запись об исходе и причине в состоянии лота, событие
+в ленте сделки, пересчёт суммы договора и комиссии.</p>
+<p><strong>Если лотов не осталось — сделка не удаляется.</strong>
+Предлагается закрыть её проигрышем, но решение за агентом: он мог
+вывести лот, чтобы тут же поставить другой.</p>
+<hr />
+<h2 id="4-макеты">4. Макеты</h2>
+<h3 id="41-карточка-сделки-широкий-экран">4.1. Карточка сделки, широкий
+экран</h3>
+<p>Порядок блоков сверху вниз и слева направо — по частоте обращения, а
+не по важности «вообще».</p>
+<p><strong>Полоса сверху, во всю ширину.</strong> Название сделки
+крупно, обычным текстом, правится по клику (механизм уже работает,
+мешала только подпись над ним). Строкой ниже мелким: услуга · цель ·
+сумма. Под ними — сквозной путь шагов с отмеченной границей: шаги
+пресейла идут пройденным неинтерактивным участком, дальше собственные
+шаги этой сделки. Справа от пути — дата конвертации и время в
+стадии.</p>
+<p><strong>Левая колонка, неподвижная, около 340 пикселей.</strong>
+Справка Консьержа. Ниже — параметры запроса без заголовка, отделённые
+тонкой линией: бюджет, форма оплаты, тип объекта, готовность, цель,
+источник. Ниже — участники: имя, роль словом, влияние подписью-пилюлей,
+канал значком, основной — пометкой. <strong>Комиссии здесь нет</strong>
+— она у объектов.</p>
+<p><strong>Правая колонка, прокручивается.</strong></p>
+<ol type="1">
+<li>«Что дальше» — одна выделенная строка следующего шага с основанием,
+под ней запланированные и просроченные события с датами.</li>
+<li>Объекты: подборка до перехода, лоты после. У каждого — статус чьего
+хода, ставка комиссии в строке. Больше трёх — прокрутка внутри блока со
+счётчиком.</li>
+<li>«Что было» — компактная лента последних событий и ссылка на всю
+историю.</li>
+</ol>
+<p><strong>Низ, во всю ширину.</strong> Одна строка ввода — она же вход
+в Консьержа. Слева в ней переключатель «заметка или поручение».
+<strong>Отдельной кнопки «Работать через Консьержа» нет:</strong> она и
+была дублем этой же строки, и именно её партнёр критикует в своём
+тексте, не заметив, что нарисовал сам.</p>
+<p><strong>При вызове Консьержа</strong> правая колонка делится: диалог
+занимает верх, объекты и события сжимаются в одну строку-напоминание,
+куда возвращаются одним нажатием. Левая колонка не меняется — обещание
+«не выходить из сделки» выполняется буквально.</p>
+<h3 id="42-карточка-сделки-узкий-экран">4.2. Карточка сделки, узкий
+экран</h3>
+<p>Верхняя полоса остаётся, путь шагов прокручивается вбок и держит
+текущий шаг в поле зрения. Левая колонка сворачивается в раскрываемую
+справку под названием. Правая становится тремя вкладками:
+<strong>Объекты · События · Участники</strong>. Строка ввода прилипает к
+низу. Консьерж раскрывается шторкой на весь экран с кнопкой
+возврата.</p>
+<p>Это тот же принцип, что уже действует для доски: <strong>на узком
+экране список вместо доски</strong>, здесь — вкладки вместо колонок. Ни
+один блок не пропадает, меняется только способ до него добраться.</p>
+<h3 id="43-лента-отношения-на-карточке-клиента">4.3. Лента «Отношения»
+на карточке клиента</h3>
+<p>Один список, два источника, две секции.</p>
+<p><strong>Впереди</strong> — по возрастанию даты: обязательства по
+договорам (платёж по графику, веха, продление) и поводы касаний (день
+рождения, годовщина, тишина, объект под профиль). У обязательства метка
+договора и срок; у повода — метка основания и слово «почему».</p>
+<p><strong>Было</strong> — по убыванию даты: закрытые касания, прошедшие
+вехи, завершённые задачи.</p>
+<p>Брокер видит одну работу и не переключает режимы. Система различает
+источники и считает их отдельно: срок обязательства пропустить нельзя,
+повод касания — можно.</p>
+<p><strong>Рядом — портфель:</strong> все заявки, сделки и договоры
+человека одним списком, каждая строка со своей стадией и своим сроком.
+Общего прогресса у них нет и рисовать его нечем.</p>
+<h3 id="44-раздел-сопровождение">4.4. Раздел «Сопровождение»</h3>
+<p>Бывшие «Договоры». Список договоров, строка: клиент · объект · вид
+договора · ближайшая веха с датой · сумма · ответственный. Группировка
+по состоянию: действующие, требуют внимания, закрытые. «Требуют
+внимания» — просроченная веха или платёж.</p>
+<p>Карточка договора уже устроена правильно и содержит всё нужное: вехи
+с состояниями, график платежей, документы, комиссию по стадиям
+начисления. Добавляется три вещи: <strong>задачи по договору</strong>,
+<strong>строка ввода Консьержа</strong> (та же, что в сделке) и
+<strong>ссылка на исходную сделку</strong>.</p>
+<p>Библиотека шаблонов остаётся в «Документах» и сюда не переезжает.</p>
+<hr />
+<h2 id="5-миграция-хранилища">5. Миграция хранилища</h2>
+<p>Версия схемы поднимается <strong>с 23 на 24</strong>. Подъём
+отбрасывает несовместимое сохранённое состояние — это и есть нужное
+поведение: без него новые поля не появятся у тех, кто уже открывал
+стенд.</p>
+<p>Что входит в подъём: стадия отношений и признак успеха на контакте ·
+ссылки задачи на сделку и заявку · канал и компания у участника сделки ·
+новый словарь ролей и влияния · поле чьего хода у объекта подборки ·
+карта состояний лотов · коллекция поводов · коллекция предложений · виды
+записей ленты «факт» и «итог».</p>
+<p>Миграции внутри исходных данных: роли и влияние участников по
+таблицам §1.3 и §1.4 · три задачи получают область по §2.6 · вычисляемая
+стадия отношений проставляется всем контактам при первой сборке.</p>
+<hr />
+<h2 id="6-план-проверок">6. План проверок</h2>
+<p><strong>Что придётся переписать.</strong> Существующая проверочная
+база закрепляет ровно то, что мы меняем, и обойти это нельзя — только
+заменить осознанно:</p>
+<ul>
+<li>отсутствие стадий пресейла в колонках сделок — после перекладки они
+там появятся как пройденный участок;</li>
+<li>отдельный неинтерактивный путь шагов на карточке заявки — остаётся,
+но рядом появляется путь сделки;</li>
+<li>четыре отсека сводной воронки и точные числа записей в них — числа
+сдвинутся после разделения задач.</li>
+</ul>
+<p><strong>Что добавить.</strong> Новых проверок нужно ровно столько,
+сколько новых правил:</p>
+<ul>
+<li>каждая допустимая стадия принадлежит <strong>ровно одному</strong>
+отсеку доски, неизвестная стадия не попадает в первый по умолчанию;</li>
+<li>задача видна только в своей области: задача сделки не появляется во
+второй сделке того же клиента;</li>
+<li>правки участника переживают перезагрузку — сейчас нет, и это живой
+дефект;</li>
+<li>влияние участника отображается словом и не ломает вёрстку
+значка;</li>
+<li>статус объекта показывает подпись по таблице §1.5 для всех шести
+сочетаний;</li>
+<li>второй договор по той же сделке не создаётся;</li>
+<li>вывод лота из сделки пересчитывает сумму и комиссию;</li>
+<li>на пару «контакт + причина» живёт не больше одного предложенного
+повода;</li>
+<li>неподтверждённый итог не участвует ни в справке, ни в следующем
+шаге, ни в ответах Консьержа.</li>
+</ul>
+<p><strong>Порядок работ остаётся волновым</strong> (см. раздел 4
+сводной спеки), с прогоном всей проверочной базы после каждой волны и
+сборкой HTML для визуального просмотра.</p>
+<hr />
+<h2 id="7-уточнения-после-приёмки-спеки">7. Уточнения после приёмки
+спеки</h2>
+<p>Приёмка нашла десять мест, где формулировка звучала решённо, но
+действия не задавала. Закрыты здесь.</p>
+<h3 id="71-итог-контакта-черновиком-пишет-модель-не-человек">7.1. Итог
+контакта: черновиком пишет модель, не человек</h3>
+<p>Правило §2.2 «итог пишется только черновиком» относится <strong>к
+машинной записи</strong>. Когда итог набирает человек — закрывая задачу,
+добавляя заметку, — он сразу <strong>подтверждён</strong>: подтверждать
+нечего, это и есть первоисточник.</p>
+<p>Полное правило: автор <code>Консьерж</code> → состояние
+<code>draft</code>; автор-человек → состояние <code>confirmed</code>.
+Отклонённый черновик остаётся в ленте бледным со следом отклонения —
+иначе непонятно, почему Консьерж больше не предлагает то, что предлагал
+вчера.</p>
+<h3 id="72-чей-ход-что-считается-ответом-клиента">7.2. Чей ход: что
+считается ответом клиента</h3>
+<p>Ход переключается на нас, когда по этой заявке появляется
+<strong>входящая запись от клиента</strong> — факт контакта, у которого
+автор клиент, — либо когда меняется решение по объекту. Ход
+переключается на клиента в момент отправки подборки или предложения.</p>
+<p>Ручная правка побеждает вывод и держится, <strong>пока не произойдёт
+следующее переключающее событие</strong>: иначе поставленная вручную
+пометка застынет навсегда и будет врать. То же правило действует для
+стадии отношений из §1.1 — единое, чтобы два поля не вели себя
+по-разному.</p>
+<h3 id="73-запланированное-событие-что-именно-считается">7.3.
+Запланированное событие: что именно считается</h3>
+<p>Инвариант §3.3 опирается на два источника, и оба должны знать про
+сделку:</p>
+<ul>
+<li><strong>открытая задача</strong> этой сделки со сроком сегодня или
+позже;</li>
+<li><strong>запись календаря</strong>, привязанная к сделке.</li>
+</ul>
+<p>Записи календаря сейчас несут только ссылку на контакт — им нужна та
+же тройная область, что и задачам по §2.6. Без этого встреча по одной
+сделке будет закрывать инвариант по второй.</p>
+<p><strong>Клиентская задача следующим шагом сделки не
+считается.</strong> «Поздравить с днём рождения» не двигает сделку, и
+засчитывать её значило бы прятать настоящую дыру.</p>
+<h3 id="74-когда-пересчитываются-поводы">7.4. Когда пересчитываются
+поводы</h3>
+<p>Три момента: при смене демо-суток, при изменении договора или
+подборки, и по явной команде агента. Пересчёт
+<strong>идемпотентен</strong> — повторный запуск в тот же день не
+порождает второго повода той же причины (правило одного повода из
+§2.1).</p>
+<h3 id="75-участники-попадают-в-сводку-консьержа">7.5. Участники
+попадают в сводку Консьержа</h3>
+<p>Сводка сделки сейчас отдаёт клиента, компанию и лоты. Добавляется
+<strong>список участников</strong> — имя, роль словом, влияние, канал,
+пометка основного. Без этого расширенный справочник ролей останется
+невидимым для того, кто должен им пользоваться: Консьерж не сможет ни
+выбрать адресата, ни объяснить, почему пишет юристу, а не
+покупателю.</p>
+<h3 id="76-где-именно-исчезает-слово-заявка">7.6. Где именно исчезает
+слово «заявка»</h3>
+<p>Правило: <strong>у агента — «запрос», у руководителя и в данных —
+«заявка».</strong> Замена нужна не только в меню: заголовок карточки,
+кнопки перехода, хлебные крошки, записи ленты сделки, подсказки
+Консьержа и настройки. Раздел «Заявки» становится «Входящими», но
+карточка называется «Запрос клиента», а строка в сделке — «из запроса
+такого-то».</p>
+<p>Проверка на это ставится отдельная: слово «заявка» не встречается в
+интерфейсе роли агента.</p>
+<h3 id="77-предложение-два-режима-и-граница-между-ними">7.7.
+Предложение: два режима и граница между ними</h3>
+<p>Пока сделки нет, предложение принадлежит <strong>заявке</strong> и
+правится свободно. В момент создания сделки текущая версия
+<strong>фиксируется снимком</strong> и получает пометку неизменяемости —
+это то основание, на котором сделка заведена, и переписывать его
+нельзя.</p>
+<p>Дальше предложения создаются <strong>на сделке</strong>, каждое новой
+версией. Правка отправленной версии не меняет её, а порождает следующую.
+Так история переговоров остаётся читаемой.</p>
+<h3 id="78-лот-который-возвращается">7.8. Лот, который возвращается</h3>
+<p>Состояние лота из §2.3 — <strong>на сделке и про эту сделку</strong>.
+Лот, вышедший из первой сделки и попавший во вторую, получает во второй
+свою чистую запись.</p>
+<p>Сквозная история «объект ↔︎ сделка» — это отдельная связь с датами,
+исходом и причиной, которая уже описана в ратифицированной модели от 17
+августа и здесь не переизобретается. Именно она отвечает на вопрос «где
+этот объект был раньше», а карта состояний — на вопрос «что с ним в этой
+сделке».</p>
+<h3 id="79-пересчёт-при-выводе-лота">7.9. Пересчёт при выводе лота</h3>
+<p><strong>Сумма сделки.</strong> Если она собрана из лотов —
+пересчитывается по оставшимся. Если введена вручную — не трогается, но
+показывается расхождение с суммой лотов: молча переписать введённое
+агентом число хуже, чем показать, что оно разошлось.</p>
+<p><strong>Комиссия</strong> — всегда по оставшимся лотам, по их
+ставкам.</p>
+<p><strong>Договор, если он уже создан,</strong> автоматически не
+пересобирается: вехи и график платежей — согласованные с другой стороной
+обязательства, и менять их одним нажатием нельзя. Договор помечается как
+требующий пересмотра, с указанием, какой лот вышел.</p>
+<h3 id="710-мелкие-крайние-случаи">7.10. Мелкие крайние случаи</h3>
+<p><strong>Поводы при удалении контакта</strong> уходят вместе с ним:
+повод без адресата смысла не имеет. <strong>Поводы при передаче
+сделки</strong> остаются на контакте, а не на сделке, и переназначаются
+вместе с ответственным — они про отношения, а не про транзакцию.
+<strong>Заблокированный лот</strong> виден агенту с причиной блокировки,
+и блокировку можно снять тем же действием, каким она поставлена.
+<strong>Прежний ответственный после передачи</strong> видит карточку
+целиком и её историю, но не может менять стадию, ставить задачи и писать
+от имени сделки: он свидетель, а не участник. <strong>Согласие на
+отправку</strong> держится на контакте — там же, где оно проверяется
+сегодня перед любой адресной отправкой. <strong>Класс оформления
+влияния</strong> берётся из ключа (<code>lpr</code>, <code>infl</code>,
+<code>exec</code>), а не из отображаемого слова: иначе смена подписи
+сломает вёрстку.</p>
+<h3 id="711-область-получают-все-пути-создания-задачи">7.11. Область
+получают все пути создания задачи</h3>
+<p>Не только форма, лента сделки и Консьерж, но и <strong>сценарии и
+события</strong>, которые тоже порождают задачи. Проверка ставится на
+само правило, а не на перечень мест: <strong>у задачи, созданной любым
+путём внутри сделки, есть ссылка на сделку.</strong> Так новый путь,
+добавленный позже, не проскочит мимо.</p>
+<footer class="md2html-footer">
+  <span class="brand">VOS&#8217;HOD INTELLIGENCE &middot; md2html</span>
+  <span>auto-generated &middot; mirror of source .md &middot; do not edit by hand</span>
+</footer>
+<script type="module">
+  // Render Mermaid diagrams if any `.mermaid` blocks are present (harmless if none).
+  if (document.querySelector('pre.mermaid, div.mermaid')) {
+    // pandoc emits <pre class="mermaid"><code>…</code></pre>; unwrap <code> so Mermaid reads clean source.
+    document.querySelectorAll('pre.mermaid > code').forEach(function (c) {
+      c.parentElement.textContent = c.textContent;
+    });
+    import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')
+      .then(function (m) { m.default.initialize({ startOnLoad: true, securityLevel: 'loose' }); })
+      .catch(function () { /* offline: diagram stays as text, no breakage */ });
+  }
+</script>
+</body>
+</html>
