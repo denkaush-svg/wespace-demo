@@ -1153,8 +1153,18 @@
      тишина становится поводом написать; `cueSilenceDays` — сколько молчит отклонённый повод. */
   const settings = { dormantDays: 90, silenceDays: 30, cueSilenceDays: 30 };
 
+  /* Итог разговора, написанный Консьержем и ещё не подтверждённый. Он намеренно НЕ лежит
+     в ленте сделки: пока агент его не подтвердил, он не должен попадаться ни справке,
+     ни следующему шагу, ни ответу Консьержа. Факт контакта при этом уже записан — звонок
+     был, и это наблюдаемое событие. */
+  const outcomes = [
+    { id: 'oc_deal_d_anna_1', scope: 'deal', entityId: 'd_anna', factId: null, at: '13 мая · 19:05', ord: 131906,
+      by: 'Консьерж', state: 'draft',
+      text: 'Итог звонка: клиент согласен на рассрочку 60/40, просит зафиксировать цену до конца недели и прислать график платежей.' },
+  ];
+
   WS.fixtures = {
-    version: 1, settings,
+    version: 1, settings, outcomes,
     DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,

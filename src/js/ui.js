@@ -2964,7 +2964,10 @@
       .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">' + (kind === 'contact' ? 'по контакту пока нет событий' : 'по компании пока нет событий') + '</div>';
     const more = (limit && total > limit)
       ? '<button class="btn xs" data-etab="' + kind + '~' + ent.id + '~history" style="margin-top:8px">' + I('clock') + 'Вся лента · ' + total + '</button>' : '';
-    return '<div class="timeline">' + rows + '</div>' + more;
+    // Черновики итогов по этому контакту — над лентой и только на полной истории: в превью
+    // они вытеснили бы настоящие события, которых там и так три строки.
+    const drafts = limit ? '' : outcomesBlock(kind === 'contact' ? 'contact' : 'company', ent.id);
+    return '<div class="timeline">' + drafts + rows + '</div>' + more;
   }
   function contactFeedEntries(c) { return entityFeedEntries('contact', c); }
   function contactFeedInner(c, limit) { return entityFeedInner('contact', c, limit); }
@@ -5071,6 +5074,64 @@
   // when: 'now' | { daysAgo: 0..N, h, mi }. Returns the stored entry, or null if the input is
   // not valid (unknown scope / unknown entity / empty text) — never writes a half-formed record.
   let taskSeq = 0;   // ids for tasks the Concierge creates; stable within a session
+  /* ---- Факт контакта и итог контакта (§2.2 и §7.1 решений) ----
+     Факт — «позвонили, написали, встретились» — наблюдаемое событие: пишется сразу, модель
+     здесь не ошибается. Итог — «о чём договорились» — модель додумывает, и её догадка иначе
+     ляжет в историю как факт, на который потом обопрётся другой ответ.
+
+     Поэтому машинный итог НЕ кладётся в ленту. Он живёт отдельным списком и попадает в ленту
+     только подтверждённым. Это не придирка к форме: правило «неподтверждённый итог не участвует
+     ни в одном выводе» иначе пришлось бы помнить в тринадцати местах, которые читают ленту, —
+     а так оно выполняется само, потому что читать нечего.
+
+     Итог, который набрал человек, сразу подтверждён: подтверждать нечего, это первоисточник. */
+  function outcomesFor(scope, id) {
+    return (D().outcomes || []).filter((x) => x.scope === scope && x.entityId === id);
+  }
+  function addOutcomeDraft(scope, id, opts) {
+    const o = opts || {};
+    const txt = String(o.text == null ? '' : o.text).trim();
+    if (!txt || !feedOwner(scope, id)) return null;
+    const rec = { id: 'oc_' + scope + '_' + id + '_' + ((D().outcomes || []).length + 1),
+      scope: scope, entityId: id, factId: o.factId || null, text: txt,
+      by: o.by || 'Консьерж', at: 'сейчас', ord: NOW_ORD + 1, state: 'draft' };
+    (D().outcomes || (D().outcomes = [])).push(rec);
+    WS.storeApi.touch();
+    return rec;
+  }
+  function confirmOutcome(oid) {
+    const rec = (D().outcomes || []).find((x) => x.id === oid); if (!rec) return;
+    D().outcomes = (D().outcomes || []).filter((x) => x !== rec);
+    const e = addEventEntry(rec.scope, rec.entityId, { type: 'note', text: rec.text, by: rec.by });
+    if (e) { e.role = 'outcome'; e.state = 'confirmed'; e.factId = rec.factId; }
+    WS.storeApi.touch();
+    WS.storeApi.toast('Итог подтверждён — теперь он участвует в выводах', 'ok');
+  }
+  function rejectOutcome(oid) {
+    const rec = (D().outcomes || []).find((x) => x.id === oid); if (!rec) return;
+    // Отклонённый черновик остаётся со следом отклонения: иначе непонятно, почему Консьерж
+    // больше не предлагает то, что предлагал вчера.
+    rec.state = 'rejected';
+    WS.storeApi.touch();
+    WS.storeApi.toast('Итог отклонён — след остался в ленте');
+  }
+  function outcomeRow(rec) {
+    const acts = rec.state === 'draft'
+      ? '<div class="rel-acts"><button class="btn xs primary" data-ocok="' + rec.id + '">' + I('check') + 'Подтвердить</button>' +
+        '<button class="tl-ic-btn" data-ocno="' + rec.id + '" title="Отклонить итог">' + I('x') + '</button></div>'
+      : '<span class="rel-tag stop">отклонён</span>';
+    return '<div class="evc ai oc-' + rec.state + '">' +
+      '<div class="evc-top"><span class="evc-ic ai">' + I('sparkle') + '</span>' +
+      '<span class="evc-name">Итог разговора · ' + (rec.state === 'draft' ? 'черновик' : 'отклонён') + '</span>' +
+      '<span class="evc-by ai">' + I('sparkle') + escAttr(rec.by) + '<i>AI-агент</i></span>' +
+      '<span class="evc-when">' + escAttr(rec.at) + '</span></div>' +
+      '<div class="evc-text">' + escAttr(rec.text) + '</div>' +
+      '<div class="evc-tags"><span class="tl-src">' + I('lock') + 'не участвует в выводах, пока не подтверждён</span>' + acts + '</div></div>';
+  }
+  function outcomesBlock(scope, id) {
+    const list = outcomesFor(scope, id);
+    return list.length ? list.map(outcomeRow).join('') : '';
+  }
   function addEventEntry(scope, id, opts) {
     const o = opts || {};
     const txt = String(o.text == null ? '' : o.text).trim();
@@ -5805,7 +5866,12 @@
   }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
-    return dealNextStepCard(d) + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
+    /* Черновик итога стоит в РАБОЧЕЙ области, а не в истории: он не часть истории, пока его
+       не подтвердили, и это дело на сегодня — «подтвердите или отклоните», — а не запись
+       о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
+    const drafts = outcomesBlock('deal', d.id);
+    const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
+    return dealNextStepCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -8478,6 +8544,7 @@
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
+    outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
     REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
     cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
     ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts,

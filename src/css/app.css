@@ -2129,3 +2129,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .lot-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .lot-out .obj-mini { opacity: .55; }
 .lot-out .obj-mini-n { text-decoration: line-through; }
+
+/* Неподтверждённый итог виден бледным: он в ленте, но не в выводах. Отклонённый остаётся
+   со следом — иначе непонятно, почему Консьерж больше не предлагает вчерашнее. */
+.evc.oc-draft { opacity: .82; border-style: dashed; }
+.evc.oc-rejected { opacity: .55; border-style: dashed; }
+.evc.oc-rejected .evc-text { text-decoration: line-through; }
+.evc.oc-draft .evc-tags, .evc.oc-rejected .evc-tags { align-items: center; }

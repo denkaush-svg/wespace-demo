@@ -4842,6 +4842,53 @@ setTimeout(async () => {
     dd().offers = [];
   }
 
+  // ---- Волна 3: факт контакта против итога контакта ------------------------------------------
+  {
+    const draft = (dd().outcomes || []).find((x) => x.entityId === 'd_anna' && x.state === 'draft');
+    check('итог · машинный черновик есть в данных', !!draft, JSON.stringify((dd().outcomes || []).length));
+    // Главное правило: неподтверждённый итог не участвует НИ В ОДНОМ выводе. Проверяется
+    // не перечнем мест, а тем, что читать его негде: в ленте сделки его нет.
+    const tl = (dd().dealTimeline || {})['d_anna'] || [];
+    check('итог · черновик не лежит в ленте сделки', !tl.some((e) => e.text === draft.text),
+      'записей ' + tl.length);
+    const briefBefore = WS.ui.dealBrief ? WS.ui.dealBrief(dd().deals.find((x) => x.id === 'd_anna')) : '';
+    // …и в сводке, которую получает модель.
+    const dg = WS.live && WS.live.digest ? WS.live.digest() : null;
+    check('итог · черновик не попадает в сводку Консьержа',
+      !dg || JSON.stringify(dg).indexOf('рассрочку 60/40, просит зафиксировать') < 0);
+
+    // Но виден на карточке — бледным и с двумя кнопками.
+    WS.ui.dealCard('d_anna');
+    const h = doc.getElementById('app').innerHTML;
+    check('итог · черновик виден в карточке', h.indexOf('oc-draft') >= 0 && h.indexOf('data-ocok="' + draft.id + '"') >= 0);
+    check('итог · черновик подписан как не участвующий в выводах', h.indexOf('не участвует в выводах') >= 0);
+
+    // Подтверждение переносит итог в ленту — и с этого момента он виден выводам.
+    const nBefore = tl.length;
+    WS.ui.confirmOutcome(draft.id);
+    const tl2 = (dd().dealTimeline || {})['d_anna'] || [];
+    check('итог · подтверждённый попадает в ленту', tl2.length === nBefore + 1 && tl2.some((e) => e.role === 'outcome' && e.state === 'confirmed'),
+      nBefore + ' → ' + tl2.length);
+    check('итог · подтверждённый уходит из очереди черновиков',
+      !(dd().outcomes || []).some((x) => x.id === draft.id));
+
+    // Итог, написанный ЧЕЛОВЕКОМ, сразу подтверждён: подтверждать нечего, это первоисточник.
+    const mine = WS.ui.addEventEntry('deal', 'd_anna', { type: 'note', text: 'Итог встречи: договорились о брони до пятницы.', by: 'Марина Волкова' });
+    check('итог · написанный человеком не требует подтверждения',
+      !!mine && !(dd().outcomes || []).some((x) => x.text === mine.text), mine ? 'записан' : 'нет');
+
+    // Отклонённый остаётся со следом — иначе непонятно, почему Консьерж больше не предлагает вчерашнее.
+    const d2 = WS.ui.addOutcomeDraft('deal', 'd_anna', { text: 'Итог: клиент готов увеличить бюджет до 2,4 млн.' });
+    WS.ui.rejectOutcome(d2.id);
+    const kept = (dd().outcomes || []).find((x) => x.id === d2.id);
+    check('итог · отклонённый остаётся со следом', !!kept && kept.state === 'rejected', kept ? kept.state : 'исчез');
+    const tl3 = (dd().dealTimeline || {})['d_anna'] || [];
+    check('итог · отклонённый в ленту не попал', !tl3.some((e) => e.text === d2.text));
+    WS.ui.dealCard('d_anna');
+    check('итог · отклонённый виден со следом отклонения', doc.getElementById('app').innerHTML.indexOf('oc-rejected') >= 0);
+    dd().outcomes = (dd().outcomes || []).filter((x) => x.id !== d2.id);
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);
