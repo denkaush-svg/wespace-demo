@@ -4567,6 +4567,109 @@
       (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.objectIds : null) || [];
     return ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
   }
+  /* ---- Коммерческие предложения: версии, а не правки (§2.4 и §7.7 решений) ----
+     Снимок КП, зафиксированный при создании сделки, остаётся неизменяемым — это то основание,
+     на котором сделка заведена, и переписывать его нельзя. Правка предложения СОЗДАЁТ новую
+     версию: так история переговоров остаётся читаемой, и видно, на что клиент отвечал. */
+  function offersOf(scope, id) {
+    const key = scope === 'deal' ? 'dealId' : 'requestId';
+    return (D().offers || []).filter((x) => x[key] === id).sort((a, b) => b.version - a.version);
+  }
+  function offerTerms(src) {
+    return { paymentForm: src.paymentForm || null, vat: !!src.vat, horizon: src.horizon || null, funding: src.funding || null };
+  }
+  function newOffer(scope, id) {
+    const isDeal = scope === 'deal';
+    const src = isDeal ? D().deals.find((x) => x.id === id) : requestById(id);
+    if (!src) return null;
+    const prev = offersOf(scope, id)[0];
+    const objectIds = prev ? prev.objectIds.slice()
+      : (isDeal ? dealLiveLots(src).map((o) => o.id)
+        : (src.offered || []).filter((o) => o.state === 'selected').map((o) => o.id));
+    const o = {
+      id: 'of_' + id + '_' + ((prev ? prev.version : 0) + 1),
+      dealId: isDeal ? id : null, requestId: isDeal ? (src.requestId || null) : id,
+      version: (prev ? prev.version : 0) + 1, objectIds: objectIds,
+      terms: prev ? Object.assign({}, prev.terms) : offerTerms(src),
+      body: prev ? prev.body : 'Предлагаем к рассмотрению объекты ниже. Условия — в таблице; готовы обсудить график платежей.',
+      state: 'draft', sentTo: null, sentAt: null,
+    };
+    (D().offers || (D().offers = [])).unshift(o);
+    return o;
+  }
+  function offerById(id) { return (D().offers || []).find((x) => x.id === id) || null; }
+  // Правка ОТПРАВЛЕННОЙ версии не меняет её, а порождает следующую: иначе исчезнет то,
+  // на что клиент отвечал.
+  function editOffer(offerId) {
+    const o = offerById(offerId); if (!o) return;
+    const target = o.state === 'sent' ? newOffer(o.dealId ? 'deal' : 'request', o.dealId || o.requestId) : o;
+    if (o.state === 'sent' && target) { target.body = o.body; target.objectIds = o.objectIds.slice(); target.terms = Object.assign({}, o.terms); }
+    openOfferForm((target || o).id, o.state === 'sent');
+  }
+  function openOfferForm(offerId, forked) {
+    const o = offerById(offerId); if (!o) return;
+    const objs = (o.objectIds || []).map((id) => (D().objects || []).find((x) => x.id === id)).filter(Boolean);
+    const who = o.dealId ? D().deals.find((x) => x.id === o.dealId) : requestById(o.requestId);
+    const c = who ? D().clients.find((x) => x.id === who.clientId) : null;
+    const note = forked ? 'Отправленная версия не меняется — это версия ' + o.version + ', её копия. Предыдущая осталась в истории.' : null;
+    const body = kpDocBody((c && c.name) || 'Клиент', 'версия ' + o.version + ' · черновик', objs, o.terms || {}, note) +
+      '<label class="fld" style="margin-top:10px"><span>Текст предложения</span>' +
+      '<textarea id="of_body" rows="3">' + escAttr(o.body || '') + '</textarea></label>';
+    // Отправка адресуется участнику, а не «клиенту вообще»: у сделки их несколько,
+    // и юристу пишут не то же, что покупателю.
+    const parts = who && o.dealId ? dealContacts(who) : (c ? [{ clientId: c.id, role: 'Клиент' }] : []);
+    const to = '<label class="fld"><span>Кому отправить</span><select id="of_to">' +
+      parts.map((p, i) => '<option value="' + i + '">' + escAttr(contactDisplayName(p)) + ' · ' + roleOf(p) + '</option>').join('') + '</select></label>';
+    openModal('Предложение · версия ' + o.version, body + to,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn" data-act="saveOffer" data-offer="' + o.id + '">' + I('check') + 'Сохранить черновик</button>' +
+      '<button class="btn primary" data-act="sendOffer" data-offer="' + o.id + '">' + I('send') + 'Отправить клиенту</button>');
+  }
+  function readOfferForm(o) {
+    const el = document.getElementById('of_body');
+    if (el) o.body = el.value.trim();
+  }
+  function saveOffer(offerId) {
+    const o = offerById(offerId); if (!o) return;
+    readOfferForm(o); WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Черновик версии ' + o.version + ' сохранён', 'ok');
+  }
+  function sendOffer(offerId) {
+    const o = offerById(offerId); if (!o) return;
+    readOfferForm(o);
+    const who = o.dealId ? D().deals.find((x) => x.id === o.dealId) : requestById(o.requestId);
+    const parts = who && o.dealId ? dealContacts(who) : [];
+    const sel = document.getElementById('of_to');
+    const p = parts[sel ? +sel.value : 0] || (who ? { clientId: who.clientId } : {});
+    /* Отправка блокируется без согласия — тем же правилом, что и любая адресная рассылка.
+       У участника без своей карточки контакта собственного согласия нет: он появился в сделке
+       через клиента, и его согласием мы считаем клиентское. Пропускать такого адресата
+       «потому что записи нет» значило бы обойти правило именем в свободном поле. */
+    const cid = p.clientId || (who && who.clientId);
+    const c = cid ? D().clients.find((x) => x.id === cid) : null;
+    if (c && c.consent === false) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
+    o.state = 'sent';
+    o.sentTo = contactDisplayName(p);
+    o.sentAt = WS.storeApi.clockLabel().date;
+    if (who && o.dealId) addEventEntry('deal', who.id, { type: 'msg', text: 'Отправлено предложение, версия ' + o.version + ' — ' + o.sentTo + '. Отправка имитируется (DEMO).' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Версия ' + o.version + ' отправлена — ' + o.sentTo + ' (имитация)', 'ok');
+    if (o.dealId) dealCard(o.dealId);
+  }
+  function dealOffersBlock(d) {
+    const list = offersOf('deal', d.id);
+    const add = '<button class="btn xs" data-offernew="deal:' + d.id + '">' + I('plus') + 'Новая версия</button>';
+    const rows = list.map((o) => {
+      const sent = o.state === 'sent';
+      return '<div class="rel-row"><div class="fi i-' + (sent ? 'ok' : 'mut') + '">' + I('doc') + '</div>' +
+        '<div class="ft"><div class="t">Версия ' + o.version + ' · ' + (o.objectIds || []).length + ' ' + plural((o.objectIds || []).length, 'объект', 'объекта', 'объектов') + '</div>' +
+        '<div class="m">' + (sent ? 'отправлена ' + o.sentAt + ' · ' + escAttr(o.sentTo || '') : 'черновик') + '</div></div>' +
+        '<div class="rel-acts"><button class="btn xs" data-offeredit="' + o.id + '">' + I('pencil') + (sent ? 'Новая версия из этой' : 'Открыть') + '</button></div></div>';
+    }).join('');
+    const empty = '<div style="font-size:12px;color:var(--faint);padding:6px 0">предложений по сделке ещё нет</div>';
+    const why = '<div class="rel-why">' + I('lock') + '<span>Снимок КП, на котором заведена сделка, не меняется — он открывается кнопкой «Собрать КП». Правка отправленной версии создаёт следующую.</span></div>';
+    return dxSec('doc', 'Предложения · ' + list.length, add, why + '<div class="rel-list">' + (rows || empty) + '</div>');
+  }
   function openDealKp(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
     const objs = dealKpObjects(d);
@@ -5702,7 +5805,7 @@
   }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
-    return dealNextStepCard(d) + dealLotsBlock(d) + dealRecentCard(d);
+    return dealNextStepCard(d) + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -8379,6 +8482,7 @@
     cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
     ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts,
     LOT_EXITS, lotState, lotIsOut, dealLiveLots, lotCommissionPct, lotsMismatch, lotExitForm, saveLotExit, undoLotBlock,
-    contractFromDeal, ensureContract, finishDealForm, saveFinishDeal, contractsOfDeal, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    contractFromDeal, ensureContract, finishDealForm, saveFinishDeal, contractsOfDeal,
+    offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

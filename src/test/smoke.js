@@ -4787,6 +4787,61 @@ setTimeout(async () => {
     delete dl.amountFromLots;
   }
 
+  // ---- Волна 3: коммерческие предложения версиями --------------------------------------------
+  {
+    const d = dd().deals.find((x) => x.id === 'd_anna');
+    const snapBefore = JSON.stringify(d.kpSnapshot || null);
+    const v1 = WS.ui.newOffer('deal', 'd_anna');
+    check('предложения · первая версия — номер один и черновик', !!v1 && v1.version === 1 && v1.state === 'draft',
+      v1 ? v1.version + '/' + v1.state : 'нет');
+    check('предложения · собрано из живых лотов сделки',
+      !!v1 && v1.objectIds.length === WS.ui.dealLiveLots(d).length, v1 && JSON.stringify(v1.objectIds));
+    // Отправка адресуется участнику, а не «клиенту вообще».
+    WS.ui.openOfferForm(v1.id);
+    const to = doc.getElementById('of_to');
+    check('предложения · адресат выбирается среди участников сделки',
+      !!to && to.options.length === WS.ui.dealContacts(d).length, to ? to.options.length : 'списка нет');
+    const bodyEl = doc.getElementById('of_body'); if (bodyEl) bodyEl.value = 'Первая редакция.';
+    WS.ui.sendOffer(v1.id);
+    check('предложения · отправленная версия помечена и знает адресата',
+      v1.state === 'sent' && !!v1.sentTo && !!v1.sentAt, JSON.stringify({ s: v1.state, to: v1.sentTo }));
+
+    // Правка отправленной версии не меняет её, а порождает следующую.
+    WS.ui.editOffer(v1.id);
+    const list = WS.ui.offersOf('deal', 'd_anna');
+    check('предложения · правка отправленной порождает следующую версию',
+      list.length === 2 && list[0].version === 2 && list[0].state === 'draft',
+      list.map((x) => x.version + '/' + x.state).join(', '));
+    check('предложения · отправленная версия осталась нетронутой',
+      v1.state === 'sent' && v1.body === 'Первая редакция.', v1.body);
+    check('предложения · снимок КП сделки не тронут', JSON.stringify(d.kpSnapshot || null) === snapBefore);
+
+    // Отправка блокируется без согласия — тем же правилом, что и любая адресная рассылка.
+    const noc = dd().clients.find((x) => x.consent === false);
+    if (noc) {
+      const was = d.contacts[0].clientId;
+      d.contacts[0].clientId = noc.id;                       // адресатом становится тот, кто не давал согласия
+      const vn = WS.ui.newOffer('deal', 'd_anna');
+      WS.ui.openOfferForm(vn.id);
+      WS.ui.sendOffer(vn.id);
+      check('предложения · без согласия отправка не проходит', vn.state === 'draft', vn.state);
+      // Участник без своей карточки контакта согласия не имеет — тогда действует согласие
+      // клиента сделки, иначе правило обходится именем в свободном поле.
+      d.contacts[0].clientId = was;
+      const free = d.contacts.findIndex((x) => !x.clientId);
+      if (free >= 0) {
+        const wasC = d.clientId; d.clientId = noc.id;
+        const vf = WS.ui.newOffer('deal', 'd_anna');
+        WS.ui.openOfferForm(vf.id);
+        const sel2 = doc.getElementById('of_to'); if (sel2) sel2.value = String(free);
+        WS.ui.sendOffer(vf.id);
+        check('предложения · участник без своей карточки не обходит согласие клиента', vf.state === 'draft', vf.state);
+        d.clientId = wasC;
+      }
+    }
+    dd().offers = [];
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);
