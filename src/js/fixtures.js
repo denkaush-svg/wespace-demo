@@ -967,8 +967,11 @@
   const events = [
     // Показ Creekline прошёл 9 мая (см. requestTimeline.r_anna) — в календаре стоит то, что
     // действительно впереди: разговор про график первого платежа, который держит бронирование.
-    { id: 'e_call_anna', clientId: 'c_anna', title: 'Звонок Анне — график первого платежа', when: 'сегодня 16:00', kind: 'call' },
-    { id: 'e_call_karim', clientId: 'c_partner', title: 'Звонок Karim Aziz', when: 'завтра 11:30', kind: 'call' },
+    // Запись календаря несёт ту же тройную область, что и задача. Прежде она знала только
+    // контакт — и встреча по одной сделке закрывала инвариант «нет живой сделки без
+    // запланированного события» по второй сделке того же человека.
+    { id: 'e_call_anna', clientId: 'c_anna', dealId: 'd_anna', title: 'Звонок Анне — график первого платежа', when: 'сегодня 16:00', kind: 'call' },
+    { id: 'e_call_karim', clientId: 'c_partner', dealId: 'd_karim_cross', title: 'Звонок Karim Aziz', when: 'завтра 11:30', kind: 'call' },
   ];
 
   // Night inbox (S14) + overdue signals for the start screen feed.

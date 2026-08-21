@@ -89,7 +89,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -153,7 +153,9 @@
     if (d.oggal) { e.stopPropagation(); return WS.ui.objGalleryNav(+d.oggal); }
     if (d.scen) return WS.ui.finScenario(d.scen);
     if (d.podbor) { store.podborClient = d.podbor; return api.emit(); }
-    if (d.taskdone) { api.taskAction(d.taskdone, 'done'); return api.toast('Задача выполнена', 'ok'); }
+    // Выполнение открывает короткую форму итога. Комментарий необязателен: обязательное поле
+    // здесь — прямой путь к тому, что задачи перестанут закрывать вовсе.
+    if (d.taskdone) return WS.ui.taskDoneForm(d.taskdone);
     if (d.taskreopen) { return api.taskAction(d.taskreopen, 'reopen'); }
     if (d.tasksnooze) { api.taskAction(d.tasksnooze, 'snooze'); return api.toast('Отложено на завтра'); }
     if (d.dealmove) { e.stopPropagation(); return WS.ui.moveDealDir(d.dealmove, d.dir); }
@@ -217,6 +219,7 @@
     // Предложение: новая версия заводится явно, правка отправленной — порождает следующую.
     if (d.offernew) { const p = d.offernew.split(':'); const o = WS.ui.newOffer(p[0], p[1]); return o ? WS.ui.openOfferForm(o.id) : api.toast('Нечего предлагать — выберите объекты'); }
     if (d.offeredit) return WS.ui.editOffer(d.offeredit);
+    if (d.reqturn) { const p = d.reqturn.split('~'); WS.ui.setTurn(p[0], p[1], p[2]); return api.emit(); }
     // Итог, написанный моделью, входит в историю только подтверждённым.
     if (d.ocok) { const sc = WS.ui.outcomesFor; WS.ui.confirmOutcome(d.ocok); return api.emit(); }
     if (d.ocno) { WS.ui.rejectOutcome(d.ocno); return api.emit(); }
@@ -306,7 +309,12 @@
       case 'saveDealContact': WS.ui.saveDealContact(t.dataset.deal, +t.dataset.idx); break;
       case 'saveLotExit': WS.ui.saveLotExit(t.dataset.deal, t.dataset.obj); break;
       case 'finishDeal': WS.ui.finishDealForm(t.dataset.deal); break;
+      case 'transferDeal': WS.ui.dealTransferForm(t.dataset.deal); break;
+      case 'saveTransfer': WS.ui.saveTransfer(t.dataset.deal); break;
+      case 'partnerDeal': WS.ui.dealPartnerForm(t.dataset.deal); break;
+      case 'savePartner': WS.ui.savePartner(t.dataset.deal); break;
       case 'saveOffer': WS.ui.saveOffer(t.dataset.offer); break;
+      case 'saveTaskDone': WS.ui.saveTaskDone(t.dataset.task); break;
       case 'sendOffer': WS.ui.sendOffer(t.dataset.offer); break;
       case 'saveFinishDeal': WS.ui.saveFinishDeal(t.dataset.deal); break;
       case 'capToggle': { const id = t.dataset.deal; store.capture = store.capture || {}; const cur = (id in store.capture) ? store.capture[id] : true; store.capture[id] = !cur; api.toast('Запись разговоров: ' + (store.capture[id] ? 'включена' : 'выключена'), 'ok'); WS.ui.dealCard(id); break; }

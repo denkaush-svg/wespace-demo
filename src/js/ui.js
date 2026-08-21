@@ -594,6 +594,9 @@
     } else {
       queueBlock = pulseMyDay();
     }
+    // Разбираемый список сделок без следующего шага. У руководителя — по всей команде,
+    // с ответственным в строке. Пустой список блок не рисует.
+    queueBlock += pulseNoNextStep();
 
     // Пульс (rev.3): первая строка — ввод Консьержа, затем приветствие, событие дня, очередь, аналитика.
     const eventsPlayed = (S().eventsPlayed || []).length;
@@ -2641,7 +2644,10 @@
     const cue = cuesFor(cid).find((x) => x.key === key);
     if (!cue) return;
     WS.storeApi.addTask({ id: 'tk_cue_' + key.replace(/[^a-z0-9_]/gi, '_'), title: cue.title,
-      clientId: cid, kind: 'touch', due: cue.dueAt || 'сегодня', when: 'today' });
+      clientId: cid, kind: 'touch', due: cue.dueAt || 'сегодня', when: 'today',
+      // Повод, пришедший от договора, оставляет ссылку на него: иначе задача «напомнить
+      // о платеже» висит на человеке и не находится там, где платёж живёт.
+      contractId: (cue.payload && cue.payload.contractId) || undefined });
     cueDecide(key, 'accepted');
     WS.storeApi.toast('Повод принят — задача поставлена', 'ok');
   }
@@ -3310,7 +3316,10 @@
   // Справа от пути: когда запрос стал сделкой и сколько она стоит на текущем шаге.
   function dealPathMeta(d) {
     const ago = createdAgoLabel(d);
-    const conv = d.createdAt ? ('стала сделкой ' + d.createdAt + (ago ? ' · ' + ago : '')) : '';
+    // Дата конверсии, когда она записана, главнее даты создания: «стала сделкой» — это
+    // момент согласования условий, а не момент заведения карточки.
+    const when = d.convertedAt || d.createdAt;
+    const conv = when ? ('стала сделкой ' + when + (ago ? ' · ' + ago : '')) : '';
     const days = d.stageDays != null ? ('на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней')) : '';
     const both = [conv, days].filter(Boolean);
     return both.length ? '<div class="dx-path-meta">' + both.map((t) => '<span>' + t + '</span>').join('') + '</div>' : '';
@@ -3617,8 +3626,63 @@
       // Завершение — отдельное действие с двумя исходами, а не «поставить последний шаг»:
       // успех означает полученное вознаграждение, а не подписанный договор.
       dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', ''],
+      dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', ''],
+      dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
+  }
+  /* ---- Передать против привлечь (§3.1 решений) ----
+     Сейчас это смешано в одном поле, а операции разные. ПЕРЕДАТЬ — меняется ответственный,
+     открытые задачи переназначаются, в ленте остаётся след, прежний ответственный сохраняет
+     доступ на чтение: он отвечал перед клиентом и должен видеть, чем кончилось. ПРИВЛЕЧЬ —
+     ответственный не меняется, это со-брокеридж. Разница названа словами, а не оттенком. */
+  function dealTransferForm(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const who = TEAM.filter((m) => m.id !== d.agent);
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Передача меняет ответственного и переназначает открытые задачи. Прежний ответственный сохранит доступ на чтение — он отвечал перед клиентом. Если нужно разделить вознаграждение, а не передать сделку, это «Привлечь партнёра».</p>' +
+      '<div class="match-grid"><label class="fld"><span>Кому передаём</span><select id="tr_to">' +
+      who.map((m) => '<option value="' + m.id + '">' + escAttr(m.name) + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Причина</span><input id="tr_why" type="text" placeholder="Напр.: ухожу в отпуск с 20 мая"></label></div>';
+    openModal('Передать сделку · ' + escAttr(d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveTransfer" data-deal="' + dealId + '">' + I('check') + 'Передать</button>');
+  }
+  function saveTransfer(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const to = g('tr_to'), why = g('tr_why');
+    if (!to || to === d.agent) { WS.storeApi.toast('Выберите, кому передаёте'); return; }
+    const from = d.agent;
+    d.agent = to;
+    // Прежний ответственный остаётся свидетелем: карточку и историю видит, менять не может.
+    d.witness = (d.witness || []).concat(from ? [from] : []);
+    (D().tasks || []).forEach((t) => { if (t.dealId === dealId && t.status !== 'done') t.assignee = to; });
+    addEventEntry('deal', dealId, { type: 'note', text: 'Сделка передана: ' + agentName(from) + ' → ' + agentName(to) + (why ? '. Причина: ' + why : '') + '.' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Сделка передана — ' + agentName(to), 'ok');
+    dealCard(dealId);
+  }
+  function dealPartnerForm(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const who = TEAM.filter((m) => m.id !== d.agent);
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Привлечение партнёра не меняет ответственного: это со-брокеридж. Ответственным по сделке остаётесь вы.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Агент-партнёр</span><select id="pa_who">' +
+      who.map((m) => '<option value="' + m.id + '"' + (m.id === d.partnerAgent ? ' selected' : '') + '>' + escAttr(m.name) + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Условия разделения</span><input id="pa_split" type="text" value="' + escAttr(d.split || '50 / 50') + '"></label></div>';
+    openModal('Привлечь партнёра · ' + escAttr(d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="savePartner" data-deal="' + dealId + '">' + I('check') + 'Привлечь</button>');
+  }
+  function savePartner(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const who = g('pa_who'); if (!who) return;
+    d.partnerAgent = who;
+    d.split = g('pa_split') || '50 / 50';
+    addEventEntry('deal', dealId, { type: 'note', text: 'Привлечён партнёр: ' + agentName(who) + ' · разделение ' + d.split + '. Ответственный не менялся.' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Партнёр привлечён — ' + agentName(who), 'ok');
+    dealCard(dealId);
   }
   function dealChipRow(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
@@ -4133,8 +4197,36 @@
       (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
     });
     if (dealObjIds[off.id]) return dealObjIds[off.id] === 'done' ? { label: 'Сделка закрыта', tone: 'ok', icon: 'check' } : { label: 'В сделке', tone: 'acc', icon: 'briefcase' };
-    const m = ({ selected: ['Выбран', 'ok', 'check'], rejected: ['Отклонён', 'stop', 'x'] })[off.state] || ['На рассмотрении', '', 'clock'];
-    return { label: m[0], tone: m[1], icon: m[2] };
+    if (off.state === 'selected') return { label: 'Акцептован, работаем', tone: 'ok', icon: 'check' };
+    if (off.state === 'rejected') return { label: 'Отказ', tone: 'stop', icon: 'x' };
+    // Решение клиента и «чей ход» — два разных поля. Первое не переосмысливается: от него
+    // зависят сбор КП, вычисляемая стадия заявки, право создать сделку и профиль предпочтений.
+    // Подпись собирается из пары, по словарю партнёра.
+    return turnOf(r, off) === 'us'
+      ? { label: 'За нами — подготовить ответ', tone: 'acc', icon: 'clock' }
+      : { label: 'Ждём обратную связь', tone: '', icon: 'clock' };
+  }
+  /* Чей ход. Выводится по умолчанию, правится вручную; ручная правка держится, ПОКА не произойдёт
+     следующее переключающее событие, — иначе поставленная пометка застынет навсегда и будет врать.
+     При отказе и при выборе ход ничей: там подпись говорит сама за себя. */
+  function turnDerived(r) {
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    const last = tl.reduce((m, e) => ((e.ord != null && (!m || e.ord > m.ord)) ? e : m), null);
+    // Ход переключается на нас, когда по заявке появляется входящая запись от клиента,
+    // и на клиента — в момент отправки подборки или предложения.
+    return (last && (last.by === 'Клиент' || last.dir === 'in')) ? 'us' : 'client';
+  }
+  function turnOf(r, off) {
+    if (!off || off.state === 'rejected' || off.state === 'selected') return null;
+    const derived = turnDerived(r);
+    return (off.turn && off.turnOver === derived) ? off.turn : derived;
+  }
+  function setTurn(reqId, objId, v) {
+    const r = requestById(reqId); if (!r) return;
+    const off = (r.offered || []).find((x) => x.id === objId); if (!off) return;
+    if (!v || v === 'auto') { delete off.turn; delete off.turnOver; }
+    else { off.turn = v; off.turnOver = turnDerived(r); }
+    WS.storeApi.touch();
   }
   // Full-width подбор with the status model + INLINE decision editing (pick / in-work / reject right
   // in the tile — no separate edit page). Under it the КП scenario: отметить выбранное → собрать КП
@@ -4147,6 +4239,11 @@
       const locked = st.label === 'В сделке' || st.label === 'Сделка закрыта';
       const ph = (WS.photos && WS.photos[obj.id]) || '';
       const reason = (o.state === 'rejected' && o.reason) ? '<div class="reqo-reason">' + I('warn') + o.reason + '</div>' : '';
+      // Переключатель хода стоит рядом с решением клиента и не подменяет его: это второе поле.
+      const turn = turnOf(r, o);
+      const turnSeg = (locked || !turn) ? '' : '<div class="obj-seg obj-seg-turn">' +
+        [['client', 'Ход клиента', 'users'], ['us', 'Ход наш', 'briefcase']].map((v) =>
+          '<button class="obj-seg-b' + (turn === v[0] ? ' on' : '') + '" data-reqturn="' + r.id + '~' + obj.id + '~' + v[0] + '">' + I(v[2] || 'dot') + v[1] + '</button>').join('') + '</div>';
       const seg = locked ? '' : '<div class="obj-seg">' +
         [['selected', 'Выбран', 'check'], ['offered', 'В работе', 'clock'], ['rejected', 'Отклонён', 'x']].map((s) =>
           '<button class="obj-seg-b' + (o.state === s[0] ? ' on' : '') + '" data-reqobj="' + r.id + '~' + obj.id + '~' + s[0] + '">' + I(s[2]) + s[1] + '</button>').join('') + '</div>';
@@ -4155,7 +4252,7 @@
         '<div class="obj-mini-b' + (seg ? ' obj-mini-b-row' : '') + '"><div class="obj-mini-info"><div class="obj-mini-n">' + obj.name + '</div>' +
         '<div class="obj-mini-m">' + obj.area + ' · ' + WS.AED(obj.price) + ' · ' + obj.br + '</div>' +
         '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
-        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + '</div>' +
+        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + turnSeg + '</div>' +
         I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
     const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить</button>';
@@ -4469,6 +4566,9 @@
           funnel: fk, readiness: readiness, side: r.side || null,
           stage: steps[0], stageDays: 0, amount: g.objs.reduce((s, o) => s + (o.price || 0), 0), hot: false,
           createdAt: 'сегодня', updated: 'только что', tags: [],
+          // Дата конверсии запроса в сделку. Без неё «сколько идёт от лида до сделки» считать
+          // нечем: createdAt отвечает на «когда завели», а не на «когда согласовали условия».
+          convertedAt: WS.storeApi.clockLabel().date,
           goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source,
           objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
           requestId: r.id, lots: lots, objectId: lots[0],
@@ -5085,6 +5185,42 @@
      а так оно выполняется само, потому что читать нечего.
 
      Итог, который набрал человек, сразу подтверждён: подтверждать нечего, это первоисточник. */
+  /* ---- Итог при закрытии задачи (§3.2 решений) ----
+     Форма из двух полей: что вышло и следующий шаг. Закрыть БЕЗ комментария можно — обязательное
+     поле здесь прямой путь к тому, что агент перестанет закрывать задачи вовсе, и мы потеряем
+     и комментарий, и сам факт закрытия. Комментарий пишется в ленту как итог в состоянии
+     «подтверждён»: его написал человек, а не модель, и подтверждать нечего. */
+  function taskDoneForm(taskId) {
+    const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
+    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующее касание');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Закрыть можно и без комментария — тогда останется только факт выполнения. Что напишете здесь, ляжет в ленту как итог от вас.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Что вышло</span><input id="td_out" type="text" placeholder="Напр.: договорились о брони до пятницы"></label>' +
+      '<label class="fld"><span>Следующий шаг</span><input id="td_next" type="text" value="' + escAttr(next) + '"></label></div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="td_mk" checked> Поставить следующий шаг задачей</label>';
+    openModal('Выполнить · ' + escAttr(t.title), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveTaskDone" data-task="' + taskId + '">' + I('check') + 'Выполнить</button>');
+  }
+  function saveTaskDone(taskId) {
+    const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const out = g('td_out'), next = g('td_next');
+    const mk = !!(document.getElementById('td_mk') || {}).checked;
+    t.outcome = out || undefined;
+    WS.storeApi.taskAction(taskId, 'done');
+    const scope = t.dealId ? ['deal', t.dealId] : (t.requestId ? ['request', t.requestId] : (t.clientId ? ['contact', t.clientId] : null));
+    if (out && scope) {
+      const e = addEventEntry(scope[0], scope[1], { type: 'note', text: 'Итог: ' + out });
+      if (e) { e.role = 'outcome'; e.state = 'confirmed'; }
+    }
+    if (mk && next) {
+      WS.storeApi.addTask({ id: 'tk_next_' + taskId, title: next, clientId: t.clientId,
+        dealId: t.dealId, requestId: t.requestId, contractId: t.contractId, due: 'завтра', when: 'tomorrow', kind: 'manual' });
+    }
+    closeModal();
+    WS.storeApi.toast('Задача выполнена' + (out ? ' · итог записан' : ''), 'ok');
+  }
+
   function outcomesFor(scope, id) {
     return (D().outcomes || []).filter((x) => x.scope === scope && x.entityId === id);
   }
@@ -6640,6 +6776,35 @@
     return rows + doneBlock;
   }
   // Пульс разгружен: вместо полной очереди — только «Мой день» (сегодня/просрочено) + вход на экран «Задачи».
+  /* ---- Сделки без следующего шага (§3.3 решений) ----
+     Требование партнёра «сделок без запланированных событий быть не должно» превращается
+     не в предупреждение, а в РАЗБИРАЕМЫЙ СПИСОК: предупреждение без списка бесполезно —
+     агент видит, что что-то не так, и не знает, где именно. */
+  function dealHasNextStep(d) {
+    // Клиентская задача следующим шагом сделки не считается: «поздравить с днём рождения»
+    // сделку не двигает, и засчитывать её значило бы прятать настоящую дыру.
+    const task = (D().tasks || []).some((t) => t.dealId === d.id && t.status !== 'done' && t.when !== 'overdue');
+    if (task) return true;
+    return (D().events || []).some((e) => e.dealId === d.id && e.status !== 'canceled');
+  }
+  function dealsWithoutNextStep(agentId) {
+    return (D().deals || []).filter((d) => !dealClosed(d) && (!agentId || d.agent === agentId) && !dealHasNextStep(d));
+  }
+  function pulseNoNextStep() {
+    const mgr = S().role === 'manager';
+    const list = dealsWithoutNextStep(mgr ? null : (D().users[S().role] || {}).id);
+    if (!list.length) return '';                       // пустой список блок не рисует
+    const rows = list.map((d) => {
+      const c = D().clients.find((x) => x.id === d.clientId) || {};
+      const who = mgr && d.agent ? ' · ' + agentName(d.agent) : '';
+      return '<div class="rel-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+        '<div class="fi i-hot">' + I('warn') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
+        '<div class="m">' + (c.name || '—') + ' · ' + stageLabel(d.stage) + who + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('');
+    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Без следующего шага · ' + list.length + '</div></div>' +
+      '<div class="card" style="padding:4px 16px"><div class="rel-list">' + rows + '</div></div>';
+  }
   function pulseMyDay() {
     const all = D().tasks || [];
     const open = all.filter((t) => t.status !== 'done');
@@ -8083,18 +8248,38 @@
     const label = !total ? '—' : (got >= total ? 'получена' : (got > 0 ? 'получена частично' : ((c.entries || []).some((e) => e.k === 'invoiced' && e.state !== 'wait') ? 'счёт выставлен' : 'начислена')));
     return { total: total, got: got, label: label, tone: got >= total && total ? 'ok' : (got > 0 ? 'acc' : ''), payer: c.payer || 'по договору', vat: !!c.vat };
   }
+  /* Договор требует внимания, когда просрочена веха или платёж. Это не оттенок строки,
+     а группа списка: «требуют внимания» — то, ради чего раздел открывают. */
+  function contractOverdue(k) {
+    return (k.schedule || []).some((s) => s.state === 'overdue') ||
+      (k.milestones || []).some((m) => m.state === 'overdue');
+  }
+  function contractGroup(k) {
+    if (k.status === 'closed') return 'closed';
+    return (contractOverdue(k) || k.review) ? 'attention' : 'active';
+  }
   function contractRow(k) {
     const c = D().clients.find((x) => x.id === k.clientId) || {};
     const st = contractStep(k), money = commissionState(k);
     const now = st.cur.length ? st.cur.map((m) => m.label).join(' · ') : 'все вехи пройдены';
+    const obj = (D().objects || []).find((o) => o.id === k.objectId);
+    const dl = k.dealId ? D().deals.find((x) => x.id === k.dealId) : null;
+    // Строка списка называет всё, по чему договор ищут: клиент · объект · вид · ближайшая
+    // веха со сроком · сумма · ответственный. Прежде объекта, суммы и ответственного не было.
+    const meta = [obj ? obj.name.split(',')[0] : null, now + ' · веха ' + Math.min(st.done + 1, st.total) + ' из ' + st.total,
+      k.nextDue || null, k.amount ? WS.AED(k.amount) : null, dl && dl.agent ? agentName(dl.agent) : null].filter(Boolean).join(' · ');
+    const flag = k.review ? '<span class="badge warn">' + I('warn') + 'требует пересмотра</span>' : '';
     return '<div class="feed-row" data-contract="' + k.id + '" style="cursor:pointer">' +
       '<div class="fi i-acc">' + I(contractKind(k).icon) + '</div>' +
       '<div class="ft"><div class="t">' + contractKind(k).label + ' · ' + (c.name || '—') + '</div>' +
-      '<div class="m">' + now + ' · веха ' + Math.min(st.done + 1, st.total) + ' из ' + st.total +
-      (k.nextDue ? ' · ' + k.nextDue : '') + '</div></div>' +
+      '<div class="m">' + meta + '</div></div>' + flag +
       '<span class="badge ' + money.tone + '">' + I('money') + 'Комиссия · ' + money.label + '</span>' +
       I('arrowRight') + '</div>';
   }
+  // Задачи по договору. Ссылка на договор — четвёртый вид привязки задачи рядом с тремя
+  // существующими: сопровождение живёт месяцами, и дела по нему принадлежат договору,
+  // а не сделке, которая закрылась вознаграждением.
+  function tasksOfContract(id) { return (D().tasks || []).filter((t) => t.contractId === id); }
   /* ---- Рождение договора и завершение сделки (§2.5 решений) ----
      Это два разных момента, и их нельзя складывать в одну кнопку. Договор рождается
      на шаге «Подписание»; сделка закрывается тогда, когда получено вознаграждение.
@@ -8195,7 +8380,14 @@
     const active = list.filter((k) => k.status !== 'closed');
     const due = active.filter((k) => k.nextDue).length;
     const owed = active.reduce((sum, k) => { const m = commissionState(k); return sum + Math.max(0, m.total - m.got); }, 0);
-    const rows = list.map(contractRow).join('') ||
+    // Группировка по состоянию: сначала то, что горит, потом остальное.
+    const GROUPS = [['attention', 'Требуют внимания'], ['active', 'Действующие'], ['closed', 'Закрытые']];
+    const rows = GROUPS.map((g) => {
+      const part = list.filter((k) => contractGroup(k) === g[0]);
+      if (!part.length) return '';
+      return '<div class="section-label" style="margin-top:10px">' + g[1] + ' · ' + part.length + '</div>' +
+        part.map(contractRow).join('');
+    }).join('') ||
       '<div style="font-size:12px;color:var(--faint);padding:10px 0">договоров пока нет — они открываются после успешной сделки</div>';
     return heroBand('Сопровождение', 'Что идёт после подписания: платежи по графику, регистрация права, продления — и работа с самим клиентом, пока он клиент. Сделка закрывается вознаграждением, договор живёт дальше.', 'o_bayline') +
       '<div class="tiles" style="margin-top:20px">' +
@@ -8409,6 +8601,15 @@
   }
   function contractTabContent(k, tab) {
     if (tab === 'docs') return contractDocs(k);
+    /* Задачи по договору. Сопровождение живёт месяцами, и дела по нему принадлежат договору,
+       а не сделке: сделка закрылась вознаграждением и своих задач больше не порождает. */
+    if (tab === 'tasks') {
+      const list = tasksOfContract(k.id);
+      const add = '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>';
+      const rows = list.map(taskRow).join('') ||
+        '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по договору нет. Они появляются из поводов касания и вручную</div>';
+      return dxSec('checkCircle', 'Задачи по договору · ' + list.length, add, '<div class="feed">' + rows + '</div>');
+    }
     if (tab === 'money') return dxSec('money', 'Комиссия', '<span class="badge ' + commissionState(k).tone + '">' + commissionState(k).label + '</span>', contractMoney(k));
     if (tab === 'client') {
       return dxSec('users', 'Что видит клиент', '<span class="badge demo">' + I('lock') + 'предпросмотр</span>',
@@ -8445,7 +8646,7 @@
       hero: contractHero2(k),
       acts: entityActionBar(contractActions(k)),
       state: contractState(k),
-      tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
+      tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['tasks', 'Задачи · ' + tasksOfContract(id).filter((t) => t.status !== 'done').length], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
       render: (tab) => contractTabContent(k, tab),
       concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
     };
@@ -8545,11 +8746,16 @@
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
+    taskDoneForm, saveTaskDone,
     REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
     cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
     ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts,
     LOT_EXITS, lotState, lotIsOut, dealLiveLots, lotCommissionPct, lotsMismatch, lotExitForm, saveLotExit, undoLotBlock,
     contractFromDeal, ensureContract, finishDealForm, saveFinishDeal, contractsOfDeal,
+    contractGroup, contractOverdue, tasksOfContract,
+    turnOf, turnDerived, setTurn, reqOfferStatus,
+    dealHasNextStep, dealsWithoutNextStep, pulseNoNextStep,
+    dealTransferForm, saveTransfer, dealPartnerForm, savePartner,
     offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

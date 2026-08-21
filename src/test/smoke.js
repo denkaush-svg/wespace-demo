@@ -4889,6 +4889,168 @@ setTimeout(async () => {
     dd().outcomes = (dd().outcomes || []).filter((x) => x.id !== d2.id);
   }
 
+  // ---- блоки H/I: учёт, итог задачи, чей ход, нарушители, передача/партнёр ----
+  {
+    // Группы договоров: закрытый → 'closed'; просроченный/на проверке → 'attention'; остальные → 'active'.
+    const ks = dd().contracts || [];
+    const closed = ks.find((k) => k.status === 'closed');
+    const active = ks.find((k) => k.status !== 'closed' &&
+      !(k.milestones || []).some((m) => m.state === 'overdue') &&
+      !(k.schedule || []).some((s) => s.state === 'overdue') && !k.review);
+    const attn = ks.find((k) => k.status !== 'closed' &&
+      ((k.milestones || []).some((m) => m.state === 'overdue') ||
+       (k.schedule || []).some((s) => s.state === 'overdue') || k.review));
+    check('сопровождение · закрытый договор попадает в группу closed',
+      !closed || WS.ui.contractGroup(closed) === 'closed', closed && WS.ui.contractGroup(closed));
+    check('сопровождение · активный без просрочки попадает в группу active',
+      !active || WS.ui.contractGroup(active) === 'active', active && WS.ui.contractGroup(active));
+    check('сопровождение · просроченный или на проверке попадает в attention',
+      !attn || WS.ui.contractGroup(attn) === 'attention', attn && WS.ui.contractGroup(attn));
+    // На стенде должны быть хотя бы активные договоры — иначе раздел пустой.
+    check('сопровождение · на стенде есть хотя бы один активный договор', ks.length > 0, String(ks.length));
+
+    // Форма «Выполнить задачу» открывает модал с полями «Что вышло» и «Следующий шаг».
+    const tk = (dd().tasks || []).find((t) => t.status !== 'done');
+    if (tk) {
+      WS.ui.taskDoneForm(tk.id);
+      const modal = doc.getElementById('modal').innerHTML;
+      check('задача · форма выполнения содержит поле итога', modal.indexOf('td_out') >= 0, modal.slice(0, 80));
+      check('задача · форма выполнения содержит поле следующего шага', modal.indexOf('td_next') >= 0);
+      check('задача · форма выполнения предлагает поставить следующий шаг задачей',
+        modal.indexOf('td_mk') >= 0, modal.slice(0, 120));
+      WS.ui.closeModal();
+
+      // saveTaskDone: итог идёт в ленту как confirmed, следующий шаг создаёт задачу.
+      const tlBefore = ((dd().dealTimeline || {})[tk.dealId || ''] || []).length;
+      const tksBefore = (dd().tasks || []).length;
+      // Имитируем DOM-поля формы без реального modal: подставляем напрямую через addEventEntry.
+      const fake = { id: 'td_out', value: 'Итог: договорились о брони' };
+      doc.body.appendChild(Object.assign(doc.createElement('input'), fake));
+      const fakeNext = Object.assign(doc.createElement('input'), { id: 'td_next', value: 'Позвонить в среду' });
+      doc.body.appendChild(fakeNext);
+      const fakeCb = Object.assign(doc.createElement('input'), { id: 'td_mk', type: 'checkbox' });
+      fakeCb.checked = true;
+      doc.body.appendChild(fakeCb);
+      WS.ui.saveTaskDone(tk.id);
+      // Итог в ленте
+      const tlAfter = ((dd().dealTimeline || {})[tk.dealId || ''] || []).length;
+      const tksDone = (dd().tasks || []).find((x) => x.id === tk.id);
+      check('задача · выполненная получает статус done', !!tksDone && tksDone.status === 'done', tksDone && tksDone.status);
+      if (tk.dealId) {
+        check('задача · итог добавляется в ленту сделки', tlAfter > tlBefore, tlAfter + ' vs ' + tlBefore);
+        const outcome = ((dd().dealTimeline || {})[tk.dealId] || []).find((e) => e.role === 'outcome');
+        check('задача · итог помечен role=outcome и state=confirmed',
+          !!outcome && outcome.state === 'confirmed', outcome ? outcome.state : 'нет');
+      }
+      check('задача · следующий шаг создан задачей', (dd().tasks || []).length > tksBefore, (dd().tasks || []).length + ' vs ' + tksBefore);
+      // Убираем DOM-мусор.
+      [fake.id, 'td_next', 'td_mk'].forEach((id) => { const el = doc.getElementById(id); if (el) el.parentNode.removeChild(el); });
+    }
+
+    // «Чей ход»: при последней входящей записи от клиента — ход наш, иначе — клиента.
+    // turnOf возвращает null, когда объект выбран или отклонён — не актуально.
+    const rq = (dd().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'offered'));
+    if (rq) {
+      const off = (rq.offered || []).find((o) => o.state === 'offered');
+      const tl0 = (dd().requestTimeline || {})[rq.id] || [];
+      const turn = WS.ui.turnOf(rq, off);
+      check('чей ход · возвращает client или us', turn === 'client' || turn === 'us', String(turn));
+      // Добавляем входящую запись от клиента — ход должен стать «нашим».
+      const before2 = WS.ui.turnOf(rq, off);
+      (dd().requestTimeline || (dd().requestTimeline = {}))[rq.id] =
+        tl0.concat([{ id: 'e_test_in', by: 'Клиент', dir: 'in', ord: 999999, at: 'сейчас', text: 'Жду' }]);
+      const afterIn = WS.ui.turnOf(rq, off);
+      check('чей ход · входящее от клиента переключает на «нас»', afterIn === 'us', afterIn);
+      // Откатываем
+      dd().requestTimeline[rq.id] = tl0;
+    }
+    // turnOf на выбранном/отклонённом объекте возвращает null.
+    const rqSel = (dd().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'selected'));
+    if (rqSel) {
+      const offSel = (rqSel.offered || []).find((o) => o.state === 'selected');
+      check('чей ход · на выбранном объекте ход не показывается', WS.ui.turnOf(rqSel, offSel) === null, String(WS.ui.turnOf(rqSel, offSel)));
+    }
+
+    // Нарушители (сделки без следующего шага): функция возвращает список.
+    const viol = WS.ui.dealsWithoutNextStep();
+    check('нарушители · dealsWithoutNextStep возвращает массив', Array.isArray(viol), typeof viol);
+    // Все найденные нарушители действительно не имеют шага.
+    const falsePos = viol.filter((d) => WS.ui.dealHasNextStep(d));
+    check('нарушители · в списке только те, у кого нет шага', falsePos.length === 0,
+      falsePos.map((d) => d.id).join(', '));
+    // На стенде есть хотя бы одна сделка с задачей — иначе список нарушителей всегда включал бы всех.
+    const withStep = (dd().deals || []).filter((d) => WS.ui.dealHasNextStep(d));
+    check('нарушители · на стенде есть сделка с задачей', withStep.length > 0,
+      (dd().deals || []).map((d) => d.id).join(' '));
+
+    // Передача сделки: меняет ответственного, старый становится свидетелем, задачи переназначаются.
+    {
+      const td = (dd().deals || []).find((d) => d.stage !== 'won' && d.stage !== 'lost' && d.agent);
+      if (td) {
+        const TEAM = WS.ui.TEAM || [];
+        const other = TEAM.find((m) => m.id !== td.agent);
+        if (other) {
+          const fromAgent = td.agent;
+          const tasksBefore = (dd().tasks || []).filter((t) => t.dealId === td.id && t.status !== 'done').map((t) => t.id);
+          // Открываем форму
+          WS.ui.dealTransferForm(td.id);
+          const mHtml = doc.getElementById('modal').innerHTML;
+          check('передача · форма открывается с полем выбора агента', mHtml.indexOf('tr_to') >= 0, mHtml.slice(0, 80));
+          WS.ui.closeModal();
+          // Вставляем DOM-поля и сохраняем
+          const toEl = Object.assign(doc.createElement('select'), { id: 'tr_to' });
+          const opt = doc.createElement('option'); opt.value = other.id; toEl.appendChild(opt);
+          toEl.value = other.id;
+          doc.body.appendChild(toEl);
+          const whyEl = Object.assign(doc.createElement('input'), { id: 'tr_why', value: 'тест' });
+          doc.body.appendChild(whyEl);
+          WS.ui.saveTransfer(td.id);
+          const tdNow = (dd().deals || []).find((x) => x.id === td.id);
+          check('передача · ответственный сменился', tdNow && tdNow.agent === other.id, tdNow && tdNow.agent);
+          check('передача · прежний агент стал свидетелем', (tdNow.witness || []).indexOf(fromAgent) >= 0,
+            JSON.stringify(tdNow.witness));
+          // Открытые задачи переназначены
+          const tasksAfter = (dd().tasks || []).filter((t) => tasksBefore.indexOf(t.id) >= 0);
+          const wrongAgent = tasksAfter.filter((t) => t.status !== 'done' && t.assignee !== other.id);
+          check('передача · задачи переназначены новому ответственному', wrongAgent.length === 0,
+            wrongAgent.map((t) => t.id + ':' + t.assignee).join(', '));
+          // Убираем DOM-мусор и возвращаем данные
+          ['tr_to', 'tr_why'].forEach((id) => { const el = doc.getElementById(id); if (el) el.parentNode.removeChild(el); });
+          td.agent = fromAgent; td.witness = (tdNow.witness || []).filter((w) => w !== fromAgent);
+        }
+      }
+    }
+
+    // Привлечь партнёра: ответственный не меняется, partnerAgent устанавливается.
+    {
+      const pd = (dd().deals || []).find((d) => d.stage !== 'won' && d.stage !== 'lost' && d.agent);
+      if (pd) {
+        const TEAM = WS.ui.TEAM || [];
+        const partner = TEAM.find((m) => m.id !== pd.agent);
+        if (partner) {
+          const responsible = pd.agent;
+          WS.ui.dealPartnerForm(pd.id);
+          const mHtml2 = doc.getElementById('modal').innerHTML;
+          check('партнёр · форма открывается с полем выбора партнёра', mHtml2.indexOf('pa_who') >= 0, mHtml2.slice(0, 80));
+          WS.ui.closeModal();
+          const paWho = Object.assign(doc.createElement('select'), { id: 'pa_who' });
+          const pOpt = doc.createElement('option'); pOpt.value = partner.id; paWho.appendChild(pOpt);
+          paWho.value = partner.id;
+          doc.body.appendChild(paWho);
+          const paSplit = Object.assign(doc.createElement('input'), { id: 'pa_split', value: '70 / 30' });
+          doc.body.appendChild(paSplit);
+          WS.ui.savePartner(pd.id);
+          const pdNow = (dd().deals || []).find((x) => x.id === pd.id);
+          check('партнёр · ответственный не изменился', pdNow && pdNow.agent === responsible, pdNow && pdNow.agent);
+          check('партнёр · partnerAgent установлен', pdNow && pdNow.partnerAgent === partner.id, pdNow && pdNow.partnerAgent);
+          check('партнёр · split сохранён', pdNow && pdNow.split === '70 / 30', pdNow && pdNow.split);
+          ['pa_who', 'pa_split'].forEach((id) => { const el = doc.getElementById(id); if (el) el.parentNode.removeChild(el); });
+          delete pd.partnerAgent; delete pd.split;
+        }
+      }
+    }
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

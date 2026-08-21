@@ -335,7 +335,7 @@
     tasks: {
       safe: ['title', 'due', 'kind', 'assignee'],
       // Область задачи — структурное поле: от неё зависит, в какой карточке задача видна.
-      guarded: ['status', 'when', 'dealId', 'requestId'],
+      guarded: ['status', 'when', 'dealId', 'requestId', 'contractId'],
     },
     // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
     // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
@@ -414,7 +414,7 @@
   // from the data rather than from a sentence.
   const REFS = {
     clientId: 'clients', companyId: 'companies', objectId: 'objects',
-    dealId: 'deals', requestId: 'requests', assignee: 'users', agent: 'users',
+    dealId: 'deals', requestId: 'requests', contractId: 'contracts', assignee: 'users', agent: 'users',
   };
   /* `coming` holds what EARLIER operations in the same batch will create.
 
