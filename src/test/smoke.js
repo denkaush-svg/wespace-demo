@@ -4494,9 +4494,108 @@ setTimeout(async () => {
       at ? 'objectId=' + at.objectId : 'активности нет');
   }
   {
-    // Версия схемы: подъём 23 → 24 и есть то, что доставляет новые поля тем, кто уже открывал стенд.
+    // Версия схемы: подъём и есть то, что доставляет новые поля тем, кто уже открывал стенд.
     // Прежняя проверка требовала «не ниже 7» и пропустила бы откат подъёма.
-    check('схема · версия не ниже 24 (подъём волны 1 на месте)', WS.store.schema >= 24, 'схема: ' + WS.store.schema);
+    check('схема · версия не ниже 25 (подъём волны 3 на месте)', WS.store.schema >= 25, 'схема: ' + WS.store.schema);
+  }
+
+  // ---- Волна 3: отношения с клиентом --------------------------------------------------------
+  {
+    const keys = WS.ui.REL_STAGES.map((s) => s.k);
+    const outside = (dd().clients || []).filter((c) => keys.indexOf(WS.ui.relStageOf(c).k) < 0);
+    check('отношения · у каждого контакта стадия из словаря', outside.length === 0,
+      outside.map((c) => c.id).join(', '));
+    // Подпись не должна совпадать со стадией сделки: одно слово о двух разных вещах — это
+    // ровно тот дефект, который мы весь август чиним.
+    const SL = WS.fixtures.STAGE_LABELS || {};
+    const dealWords = Object.keys(SL).map((k) => SL[k]);
+    const clash = WS.ui.REL_STAGES.filter((s) => dealWords.indexOf(s.label) >= 0);
+    check('отношения · подпись стадии не повторяет стадию сделки', clash.length === 0,
+      clash.map((s) => s.label).join(', '));
+
+    const anna = dd().clients.find((c) => c.id === 'c_anna');
+    check('отношения · «был успех» виден у клиента с договором', WS.ui.clientHasWon('c_anna') === true);
+    const noWork = dd().clients.find((c) => !(dd().requests || []).some((r) => r.clientId === c.id) &&
+      !(dd().deals || []).some((x) => x.clientId === c.id) && !(dd().contracts || []).some((k) => k.clientId === c.id));
+    if (noWork) check('отношения · контакт без работы — «новый»', WS.ui.relStageOf(noWork).k === 'new',
+      noWork.id + ' → ' + WS.ui.relStageOf(noWork).k);
+
+    // Ручная правка побеждает вывод — и снимается, когда вывод изменился. Иначе пометка,
+    // поставленная в мае, будет утверждать «потерян» и через год после покупки.
+    const before = WS.ui.relStageDerived(anna);
+    WS.ui.setRelStage('c_anna', 'dormant');
+    check('отношения · ручная правка побеждает вывод', WS.ui.relStageOf(anna).k === 'dormant' && WS.ui.relStageOf(anna).manual === true,
+      'вышло ' + WS.ui.relStageOf(anna).k);
+    anna.relStageOver = before === 'lost' ? 'new' : 'lost';   // как будто вывод сместился
+    check('отношения · ручная правка снимается, когда вывод изменился', WS.ui.relStageOf(anna).k === before,
+      'вышло ' + WS.ui.relStageOf(anna).k + ', вывод ' + before);
+    WS.ui.setRelStage('c_anna', 'auto');
+    check('отношения · «авто» возвращает вывод', WS.ui.relStageOf(anna).manual === false && WS.ui.relStageOf(anna).k === before);
+  }
+
+  // ---- Волна 3: движок поводов касания ------------------------------------------------------
+  {
+    const all = [];
+    (dd().clients || []).forEach((c) => (WS.ui.cuesFor(c.id) || []).forEach((q) => all.push(q)));
+    check('поводы · движок вообще что-то находит', all.length > 0, 'поводов: ' + all.length);
+    check('поводы · у каждого есть основание', all.every((q) => q.why && String(q.why).trim()),
+      all.filter((q) => !q.why).map((q) => q.key).join(', '));
+    // Правило одного повода: на пару «контакт + причина» не больше одного предложенного.
+    const seen = {}; const dup = [];
+    all.forEach((q) => { const k = q.contactId + '~' + q.reason; if (seen[k]) dup.push(k); seen[k] = 1; });
+    check('поводы · на пару «контакт + причина» не больше одного', dup.length === 0, dup.join(', '));
+    // Идемпотентность: повторное чтение в тот же день не порождает второго повода.
+    const again = [];
+    (dd().clients || []).forEach((c) => (WS.ui.cuesFor(c.id) || []).forEach((q) => again.push(q)));
+    check('поводы · повторный пересчёт не порождает новых', again.length === all.length,
+      all.length + ' → ' + again.length);
+
+    const withCue = (dd().clients || []).find((c) => (WS.ui.cuesFor(c.id) || []).length);
+    if (withCue) {
+      const q0 = WS.ui.cuesFor(withCue.id)[0];
+      WS.ui.dismissCue(q0.key);
+      check('поводы · отклонённый повод не возвращается сразу',
+        !(WS.ui.cuesFor(withCue.id) || []).some((x) => x.key === q0.key), q0.key);
+      // Тишина конечна: она отсчитывается от дня отказа, а не навсегда.
+      dd().cueState[q0.key].at = -999;
+      check('поводы · после срока тишины повод возвращается',
+        (WS.ui.cuesFor(withCue.id) || []).some((x) => x.key === q0.key), q0.key);
+      const before = (dd().tasks || []).length;
+      WS.ui.acceptCue(q0.key);
+      const made = (dd().tasks || []).length === before + 1;
+      const t = (dd().tasks || []).find((x) => x.clientId === withCue.id && x.kind === 'touch');
+      check('поводы · принять повод — значит создать задачу', made && !!t, 'задач было ' + before + ', стало ' + (dd().tasks || []).length);
+      check('поводы · принятый повод уходит из очереди',
+        !(WS.ui.cuesFor(withCue.id) || []).some((x) => x.key === q0.key), q0.key);
+      if (t) { dd().tasks = (dd().tasks || []).filter((x) => x !== t); }
+      delete dd().cueState[q0.key];
+    }
+  }
+
+  // ---- Волна 3: лента отношений и портфель --------------------------------------------------
+  {
+    const anna = dd().clients.find((c) => c.id === 'c_anna');
+    const ahead = WS.ui.relationsAhead(anna), past = WS.ui.relationsPast(anna);
+    check('отношения · впереди есть и обязательство, и повод',
+      ahead.some((r) => r.kind === 'duty') && ahead.some((r) => r.kind === 'cue'),
+      'duty=' + ahead.filter((r) => r.kind === 'duty').length + ' cue=' + ahead.filter((r) => r.kind === 'cue').length);
+    const dated = ahead.filter((r) => r.ord != null).map((r) => r.ord);
+    check('отношения · «Впереди» по возрастанию даты', dated.every((v, i) => i === 0 || dated[i - 1] <= v), dated.join(','));
+    const datedPast = past.filter((r) => r.ord != null).map((r) => r.ord);
+    check('отношения · «Было» по убыванию даты', datedPast.every((v, i) => i === 0 || datedPast[i - 1] >= v), datedPast.join(','));
+
+    WS.ui.clientCard('c_anna');
+    WS.ui.setEntityTab('contact', 'c_anna', 'relations');
+    const html = doc.getElementById('app').innerHTML;
+    check('отношения · вкладка рисует ленту', html.indexOf('rel-list') >= 0);
+    check('отношения · вкладка рисует переключатель стадии', html.indexOf('data-relstage="c_anna:') >= 0);
+    // Портфель: все заявки, сделки и договоры человека одним списком.
+    const nReq = (dd().requests || []).filter((r) => r.clientId === 'c_anna').length;
+    const nDeal = (dd().deals || []).filter((d) => d.clientId === 'c_anna').length;
+    const nK = (dd().contracts || []).filter((k) => k.clientId === 'c_anna').length;
+    check('отношения · портфель считает заявки, сделки и договоры вместе',
+      html.indexOf('Портфель · ' + (nReq + nDeal + nK)) >= 0, 'ждали ' + (nReq + nDeal + nK));
+    check('отношения · портфель ведёт на договор', html.indexOf('data-contract="k_palm"') >= 0);
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));

@@ -2303,6 +2303,13 @@
     if (tab === 'profile') {
       return dxSec('sparkle', 'Портрет клиента', '', psychInner(c));
     }
+    // Отношения: стадия, портфель и одна лента, где рядом стоят «через 12 дней платёж
+    // по графику» и «через неделю день рождения».
+    if (tab === 'relations') {
+      return relStageBlock(c) +
+        '<div style="margin-top:14px">' + clientPortfolio(c) + '</div>' +
+        '<div style="margin-top:14px">' + relationsBlock(c) + '</div>';
+    }
     if (tab === 'kyc') {
       const k = kycOf(c);
       const kycInner = '<div class="prov">' +
@@ -2476,6 +2483,256 @@
       '<div class="of-list">' + rows + '</div>' +
       '<div class="of-foot">' + I('sparkle') + 'Отобрано по бюджету, районам и профилю решений; уже показанное исключено.</div>');
   }
+  // ---------------- ОТНОШЕНИЯ С КЛИЕНТОМ (волна 3) ----------------
+  /* Отношения — состояние контакта, а не сущность: у них нет ни своих часов, ни условия конца,
+     ни отдельного хозяина (клиент пожизненно закреплён за агентом). Поэтому стадия ВЫВОДИТСЯ
+     из фактов при каждом чтении и не хранится второй копией: сохранённое значение расходится
+     с данными ровно так же, как расходилась «ближайшая задача», угаданная по клиенту.
+     Хранится только ручная правка — вместе с тем выводом, поверх которого её поставили. */
+  /* Подпись `active` — «Активный», а НЕ «В работе», как записано в §1.1 решений: этими словами
+     уже называется стадия сделки, и одна фраза о двух разных вещах на одном экране — это то,
+     от чего мы весь август уходим. Ключ значения не меняется. */
+  const REL_STAGES = [
+    { k: 'new', label: 'Новый', tone: '' },
+    { k: 'active', label: 'Активный', tone: 'ok' },
+    { k: 'dormant', label: 'Спящий', tone: 'warn' },
+    { k: 'lost', label: 'Потерян', tone: 'stop' },
+  ];
+  const relLabel = (k) => (REL_STAGES.find((x) => x.k === k) || {}).label || k;
+  const relTone = (k) => (REL_STAGES.find((x) => x.k === k) || {}).tone || '';
+  // Пороги — рабочие числа, вынесенные в данные: их придётся калибровать на живых клиентах,
+  // и выдумывать точное значение оснований нет.
+  function settingOf(k, dflt) { const s = D().settings || {}; return s[k] == null ? dflt : s[k]; }
+  const REQ_OPEN = ['new', 'qual', 'offer', 'meet', 'talks'];
+  function requestsOfClient(id) { return (D().requests || []).filter((r) => r.clientId === id); }
+  function dealsOfClient(id) { return (D().deals || []).filter((d) => d.clientId === id); }
+  // Был ли хоть один успех. Не стадия, а факт биографии: пара «спящий + был успех» — это
+  // не потерянный лид, а клиент, о котором забыли, и она и есть цель удержания.
+  function clientHasWon(id) {
+    return dealsOfClient(id).some((d) => d.stage === 'won') || contractsOfClient(id).length > 0;
+  }
+  // «13 мая» → день года. Даты в стенде написаны словами, а не отметками времени.
+  function dayNumOf(s) {
+    const m = /(\d{1,2})\s+([а-яё]+)/i.exec(String(s || ''));
+    if (!m) return null;
+    const mi = RU_MONTHS.indexOf(m[2].toLowerCase());
+    if (mi < 0) return null;
+    return dayOfYear(parseInt(m[1], 10), mi + 1);
+  }
+  function todayNum() { const n = demoNow(); return dayOfYear(n.d, n.mo); }
+  // Сколько дней молчим — по всем лентам клиента разом.
+  function lastTouchDays(cid) {
+    const n = dayNumOf(lastTouchOf(cid));
+    if (n == null) return null;
+    const days = todayNum() - n;
+    return days >= 0 ? days : null;
+  }
+  function relStageDerived(c) {
+    const id = c.id;
+    const reqs = requestsOfClient(id);
+    const deals = dealsOfClient(id);
+    const liveContract = contractsOfClient(id).some((k) => k.status !== 'closed');
+    if (!reqs.length && !deals.length && !contractsOfClient(id).length) return 'new';
+    const openReq = reqs.some((r) => REQ_OPEN.indexOf(reqStage(r)) >= 0);
+    const liveDeal = deals.some((d) => d.stage !== 'won' && d.stage !== 'lost');
+    if (openReq || liveDeal || liveContract) return 'active';
+    // Открытой работы нет. Отказ без единого успеха — «потерян»; иначе решает тишина.
+    const refused = reqs.some((r) => reqStage(r) === 'lost') || deals.some((d) => d.stage === 'lost');
+    if (refused && !clientHasWon(id)) return 'lost';
+    // Работа закрыта, но разговор идёт — это ещё не «спящий»: порог и есть та граница,
+    // на которой контакт перестаёт быть живым.
+    const silent = lastTouchDays(id);
+    return (silent == null || silent >= settingOf('dormantDays', 90)) ? 'dormant' : 'active';
+  }
+  /* Ручное значение побеждает вывод — но не навсегда. Оно держится, пока вывод не изменился:
+     иначе пометка, поставленная в мае, будет утверждать «потерян» и через год после покупки. */
+  function relStageOf(c) {
+    const derived = relStageDerived(c);
+    const manual = (c.relStage && c.relStageOver === derived) ? c.relStage : null;
+    return { k: manual || derived, derived: derived, manual: !!manual };
+  }
+  function setRelStage(id, k) {
+    const c = D().clients.find((x) => x.id === id); if (!c) return;
+    if (!k || k === 'auto') { delete c.relStage; delete c.relStageOver; }
+    else { c.relStage = k; c.relStageOver = relStageDerived(c); }
+    WS.storeApi.touch();
+  }
+
+  /* ---- Движок поводов касания (§2.1 решений) ----
+     Повод ВЫВОДИТСЯ из данных, а хранится только решение агента по нему. Иначе пришлось бы
+     писать коллекцию во время отрисовки и следить, чтобы повторный запуск не порождал второй
+     повод той же причины — «правило одного повода» и идемпотентность здесь выполняются сами.
+     `why` обязателен: повод без основания не показывается. */
+  const CUE_REASONS = {
+    birthday: 'день рождения', deal_anniversary: 'годовщина сделки', handover: 'передача ключей',
+    lease_90d: 'до конца аренды 90 дней', silence: 'молчим', match_object: 'объект под профиль',
+    rent_index: 'сдвиг индекса аренды', new_launch: 'старт продаж в его районе',
+    payment_due: 'платёж по графику', milestone_near: 'веха договора близко',
+  };
+  const cueKey = (cid, reason) => cid + '~' + reason;
+  function cueDecision(cid, reason) { return (D().cueState || {})[cueKey(cid, reason)] || null; }
+  // Отклонённый повод той же причины не повторяется 30 дней — иначе к концу недели
+  // у клиента шесть одинаковых напоминаний.
+  function cueSuppressed(cid, reason) {
+    const st = cueDecision(cid, reason);
+    if (!st) return false;
+    if (st.state === 'accepted' || st.state === 'done') return true;
+    if (st.state !== 'dismissed') return false;
+    const at = st.at == null ? null : st.at;
+    return at == null || (todayNum() - at) < settingOf('cueSilenceDays', 30);
+  }
+  function cuesFor(cid) {
+    const c = D().clients.find((x) => x.id === cid);
+    if (!c) return [];
+    const out = [];
+    const add = (reason, title, why, dueAt, payload) => {
+      if (!why || cueSuppressed(cid, reason)) return;
+      out.push({ key: cueKey(cid, reason), contactId: cid, reason: reason, title: title, why: why,
+        dueAt: dueAt || '', payload: payload || {}, source: CUE_SOURCE[reason] || 'state' });
+    };
+    // Время
+    if (c.birthday) {
+      const n = dayNumOf(c.birthday), t = todayNum();
+      if (n != null && n - t >= 0 && n - t <= 14) add('birthday', 'Поздравить с днём рождения', c.birthday + ' — через ' + (n - t) + ' ' + plural(n - t, 'день', 'дня', 'дней'), c.birthday);
+    }
+    contractsOfClient(cid).forEach((k) => {
+      const sd = dayNumOf(k.signedAt), t = todayNum();
+      if (sd != null && Math.abs(t - sd) <= 30) {
+        add('deal_anniversary', 'Написать к годовщине покупки', 'договор подписан ' + k.signedAt, k.signedAt, { contractId: k.id });
+      }
+      const due = (k.schedule || []).find((s) => s.state === 'overdue') || (k.schedule || []).find((s) => s.state === 'due');
+      if (due) add('payment_due', 'Напомнить о платеже: ' + due.label, 'по графику договора — ' + due.due, due.due, { contractId: k.id });
+      const near = (k.milestones || []).find((m) => m.state === 'now' && !m.internalOnly);
+      if (near) add('milestone_near', near.label, 'веха договора ' + (k.number || '') + ' — ' + near.at, near.at, { contractId: k.id, milestoneKey: near.k });
+      const ren = k.kind === 'lease' && (k.milestones || []).find((m) => m.k === 'renewal');
+      if (ren) add('lease_90d', 'Начать разговор о продлении', 'аренда заканчивается: ' + ren.at, ren.at, { contractId: k.id });
+    });
+    // Состояние
+    const silent = lastTouchDays(cid);
+    if (silent != null && silent >= settingOf('silenceDays', 30) && relStageOf(c).k !== 'lost') {
+      add('silence', 'Возобновить разговор', 'молчим ' + silent + ' ' + plural(silent, 'день', 'дня', 'дней'), '');
+    }
+    // Событие: появился объект под профиль. Только то, чего он ещё не видел.
+    const seen = {};
+    requestsOfClient(cid).forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = 1; }));
+    const areas = c.areas || [];
+    const match = (D().objects || []).find((o) => !seen[o.id] && areas.indexOf(o.area) >= 0 &&
+      c.budget && o.price && o.price <= c.budget * 1.05);
+    if (match) add('match_object', 'Показать новый объект: ' + match.name, match.area + ' · ' + WS.AED(match.price) + ' — в его районах и в бюджете', '', { objectId: match.id });
+    return out;
+  }
+  const CUE_SOURCE = { birthday: 'time', deal_anniversary: 'time', lease_90d: 'time', silence: 'time',
+    match_object: 'event', rent_index: 'event', new_launch: 'event', handover: 'event',
+    payment_due: 'state', milestone_near: 'state' };
+  function cueDecide(key, state) {
+    const cs = D().cueState || (D().cueState = {});
+    cs[key] = { state: state, at: todayNum() };
+    WS.storeApi.touch();
+  }
+  // Принять повод — значит создать задачу. Повод сам по себе ничего не двигает.
+  function acceptCue(key) {
+    const cid = String(key).split('~')[0];
+    const cue = cuesFor(cid).find((x) => x.key === key);
+    if (!cue) return;
+    WS.storeApi.addTask({ id: 'tk_cue_' + key.replace(/[^a-z0-9_]/gi, '_'), title: cue.title,
+      clientId: cid, kind: 'touch', due: cue.dueAt || 'сегодня', when: 'today' });
+    cueDecide(key, 'accepted');
+    WS.storeApi.toast('Повод принят — задача поставлена', 'ok');
+  }
+  function dismissCue(key) { cueDecide(key, 'dismissed'); WS.storeApi.toast('Повод отклонён — не повторится ' + settingOf('cueSilenceDays', 30) + ' дней'); }
+
+  /* ---- Лента «Отношения» (§4.3 решений): один список, два источника, две секции.
+     Брокер видит одну работу и не переключает режимы. Система различает источники и считает
+     их отдельно: срок обязательства пропустить нельзя, повод касания — можно. */
+  function relationsAhead(c) {
+    const rows = [];
+    contractsOfClient(c.id).forEach((k) => {
+      const kind = contractKind(k).label;
+      (k.schedule || []).filter((s) => s.state === 'due' || s.state === 'overdue').forEach((s) => {
+        rows.push({ ord: dayNumOf(s.due), kind: 'duty', icon: 'money', tone: s.state === 'overdue' ? 'stop' : '',
+          title: s.label + ' · ' + WS.AED(s.amount), meta: kind + ' · срок ' + s.due, tag: 'обязательство', to: 'data-contract="' + k.id + '"' });
+      });
+      (k.milestones || []).filter((m) => m.state === 'now' && !m.internalOnly).forEach((m) => {
+        rows.push({ ord: dayNumOf(m.at), kind: 'duty', icon: 'flag', tone: '',
+          title: m.label, meta: kind + ' · ' + m.at, tag: 'обязательство', to: 'data-contract="' + k.id + '"' });
+      });
+    });
+    cuesFor(c.id).forEach((q) => {
+      rows.push({ ord: dayNumOf(q.dueAt), kind: 'cue', icon: 'sparkle', tone: 'acc',
+        title: q.title, meta: q.why, tag: 'повод', key: q.key });
+    });
+    // Без разобранной даты запись не новость: она уходит в конец, а не возглавляет список.
+    return rows.sort((a, b) => (a.ord == null ? 1e9 : a.ord) - (b.ord == null ? 1e9 : b.ord));
+  }
+  function relationsPast(c) {
+    const rows = [];
+    contractsOfClient(c.id).forEach((k) => {
+      const kind = contractKind(k).label;
+      (k.milestones || []).filter((m) => m.state === 'done').forEach((m) => {
+        rows.push({ ord: dayNumOf(m.at), icon: 'check', title: m.label, meta: kind + ' · ' + m.at, tag: 'веха пройдена', to: 'data-contract="' + k.id + '"' });
+      });
+      (k.schedule || []).filter((s) => s.state === 'paid').forEach((s) => {
+        rows.push({ ord: dayNumOf(s.due), icon: 'money', title: s.label + ' · ' + WS.AED(s.amount), meta: kind + ' · оплачен ' + s.due, tag: 'платёж', to: 'data-contract="' + k.id + '"' });
+      });
+    });
+    (D().tasks || []).filter((t) => t.clientId === c.id && t.status === 'done').forEach((t) => {
+      rows.push({ ord: dayNumOf(t.due), icon: 'checkCircle', title: t.title, meta: 'задача выполнена' + (t.outcome ? ' · ' + t.outcome : ''), tag: 'касание' });
+    });
+    return rows.sort((a, b) => (b.ord == null ? -1 : b.ord) - (a.ord == null ? -1 : a.ord));
+  }
+  function relRow(r) {
+    const acts = r.key
+      ? '<div class="rel-acts"><button class="btn xs primary" data-cueok="' + r.key + '">' + I('check') + 'Принять</button>' +
+        '<button class="tl-ic-btn" data-cueno="' + r.key + '" title="Отклонить повод">' + I('x') + '</button></div>'
+      : '';
+    const nav = r.to ? ' ' + r.to + ' style="cursor:pointer"' : '';
+    return '<div class="rel-row"' + nav + '><div class="fi i-' + (r.tone === 'stop' ? 'hot' : r.tone === 'acc' ? 'acc' : 'mut') + '">' + I(r.icon) + '</div>' +
+      '<div class="ft"><div class="t">' + escAttr(r.title) + '</div><div class="m">' + escAttr(r.meta) + '</div></div>' +
+      '<span class="rel-tag' + (r.tone === 'stop' ? ' stop' : '') + '">' + r.tag + '</span>' + acts + '</div>';
+  }
+  function relationsBlock(c) {
+    const ahead = relationsAhead(c), past = relationsPast(c);
+    const aheadHtml = ahead.length ? ahead.map(relRow).join('')
+      : '<div style="font-size:12px;color:var(--faint);padding:6px 0">впереди ничего не запланировано</div>';
+    const pastHtml = past.length ? past.slice(0, 12).map(relRow).join('')
+      : '<div style="font-size:12px;color:var(--faint);padding:6px 0">пока ничего не завершено</div>';
+    const why = '<div class="rel-why">' + I('sparkle') +
+      '<span>Обязательства приходят из договоров, поводы — из профиля и состояния. Срок обязательства пропустить нельзя, повод касания — можно.</span></div>';
+    return dxSec('clock', 'Впереди · ' + ahead.length, '', why + '<div class="rel-list">' + aheadHtml + '</div>') +
+      '<div style="margin-top:14px">' + dxSec('check', 'Было · ' + past.length, '', '<div class="rel-list">' + pastHtml + '</div>') + '</div>';
+  }
+  /* Портфель: все заявки, сделки и договоры человека одним списком. Общего прогресса
+     у них нет и рисовать его нечем — у каждой строки своя стадия и свой срок. */
+  function clientPortfolio(c) {
+    const rows = [];
+    requestsOfClient(c.id).forEach((r) => rows.push('<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer">' +
+      '<div class="fi i-mut">' + I('mail') + '</div><div class="ft"><div class="t">' + escAttr(r.title || 'Запрос') + '</div>' +
+      '<div class="m">запрос · ' + reqStageLabel(reqStage(r), r) + (r.budget ? ' · ' + WS.AED(r.budget) : '') + '</div></div>' + I('arrowRight') + '</div>'));
+    dealsOfClient(c.id).forEach((d) => rows.push('<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+      '<div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
+      '<div class="m">сделка · ' + stageLabel(d.stage) + (d.amount ? ' · ' + WS.AED(d.amount) : '') + '</div></div>' + I('arrowRight') + '</div>'));
+    contractsOfClient(c.id).forEach((k) => rows.push('<div class="feed-row" data-contract="' + k.id + '" style="cursor:pointer">' +
+      '<div class="fi i-ok">' + I(contractKind(k).icon) + '</div><div class="ft"><div class="t">' + contractKind(k).label + ' · ' + (k.number || '') + '</div>' +
+      '<div class="m">договор · ' + (k.status === 'closed' ? 'закрыт' : 'действует') + (k.nextDue ? ' · ' + k.nextDue : '') + '</div></div>' + I('arrowRight') + '</div>'));
+    const inner = rows.length ? rows.join('') : '<div style="font-size:12px;color:var(--faint);padding:6px 0">работы по этому контакту ещё не было</div>';
+    return dxSec('grid', 'Портфель · ' + rows.length, '', '<div class="feed">' + inner + '</div>');
+  }
+  // Стадия отношений с переключателем: вывод виден рядом с ручным значением, чтобы правка
+  // не выглядела единственной правдой.
+  function relStageBlock(c) {
+    const st = relStageOf(c);
+    const pills = REL_STAGES.map((s) => '<button class="rel-pill' + (s.k === st.k ? ' on' : '') + '" data-relstage="' + c.id + ':' + s.k + '">' + s.label + '</button>').join('') +
+      (st.manual ? '<button class="rel-pill" data-relstage="' + c.id + ':auto" title="Вернуть автоматический вывод">' + I('sparkle') + 'авто</button>' : '');
+    const note = st.manual
+      ? 'Поставлено вручную поверх вывода «' + relLabel(st.derived) + '». Держится, пока вывод не изменится.'
+      : 'Выведено из фактов: заявки, сделки, договоры и дата последнего касания.';
+    const won = clientHasWon(c.id)
+      ? '<span class="badge ok">' + I('star') + 'Был успех</span>'
+      : '<span class="badge">' + I('dot') + 'Успехов ещё не было</span>';
+    return dxSec('users', 'Отношения', won, '<div class="rel-pills">' + pills + '</div>' +
+      '<div class="rel-why">' + I('sparkle') + '<span>' + note + '</span></div>');
+  }
+
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
     // Разговор на карточке контакта принадлежит контакту. Прежде тред брался у первой
@@ -2495,7 +2752,7 @@
       hero: clientHero(c) + status,
       acts: entityActionBar(clientActions(c)),
       state: clientOps(c),
-      tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+      tabs: [['overview', 'Обзор'], ['relations', 'Отношения'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', clientTid, c.name, 'users'),
     };
@@ -3139,7 +3396,11 @@
     const cm = chanMeta(prefChannel(c));
     const since = clientSince(c);
     const nDeals = (D().deals || []).filter((x) => x.clientId === c.id).length;
+    const rel = relStageOf(c);
     const facts = [
+      // Стадия отношений стоит первой: она отвечает на «что у нас с этим человеком вообще»,
+      // а всё остальное в обложке — подробности.
+      ['users', relLabel(rel.k) + (clientHasWon(c.id) ? ' · был успех' : '')],
       since ? ['calendar', 'в работе с ' + since.at] : null,
       nDeals ? ['briefcase', nDeals + ' ' + plural(nDeals, 'сделка', 'сделки', 'сделок')] : null,
       [kycIcon, k.label],
@@ -7817,6 +8078,8 @@
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
+    REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
+    cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

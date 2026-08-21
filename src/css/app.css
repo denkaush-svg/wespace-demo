@@ -2083,3 +2083,33 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 }
 /* Последний блок карточки не должен навсегда оставаться под прилипшей строкой ввода. */
 .dcard { padding-bottom: 8px; }
+
+/* ---- Отношения с клиентом (волна 3) ----
+   Одна лента, два источника. Обязательство и повод отличаются не цветом строки, а меткой
+   справа: цвет уже занят срочностью, и два значения на одном канале читаются как одно. */
+.rel-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.rel-pill { font: inherit; font-size: 12px; font-weight: 600; color: var(--mut); cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  display: inline-flex; align-items: center; gap: 5px; }
+.rel-pill svg { width: 12px; height: 12px; }
+.rel-pill.on { color: var(--acc-ink, var(--ink)); background: var(--acc-soft, var(--surface-3)); border-color: var(--acc-line); }
+.rel-why { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; color: var(--faint);
+  margin-top: 8px; line-height: 1.45; }
+.rel-why svg { width: 13px; height: 13px; flex: 0 0 auto; margin-top: 1px; opacity: .7; }
+.rel-list { display: flex; flex-direction: column; }
+.rel-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.rel-row:last-child { border-bottom: 0; }
+.rel-row .ft { flex: 1 1 auto; min-width: 0; }
+.rel-row .ft .t { font-size: 13px; font-weight: 600; }
+.rel-row .ft .m { font-size: 11.5px; color: var(--mut); }
+.rel-tag { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+  color: var(--faint); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+.rel-tag.stop { color: var(--stop-ink, #b42318); border-color: var(--stop-line, var(--line)); }
+.rel-acts { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+@media (max-width: 599.98px) {
+  /* На телефоне метка и кнопки не помещаются в строку — они уходят под текст, а не режут его. */
+  .rel-row { flex-wrap: wrap; }
+  .rel-row .ft { flex: 1 1 100%; order: 2; }
+  .rel-tag { order: 3; }
+  .rel-acts { order: 4; margin-left: auto; }
+}

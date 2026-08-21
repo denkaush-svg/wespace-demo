@@ -54,6 +54,8 @@
   const clients = [
     {
       id: 'c_anna', name: 'Анна Петрова', tag: 'main', lang: 'RU', channel: 'whatsapp',
+      // Тип клиента — правило движка поводов («инвестор покупает раз в год»), а не ярлык.
+      ctype: 'investor', birthday: '18 мая',
       consent: true, goal: 'Инвестиционная квартира', budget: 2000000,
       areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
       note: 'Действующее согласие на сообщения. Активная история G1→G2→G3.',
@@ -65,13 +67,13 @@
         triggers: ['График первого платежа', 'Подтверждённая доходность'], bestTime: 'Будни, вечер',
         source: 'выведено из переписки G1–G3 (сигналы стиля)' },
     },
-    { id: 'c_lead15', name: 'Дмитрий Соколов', tag: 's15', lang: 'RU', channel: 'whatsapp', consent: true,
+    { id: 'c_lead15', name: 'Дмитрий Соколов', tag: 's15', lang: 'RU', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Инвестиционная квартира до 1,5 млн', budget: 1500000, areas: ['Дубай — район не указан'], horizon: 'не указан',
       note: 'Новый неквалифицированный лид. «Ищу инвестиционную квартиру в Дубае до 1,5 млн».', phone: '+971 52 •••• ••11 (DEMO)' },
-    { id: 'c_night', name: 'Sarah Mansour', tag: 's14', lang: 'EN', channel: 'whatsapp', consent: true,
+    { id: 'c_night', name: 'Sarah Mansour', tag: 's14', lang: 'EN', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Квартира 1BR под аренду', budget: 1300000, areas: ['JVC', 'Business Bay'], horizon: '2–4 месяца',
       note: 'Ночное входящее в 02:14. Ожидает агента.', phone: '+971 50 •••• ••77 (DEMO)' },
-    { id: 'c_overdue', name: 'Игорь Лебедев', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true,
+    { id: 'c_overdue', name: 'Игорь Лебедев', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Апартаменты под перепродажу', budget: 2400000, areas: ['Business Bay'], horizon: '1–2 месяца',
       note: 'Просроченное касание (обещали КП 12 мая).', phone: '+971 55 •••• ••02 (DEMO)',
       psych: { filled: true, decision: 'Статусный — важны престиж и «первым узнать»', values: ['Статус/престиж', 'Скорость'],
@@ -79,19 +81,19 @@
         channel: 'WhatsApp + звонок; любит голосовые', tone: 'Коротко, с эксклюзивом и срочностью',
         triggers: ['Эксклюзив/закрытый доступ', 'Ограниченность предложения'], bestTime: 'Утро',
         source: 'выведено из истории касаний (сигналы стиля)' } },
-    { id: 'c_noconsent', name: 'Марат Ибрагимов', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false,
+    { id: 'c_noconsent', name: 'Марат Ибрагимов', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false, ctype: 'enduser',
       goal: 'Квартира у воды', budget: 1800000, areas: ['Dubai Creek Harbour'], horizon: '3–6 месяцев',
       note: 'Нет действующего согласия — исключается из адресных отправок.', phone: '+971 54 •••• ••90 (DEMO)' },
-    { id: 'c_ambig', name: 'Елена Крылова', tag: 'g3', lang: 'RU', channel: 'whatsapp', consent: true,
+    { id: 'c_ambig', name: 'Елена Крылова', tag: 'g3', lang: 'RU', channel: 'whatsapp', consent: true, ctype: 'owner',
       goal: 'Офис под сдачу после отделки', budget: 2100000, areas: ['Business Bay'], horizon: '1–3 месяца',
       note: 'Две активные сделки — неоднозначная привязка заметки в G3.', phone: '+971 56 •••• ••45 (DEMO)' },
-    { id: 'c_docs', name: 'Виктор Орлов', tag: 's4', lang: 'RU', channel: 'email', consent: true,
+    { id: 'c_docs', name: 'Виктор Орлов', tag: 's4', lang: 'RU', channel: 'email', consent: true, ctype: 'enduser',
       goal: 'Квартира у воды под инвестицию', budget: 1950000, areas: ['Dubai Creek Harbour', 'DIFC'], horizon: '1–3 месяца',
       note: 'Документ в подготовке (S4).', phone: '+971 55 •••• ••28 (DEMO)' },
-    { id: 'c_partner', name: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true,
+    { id: 'c_partner', name: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Резиденция в Downtown для семьи', budget: 2600000, areas: ['Downtown'], horizon: '1–2 месяца',
       note: 'Требуется подключение клубного партнёра (S6).', phone: '+971 50 •••• ••63 (DEMO)' },
-    { id: 'c_owner', name: 'Сергей Орлов', tag: 'own', lang: 'RU', channel: 'email', consent: true,
+    { id: 'c_owner', name: 'Сергей Орлов', tag: 'own', lang: 'RU', channel: 'email', consent: true, ctype: 'owner',
       goal: 'Реализовать офисный блок в DIFC', budget: 12000000, areas: ['DIFC'], horizon: '3–6 месяцев',
       note: 'Управляющий портфелем Altura Capital. Собственник со стороны продажи — отдаёт блок на эксклюзив.',
       phone: '+971 4 401 9900 (DEMO)' },
@@ -1136,8 +1138,14 @@
     district('arjan', 'Arjan', 11600, 8.1, { yoy: 13, dom: 31, offplan: 55 }),
   ];
 
+  /* Пороги, которые придётся калибровать на живых клиентах. Держим их данными, а не числами
+     внутри кода: выдумывать точное значение оснований нет, а менять его придётся по первым же
+     наблюдениям. `dormantDays` — когда контакт перестаёт считаться живым; `silenceDays` — когда
+     тишина становится поводом написать; `cueSilenceDays` — сколько молчит отклонённый повод. */
+  const settings = { dormantDays: 90, silenceDays: 30, cueSilenceDays: 30 };
+
   WS.fixtures = {
-    version: 1,
+    version: 1, settings,
     DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
