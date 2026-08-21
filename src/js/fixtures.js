@@ -321,6 +321,11 @@
       funnel: 'sale', dealType: 'Продажа', objectType: 'ГАБ', readiness: 'готовый', saleKind: 'вторичка', side: 'покупатель', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
       consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_difc_a', 'o_difc_b'],
+      /* Регистрация идёт по каждому юниту отдельно — это подтверждено, а один договор на два
+         юнита нет. Поэтому состояние заводится картой на сделке, ключом по объекту: первый лот
+         уже зарегистрирован и идёт по своей ставке, второй записи не имеет и наследует ставку
+         объекта. Отсутствие записи — это «как у сделки», а не «пусто». */
+      lotState: { o_difc_a: { regNo: 'Title-2026-4471', regAt: '12 мая', commissionPct: 2.5 } },
       gates: { kyc: true, title: true, leases: true },
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     // Сорвавшаяся сделка. Без неё воронка показывала 100% успеха на одном наблюдении — число,

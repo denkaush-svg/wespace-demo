@@ -201,19 +201,21 @@
   // Комиссия сделки. У сделки с несколькими лотами ставка у каждого своя, а брать ставку первого
   // и умножать на всю сумму — это ровно та ошибка, которую брокер замечает первой. Считаем по лотам,
   // и только если их цены не складываются в сумму сделки, возвращаемся к ставке ведущего объекта.
+  /* Комиссия считается ПО ЛОТАМ и по их собственным ставкам — прежде ставка первого лота
+     применялась ко всей сумме сделки, то есть один объект назначал процент всем остальным.
+     Вышедший из сделки лот в расчёт не входит: это и есть пересчёт при частичном отказе.
+     Один лот или ни одного — база остаётся суммой сделки: она могла быть выторгована ниже
+     прайса, и подменять её ценой объекта значило бы считать не ту сделку. */
   function dealCommission(deal) {
     if (!deal) return 0;
     const objs = D().objects || [];
-    const byId = (id) => objs.find((o) => o.id === id);
-    const lots = (deal.lots && deal.lots.length) ? deal.lots.map(byId).filter(Boolean) : [];
-    if (lots.length > 1) {
-      const sum = lots.reduce((a, o) => a + (o.price || 0), 0);
-      if (sum && Math.abs(sum - (deal.amount || 0)) <= 1) {
-        return Math.round(lots.reduce((a, o) => a + (o.price || 0) * ((o.commissionPct || DEFAULT_COMM_PCT) / 100), 0));
-      }
+    const all = (deal.lots && deal.lots.length) ? deal.lots.map((id) => objs.find((o) => o.id === id)).filter(Boolean) : [];
+    if (all.length > 1) {
+      const live = all.filter((o) => !lotIsOut(lotState(deal, o.id)));
+      return Math.round(live.reduce((a, o) => a + (o.price || 0) * (lotCommissionPct(deal, o) / 100), 0));
     }
-    const obj = byId(deal.objectId);
-    const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
+    const obj = objs.find((o) => o.id === deal.objectId) || all[0];
+    const pct = obj ? lotCommissionPct(deal, obj) : DEFAULT_COMM_PCT;
     return Math.round((deal.amount || 0) * pct / 100);
   }
 
@@ -3663,10 +3665,113 @@
       '<div class="obj-mini-badges">' + avail + '<span class="badge">' + I('money') + 'комиссия ' + (o.commissionPct || '—') + '%</span></div></div>' +
       I('arrowRight') + '</div>';
   }
+  /* ---- Пер-лотовое состояние (§2.3 решений) ----
+     Массив лотов формы НЕ меняет: его читают около десяти мест кода и восемь проверок,
+     и смена формы без переходника дала бы не ошибку, а тихие пустые выборки. Состояние
+     заводится отдельной картой на сделке, ключом по объекту. Отсутствие записи — это
+     не «пусто», а «как у сделки»: лот без своей записи наследует шаг и ставку объекта. */
+  const LOT_EXITS = [
+    { k: 'returned', label: 'Вернуть в подбор', done: 'возвращён в подбор' },
+    { k: 'rejected', label: 'Отклонить', done: 'отклонён клиентом' },
+    { k: 'replaced', label: 'Заменить', done: 'заменён другим объектом' },
+    { k: 'blocked', label: 'Заблокировать', done: 'заблокирован' },
+  ];
+  const exitLabel = (k) => (LOT_EXITS.find((x) => x.k === k) || {}).done || k;
+  function lotState(d, objId) { return ((d && d.lotState) || {})[objId] || null; }
+  // Заблокированный лот остаётся в сделке — он помечен как непредлагаемый, а не выведен.
+  function lotIsOut(st) { return !!(st && st.exit && st.exit !== 'blocked'); }
+  // Лоты, которые считаются: вышедшие из сделки в сумму и комиссию не входят.
+  function dealLiveLots(d) { return dealLots(d).filter((o) => !lotIsOut(lotState(d, o.id))); }
+  function lotCommissionPct(d, o) {
+    const st = lotState(d, o.id);
+    return (st && st.commissionPct != null) ? st.commissionPct : (o.commissionPct || DEFAULT_COMM_PCT);
+  }
+  /* Сумма сделки, собранная из лотов, пересчитывается по оставшимся. Введённая вручную —
+     не трогается: молча переписать число, которое агент ввёл сам, хуже, чем показать,
+     что оно разошлось с суммой лотов. */
+  function lotsSum(d) { return dealLiveLots(d).reduce((a, o) => a + (o.price || 0), 0); }
+  /* Собрана ли сумма из лотов — решается ОДИН раз и запоминается. Если спрашивать заново
+     после каждого вывода, второй лот сравнивался бы уже с пересчитанной суммой, не сходился
+     бы с полным списком, и сделка молча переставала бы считаться собранной из лотов. */
+  function amountFromLots(d) {
+    if (d.amountFromLots != null) return !!d.amountFromLots;
+    const all = dealLots(d).reduce((a, o) => a + (o.price || 0), 0);
+    return all > 0 && Math.abs(all - (d.amount || 0)) <= 1;
+  }
+  function lotsMismatch(d) {
+    const s = lotsSum(d);
+    return (s && d.amount && Math.abs(s - d.amount) > 1) ? { lots: s, deal: d.amount } : null;
+  }
+  function lotExitForm(dealId, objId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const o = (D().objects || []).find((x) => x.id === objId) || {};
+    const opts = LOT_EXITS.map((e) => '<option value="' + e.k + '">' + e.label + '</option>').join('');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Исход обязателен: причины разные, и последствия у них разные — автоматически вернуть лот в подбор нельзя. Договор при этом не пересобирается: вехи и график согласованы с другой стороной.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Что происходит с лотом</span><select id="lot_exit">' + opts + '</select></label>' +
+      '<label class="fld"><span>Причина</span><input id="lot_why" type="text" placeholder="Напр.: клиент выбрал другой этаж"></label></div>';
+    openModal('Вывести из сделки · ' + (o.name || objId), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveLotExit" data-deal="' + dealId + '" data-obj="' + objId + '">' + I('check') + 'Применить</button>');
+  }
+  function saveLotExit(dealId, objId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const exit = g('lot_exit') || 'returned';
+    const why = g('lot_why');
+    const fromLots = amountFromLots(d);
+    if (d.amountFromLots == null) d.amountFromLots = fromLots;
+    if (!d.lotState) d.lotState = {};
+    d.lotState[objId] = Object.assign({}, d.lotState[objId], { exit: exit, exitReason: why, exitAt: WS.storeApi.clockLabel().date });
+    if (exit === 'returned' || exit === 'rejected') {
+      // Лот выходит из подборки заявки в то состояние, которое назвал агент: возврат — снова
+      // доступен и ход наш; отказ — помечен отказом клиента.
+      const r = d.requestId ? requestById(d.requestId) : null;
+      const off = r && (r.offered || []).find((x) => x.id === objId);
+      if (off) { off.state = exit === 'rejected' ? 'rejected' : 'offered'; if (exit === 'returned') off.turn = 'us'; }
+    }
+    if (fromLots) d.amount = lotsSum(d);
+    // Договор автоматически не пересобирается — он помечается как требующий пересмотра.
+    contractsOfDeal(d.id).forEach((k) => { k.review = 'вышел лот: ' + ((D().objects || []).find((x) => x.id === objId) || {}).name; });
+    addEventEntry('deal', d.id, { type: 'note', text: 'Лот ' + (((D().objects || []).find((x) => x.id === objId) || {}).name || objId) + ' — ' + exitLabel(exit) + (why ? ': ' + why : '') + '.' });
+    WS.storeApi.touch();
+    closeModal();
+    if (!dealLiveLots(d).length) WS.storeApi.toast('Лотов не осталось. Сделку можно закрыть проигрышем — или поставить другой лот', 'warn');
+    else WS.storeApi.toast('Лот ' + exitLabel(exit), 'ok');
+    dealCard(dealId);
+  }
+  function undoLotBlock(dealId, objId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d || !d.lotState || !d.lotState[objId]) return;
+    delete d.lotState[objId].exit; delete d.lotState[objId].exitReason; delete d.lotState[objId].exitAt;
+    WS.storeApi.touch(); WS.storeApi.toast('Блокировка снята', 'ok'); dealCard(dealId);
+  }
+  // Строка лота: своя регистрация, свой срок, своя ставка — и кнопка вывода из сделки.
+  function lotRow(d, o) {
+    const st = lotState(d, o.id) || {};
+    const out = lotIsOut(st);
+    const reg = st.regNo ? '<span class="badge ok">' + I('shield') + (st.regNo) + (st.regAt ? ' · ' + st.regAt : '') + '</span>' : '';
+    const pct = lotCommissionPct(d, o);
+    const own = (st.commissionPct != null) ? ' (своя)' : '';
+    const mark = out ? '<span class="badge stop">' + I('x') + exitLabel(st.exit) + '</span>'
+      : (st.exit === 'blocked' ? '<span class="badge warn">' + I('lock') + 'заблокирован' + (st.exitReason ? ' · ' + escAttr(st.exitReason) : '') + '</span>' : '');
+    const act = out ? ''
+      : (st.exit === 'blocked'
+        ? '<button class="btn xs" data-lotunblock="' + d.id + ':' + o.id + '">' + I('check') + 'Снять блокировку</button>'
+        : '<button class="btn xs" data-lotexit="' + d.id + ':' + o.id + '">' + I('x') + 'Вывести из сделки</button>');
+    return '<div class="lot-row' + (out ? ' lot-out' : '') + '">' + dealObjectMini(o) +
+      '<div class="lot-meta"><span class="badge">' + I('money') + 'комиссия ' + pct + '%' + own + ' · ' + WS.AED(Math.round((o.price || 0) * pct / 100)) + '</span>' +
+      reg + mark + act + '</div></div>';
+  }
   function dealLotsBlock(d) {
     const lots = dealLots(d);
-    const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
-    return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
+    const live = dealLiveLots(d);
+    const title = lots.length > 1 ? 'Объекты сделки · ' + live.length + ' ' + plural(live.length, 'лот', 'лота', 'лотов') : 'Объект сделки';
+    const mism = lotsMismatch(d);
+    // Расхождение показывается, а не исправляется молча: сумма могла быть введена рукой.
+    const warn = mism ? '<div class="rel-why">' + I('warn') + '<span>Сумма лотов ' + WS.AED(mism.lots) +
+      ' расходится с суммой сделки ' + WS.AED(mism.deal) + '. Введённое вручную число мы не переписываем.</span></div>' : '';
+    const body = lots.length ? warn + lots.map((o) => lotRow(d, o)).join('')
+      : '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>';
+    return dxSec('building', title, '', body);
   }
   // EOI / booking deposit — amount, paid?, date, refundable (Codex IA review: a P0 for a live deal).
   function depositLabel(d) {
@@ -3683,7 +3788,15 @@
       : d.funnel === 'rent' ? 'арендатор'
       : (d.funnel === 'manage' || d.funnel === 'exclusive') ? 'собственник'
       : d.funnel === 'cross' ? 'партнёр' : 'по договору';
-    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) + ' · платит ' + commPayer : '—';
+    // Итог остаётся в шапке, но раскрывается построчно: с несколькими лотами одного процента
+    // не существует, и «5%» в шапке было бы ставкой первого объекта, выданной за общую.
+    const live = dealLiveLots(d);
+    const commSum = dealCommission(d);
+    const comm = commSum
+      ? (live.length > 1
+        ? WS.AED(commSum) + ' · по лотам: ' + live.map((o) => lotCommissionPct(d, o) + '%').join(' · ') + ' · платит ' + commPayer
+        : (o0 ? lotCommissionPct(d, o0) + '% · ' + WS.AED(commSum) + ' · платит ' + commPayer : WS.AED(commSum)))
+      : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
     const dep = depositLabel(d);
     return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
@@ -8166,6 +8279,7 @@
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
     cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
-    ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts,
+    LOT_EXITS, lotState, lotIsOut, dealLiveLots, lotCommissionPct, lotsMismatch, lotExitForm, saveLotExit, undoLotBlock, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

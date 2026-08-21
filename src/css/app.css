@@ -2119,3 +2119,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .rel-tag { order: 3; }
   .rel-acts { order: 4; margin-left: auto; }
 }
+
+/* ---- Лоты сделки (волна 3) ----
+   Строка лота = объект + то, что принадлежит именно этому лоту в этой сделке: своя
+   регистрация, своя ставка, свой исход. Вышедший лот не удаляется со страницы: агенту
+   нужно видеть, что с ним стало, а не обнаружить, что он исчез. */
+.lot-row { border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; }
+.lot-row:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.lot-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.lot-out .obj-mini { opacity: .55; }
+.lot-out .obj-mini-n { text-decoration: line-through; }

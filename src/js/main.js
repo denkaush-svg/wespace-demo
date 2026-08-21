@@ -89,7 +89,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -211,6 +211,9 @@
     if (d.agsay != null) return WS.voice.sayReply(d.agsay);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
+    // Вывод лота из сделки: исход обязателен, поэтому сначала форма, а не немедленное действие.
+    if (d.lotexit) { const p = d.lotexit.split(':'); return WS.ui.lotExitForm(p[0], p[1]); }
+    if (d.lotunblock) { const p = d.lotunblock.split(':'); return WS.ui.undoLotBlock(p[0], p[1]); }
     // Отношения: стадия правится вручную, повод принимается задачей или отклоняется.
     if (d.relstage) { const p = d.relstage.split(':'); WS.ui.setRelStage(p[0], p[1]); return WS.ui.clientCard(p[0]); }
     if (d.cueok) { WS.ui.acceptCue(d.cueok); return WS.ui.clientCard(d.cueok.split('~')[0]); }
@@ -295,6 +298,7 @@
       case 'saveEventEntry': WS.ui.saveEventEntry(t.dataset.scope || 'deal', t.dataset.eid); break;
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
       case 'saveDealContact': WS.ui.saveDealContact(t.dataset.deal, +t.dataset.idx); break;
+      case 'saveLotExit': WS.ui.saveLotExit(t.dataset.deal, t.dataset.obj); break;
       case 'capToggle': { const id = t.dataset.deal; store.capture = store.capture || {}; const cur = (id in store.capture) ? store.capture[id] : true; store.capture[id] = !cur; api.toast('Запись разговоров: ' + (store.capture[id] ? 'включена' : 'выключена'), 'ok'); WS.ui.dealCard(id); break; }
       case 'cgFeatureStub': WS.ui.closeModal(); api.toast('Настройка сохранена (демо)', 'ok'); break;
       case 'cgAttach': store.cgMenu = store.cgMenu === 'attach' ? null : 'attach'; api.emit(); break;

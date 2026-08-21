@@ -516,7 +516,10 @@ setTimeout(async () => {
     const dPort = dealBy('d_rentbiz');
     if (dPort) {
       const lots = (dPort.lots || []).map((id) => dd().objects.find((o) => o.id === id)).filter(Boolean);
-      const byLot = Math.round(lots.reduce((a, o) => a + o.price * ((o.commissionPct || 2) / 100), 0));
+      // Ставка берётся ПО ЛОТУ: у лота может быть своя, отличная от ставки объекта, и именно
+      // она должна победить. Считать здесь по o.commissionPct значило бы проверять правило,
+      // которое волна 3 как раз заменила.
+      const byLot = Math.round(lots.reduce((a, o) => a + o.price * (WS.ui.lotCommissionPct(dPort, o) / 100), 0));
       check('commission · многолотовая сделка считается по лотам',
         WS.ui.dealCommission(dPort) === byLot, WS.ui.dealCommission(dPort) + ' vs ' + byLot);
     }
@@ -3587,7 +3590,7 @@ setTimeout(async () => {
       if (deal) {
         const objs = dd().objects || [];
         const lots = deal.lots.map((id) => objs.find((o) => o.id === id)).filter(Boolean);
-        const rates = lots.map((o) => (o.commissionPct || 2));
+        const rates = lots.map((o) => WS.ui.lotCommissionPct(deal, o));
         const got = WS.ui.dealCommission(deal);
         const first = Math.round((deal.amount || 0) * rates[0] / 100);
         const differ = rates.some((r) => r !== rates[0]);
@@ -4659,6 +4662,74 @@ setTimeout(async () => {
       check('участники · основной остался на стороне клиента',
         WS.ui.roleGroupOf(anna.contacts.find((x) => x.primary) || {}) === 'client');
     }
+  }
+
+  // ---- Волна 3: лоты — своё состояние, свой выход, свой пересчёт -----------------------------
+  {
+    const d = dd().deals.find((x) => x.id === 'd_rentbiz');
+    const objs = dd().objects || [];
+    const a = objs.find((o) => o.id === 'o_difc_a'), b = objs.find((o) => o.id === 'o_difc_b');
+    check('лоты · массив лотов формы не поменял', Array.isArray(d.lots) && typeof d.lots[0] === 'string',
+      JSON.stringify(d.lots));
+    // Отсутствие записи — это «как у сделки», а не «пусто».
+    check('лоты · лот без своей записи наследует ставку объекта',
+      WS.ui.lotState(d, 'o_difc_b') === null && WS.ui.lotCommissionPct(d, b) === b.commissionPct);
+    check('лоты · своя ставка лота побеждает ставку объекта',
+      WS.ui.lotCommissionPct(d, a) === 2.5 && a.commissionPct !== 2.5, 'вышло ' + WS.ui.lotCommissionPct(d, a));
+    check('лоты · своя регистрация лота видна', (WS.ui.lotState(d, 'o_difc_a') || {}).regNo === 'Title-2026-4471');
+
+    const commBefore = WS.ui.dealCommission(d);
+    const amountBefore = d.amount;
+    // Вывод лота: исход обязателен, поэтому сначала форма. Проверяем сам вывод.
+    WS.ui.lotExitForm('d_rentbiz', 'o_difc_b');
+    const sel = doc.getElementById('lot_exit'); if (sel) sel.value = 'rejected';
+    const why = doc.getElementById('lot_why'); if (why) why.value = 'клиент отказался от второго этажа';
+    WS.ui.saveLotExit('d_rentbiz', 'o_difc_b');
+    check('лоты · вышедший лот перестал считаться',
+      WS.ui.dealLiveLots(d).length === 1 && WS.ui.dealLiveLots(d)[0].id === 'o_difc_a',
+      'осталось ' + WS.ui.dealLiveLots(d).length);
+    const commAfter = WS.ui.dealCommission(d);
+    check('лоты · комиссия пересчитана по оставшимся',
+      commAfter === Math.round(a.price * 2.5 / 100) && commAfter !== commBefore,
+      commBefore + ' → ' + commAfter);
+    // Сумма этой сделки собрана из лотов (2 050 000 + 2 150 000 = 4 200 000) — значит
+    // пересчитывается по оставшимся.
+    check('лоты · сумма, собранная из лотов, пересчитана по оставшимся',
+      d.amount === a.price && amountBefore === 4200000, amountBefore + ' → ' + d.amount);
+    // Отказ доходит до подборки заявки: лот помечен отказом клиента, а не просто исчез.
+    const r = (dd().requests || []).find((x) => x.id === d.requestId);
+    const off = r && (r.offered || []).find((x) => x.id === 'o_difc_b');
+    check('лоты · отказ дошёл до подборки заявки', !!off && off.state === 'rejected', off ? off.state : 'строки нет');
+    // Договор не пересобирается сам: вехи и график согласованы с другой стороной.
+    const ks = (dd().contracts || []).filter((k) => k.dealId === d.id);
+    check('лоты · договор помечен как требующий пересмотра, а не пересчитан',
+      ks.every((k) => !!k.review), ks.map((k) => k.id + '=' + k.review).join('; ') || 'договоров нет');
+    // Сделка без лотов не удаляется — предлагается закрыть, но решение за агентом.
+    WS.ui.lotExitForm('d_rentbiz', 'o_difc_a');
+    const sel2 = doc.getElementById('lot_exit'); if (sel2) sel2.value = 'returned';
+    WS.ui.saveLotExit('d_rentbiz', 'o_difc_a');
+    check('лоты · сделка без лотов не удаляется', !!dd().deals.find((x) => x.id === 'd_rentbiz') && WS.ui.dealLiveLots(d).length === 0);
+    // Заблокированный лот ОСТАЁТСЯ в сделке: это юридический дефект, а не выход.
+    d.lotState = { o_difc_a: { exit: 'blocked', exitReason: 'обременение' }, o_difc_b: { exit: 'rejected' } };
+    check('лоты · заблокированный лот остаётся в сделке',
+      WS.ui.dealLiveLots(d).length === 1 && WS.ui.lotIsOut(WS.ui.lotState(d, 'o_difc_a')) === false,
+      'живых ' + WS.ui.dealLiveLots(d).length);
+    WS.ui.undoLotBlock('d_rentbiz', 'o_difc_a');
+    check('лоты · блокировка снимается тем же действием', !(WS.ui.lotState(d, 'o_difc_a') || {}).exit);
+    // Введённая рукой сумма — вторая ветка правила, и она не должна вести себя так же:
+    // молча переписать число, которое агент ввёл сам, хуже, чем показать, что оно разошлось.
+    d.lotState = {}; delete d.amountFromLots; d.amount = 3900000;
+    WS.ui.lotExitForm('d_rentbiz', 'o_difc_b');
+    const s3 = doc.getElementById('lot_exit'); if (s3) s3.value = 'returned';
+    WS.ui.saveLotExit('d_rentbiz', 'o_difc_b');
+    check('лоты · сумма, введённая вручную, не переписана молча', d.amount === 3900000, 'вышло ' + d.amount);
+    check('лоты · расхождение с суммой лотов показано, а не спрятано', !!WS.ui.lotsMismatch(d),
+      JSON.stringify(WS.ui.lotsMismatch(d)));
+
+    d.lotState = { o_difc_a: { regNo: 'Title-2026-4471', regAt: '12 мая', commissionPct: 2.5 } };
+    d.amount = 4200000; delete d.amountFromLots;
+    if (off) off.state = 'selected';
+    ks.forEach((k) => { delete k.review; });
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));
