@@ -120,6 +120,25 @@
     };
     return best(d.clients, 'contact') || best(d.companies, 'company') || null;
   }
+  /* Область задачи, поставленной Консьержем, берётся из треда, в котором его позвали:
+     «поставь задачу» внутри сделки принадлежит ЭТОЙ сделке, а не просто её клиенту.
+     Прежде ставилась только ссылка на контакт, и у клиента с тремя сделками задача оседала
+     без области — тот же дефект, что чинила первая волна, только с другого входа.
+     Тред — единственное, что об этом знает; разбор текста об этом не знает ничего. */
+  function threadScope() {
+    const id = String((WS.engine && WS.engine.activeThreadId && WS.engine.activeThreadId()) || '');
+    const d = WS.store.data || {};
+    const at = (pfx, coll) => (id.indexOf(pfx) === 0
+      ? (d[coll] || []).find((y) => y.id === id.slice(pfx.length))
+      : null);
+    const deal = at('deal:', 'deals');
+    if (deal) return { dealId: deal.id, clientId: deal.clientId };
+    const req = at('request:', 'requests');
+    if (req) return { requestId: req.id, clientId: req.clientId };
+    const c = at('contact:', 'clients');
+    if (c) return { clientId: c.id };
+    return null;
+  }
   function dealsOf(clientId) {
     return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
   }
@@ -415,7 +434,16 @@
       const w = (WHEN.find((x) => x[0].test(t)) || [null, ['сегодня', 'today']])[1];
       const title = text.replace(/^\s*(поставь|создай)\s+задач\w*[:\s]*/i, '').trim() || 'Задача от Консьержа';
       const task = { id: 'ag_task_' + (propSeq + 1) + '_' + WS.store.dataRevision, title: title, due: w[0], when: w[1], kind: 'manual', status: 'open' };
+      const sc = threadScope();
       if (ent && ent.kind === 'contact') task.clientId = ent.id;
+      else if (sc && sc.clientId) task.clientId = sc.clientId;
+      // Область ставится только когда клиент задачи и клиент треда совпадают: если в сделке
+      // Виктора попросили задачу «по Анне», названный человек главнее треда, а чужая сделка
+      // к нему не прицепляется — слой записи такую пару всё равно отклонит.
+      if (sc && task.clientId === sc.clientId) {
+        if (sc.dealId) task.dealId = sc.dealId;
+        if (sc.requestId) task.requestId = sc.requestId;
+      }
       return propose([{ op: 'addTask', task: task }],
         { subject: ent ? ent.id : null, title: 'Новая задача', lines: ['Задача: «' + title + '», срок — ' + w[0]] });
     }

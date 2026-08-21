@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:35</title>
+  <title>WESPACE · сборка 13:26</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:35';
+    window.WS_BUILD='13:26';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2146,6 +2146,93 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cg-rail-search { flex: none; margin: 8px; padding: 4px 4px 4px 12px; border-radius: var(--r); box-shadow: none; }  /* the rail is a flex COLUMN — .obj-search's flex:1 would stretch the field down the whole panel */
 .cg-rail-search input { font-size: 13px; padding: 8px 0; }
 .cg-rail-search .ico svg { width: 15px; height: 15px; }
+
+/* ============================================================================================
+   Карточка сделки: полоса сверху · слева справка и участники · справа работа · ввод снизу.
+   Порядок блоков — по частоте обращения, а не по важности «вообще».
+
+   Порог тот же, что у доски (900px), и написан здесь один раз рядом с ней: два порога,
+   разъехавшиеся на пиксель, дают полосу ширины, где колонки уже сложились, а левая ещё
+   висит неподвижной — и карточка выглядит сломанной ровно в этой полосе.
+   ============================================================================================ */
+.dcard { display: block; }
+.dcard-top { padding: 4px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.dcard-title .deal-title-text { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.25;
+  display: inline-block; min-width: 40%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; outline: none; }
+.dcard-title .deal-title-text:hover { background: var(--acc-soft); }
+.dcard-title .deal-title-text:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--acc); }
+.dcard-sub { font-size: 12.5px; color: var(--mut); margin: 4px 0 14px; }
+.dcard-pathrow { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
+.dx-path { display: flex; align-items: flex-start; flex: 1 1 460px; min-width: 0; overflow-x: auto; padding-bottom: 4px; }
+.dx-path .dx-step { flex: 1 0 auto; min-width: 74px; }
+.dx-path.long .dx-step { min-width: 62px; }
+.dx-path.long .dx-step .l { font-size: 10.5px; max-width: 84px; margin-top: 6px; }
+.dx-path.long .dx-step .d { width: 26px; height: 26px; font-size: 11.5px; }
+.dx-path.long .dx-step::before { top: 12px; }
+/* Пресейл — пройденный участок: он приглушён и не кликается, потому что стадия запроса
+   вычисляется из фактов, а не выставляется рукой. Кликабельный вид обещал бы обратное. */
+.dx-path .dx-step.pre { cursor: default; opacity: .62; }
+.dx-path .dx-step.pre .d { background: var(--mut); border-color: var(--mut); }
+.dx-path .dx-step.pre::before { background: var(--mut); }
+/* Граница «условия согласованы» — тот самый переход, из-за которого шёл весь спор.
+   Она рисуется явно: невидимая читается как «всё это одно и то же». */
+/* Граница держит собственную колонку, а не висит поверх соседних подписей: подпись шириной
+   в 60 пикселей на элементе шириной 26 налезала на «Переговоры» слева и на текущий шаг справа. */
+.dx-bound { flex: 0 0 auto; align-self: stretch; position: relative; width: 88px; }
+.dx-bound::before { content: ''; position: absolute; left: 43px; top: 2px; bottom: 18px; width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--acc) 0 4px, transparent 4px 8px); }
+.dx-bound-l { position: absolute; top: 38px; left: 50%; transform: translateX(-50%);
+  font-size: 9.5px; line-height: 1.15; text-align: center; color: var(--acc-ink); font-weight: 700;
+  width: 84px; text-transform: lowercase; }
+.dx-path-meta { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px;
+  font-size: 11.5px; color: var(--faint); padding-top: 4px; }
+
+.dcard-cols { display: block; }
+.dcard-aside { display: none; }
+.dcard-aside-m > summary { cursor: pointer; display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: var(--ink); padding: 11px 13px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface-2); margin-bottom: 14px; }
+.dcard-aside-m > summary svg { width: 15px; height: 15px; opacity: .7; }
+.dcard-aside-m[open] > summary { margin-bottom: 10px; }
+.dcard-aside-m-b { margin-bottom: 16px; }
+.dcard-params { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+  padding: 12px 0; margin: 12px 0; display: grid; gap: 9px; }
+/* Строка ввода — единственный вход в Консьержа с карточки. Отдельная кнопка была её же дублем. */
+.dcard-composer { position: sticky; bottom: 0; z-index: 3; padding: 10px 0 4px;
+  background: linear-gradient(to top, var(--bg) 72%, transparent); margin-top: 18px; }
+
+@media (min-width: 900px) {
+  .dcard-cols { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 22px; align-items: start; }
+  /* Неподвижная — это и есть обещание «не выходить из сделки»: справка, условия и участники
+     остаются на месте, пока прокручивается работа. */
+  .dcard-aside { display: block; position: sticky; top: 12px; max-height: calc(100vh - 32px);
+    overflow-y: auto; padding-right: 4px; }
+  .dcard-aside-m { display: none; }
+  .dcard-main { min-width: 0; }
+}
+
+/* Свёрнутый пресейл — только на узком экране. Пять пройденных шагов там занимают весь экран,
+   и агент при открытии карточки видит ровно то, что уже позади. Плашка говорит то же самое
+   одной строкой, а полный список остаётся в подсказке и в карточке запроса. */
+.dx-pre-sum { display: none; }
+@media (max-width: 899.98px) {
+  .dx-path .dx-step.pre { display: none; }
+  .dx-pre-sum { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; align-self: center;
+    font-size: 11px; font-weight: 600; color: var(--mut); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; margin-right: 4px; white-space: nowrap; }
+  .dx-pre-sum svg { width: 12px; height: 12px; opacity: .7; }
+  /* На телефоне подпись границы снимается: плашка «пресейл пройден» уже сказала то же самое,
+     а 54 пикселя текста поверх подписи текущего шага делают нечитаемыми обе. */
+  .dx-bound { width: 20px; }
+  .dx-bound::before { left: 9px; }
+  .dx-bound-l { display: none; }
+  /* Строка ввода на телефоне занимает одну строку, а не три: 96 пикселей из 844 — это блок
+     работы, который агент не увидит никогда. */
+  .dcard-composer { padding: 8px 0 2px; }
+  .dcard-composer .dx-cbar .ph { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+/* Последний блок карточки не должен навсегда оставаться под прилипшей строкой ввода. */
+.dcard { padding-bottom: 8px; }
 
 
 /* ============================================================
@@ -9429,6 +9516,48 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const lostChip = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
     return '<div class="dx-stepper' + (s.cols.length > 7 ? ' long' : '') + '">' + steps + '</div>' + lostChip;
   }
+  // ============================================================================================
+  // Сквозной путь сделки — то, ради чего затевалась перекладка карточки.
+  //
+  // Партнёр читает работу как одну линию от первого контакта до подписания и не понимает, почему
+  // она разорвана на два раздела. Мы читаем её как две сущности, потому что посреди жизни меняется
+  // кратность: до перехода запись связана с N объектами подборки, после — с одним договором.
+  //
+  // Оба правы, и это решается не спором, а рисунком: на экране одна линия, в данных две таблицы.
+  // Пресейл идёт ПРОЙДЕННЫМ участком — он неинтерактивен, потому что стадия запроса вычисляется
+  // из фактов, а не выставляется рукой; шаги договора кликабельны, как и были. Между ними —
+  // видимая граница «условия согласованы»: невидимая читалась бы как «всё это одно и то же».
+  // ============================================================================================
+  function dealThroughPath(d) {
+    const r = d.requestId ? requestById(d.requestId) : null;
+    const pre = r ? ['new', 'qual', 'offer', 'meet', 'talks'].map((k) => reqStageLabel(k, r)) : [];
+    const preHtml = pre.map((l) => '<span class="dx-step done pre" title="Участок до согласования условий — стадии запроса вычисляются из фактов и вручную не выставляются">' +
+      '<span class="d">' + I('check') + '</span><span class="l">' + l + '</span></span>').join('');
+    const s = funnelSteps(d);
+    const own = s.cols.map((c, i) => {
+      const cls = s.lost ? 'todo' : (i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo'));
+      const inner = (!s.lost && i < s.idx) ? I('check') : String(i + 1);
+      return '<button class="dx-step ' + cls + '" data-dealstage="' + d.id + '" data-stage="' + s.order[i] + '">' +
+        '<span class="d">' + inner + '</span><span class="l">' + c + '</span></button>';
+    }).join('');
+    // На узком экране пройденный участок сворачивается в одну плашку, а не прокручивается пятью
+    // шагами: иначе при открытии карточки видно только то, что уже позади, а текущий шаг —
+    // за краем экрана. Свёртка чисто оформительская (CSS), поэтому работает и без скриптов.
+    const preSum = pre.length ? '<span class="dx-pre-sum" title="' + escAttr(pre.join(' → ')) + '">' +
+      I('check') + 'пресейл пройден · ' + pre.length + '</span>' : '';
+    const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
+      '<span class="dx-bound-l">условия согласованы</span></span>' : '';
+    const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
+    return '<div class="dx-path' + (pre.length + s.cols.length > 7 ? ' long' : '') + '">' + preSum + preHtml + bound + own + '</div>' + lost;
+  }
+  // Справа от пути: когда запрос стал сделкой и сколько она стоит на текущем шаге.
+  function dealPathMeta(d) {
+    const ago = createdAgoLabel(d);
+    const conv = d.createdAt ? ('стала сделкой ' + d.createdAt + (ago ? ' · ' + ago : '')) : '';
+    const days = d.stageDays != null ? ('на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней')) : '';
+    const both = [conv, days].filter(Boolean);
+    return both.length ? '<div class="dx-path-meta">' + both.map((t) => '<span>' + t + '</span>').join('') + '</div>' : '';
+  }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
       '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
@@ -11672,12 +11801,75 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
+  // ---- Карточка сделки: полоса сверху · слева справка и участники · справа работа · ввод снизу ----
+  // Порядок блоков — по частоте обращения, а не по важности «вообще».
+  function dealTopBand(d) {
+    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.goal, d.amount ? WS.AED(d.amount) : null]
+      .filter(Boolean).join(' · ');
+    return '<div class="dcard-top">' +
+      '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
+      '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
+      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-pathrow">' + dealThroughPath(d) + dealPathMeta(d) + '</div></div>';
+  }
+  // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
+  // у объектов, потому что ставка принадлежит объекту, а не сделке.
+  function dealAside(d) {
+    const p = d.prov || {};
+    const params = '<div class="dcard-params">' +
+      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
+      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
+      dealField('Готовность', d.readiness, 'confirmed') +
+      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
+      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source') + '</div>';
+    const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
+    return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) + params +
+      dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
+  }
+  // Правая колонка — рабочая область: что дальше, объекты, что было.
+  function dealWork(d) {
+    return dealNextStepCard(d) + dealLotsBlock(d) + dealRecentCard(d);
+  }
+  // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
+  // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
+  function dealComposer(d) {
+    return '<div class="dcard-composer">' +
+      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
+      '<div class="w">W</div>' +
+      '<div class="ph">Записать заметку или поручить Консьержу — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
+      '<div class="send">' + I('arrowRight') + '</div></div></div>';
+  }
   function viewDealDetail(id) {
     const spec = dealSpec(id);
     if (!spec) return viewClients();
     const d = D().deals.find((x) => x.id === id);
     const crumb = (d && d.requestId) ? parentReqCrumb(requestById(d.requestId)) : '';
-    return crumb + entityPage(spec, 'clients', 'deals', 'Назад к сделкам');
+    // Узкий экран: левая колонка сворачивается в раскрываемую справку под названием, правая
+    // встаёт стопкой. Свернули в <details>, а не во вкладки: он раскрывается без скрипта,
+    // и ни один блок не пропадает — меняется только способ до него добраться.
+    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка, условия и участники</summary>' +
+      '<div class="dcard-aside-m-b">' + dealAside(d) + '</div></details>';
+    return crumb +
+      '<div class="obj-page-head">' + backBtn('clients', 'deals', 'Назад к сделкам') + '</div>' +
+      '<div class="dcard">' + dealTopBand(d) +
+      '<div class="dcard-cols">' +
+      '<aside class="dcard-aside">' + dealAside(d) + '</aside>' +
+      aside +
+      '<div class="dcard-main">' + entityActionBar(dealActions(d)) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
+      '</div>' + dealComposer(d) + '</div>';
+  }
+  // Вкладки карточки (параметры, контакты, задачи, документы, история) остаются как были —
+  // они и есть «вся глубина», к которой обращаются реже, чем к рабочей области выше.
+  function dealTabsBlock(spec) {
+    const tab = cardTab(spec.type, spec.id, spec.tabs);
+    WS._cardByType = WS._cardByType || {};
+    WS._cardByType[spec.type] = spec;
+    WS._card = spec;
+    const tabBar = '<div class="dx-tabs">' + spec.tabs.map((t) =>
+      '<button class="dx-tab' + (t[0] === tab ? ' on' : '') + '" data-etab="' + spec.type + '~' + spec.id + '~' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
+    return tabBar + '<div class="dx-tabbody" id="dxTabBody">' + spec.render(tab) + '</div>';
   }
   function viewClientDetail(id) {
     const spec = clientSpec(id);
@@ -14343,6 +14535,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     };
     return best(d.clients, 'contact') || best(d.companies, 'company') || null;
   }
+  /* Область задачи, поставленной Консьержем, берётся из треда, в котором его позвали:
+     «поставь задачу» внутри сделки принадлежит ЭТОЙ сделке, а не просто её клиенту.
+     Прежде ставилась только ссылка на контакт, и у клиента с тремя сделками задача оседала
+     без области — тот же дефект, что чинила первая волна, только с другого входа.
+     Тред — единственное, что об этом знает; разбор текста об этом не знает ничего. */
+  function threadScope() {
+    const id = String((WS.engine && WS.engine.activeThreadId && WS.engine.activeThreadId()) || '');
+    const d = WS.store.data || {};
+    const at = (pfx, coll) => (id.indexOf(pfx) === 0
+      ? (d[coll] || []).find((y) => y.id === id.slice(pfx.length))
+      : null);
+    const deal = at('deal:', 'deals');
+    if (deal) return { dealId: deal.id, clientId: deal.clientId };
+    const req = at('request:', 'requests');
+    if (req) return { requestId: req.id, clientId: req.clientId };
+    const c = at('contact:', 'clients');
+    if (c) return { clientId: c.id };
+    return null;
+  }
   function dealsOf(clientId) {
     return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
   }
@@ -14638,7 +14849,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const w = (WHEN.find((x) => x[0].test(t)) || [null, ['сегодня', 'today']])[1];
       const title = text.replace(/^\s*(поставь|создай)\s+задач\w*[:\s]*/i, '').trim() || 'Задача от Консьержа';
       const task = { id: 'ag_task_' + (propSeq + 1) + '_' + WS.store.dataRevision, title: title, due: w[0], when: w[1], kind: 'manual', status: 'open' };
+      const sc = threadScope();
       if (ent && ent.kind === 'contact') task.clientId = ent.id;
+      else if (sc && sc.clientId) task.clientId = sc.clientId;
+      // Область ставится только когда клиент задачи и клиент треда совпадают: если в сделке
+      // Виктора попросили задачу «по Анне», названный человек главнее треда, а чужая сделка
+      // к нему не прицепляется — слой записи такую пару всё равно отклонит.
+      if (sc && task.clientId === sc.clientId) {
+        if (sc.dealId) task.dealId = sc.dealId;
+        if (sc.requestId) task.requestId = sc.requestId;
+      }
       return propose([{ op: 'addTask', task: task }],
         { subject: ent ? ent.id : null, title: 'Новая задача', lines: ['Задача: «' + title + '», срок — ' + w[0]] });
     }

@@ -2926,6 +2926,48 @@
     const lostChip = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
     return '<div class="dx-stepper' + (s.cols.length > 7 ? ' long' : '') + '">' + steps + '</div>' + lostChip;
   }
+  // ============================================================================================
+  // Сквозной путь сделки — то, ради чего затевалась перекладка карточки.
+  //
+  // Партнёр читает работу как одну линию от первого контакта до подписания и не понимает, почему
+  // она разорвана на два раздела. Мы читаем её как две сущности, потому что посреди жизни меняется
+  // кратность: до перехода запись связана с N объектами подборки, после — с одним договором.
+  //
+  // Оба правы, и это решается не спором, а рисунком: на экране одна линия, в данных две таблицы.
+  // Пресейл идёт ПРОЙДЕННЫМ участком — он неинтерактивен, потому что стадия запроса вычисляется
+  // из фактов, а не выставляется рукой; шаги договора кликабельны, как и были. Между ними —
+  // видимая граница «условия согласованы»: невидимая читалась бы как «всё это одно и то же».
+  // ============================================================================================
+  function dealThroughPath(d) {
+    const r = d.requestId ? requestById(d.requestId) : null;
+    const pre = r ? ['new', 'qual', 'offer', 'meet', 'talks'].map((k) => reqStageLabel(k, r)) : [];
+    const preHtml = pre.map((l) => '<span class="dx-step done pre" title="Участок до согласования условий — стадии запроса вычисляются из фактов и вручную не выставляются">' +
+      '<span class="d">' + I('check') + '</span><span class="l">' + l + '</span></span>').join('');
+    const s = funnelSteps(d);
+    const own = s.cols.map((c, i) => {
+      const cls = s.lost ? 'todo' : (i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo'));
+      const inner = (!s.lost && i < s.idx) ? I('check') : String(i + 1);
+      return '<button class="dx-step ' + cls + '" data-dealstage="' + d.id + '" data-stage="' + s.order[i] + '">' +
+        '<span class="d">' + inner + '</span><span class="l">' + c + '</span></button>';
+    }).join('');
+    // На узком экране пройденный участок сворачивается в одну плашку, а не прокручивается пятью
+    // шагами: иначе при открытии карточки видно только то, что уже позади, а текущий шаг —
+    // за краем экрана. Свёртка чисто оформительская (CSS), поэтому работает и без скриптов.
+    const preSum = pre.length ? '<span class="dx-pre-sum" title="' + escAttr(pre.join(' → ')) + '">' +
+      I('check') + 'пресейл пройден · ' + pre.length + '</span>' : '';
+    const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
+      '<span class="dx-bound-l">условия согласованы</span></span>' : '';
+    const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
+    return '<div class="dx-path' + (pre.length + s.cols.length > 7 ? ' long' : '') + '">' + preSum + preHtml + bound + own + '</div>' + lost;
+  }
+  // Справа от пути: когда запрос стал сделкой и сколько она стоит на текущем шаге.
+  function dealPathMeta(d) {
+    const ago = createdAgoLabel(d);
+    const conv = d.createdAt ? ('стала сделкой ' + d.createdAt + (ago ? ' · ' + ago : '')) : '';
+    const days = d.stageDays != null ? ('на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней')) : '';
+    const both = [conv, days].filter(Boolean);
+    return both.length ? '<div class="dx-path-meta">' + both.map((t) => '<span>' + t + '</span>').join('') + '</div>' : '';
+  }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
       '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
@@ -5169,12 +5211,75 @@
   }
 
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
+  // ---- Карточка сделки: полоса сверху · слева справка и участники · справа работа · ввод снизу ----
+  // Порядок блоков — по частоте обращения, а не по важности «вообще».
+  function dealTopBand(d) {
+    const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.goal, d.amount ? WS.AED(d.amount) : null]
+      .filter(Boolean).join(' · ');
+    return '<div class="dcard-top">' +
+      '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
+      '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
+      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-pathrow">' + dealThroughPath(d) + dealPathMeta(d) + '</div></div>';
+  }
+  // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
+  // у объектов, потому что ставка принадлежит объекту, а не сделке.
+  function dealAside(d) {
+    const p = d.prov || {};
+    const params = '<div class="dcard-params">' +
+      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
+      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
+      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
+      dealField('Готовность', d.readiness, 'confirmed') +
+      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
+      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source') + '</div>';
+    const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
+    return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) + params +
+      dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
+  }
+  // Правая колонка — рабочая область: что дальше, объекты, что было.
+  function dealWork(d) {
+    return dealNextStepCard(d) + dealLotsBlock(d) + dealRecentCard(d);
+  }
+  // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
+  // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
+  function dealComposer(d) {
+    return '<div class="dcard-composer">' +
+      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
+      '<div class="w">W</div>' +
+      '<div class="ph">Записать заметку или поручить Консьержу — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
+      '<div class="send">' + I('arrowRight') + '</div></div></div>';
+  }
   function viewDealDetail(id) {
     const spec = dealSpec(id);
     if (!spec) return viewClients();
     const d = D().deals.find((x) => x.id === id);
     const crumb = (d && d.requestId) ? parentReqCrumb(requestById(d.requestId)) : '';
-    return crumb + entityPage(spec, 'clients', 'deals', 'Назад к сделкам');
+    // Узкий экран: левая колонка сворачивается в раскрываемую справку под названием, правая
+    // встаёт стопкой. Свернули в <details>, а не во вкладки: он раскрывается без скрипта,
+    // и ни один блок не пропадает — меняется только способ до него добраться.
+    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка, условия и участники</summary>' +
+      '<div class="dcard-aside-m-b">' + dealAside(d) + '</div></details>';
+    return crumb +
+      '<div class="obj-page-head">' + backBtn('clients', 'deals', 'Назад к сделкам') + '</div>' +
+      '<div class="dcard">' + dealTopBand(d) +
+      '<div class="dcard-cols">' +
+      '<aside class="dcard-aside">' + dealAside(d) + '</aside>' +
+      aside +
+      '<div class="dcard-main">' + entityActionBar(dealActions(d)) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
+      '</div>' + dealComposer(d) + '</div>';
+  }
+  // Вкладки карточки (параметры, контакты, задачи, документы, история) остаются как были —
+  // они и есть «вся глубина», к которой обращаются реже, чем к рабочей области выше.
+  function dealTabsBlock(spec) {
+    const tab = cardTab(spec.type, spec.id, spec.tabs);
+    WS._cardByType = WS._cardByType || {};
+    WS._cardByType[spec.type] = spec;
+    WS._card = spec;
+    const tabBar = '<div class="dx-tabs">' + spec.tabs.map((t) =>
+      '<button class="dx-tab' + (t[0] === tab ? ' on' : '') + '" data-etab="' + spec.type + '~' + spec.id + '~' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
+    return tabBar + '<div class="dx-tabbody" id="dxTabBody">' + spec.render(tab) + '</div>';
   }
   function viewClientDetail(id) {
     const spec = clientSpec(id);

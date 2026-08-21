@@ -1311,15 +1311,28 @@ setTimeout(async () => {
         WS.ui.bandOutliers().map((o) => o.kind + ' ' + o.id + ' → ' + o.stage).join(', '));
     }
 
-    // И лента на карточке рисует ровно шаги договора этой сделки — ни одним больше.
-    const off = [];
+    // Путь на карточке стал сквозным: слева пройденный пресейл, справа шаги договора.
+    // Прежняя проверка считала ВСЕ шаги ленты и после перекладки ловила бы пресейл как лишний —
+    // считаем собственные шаги сделки (у них есть data-dealstage), пресейл проверяется отдельно ниже.
+    const off = [], nopre = [];
     (dd().deals || []).forEach((d) => {
       const want = ((WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || []).filter((k) => k !== 'lost');
       WS.ui.dealCard(d.id);
-      const n = doc.querySelectorAll('#app .view .dx-stepper .dx-step').length;
+      const n = doc.querySelectorAll('#app .view .dx-path .dx-step[data-dealstage]').length;
       if (n !== want.length) off.push(d.id + ': ' + n + ' против ' + want.length);
+      // Пресейл рисуется только у сделки, выросшей из запроса, и всегда неинтерактивен:
+      // стадия запроса вычисляется из фактов, руками её не выставляют.
+      const pre = doc.querySelectorAll('#app .view .dx-path .dx-step.pre');
+      if (d.requestId && !pre.length) nopre.push(d.id + ': пресейла нет');
+      if (!d.requestId && pre.length) nopre.push(d.id + ': пресейл без запроса');
+      [].slice.call(pre).forEach((el) => { if (el.tagName === 'BUTTON' || el.hasAttribute('data-dealstage')) nopre.push(d.id + ': пресейл кликабелен'); });
     });
-    check('сделка · лента рисует шаги своего договора', off.length === 0, off.join(' | '));
+    check('сделка · путь рисует ровно шаги своего договора', off.length === 0, off.join(' | '));
+    check('сделка · и пресейл впереди — пройденным неинтерактивным участком', nopre.length === 0, nopre.slice(0, 4).join(' | '));
+    WS.ui.dealCard('d_anna');
+    check('сделка · граница «условия согласованы» нарисована между пресейлом и договором',
+      doc.querySelectorAll('#app .view .dx-path .dx-bound').length === 1,
+      'границ: ' + doc.querySelectorAll('#app .view .dx-path .dx-bound').length);
 
     // Оффплан регистрируется в Oqood, вторичка — Title Deed, аренда — Ejari: шаг один, реестр разный.
     WS.ui.dealCard('d_anna');
@@ -4183,6 +4196,81 @@ setTimeout(async () => {
     const navHtml = doc.body.innerHTML;
     check('имена · в меню агента нет пункта «Заявки»', navHtml.indexOf('>Заявки<') < 0);
     check('имена · и нет пункта «Договоры»', navHtml.indexOf('>Договоры<') < 0);
+  }
+
+  // ---- Волна 2: Консьерж наследует область из треда ----------------------------------------
+  {
+    // «Поставь задачу» внутри сделки принадлежит ЭТОЙ сделке, а не просто её клиенту:
+    // прежде ставилась только ссылка на контакт, и у клиента с тремя сделками задача теряла область.
+    const taskOf = (r) => (r && r.kind === 'proposal' && r.ops && r.ops[0] && r.ops[0].task) || null;
+    WS.engine.openThread('deal:d_viktor', 'Виктор', 'briefcase');
+    const inDeal = taskOf(WS.agent.ask('поставь задачу собрать документы на завтра'));
+    check('консьерж · задача из треда сделки получает эту сделку',
+      !!inDeal && inDeal.dealId === 'd_viktor' && inDeal.clientId === 'c_docs',
+      inDeal ? 'dealId=' + inDeal.dealId + ' clientId=' + inDeal.clientId : 'предложения нет');
+    WS.engine.openThread('request:r_igor', 'Игорь', 'mail');
+    const inReq = taskOf(WS.agent.ask('поставь задачу перезвонить завтра'));
+    check('консьерж · задача из треда запроса получает этот запрос',
+      !!inReq && inReq.requestId === 'r_igor' && !inReq.dealId,
+      inReq ? 'requestId=' + inReq.requestId + ' dealId=' + inReq.dealId : 'предложения нет');
+    // Названный человек главнее треда: чужая сделка к нему не прицепляется.
+    WS.engine.openThread('deal:d_viktor', 'Виктор', 'briefcase');
+    const named = taskOf(WS.agent.ask('поставь задачу позвонить Анне Петровой завтра'));
+    check('консьерж · названный клиент главнее треда, и чужая сделка не прицепляется',
+      !!named && named.clientId === 'c_anna' && !named.dealId,
+      named ? 'clientId=' + named.clientId + ' dealId=' + named.dealId : 'предложения нет');
+    // Вне карточки области нет — и это верно: задача принадлежит человеку, а не выдуманной сделке.
+    WS.engine.openThread('general', 'Консьерж', 'sparkle');
+    const plain = taskOf(WS.agent.ask('поставь задачу позвонить Анне Петровой завтра'));
+    check('консьерж · вне карточки задача остаётся клиентской',
+      !!plain && !plain.dealId && !plain.requestId, plain ? JSON.stringify(plain) : 'предложения нет');
+  }
+
+  // ---- Волна 2: карточка сделки ------------------------------------------------------------
+  {
+    WS.ui.dealCard('d_anna');
+    const v = () => doc.querySelector('#app .view').innerHTML;
+    const q = (s) => doc.querySelector('#app .view ' + s);
+    check('карточка · полоса сверху несёт название, суть и путь',
+      !!q('.dcard-top .deal-title-text') && !!q('.dcard-sub') && !!q('.dcard-pathrow .dx-path'));
+    check('карточка · название по-прежнему правится по клику',
+      !!q('.dcard-title.deal-title-edit[data-titledeal="d_anna"]'));
+    check('карточка · справа от пути — когда стала сделкой и сколько стоит на шаге',
+      !!q('.dx-path-meta') && /стала сделкой/.test(q('.dx-path-meta').textContent) &&
+      /на шаге/.test(q('.dx-path-meta').textContent), q('.dx-path-meta') ? q('.dx-path-meta').textContent : 'нет');
+    check('карточка · слева справка, условия и участники', !!q('.dcard-aside .dcard-params') &&
+      v().indexOf('Справка по сделке') > 0 && v().indexOf('Участники · ') > 0);
+    // Комиссия у объектов, а не в условиях слева: ставка принадлежит объекту, а не сделке.
+    check('карточка · комиссии в левой колонке нет',
+      q('.dcard-aside') && q('.dcard-aside').textContent.indexOf('Комиссия') < 0);
+    check('карточка · связь с клиентом осталась на месте', !!q('.dcard-aside .dcli-chans'));
+    check('карточка · справа «что дальше», объекты и «что было»',
+      v().indexOf('Следующий шаг') > 0 && v().indexOf('Последние события') > 0 &&
+      (v().indexOf('Объект сделки') > 0 || v().indexOf('Объекты сделки') > 0));
+    // Отдельной кнопки «Работать через Консьержа» нет — она была дублем строки ввода внизу.
+    check('карточка · внизу одна строка ввода', doc.querySelectorAll('#app .view .dcard-composer').length === 1);
+    check('карточка · и второго входа в Консьержа рядом с ней нет',
+      doc.querySelectorAll('#app .view .dx-cbar').length === 1,
+      'входов: ' + doc.querySelectorAll('#app .view .dx-cbar').length);
+    // Узкий экран: левая колонка сворачивается, ни один блок не пропадает.
+    check('карточка · на узком экране левая колонка сворачивается в раскрываемую справку',
+      !!q('details.dcard-aside-m') && q('details.dcard-aside-m').textContent.indexOf('Участники') > 0);
+    check('карточка · и раскрывается без скриптов', q('details.dcard-aside-m').tagName === 'DETAILS');
+    check('карточка · свёрнутый пресейл подписан для узкого экрана',
+      !!q('.dx-pre-sum') && /пресейл пройден/.test(q('.dx-pre-sum').textContent));
+    // Сделка без запроса пресейла не рисует — рисовать нечего. В фикстурах такой нет (все выросли
+    // из запроса), поэтому случай ставится руками: перенесённая вручную сделка — реальный сценарий.
+    const orphan = dd().deals.find((x) => x.id === 'd_anna');
+    const hadReq = orphan.requestId;
+    orphan.requestId = null;
+    WS.ui.dealCard(orphan.id);
+    check('карточка · у сделки без запроса нет ни пресейла, ни границы',
+      doc.querySelectorAll('#app .view .dx-path .dx-step.pre').length === 0 &&
+      doc.querySelectorAll('#app .view .dx-path .dx-bound').length === 0 &&
+      doc.querySelectorAll('#app .view .dx-path .dx-pre-sum').length === 0);
+    check('карточка · но собственные шаги договора на месте',
+      doc.querySelectorAll('#app .view .dx-path .dx-step[data-dealstage]').length > 0);
+    orphan.requestId = hadReq;
   }
 
   // ---- Волна 2: список сделок --------------------------------------------------------------
