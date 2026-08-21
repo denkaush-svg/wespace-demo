@@ -1283,12 +1283,33 @@ setTimeout(async () => {
     check('stage · отказ называет договор, а не воронку',
       pre && /договор/.test(pre.error || ''), (pre || {}).error);
 
-    // Доска стоит на тех же шагах: колонки услуги — объединение её видов договора.
+    // Доска переложена на четыре укрупнённых отсека. Прежняя проверка требовала ОТСУТСТВИЯ
+    // пресейла в колонках — теперь он там есть намеренно, пройденным участком сквозного пути,
+    // и требование заменено на то, ради чего перекладка делалась.
     WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
     const cols = [].slice.call(doc.querySelectorAll('#app .kanban .kcol .kh span:first-child')).map((e) => e.textContent.trim());
-    const presale = ['Подбор', 'КП', 'Показ', 'Осмотр', 'Переговоры', 'В работе'];
-    check('доска · в колонках нет пресейл-стадий',
-      cols.length > 0 && !cols.some((c) => presale.indexOf(c) >= 0), cols.join(' | '));
+    check('доска · ровно четыре отсека вместо десяти колонок', cols.length === 4, cols.join(' | '));
+    check('доска · первые два отсека — пресейл, последние два — договор',
+      cols[0] === 'Подбор и показы' && cols[1] === 'Переговоры' &&
+      cols[2] === 'Договор и деньги' && cols[3] === 'Исход', cols.join(' | '));
+    // Инвариант отсеков: каждая допустимая стадия принадлежит ровно одному, неизвестная — ни одному.
+    {
+      const B = WS.ui.DEAL_BANDS;
+      const seen = {};
+      let dup = null;
+      B.forEach((b) => ['request', 'deal'].forEach((of) => (b[of] || []).forEach((st) => {
+        const key = of + ':' + st;
+        if (seen[key]) dup = key; else seen[key] = b.k;
+      })));
+      check('доска · ни одна стадия не попадает в два отсека', !dup, 'дубль: ' + dup);
+      const dealStages = Object.keys(WS.DEAL_STEPS || {}).reduce((acc, k) => acc.concat(WS.DEAL_STEPS[k]), []).concat(['won', 'lost']);
+      const unplaced = Array.from(new Set(dealStages)).filter((st) => !WS.ui.dealBandOf(st, 'deal'));
+      check('доска · каждый шаг договора лежит в каком-то отсеке', unplaced.length === 0, 'без отсека: ' + unplaced.join(', '));
+      check('доска · неизвестная стадия не сваливается в первый отсек',
+        WS.ui.dealBandOf('такой-стадии-нет', 'deal') === null, 'вернулось: ' + WS.ui.dealBandOf('такой-стадии-нет', 'deal'));
+      check('доска · на текущих данных нарушителей нет', WS.ui.bandOutliers().length === 0,
+        WS.ui.bandOutliers().map((o) => o.kind + ' ' + o.id + ' → ' + o.stage).join(', '));
+    }
 
     // И лента на карточке рисует ровно шаги договора этой сделки — ни одним больше.
     const off = [];
@@ -1540,13 +1561,13 @@ setTimeout(async () => {
     win.matchMedia = (q) => ({ matches: false, media: q, addListener: () => {}, removeListener: () => {} });
     WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
     const narrow = doc.querySelector('#app').innerHTML;
-    check('доска · на узком экране доски нет', narrow.indexOf('class="kanban"') < 0);
+    check('доска · на узком экране доски нет', narrow.indexOf('class="kanban') < 0);
     check('доска · и переключателя, который её обещает, тоже', narrow.indexOf('data-v="kanban"') < 0);
     check('доска · вместо неё список сделок', narrow.indexOf('deals-table') >= 0);
     win.matchMedia = mmWas;
     WS.router.go('clients');
     check('доска · на широком экране доска возвращается',
-      doc.querySelector('#app').innerHTML.indexOf('class="kanban"') >= 0);
+      doc.querySelector('#app').innerHTML.indexOf('class="kanban') >= 0);
   }
 
   // ---- сводная воронка идёт по всей книге, и две конверсии не складываются ----
@@ -1690,12 +1711,12 @@ setTimeout(async () => {
     D2().requestTimeline = JSON.parse(JSON.stringify(revert.rtl));
   }
 
-  // ---- Консьерж не делает вид, что умеет двигать стадию заявки ----
+  // ---- Консьерж не делает вид, что умеет двигать стадию запроса ----
   {
     const r = WS.agent.ask('переведи сделку Анны в показ');
     check('консьерж · пресейл-команда не превращается в шаг сделки', r.kind !== 'proposal', r.kind);
-    check('консьерж · объясняет, что стадия заявки вычисляется',
-      /заявк/i.test(r.text || '') && /не выставляется|сама/i.test(r.text || ''), (r.text || '').slice(0, 90));
+    check('консьерж · объясняет, что стадия запроса вычисляется',
+      /запрос/i.test(r.text || '') && /не выставляется|сам/i.test(r.text || ''), (r.text || '').slice(0, 90));
   }
 
   // ---- the client register never shows a milestone marked internal ----
@@ -4144,6 +4165,67 @@ setTimeout(async () => {
   }
 
 
+  // ---- Волна 2: имена разделов ------------------------------------------------------------
+  {
+    // Слово «заявка» у агента значило то же, что «сделка», и именно на нём разошлись с партнёром.
+    // Раздел разбирает входящее, работа идёт в «Сделках» — имена должны это говорить.
+    const main = () => doc.getElementById('main').innerHTML;
+    WS.router.go('requests');
+    check('имена · раздел разбора называется «Входящие»', main().indexOf('Входящие') > 0);
+    check('имена · и не называется «Заявки»', main().indexOf('>Заявки<') < 0 && main().indexOf('Активные заявки') < 0,
+      'осталось: ' + (main().match(/[Зз]аявк\w*/g) || []).slice(0, 6).join(', '));
+    WS.router.go('contracts');
+    check('имена · раздел после подписания называется «Сопровождение»', main().indexOf('Сопровождение') > 0);
+    check('имена · область задачи по запросу читается словом «запрос»',
+      WS.ui.taskScopeLabel({ requestId: 'r_igor' }).indexOf('запрос') === 0,
+      'подпись: ' + WS.ui.taskScopeLabel({ requestId: 'r_igor' }));
+    // Меню агента — то место, где слово попадалось первым.
+    const navHtml = doc.body.innerHTML;
+    check('имена · в меню агента нет пункта «Заявки»', navHtml.indexOf('>Заявки<') < 0);
+    check('имена · и нет пункта «Договоры»', navHtml.indexOf('>Договоры<') < 0);
+  }
+
+  // ---- Волна 2: список сделок --------------------------------------------------------------
+  {
+    const main = () => doc.getElementById('main').innerHTML;
+    const countRows = () => (main().match(/data-deal="/g) || []).length;
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'table';
+    WS.store.dealSearch = ''; WS.store.dealStage = 'all'; WS.store.dealFunnelAll = true;
+    WS.router.go('clients');
+    const all = countRows();
+    check('список · таблица показывает колонки стадии, задачи, срока и ответственного',
+      main().indexOf('>Стадия<') > 0 && main().indexOf('>Ближайшая задача<') > 0 &&
+      main().indexOf('>Срок<') > 0 && main().indexOf('>Ответственный<') > 0,
+      'заголовки: ' + (main().match(/<th>[^<]*<\/th>/g) || []).join(' '));
+    // Пояснение над списком снято — оно занимало первый экран у того, кто заходит сюда постоянно.
+    check('список · абзаца-пояснения над сделками больше нет', main().indexOf('Воронка сделок по стадиям') < 0);
+    // Стадия: фильтр есть и он сужает.
+    const stageSel = doc.getElementById('dealStage');
+    check('список · фильтр по стадиям есть', !!stageSel);
+    const someStage = (dd().deals.find((d) => d.stage) || {}).stage;
+    WS.store.dealStage = someStage; WS.storeApi.emit();
+    const byStage = countRows();
+    check('список · выбор стадии сужает выборку', byStage > 0 && byStage < all,
+      'всего ' + all + ', на стадии «' + someStage + '» ' + byStage);
+    check('список · и все оставшиеся строки этой стадии',
+      dd().deals.filter((d) => d.stage === someStage).length === byStage);
+    WS.store.dealStage = 'all'; WS.storeApi.emit();
+    // Источники были чипами первого ряда, стали выпадающим списком.
+    check('список · источники выбираются списком, а не чипами', !!doc.getElementById('dealSrc'));
+    check('список · чипов источников в первом ряду не осталось', main().indexOf('data-dealsrc=') < 0);
+    // Воронка не теряется при переключении вида — это и был дефект.
+    check('список · переключатель воронок виден и в списке', main().indexOf('data-funnel=') > 0);
+    check('список · по умолчанию показаны все воронки', countRows() === all && main().indexOf('Все воронки') > 0);
+    WS.store.dealFunnelAll = false; WS.store.dealFunnel = 'rent'; WS.storeApi.emit();
+    const rentRows = countRows();
+    check('список · выбор воронки сужает список', rentRows === dd().deals.filter((d) => (d.funnel || 'sale') === 'rent').length,
+      'аренда: строк ' + rentRows);
+    WS.store.dealsView = 'kanban'; WS.storeApi.emit();
+    check('список · выбранная воронка переживает переход на доску', WS.store.dealFunnel === 'rent');
+    WS.store.dealsView = 'table'; WS.store.dealFunnelAll = true; WS.storeApi.emit();
+    check('список · и возврат к «всем» показывает столько же, сколько было', countRows() === all);
+  }
+
   // ---- Волна 1: область задачи, сохранение участников, поиск по сделкам --------------------
   {
     // Область задачи. Два клиента с двумя сделками — самый частый случай, на котором ломалась
@@ -4172,7 +4254,7 @@ setTimeout(async () => {
       !!touch && !touch.dealId && !touch.requestId);
     check('область · подпись области читается словом',
       WS.ui.taskScopeLabel({ dealId: 'd_viktor' }).indexOf('сделка') === 0 &&
-      WS.ui.taskScopeLabel({ requestId: 'r_igor' }).indexOf('заявка') === 0 &&
+      WS.ui.taskScopeLabel({ requestId: 'r_igor' }).indexOf('запрос') === 0 &&
       WS.ui.taskScopeLabel({}) === 'клиент');
     // Правило «первое попадание» проверяется на задаче с ОБЕИМИ ссылками — иначе оно не проверено
     // вовсе: на задаче с одной ссылкой любой порядок разбора даёт один и тот же ответ.

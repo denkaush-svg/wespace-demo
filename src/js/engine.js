@@ -37,7 +37,7 @@
     'general': { label: 'Общий', icon: 'sparkle' },
     'object:o_bayline_av': { label: 'Bayline 1603 · проверка', icon: 'building' },
     'contact:c_partner': { label: 'Karim Aziz · подбор', icon: 'users' },
-    'request:r_viktor': { label: 'Виктор Орлов · заявка', icon: 'mail' },
+    'request:r_viktor': { label: 'Виктор Орлов · запрос', icon: 'mail' },
     'deal:d_rentbiz': { label: 'Портфель DIFC · сделка', icon: 'briefcase' },
   };
   function threadMeta(id) { return THREAD_META[id] || { label: id, icon: 'chat' }; }
@@ -714,7 +714,7 @@
        work nobody is doing. The elapsed seconds are the honest pulse. */
     const LOOK = [
       () => cnt('deals', ['сделка', 'сделки', 'сделок']) + ' — суммы, стадии, сроки шагов',
-      () => cnt('requests', ['заявка', 'заявки', 'заявок']) + ' — что предложено и что клиент выбрал',
+      () => cnt('requests', ['запрос', 'запроса', 'запросов']) + ' — что предложено и что клиент выбрал',
       () => cnt('objects', ['объект', 'объекта', 'объектов']) + ' — цены, площади, комиссия',
       () => cnt('clients', ['контакт', 'контакта', 'контактов']) + ' и история по ним',
       () => 'срез по районам Дубая · происхождение каждой величины',

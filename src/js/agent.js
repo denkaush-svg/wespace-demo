@@ -69,9 +69,9 @@
     companies_total: { label: ['компания', 'компании', 'компаний'], anchor: [/компан|застройщик/], q: { from: 'companies', aggregate: { fn: 'count' } } },
     // Заявка — верх воронки стенда. Без этих чтений цифру по лидам можно было
     // назвать, но нельзя было открыть: «откуда это число» не имело источника.
-    requests_total: { label: ['заявка', 'заявки', 'заявок'], anchor: [/заявк|заявок/], q: { from: 'requests', aggregate: { fn: 'count' } } },
-    requests_hot: { label: ['горячая заявка', 'горячие заявки', 'горячих заявок'], anchor: [/горяч/, /заявк|заявок/], q: { from: 'requests', where: [{ field: 'temperature', op: 'eq', value: 'hot' }], aggregate: { fn: 'count' } } },
-    requests_budget_sum: { label: 'бюджета в заявках', money: true, anchor: [/бюджет/, /заявк|заявок/], q: { from: 'requests', aggregate: { fn: 'sum', field: 'budget' } } },
+    requests_total: { label: ['запрос', 'запроса', 'запросов'], anchor: [/заявк|заявок/], q: { from: 'requests', aggregate: { fn: 'count' } } },
+    requests_hot: { label: ['горячий запрос', 'горячих запроса', 'горячих запросов'], anchor: [/горяч/, /заявк|заявок/], q: { from: 'requests', where: [{ field: 'temperature', op: 'eq', value: 'hot' }], aggregate: { fn: 'count' } } },
+    requests_budget_sum: { label: 'бюджета в запросах', money: true, anchor: [/бюджет/, /заявк|заявок/], q: { from: 'requests', aggregate: { fn: 'sum', field: 'budget' } } },
   };
 
   function read(key) {
@@ -243,10 +243,10 @@
   const FOLLOW_UPS = [
     { need: 'deals_active', label: 'Сколько сделок в работе', ask: 'сколько сделок в работе и на какую сумму' },
     { need: 'tasks_overdue', label: 'Просроченные задачи', ask: 'какие задачи просрочены и по кому' },
-    { need: 'requests_hot', label: 'Горячие заявки', ask: 'какие заявки горячие и что по ним дальше' },
+    { need: 'requests_hot', label: 'Горячие запросы', ask: 'какие запросы горячие и что по ним дальше' },
     { need: 'deals_hot', label: 'Горячие сделки', ask: 'какие сделки горячие и что мешает их закрыть' },
     { need: 'clients_no_consent', label: 'Контакты без согласия', ask: 'кто из контактов без согласия на переписку' },
-    { need: 'requests_total', label: 'Что в заявках', ask: 'что сейчас в заявках и на какой они стадии' },
+    { need: 'requests_total', label: 'Что в запросах', ask: 'что сейчас в запросах и на какой они стадии' },
     { need: 'objects_total', label: 'Что есть в объектах', ask: 'какие объекты у нас есть и в каких районах' },
   ];
 
@@ -425,7 +425,7 @@
       const st = (STAGES.find((x) => x[0].test(t)) || [])[1];
       const deal = ent && ent.kind === 'contact' ? (dealOf(ent.id) || dealByText(ent.id, t)) : null;
       if (!st && PRESALE_WORDS.test(t)) {
-        return { kind: 'answer', text: 'Это стадия заявки, а не сделки, и она не выставляется вручную: заявка сама встаёт на подбор, показ или переговоры, когда появляется факт. Отметьте на заявке предложенный объект или добавьте событие — стадия сдвинется сама.', evidence: [], next: suggestions() };
+        return { kind: 'answer', text: 'Это стадия запроса, а не сделки, и она не выставляется вручную: запрос сам встаёт на подбор, показ или переговоры, когда появляется факт. Отметьте в запросе предложенный объект или добавьте событие — стадия сдвинется сама.', evidence: [], next: suggestions() };
       }
       if (!deal || !st) {
         const pick = ent && ent.kind === 'contact' ? dealChoiceText(ent.id) : '';

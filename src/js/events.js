@@ -30,10 +30,10 @@
       title: 'Ночное сообщение — Sarah Mansour',
       sub: 'WhatsApp пришёл в 02:14, пока агент спал',
       thread: 'lead:sarah', tlabel: 'Sarah Mansour · ночной лид', ticon: 'moon',
-      say: 'Ночью содержательный ответ не отправляю (правило). Подготовил <b>черновик заявки</b> и <b>A1-ответ</b> «подтверждение получения», поставил лид в очередь «Ожидает агента», запустил SLA. Утром — подтвердить одной кнопкой.',
+      say: 'Ночью содержательный ответ не отправляю (правило). Подготовил <b>черновик запроса</b> и <b>A1-ответ</b> «подтверждение получения», поставил лид в очередь «Ожидает агента», запустил SLA. Утром — подтвердить одной кнопкой.',
       mark: 'prepared',
       effects: [{ op: 'addTask', task: { id: 't_ev_night', clientId: 'c_night', title: 'Утром ответить Sarah Mansour', due: 'сегодня', when: 'today', kind: 'touch', scenario: 'G1', why: 'Ночной лид 02:14, черновик A1 готов, ждёт подтверждения' } }],
-      changed: ['Черновик заявки и A1-ответа создан', 'Очередь «Ожидает агента»: +1', 'SLA-таймер: ответить до 10:00', 'Руководитель видит непокрытый лид'],
+      changed: ['Черновик запроса и A1-ответа создан', 'Очередь «Ожидает агента»: +1', 'SLA-таймер: ответить до 10:00', 'Руководитель видит непокрытый лид'],
       open: { nav: 'concierge' },
       fb: 'Ночью система подготовила ответ, но не отправила. Как правильно?',
     },
@@ -188,7 +188,7 @@
     markPlayed('ev_call');
     WS.storeApi.logEvent({ action: 'Событие: входящий звонок квалифицирован секретарём', scenario: null });
     const e = { at: CALL.at, mark: 'prepared',
-      changed: ['Звонок принят и квалифицирован секретарём', 'Заявка-черновик: 2BR Marina, до 2,2 млн, осень', 'Юр/налоговый вопрос помечен для брокера', 'Задача: перезвонить сегодня'],
+      changed: ['Звонок принят и квалифицирован секретарём', 'Запрос-черновик: 2BR Marina, до 2,2 млн, осень', 'Юр/налоговый вопрос помечен для брокера', 'Задача: перезвонить сегодня'],
       open: { nav: 'concierge' }, fb: 'Секретарь сам принял и квалифицировал звонок. Где граница доверия?', id: 'ev_call' };
     showChanged(e);
   }
@@ -287,7 +287,7 @@
       nav: 'objects', goLabel: 'Открыть объекты',
       done: 'Импортировано 3 объекта · 2 дубля отложены на разбор',
       records: [
-        { id: 'o_imp1', name: 'Marina Vista 2210', area: 'Business Bay', br: '2BR', size: 96, price: 2450000, source: 'import', sourceLabel: 'Импорт застройщика', verified: 'expired', checkedAt: 'из фида', trakheesi: 'pending', madmoun: 'na', availability: 'stale', photoKey: 'o_marina', attrs: { view: 'city', floor: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true }, match: 'Совпадает с 2 активными заявками (инвестиция, Business Bay)' },
+        { id: 'o_imp1', name: 'Marina Vista 2210', area: 'Business Bay', br: '2BR', size: 96, price: 2450000, source: 'import', sourceLabel: 'Импорт застройщика', verified: 'expired', checkedAt: 'из фида', trakheesi: 'pending', madmoun: 'na', availability: 'stale', photoKey: 'o_marina', attrs: { view: 'city', floor: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true }, match: 'Совпадает с 2 активными запросами (инвестиция, Business Bay)' },
         { id: 'o_imp2', name: 'Creek Rise 1804', area: 'Dubai Creek Harbour', br: '1BR', size: 68, price: 1690000, source: 'import', sourceLabel: 'Импорт застройщика', verified: 'expired', checkedAt: 'из фида', trakheesi: 'pending', madmoun: 'na', availability: 'stale', photoKey: 'o_interior', attrs: { view: 'water', floor: 'mid', finish: 'new', demand: 'mid', prestige: 'high', metro: false }, match: 'Близко к цели по доходности (~5%)' },
         { id: 'o_imp3', name: 'JVC Garden 312', area: 'JVC', br: 'Studio', size: 42, price: 780000, source: 'import', sourceLabel: 'Импорт застройщика', verified: 'expired', checkedAt: 'из фида', trakheesi: 'pending', madmoun: 'na', availability: 'stale', photoKey: 'o_palmcourt', attrs: { view: 'garden', floor: 'low', finish: 'standard', demand: 'mid', prestige: 'mid', metro: false }, match: 'Бюджетный вход под аренду' },
       ],

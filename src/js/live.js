@@ -359,7 +359,7 @@
   // moment it answers throws the reply off a phone screen entirely — the
   // person was still reading it.
   const VIEW_RU = { start: 'Пульс', concierge: 'Консьерж', clients: 'Контакты', companies: 'Компании',
-    objects: 'Объекты', requests: 'Заявки', leads: 'Лиды', tasks: 'Задачи', shows: 'Показы',
+    objects: 'Объекты', requests: 'Входящие', leads: 'Лиды', tasks: 'Задачи', shows: 'Показы',
     docs: 'Документы', analytics: 'Аналитика', finance: 'Финансы', calc: 'Финмодель',
     valuation: 'Оценка объекта', club: 'Клуб', partners: 'Партнёры', team: 'Команда',
     services: 'Услуги', approvals: 'Согласования', promotion: 'Продвижение',

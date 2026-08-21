@@ -211,7 +211,13 @@
     if (d.agsay != null) return WS.voice.sayReply(d.agsay);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
-    if (d.funnel) { store.dealFunnel = d.funnel; return api.emit(); }
+    // «Все воронки» — состояние списка, а не воронка: выбранная воронка при этом запоминается,
+    // чтобы переход на доску не потерял её. Ровно то, на что жаловался партнёр.
+    if (d.funnel) {
+      if (d.funnel === 'all') store.dealFunnelAll = true;
+      else { store.dealFunnel = d.funnel; store.dealFunnelAll = false; }
+      return api.emit();
+    }
     if (d.analytics) return WS.ui.openAnalyticsDrill(d.analytics);
     if (d.company) return WS.ui.companyCard(d.company);
     // A saved view only renders on the deals board, so a trigger that also carries data-nav must
@@ -332,7 +338,7 @@
       case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
       case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
       case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' }; api.emit(); break;
-      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSearch = ''; api.emit(); break;
+      case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealStage = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSearch = ''; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
       case 'endTour': store.tour = { active: false, scenarioId: null, stepIndex: 0 }; api.emit(); break;
@@ -373,11 +379,11 @@
       case 'openKp': WS.ui.openKp(); break;
       case 'kpSend': WS.ui.closeModal(); api.toast('КП отправлено клиенту на подпись (A2 · delivered)', 'ok'); break;
       case 'openXls': WS.ui.openXls(); break;
-      case 'promoSend': WS.ui.closeModal(); api.toast('Рассылка отправлена профильным партнёрам · отклики появятся в «Заявках»', 'ok'); break;
+      case 'promoSend': WS.ui.closeModal(); api.toast('Рассылка отправлена профильным партнёрам · отклики появятся во «Входящих»', 'ok'); break;
       case 'clubPost': WS.ui.openClubPost(); break;
       case 'clubPostSend': WS.ui.closeModal(); api.toast('Объект размещён в клубной витрине (демо)', 'ok'); break;
       case 'clubReqSend': WS.ui.closeModal(); api.toast('Заявка отправлена владельцу листинга в клубе (демо)', 'ok'); break;
-      case 'svcReqSend': WS.ui.closeModal(); api.toast('Заявка на услугу отправлена · появится в «Заявках» (демо)', 'ok'); break;
+      case 'svcReqSend': WS.ui.closeModal(); api.toast('Заявка на услугу отправлена · появится во «Входящих» (демо)', 'ok'); break;
       case 'walletTopup': WS.ui.openWalletTopup(); break;
       case 'walletTopupSend': WS.ui.closeModal(); api.toast('Кошелёк пополнен (демо) · баланс обновлён', 'ok'); break;
       case 'anaTab': store.analyticsTab = t.dataset.anatab; api.emit(); break;
