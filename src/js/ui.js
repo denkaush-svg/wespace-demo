@@ -3611,6 +3611,9 @@
       ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', ''],
       ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
       ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', ''],
+      // Завершение — отдельное действие с двумя исходами, а не «поставить последний шаг»:
+      // успех означает полученное вознаграждение, а не подписанный договор.
+      dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
   }
@@ -7923,6 +7926,101 @@
       '<span class="badge ' + money.tone + '">' + I('money') + 'Комиссия · ' + money.label + '</span>' +
       I('arrowRight') + '</div>';
   }
+  /* ---- Рождение договора и завершение сделки (§2.5 решений) ----
+     Это два разных момента, и их нельзя складывать в одну кнопку. Договор рождается
+     на шаге «Подписание»; сделка закрывается тогда, когда получено вознаграждение.
+     Создание привязано к СМЕНЕ СТАДИИ, а не к нажатию кнопки, поэтому доска, Консьерж
+     и кнопка дают один и тот же результат. */
+  const CONTRACT_TEMPLATES = {
+    offplan_spa: {
+      ms: [['active', 'Договор активен', 'Договор подписан и вступил в силу'], ['pay10', 'Первый платёж на escrow', 'Первый платёж принят застройщиком'],
+        ['oqood', 'Регистрация Oqood', 'Сделка зарегистрирована в реестре DLD'], ['built', 'Объект построен', 'Строительство завершено'],
+        ['keys', 'Ключи переданы, snag list закрыт', 'Приёмка объекта и передача ключей'], ['title', 'Title Deed получен', 'Право собственности оформлено']],
+      pay: [['Первый платёж', 10], ['Второй платёж', 25], ['Третий платёж', 40], ['Финальный платёж', 25]],
+    },
+    resale_title: {
+      ms: [['active', 'Договор активен', 'Договор подписан'], ['noc', 'NOC получен', 'Согласие застройщика получено'],
+        ['trustee', 'Встреча в trustee-офисе', 'Переоформление в офисе регистратора'], ['title', 'Title Deed переоформлен', 'Право собственности переоформлено']],
+      pay: [['Задаток 10%', 10], ['Остаток на переоформлении', 90]],
+    },
+    lease: { ms: [['active', 'Договор активен', 'Договор аренды зарегистрирован в Ejari'], ['cheques', 'Оплата по чекам', 'Оплата по графику'],
+      ['renewal', 'Уведомление за 90 дней', 'Подготовка к продлению договора'], ['closed', 'Продлён либо выезд', 'Продление или завершение аренды']],
+      pay: [['Чек 1 · квартал', 25], ['Чек 2 · квартал', 25], ['Чек 3 · квартал', 25], ['Чек 4 · квартал', 25]] },
+    lease_comm: { ms: [['active', 'Договор активен', 'Договор аренды подписан'], ['fitout', 'Отделка и приёмка помещения', 'Помещение принято'],
+      ['cheques', 'Оплата по чекам', 'Оплата по графику']], pay: [['Чек 1 · полугодие', 50], ['Чек 2 · полугодие', 50]] },
+    management: { ms: [['active', 'Договор управления активен', 'Объект принят в управление'], ['tenant', 'Арендатор найден', 'Найден арендатор'],
+      ['payments', 'Контроль оплат от арендатора', 'Платежи поступают по графику'], ['report', 'Отчётность собственнику', 'Отчёт по объекту за период']], pay: [] },
+    exclusive: { ms: [['active', 'Мандат активен', 'Эксклюзивный мандат подписан'], ['listing', 'Объект выставлен', 'Объявление опубликовано'],
+      ['offers', 'Сбор предложений', 'Предложения от покупателей'], ['closed', 'Мандат исполнен либо истёк', 'Итог мандата']], pay: [] },
+    service: { ms: [['active', 'Соглашение активно', 'Соглашение подписано'], ['done', 'Услуга оказана', 'Работа завершена']], pay: [] },
+  };
+  function contractFromDeal(d) {
+    const kind = WS.contractKindFor ? WS.contractKindFor(d.funnel || 'sale', d.readiness) : 'service';
+    const tpl = CONTRACT_TEMPLATES[kind] || CONTRACT_TEMPLATES.service;
+    const at = WS.storeApi.clockLabel().date;
+    const lots = dealLiveLots(d);
+    const comm = dealCommission(d);
+    /* Всё, чего шаблон знать не может, остаётся пустым и подсвечивается как незаполненное:
+       номер договора, точные даты платежей. Подставить сюда правдоподобное значит выдать
+       догадку за факт ровно там, где потом будут сверять с реестром. */
+    return {
+      id: 'k_' + d.id, dealId: d.id, clientId: d.clientId, companyId: d.companyId || null,
+      objectId: lots.length === 1 ? lots[0].id : (d.objectId || null),
+      lots: lots.map((o) => o.id),
+      kind: kind, number: '', signedAt: at, status: 'active', amount: d.amount || 0,
+      nextDue: (tpl.pay[0] ? tpl.pay[0][0] + ' — дата не назначена' : 'дата не назначена'),
+      milestones: tpl.ms.map((m, i) => ({ k: m[0], label: m[1], client: m[2], at: i === 0 ? at : '—', state: i === 0 ? 'done' : (i === 1 ? 'now' : 'wait') })),
+      schedule: tpl.pay.map((p, i) => ({ label: p[0] + ' · ' + p[1] + '%', pct: p[1],
+        amount: Math.round((d.amount || 0) * p[1] / 100), due: '—', state: i === 0 ? 'due' : 'wait' })),
+      documents: [{ name: contractKind({ kind: kind }).label, at: at, state: 'ok' }],
+      commission: { total: comm, payer: 'по договору', vat: !!d.vat, split: d.partnerAgent ? 'co-broking' : null,
+        entries: [{ k: 'accrued', label: 'Начислено', amount: comm, at: at, state: 'done' }] },
+      timeline: [{ at: at, ord: NOW_ORD, ch: 'crm', kind: 'raw', by: 'Система', text: 'Договор создан из сделки «' + (d.title || d.id) + '».' }],
+      fromDeal: true,
+    };
+  }
+  // Одна операция, повторно ничего не создающая: если договор с этой сделкой уже есть,
+  // второй не появляется — ни с доски, ни из Консьержа, ни кнопкой.
+  function ensureContract(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return null;
+    const have = contractsOfDeal(dealId)[0];
+    if (have) return have;
+    const k = contractFromDeal(d);
+    (D().contracts || (D().contracts = [])).unshift(k);
+    return k;
+  }
+  function finishDealForm(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Успех — это полученное вознаграждение, а не подписанный договор: договор рождается раньше, на подписании. Проигрыш освобождает все лоты сделки.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Исход</span><select id="fin_out">' +
+      '<option value="won">Успех — вознаграждение получено</option><option value="lost">Проигрыш</option></select></label>' +
+      '<label class="fld"><span>Причина или комментарий</span><input id="fin_why" type="text" placeholder="Напр.: комиссия пришла двумя траншами"></label></div>';
+    openModal('Завершить сделку · ' + (d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveFinishDeal" data-deal="' + dealId + '">' + I('check') + 'Завершить</button>');
+  }
+  function saveFinishDeal(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const out = g('fin_out') === 'lost' ? 'lost' : 'won';
+    const why = g('fin_why');
+    d.stage = out;
+    if (out === 'won') {
+      // Услуга может не иметь шага подписания — тогда договор рождается здесь.
+      ensureContract(dealId);
+    } else {
+      // Проигрыш освобождает все лоты по тому же правилу, что и частичный отказ.
+      if (!d.lotState) d.lotState = {};
+      dealLiveLots(d).forEach((o) => {
+        d.lotState[o.id] = Object.assign({}, d.lotState[o.id], { exit: 'returned', exitReason: why || 'сделка проиграна', exitAt: WS.storeApi.clockLabel().date });
+      });
+    }
+    addEventEntry('deal', d.id, { type: 'note', text: (out === 'won' ? 'Сделка завершена успехом' : 'Сделка проиграна') + (why ? ': ' + why : '') + '.' });
+    WS.storeApi.touch();
+    closeModal();
+    WS.storeApi.toast(out === 'won' ? 'Сделка закрыта успехом' : 'Сделка закрыта проигрышем', out === 'won' ? 'ok' : '');
+    dealCard(dealId);
+  }
   function viewContracts() {
     const list = contractsAll();
     const active = list.filter((k) => k.status !== 'closed');
@@ -8280,6 +8378,7 @@
     REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
     cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
     ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts,
-    LOT_EXITS, lotState, lotIsOut, dealLiveLots, lotCommissionPct, lotsMismatch, lotExitForm, saveLotExit, undoLotBlock, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    LOT_EXITS, lotState, lotIsOut, dealLiveLots, lotCommissionPct, lotsMismatch, lotExitForm, saveLotExit, undoLotBlock,
+    contractFromDeal, ensureContract, finishDealForm, saveFinishDeal, contractsOfDeal, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

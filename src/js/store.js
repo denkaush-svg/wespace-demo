@@ -240,6 +240,16 @@
   function setView(v) { store.view = v; emit(); }
   function setScenarioStatus(id, s) { store.scenarioStatus[id] = s; save(); emit(); }
 
+  /* Договор рождается на подписании — и привязан к СМЕНЕ СТАДИИ, а не к нажатию кнопки.
+     Стадию двигают доска, Консьерж, сценарии и слой записи; если повесить создание на одну
+     из этих дверей, остальные три дадут сделку на подписании без договора. Операция
+     идемпотентна: второй договор по той же сделке не появляется. */
+  const CONTRACT_FROM = ['sign', 'reg', 'exec', 'won'];
+  function afterDealStage(rec) {
+    if (!rec || CONTRACT_FROM.indexOf(rec.stage) < 0) return;
+    if (WS.ui && WS.ui.ensureContract) WS.ui.ensureContract(rec.id);
+  }
+
   // ---- declarative effects: scenarios mutate shared data on result (spec §18.2)
   function applyEffects(effects) {
     if (!effects || !effects.length) return;
@@ -247,10 +257,10 @@
     effects.forEach((e) => {
       if (e.op === 'updateDeal') {
         const dl = d.deals.find((x) => x.id === e.id);
-        if (dl) Object.assign(dl, e.patch);
+        if (dl) { Object.assign(dl, e.patch); if (e.patch && e.patch.stage) afterDealStage(dl); }
       } else if (e.op === 'dealStage') {
         const dl = d.deals.find((x) => x.id === e.id);
-        if (dl) dl.stage = e.stage;
+        if (dl) { dl.stage = e.stage; afterDealStage(dl); }
       } else if (e.op === 'updateRequest') {
         // Пресейл живёт на заявке, а не на сделке: сценарии, которые раньше двигали стадию
         // сделки на «в работе», записывают факт сюда. Стадии здесь нет намеренно — она
@@ -590,7 +600,7 @@
       if (bad) return bad;
       return { ok: true, tier: 'guarded',
         summary: recordRu(spec.coll, rec) + ' · стадия: ' + stageRu(rec.stage) + ' → ' + stageRu(o.stage),
-        run: () => { rec.stage = o.stage; } };
+        run: () => { rec.stage = o.stage; afterDealStage(rec); } };
     }
 
     const patch = o.patch;
@@ -622,7 +632,7 @@
       ok: true, tier: tier,
       summary: recordRu(spec.coll, rec) + ' · ' +
         keys.map((f) => fieldRu(f) + ': ' + shown(rec[f]) + ' → ' + shown(patch[f])).join('; '),
-      run: () => { Object.assign(rec, patch); },
+      run: () => { Object.assign(rec, patch); if (spec.coll === 'deals' && patch.stage) afterDealStage(rec); },
     };
   }
 
@@ -700,6 +710,7 @@
     const dl = store.data.deals.find((x) => x.id === id);
     if (!dl || dl.stage === stage) return;
     dl.stage = stage;
+    afterDealStage(dl);
     store.dataRevision++; save(); emit();
   }
 

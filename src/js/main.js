@@ -299,6 +299,8 @@
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
       case 'saveDealContact': WS.ui.saveDealContact(t.dataset.deal, +t.dataset.idx); break;
       case 'saveLotExit': WS.ui.saveLotExit(t.dataset.deal, t.dataset.obj); break;
+      case 'finishDeal': WS.ui.finishDealForm(t.dataset.deal); break;
+      case 'saveFinishDeal': WS.ui.saveFinishDeal(t.dataset.deal); break;
       case 'capToggle': { const id = t.dataset.deal; store.capture = store.capture || {}; const cur = (id in store.capture) ? store.capture[id] : true; store.capture[id] = !cur; api.toast('Запись разговоров: ' + (store.capture[id] ? 'включена' : 'выключена'), 'ok'); WS.ui.dealCard(id); break; }
       case 'cgFeatureStub': WS.ui.closeModal(); api.toast('Настройка сохранена (демо)', 'ok'); break;
       case 'cgAttach': store.cgMenu = store.cgMenu === 'attach' ? null : 'attach'; api.emit(); break;

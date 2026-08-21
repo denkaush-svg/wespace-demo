@@ -4732,6 +4732,61 @@ setTimeout(async () => {
     ks.forEach((k) => { delete k.review; });
   }
 
+  // ---- Волна 3: рождение договора и завершение сделки ---------------------------------------
+  {
+    const before = (dd().contracts || []).length;
+    const d = dd().deals.find((x) => x.id === 'd_anna');
+    const kept = d.stage;
+    // Договор рождается на подписании — и привязан к смене стадии, а не к нажатию кнопки.
+    WS.storeApi.setDealStage('d_anna', 'sign');
+    const made = (dd().contracts || []).filter((k) => k.dealId === 'd_anna');
+    check('договор · рождается на подписании', made.length === 1, 'создано ' + made.length);
+    check('договор · собран из сделки: клиент, сумма, лоты',
+      !!made[0] && made[0].clientId === d.clientId && made[0].amount === d.amount && (made[0].lots || []).length >= 1,
+      made[0] ? JSON.stringify({ c: made[0].clientId, a: made[0].amount, l: made[0].lots }) : 'нет');
+    check('договор · вид выведен из услуги и готовности',
+      !!made[0] && made[0].kind === WS.contractKindFor(d.funnel, d.readiness), made[0] && made[0].kind);
+    // Того, чего шаблон знать не может, он не выдумывает.
+    check('договор · номер остаётся пустым, а не выдуманным', !!made[0] && !made[0].number, made[0] && made[0].number);
+    // Второй раз ничего не создаётся — ни тем же путём, ни другим.
+    WS.storeApi.setDealStage('d_anna', 'reg');
+    WS.storeApi.apply([{ op: 'dealStage', id: 'd_anna', stage: 'exec' }], { confirmed: true, silent: true });
+    WS.ui.ensureContract('d_anna');
+    check('договор · второй по той же сделке не создаётся',
+      (dd().contracts || []).filter((k) => k.dealId === 'd_anna').length === 1,
+      'стало ' + (dd().contracts || []).filter((k) => k.dealId === 'd_anna').length);
+    check('договор · остальные договоры не тронуты', (dd().contracts || []).length === before + 1);
+
+    // Проигрыш освобождает все лоты по тому же правилу, что и частичный отказ.
+    const dl = dd().deals.find((x) => x.id === 'd_rentbiz');
+    dl.stage = 'prep'; dl.lotState = {}; delete dl.amountFromLots;
+    WS.ui.finishDealForm('d_rentbiz');
+    const out = doc.getElementById('fin_out'); if (out) out.value = 'lost';
+    WS.ui.saveFinishDeal('d_rentbiz');
+    check('завершение · проигрыш ставит стадию lost', dl.stage === 'lost');
+    check('завершение · проигрыш освобождает все лоты', WS.ui.dealLiveLots(dl).length === 0,
+      'осталось ' + WS.ui.dealLiveLots(dl).length);
+    check('завершение · проигрыш не создаёт договор', (dd().contracts || []).filter((k) => k.dealId === 'd_rentbiz').length === 0);
+
+    // Успех у услуги без шага подписания: договор рождается здесь.
+    const svc = dd().deals.find((x) => (x.funnel === 'consult' || x.funnel === 'cross') && !WS.ui.contractsOfDeal(x.id).length);
+    if (svc) {
+      const was = svc.stage;
+      WS.ui.finishDealForm(svc.id);
+      const o2 = doc.getElementById('fin_out'); if (o2) o2.value = 'won';
+      WS.ui.saveFinishDeal(svc.id);
+      check('завершение · успех у услуги порождает ровно один договор',
+        svc.stage === 'won' && WS.ui.contractsOfDeal(svc.id).length === 1,
+        svc.id + ' стадия ' + svc.stage + ', договоров ' + WS.ui.contractsOfDeal(svc.id).length);
+      dd().contracts = (dd().contracts || []).filter((k) => k.dealId !== svc.id);
+      svc.stage = was;
+    }
+    dd().contracts = (dd().contracts || []).filter((k) => !k.fromDeal);
+    d.stage = kept; dl.stage = 'prep';
+    dl.lotState = { o_difc_a: { regNo: 'Title-2026-4471', regAt: '12 мая', commissionPct: 2.5 } };
+    delete dl.amountFromLots;
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);
