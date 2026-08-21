@@ -4598,6 +4598,69 @@ setTimeout(async () => {
     check('отношения · портфель ведёт на договор', html.indexOf('data-contract="k_palm"') >= 0);
   }
 
+  // ---- Волна 3: участники сделки ------------------------------------------------------------
+  {
+    const roles = WS.ui.CONTACT_ROLES;
+    check('участники · справочник ролей пересекает стол (три группы)', WS.ui.ROLE_GROUPS.length === 3 && roles.length === 12,
+      'групп ' + WS.ui.ROLE_GROUPS.length + ', ролей ' + roles.length);
+    // «ЛПР» убран из ролей намеренно: это мера влияния, а не роль. Иначе участник мог бы быть
+    // «ЛПР по роли и исполнителем по влиянию».
+    check('участники · «ЛПР» больше не роль', roles.indexOf('ЛПР') < 0, roles.join(', '));
+    check('участники · «ЛПР» есть среди значений влияния', WS.ui.INFLUENCE.some((v) => v.label === 'ЛПР'));
+    // Таблица перехода читается и на старых данных: запись, оставшаяся со старым словарём,
+    // не показывается как есть и не теряет влияние.
+    check('участники · старая роль «Покупатель» читается как «Клиент»', WS.ui.roleOf({ role: 'Покупатель' }) === 'Клиент');
+    check('участники · старая роль «ЛПР» отдаёт клиента и влияние ЛПР',
+      WS.ui.roleOf({ role: 'ЛПР' }) === 'Клиент' && WS.ui.influenceOf({ role: 'ЛПР' }) === 'lpr');
+    check('участники · буквенная шкала переводится в слова',
+      WS.ui.influenceOf({ rating: 'A' }) === 'lpr' && WS.ui.influenceOf({ rating: 'B' }) === 'infl' && WS.ui.influenceOf({ rating: 'C' }) === 'exec');
+    // Каналов ровно четыре, и порталы площадок в них не входят: это источник обращения.
+    check('участники · словарь каналов один и без порталов',
+      WS.ui.CHANNELS.length === 4 && WS.ui.CHANNELS.indexOf('email') >= 0 && WS.ui.CHANNELS.indexOf('instagram') < 0,
+      WS.ui.CHANNELS.join(', '));
+
+    const anna = dd().deals.find((x) => x.id === 'd_anna');
+    // Выше по прогону проверялось, что открепление участника переживает перезагрузку, — оно
+    // сняло последнюю строку состава. Возвращаем исходный состав, иначе эта проверка будет
+    // измерять последствия предыдущей, а не то, что заявлено в её имени.
+    const annaFix = (WS.fixtures.deals || []).find((x) => x.id === 'd_anna');
+    anna.contacts = JSON.parse(JSON.stringify(annaFix.contacts));
+    const parts = WS.ui.dealParticipants(anna);
+    check('участники · в сделке есть участник другой стороны', parts.some((p) => p.сторона === 'другая сторона'),
+      parts.map((p) => p.роль).join(', '));
+    check('участники · у участника другой стороны есть компания', parts.some((p) => p.сторона === 'другая сторона' && p.компания),
+      JSON.stringify(parts.filter((p) => p.сторона === 'другая сторона')));
+    check('участники · у каждого назван канал', parts.every((p) => !!p.канал), JSON.stringify(parts.map((p) => p.канал)));
+    check('участники · ровно один основной', parts.filter((p) => p.основной).length === 1);
+    // Сводка Консьержа отдаёт участников: без этого расширенный справочник ролей невидим
+    // ровно для того, кто должен им пользоваться.
+    const snap = WS.live && WS.live.digest ? WS.live.digest() : null;
+    if (snap && snap.сделки) {
+      const sd = snap.сделки.find((x) => x.id === 'd_anna');
+      check('участники · попадают в сводку Консьержа', !!sd && Array.isArray(sd.участники) && sd.участники.length === parts.length,
+        sd ? 'в сводке ' + ((sd.участники || []).length) : 'сделки в сводке нет');
+    }
+
+    // Карточка рисует влияние словом, а не буквой в круге.
+    WS.ui.dealCard('d_anna');
+    const dh = doc.getElementById('app').innerHTML;
+    check('участники · влияние нарисовано словом', dh.indexOf('c-infl-lpr') >= 0 && dh.indexOf('>ЛПР<') >= 0);
+    check('участники · буквенный значок с карточки ушёл', dh.indexOf('c-rate') < 0);
+
+    // Основным может быть только участник со стороны клиента: основной — тот, чьё решение
+    // мы ведём, и менеджер девелопера им быть не может.
+    const idx = anna.contacts.findIndex((x) => WS.ui.roleGroupOf(x) === 'other');
+    if (idx >= 0) {
+      WS.ui.openDealContactForm('d_anna', idx);
+      const prim = doc.getElementById('dc_primary'); if (prim) prim.checked = true;
+      WS.ui.saveDealContact('d_anna', idx);
+      check('участники · основным не может стать участник другой стороны',
+        anna.contacts[idx].primary !== true, 'основной=' + anna.contacts[idx].primary);
+      check('участники · основной остался на стороне клиента',
+        WS.ui.roleGroupOf(anna.contacts.find((x) => x.primary) || {}) === 'client');
+    }
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

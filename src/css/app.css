@@ -787,10 +787,16 @@ button { font-family: inherit; cursor: pointer; }
 .dc-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .c-star { color: var(--acc); display: inline-flex; margin-left: 4px; }
 .c-star svg { width: 13px; height: 13px; }
-.c-rate { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11.5px; font-weight: 700; }
-.c-rate-a { background: var(--ok-soft); color: var(--ok); }
-.c-rate-b { background: #FDECD8; color: #B8690F; }
-.c-rate-c { background: var(--surface-3); color: var(--mut); }
+/* Влияние участника — подпись, а не буква в круге: «A» ничего не говорит человеку, открывшему
+   карточку впервые. Класс берётся из ключа, а не из слова, — смена подписи вёрстку не ломает. */
+.c-infl { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+  font-size: 11px; font-weight: 700; white-space: nowrap; }
+.c-infl-lpr { background: var(--ok-soft); color: var(--ok); }
+.c-infl-infl { background: #FDECD8; color: #B8690F; }
+.c-infl-exec { background: var(--surface-3); color: var(--mut); }
+.dc-ch { display: inline-grid; place-items: center; color: var(--mut); }
+.dc-ch svg { width: 14px; height: 14px; }
+.dc-co { border-bottom: 1px solid var(--acc-line); }
 /* Tabbed entity card (P3 redesign) */
 .dx-stepper { display: flex; margin: 2px 0 12px; }
 .dx-sec .dx-stepper { margin: 12px 0 4px; }

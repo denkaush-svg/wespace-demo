@@ -120,6 +120,11 @@
         // and the store refuses the guess after the person has read it.
         шаги: (WS.ui.dealSteps ? WS.ui.dealSteps(x) : []).map((k) => ({ код: k, шаг: WS.ui.stageLabel(k) })),
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, лоты: x.lots || null,
+        /* Участники сделки. Сводка отдавала клиента, компанию и лоты — и молчала о том, кто ещё
+           за столом: расширенный справочник ролей остался бы невидимым ровно для того, кто
+           должен им пользоваться. Без этого Консьерж не может ни выбрать адресата, ни объяснить,
+           почему пишет юристу, а не покупателю. */
+        участники: (WS.ui.dealParticipants ? WS.ui.dealParticipants(x) : []),
         заявка: x.requestId || null, горячая: !!x.hot,
         срок_шага: x.nextDue || null, дней_на_стадии: x.stageDays,
         задаток: x.deposit ? { вид: x.deposit.kind, сумма: x.deposit.amount, оплачен: !!x.deposit.paid, возвратный: !!x.deposit.refundable } : null,

@@ -2039,6 +2039,10 @@
       '<button class="btn sm" data-act="psychForm" data-cid="' + c.id + '">' + I('pencil') + 'Изменить</button></div>';
   }
   // Communication channels — Telegram + WhatsApp основные, плюс Instagram, Email, телефон.
+  /* Один словарь каналов на всё: контакт, участник сделки, лента событий. Порталы площадок
+     (Property Finder, Bayut) каналом связи не считаются — это источник обращения, а не способ
+     связаться с человеком, и они живут в поле источника заявки. */
+  const CHANNELS = ['whatsapp', 'telegram', 'email', 'call'];
   function chanMeta(ch) {
     return ({
       phone: ['phone', 'Телефон'],
@@ -3063,8 +3067,39 @@
     el.innerHTML = spec.render(p[2]);
   }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
-  const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
-  const CONTACT_RATINGS = ['A', 'B', 'C'];
+  /* Справочник ролей участника — двенадцать ролей в трёх группах. Прежние восемь описывали
+     только сторону клиента, а партнёр просил роли, которые пересекают стол. Группа нужна
+     не для порядка в списке, а для правила: основным контактом сделки может быть только тот,
+     чьё решение мы ведём, — менеджер девелопера основным быть не может. */
+  const ROLE_GROUPS = [
+    { k: 'client', label: 'Сторона клиента', roles: ['Клиент', 'Со-покупатель', 'Инвестор', 'Супруг', 'Представитель по доверенности', 'Юрист клиента', 'Финансист клиента', 'Референт'] },
+    { k: 'other', label: 'Другая сторона', roles: ['Собственник', 'Менеджер девелопера'] },
+    { k: 'broker', label: 'Посредники', roles: ['Агент-партнёр', 'Ипотечный брокер'] },
+  ];
+  const CONTACT_ROLES = ROLE_GROUPS.reduce((a, g) => a.concat(g.roles), []);
+  /* Таблица перехода со старого справочника. Строка «ЛПР» уходит из ролей совсем: это мера
+     влияния, а не роль, и держать её в обоих словарях значит позволить участнику быть
+     «ЛПР по роли и исполнителем по влиянию». Партнёрское «Клиент-ЛПР» раскладывается
+     ровно на эту пару. Переход читается и на старых данных, а не только на новых. */
+  const ROLE_WAS = { 'Покупатель': 'Клиент', 'ЛПР': 'Клиент', 'Супруг — со-решение': 'Супруг',
+    'Юрист сделки': 'Юрист клиента', 'Представитель': 'Представитель по доверенности' };
+  function roleOf(ct) { const r = ct && ct.role; return ROLE_WAS[r] || r || 'Клиент'; }
+  function roleGroupOf(ct) {
+    const r = roleOf(ct);
+    const g = ROLE_GROUPS.find((x) => x.roles.indexOf(r) >= 0);
+    return g ? g.k : 'client';
+  }
+  // Влияние — тот же словарь, что уже используется у контактов компаний. Буквенная шкала
+  // уходит: «A» ничего не говорит человеку, открывшему карточку впервые.
+  const INFLUENCE = [{ k: 'lpr', label: 'ЛПР' }, { k: 'infl', label: 'влияет' }, { k: 'exec', label: 'исполнитель' }];
+  const INFL_WAS = { A: 'lpr', B: 'infl', C: 'exec', 'ЛПР': 'lpr', 'влияет': 'infl', 'исполнитель': 'exec' };
+  function influenceOf(ct) {
+    const raw = ct && (ct.influence || ct.rating);
+    // Роль «ЛПР» из старого справочника несла влияние в себе — при переносе оно не теряется.
+    if (!raw && ct && ct.role === 'ЛПР') return 'lpr';
+    return INFL_WAS[raw] || (INFLUENCE.some((x) => x.k === raw) ? raw : 'infl');
+  }
+  const inflLabel = (k) => (INFLUENCE.find((x) => x.k === k) || INFLUENCE[1]).label;
   // Область задачи — первое попадание: есть сделка → задача сделки; иначе заявка → задача заявки;
   // иначе задача по контакту. Клиентская задача законна: касания и поздравления не относятся
   // ни к какой сделке, и требовать привязку значило бы запретить половину работы по удержанию.
@@ -3079,48 +3114,81 @@
   }
   function dealContacts(d) {
     if (Array.isArray(d.contacts) && d.contacts.length) return d.contacts;
-    if (d.clientId) return [{ clientId: d.clientId, role: 'Покупатель', rating: 'A', primary: true }];
+    if (d.clientId) return [{ clientId: d.clientId, role: 'Клиент', influence: 'lpr', primary: true }];
     return [];
   }
   function contactDisplayName(ct) {
     if (ct.clientId) { const c = D().clients.find((x) => x.id === ct.clientId); if (c) return c.name; }
     return ct.name || '—';
   }
-  function ratingBadge(r) {
-    const R = r || 'C';
-    return '<span class="c-rate c-rate-' + R.toLowerCase() + '" title="Влияние на решение: ' + R + '">' + R + '</span>';
+  // Канал участника: свой, если задан, иначе тот, которым мы связываемся с этим контактом.
+  function partChannel(ct) {
+    if (ct.channel) return ct.channel;
+    const c = ct.clientId ? D().clients.find((x) => x.id === ct.clientId) : null;
+    return (c && c.channel) || null;
+  }
+  // Значок влияния стал подписью-пилюлей: слово в круг 22 на 22 не помещается. Класс берётся
+  // из КЛЮЧА, а не из отображаемого текста, — иначе смена подписи сломает вёрстку.
+  function inflPill(k) {
+    const v = INFLUENCE.find((x) => x.k === k) || INFLUENCE[1];
+    return '<span class="c-infl c-infl-' + v.k + '" title="Влияние на решение">' + v.label + '</span>';
   }
   function dealContactsInner(d) {
     const list = dealContacts(d);
     const rows = list.map((ct, i) => {
       const c = ct.clientId ? D().clients.find((x) => x.id === ct.clientId) : null;
-      const sub = [ct.role, (c && c.goal) || ct.phone].filter(Boolean).join(' · ');
+      const co = ct.companyId ? (D().companies || []).find((x) => x.id === ct.companyId) : null;
+      const ch = partChannel(ct);
+      const chan = ch ? '<span class="dc-ch" title="Предпочитаемый канал: ' + chanMeta(ch)[1] + '">' + I(chanMeta(ch)[0]) + '</span>' : '';
+      const from = co ? '<span class="dc-co" data-company="' + co.id + '" style="cursor:pointer">' + co.name + '</span>' : '';
+      const sub = [roleOf(ct), from, (c && c.goal) || ct.phone].filter(Boolean).join(' · ');
       const star = ct.primary ? '<span class="c-star" title="Основной контакт">' + I('star') + '</span>' : '';
       const main = '<div class="dc-main"' + (ct.clientId ? ' data-client="' + ct.clientId + '" style="cursor:pointer"' : '') + '>' +
         '<div class="fi i-acc">' + I('users') + '</div>' +
         '<div class="ft"><div class="t">' + contactDisplayName(ct) + star + '</div><div class="m">' + (sub || '') + '</div></div></div>';
-      const acts = '<div class="dc-acts">' + ratingBadge(ct.rating) +
-        '<button class="tl-ic-btn" data-dcedit="' + d.id + ':' + i + '" title="Изменить роль/рейтинг">' + I('pencil') + '</button>' +
+      const acts = '<div class="dc-acts">' + chan + inflPill(influenceOf(ct)) +
+        '<button class="tl-ic-btn" data-dcedit="' + d.id + ':' + i + '" title="Изменить роль и влияние">' + I('pencil') + '</button>' +
         (list.length > 1 ? '<button class="tl-ic-btn" data-dcdel="' + d.id + ':' + i + '" title="Убрать из сделки">' + I('x') + '</button>' : '') + '</div>';
       return '<div class="dc-row">' + main + acts + '</div>';
     }).join('');
     return '<div class="dc-list">' + rows + '</div>';
   }
+  // Участники сделки так, как их читает Консьерж: имя, роль словом, влияние, канал, компания
+  // и пометка основного. Одна форма для экрана и для модели — иначе они разойдутся.
+  function dealParticipants(d) {
+    return dealContacts(d).map((ct) => ({
+      имя: contactDisplayName(ct), контакт: ct.clientId || null, роль: roleOf(ct),
+      сторона: ({ client: 'клиент', other: 'другая сторона', broker: 'посредник' })[roleGroupOf(ct)],
+      влияние: inflLabel(influenceOf(ct)), канал: partChannel(ct) || null,
+      компания: ct.companyId || null, основной: !!ct.primary,
+    }));
+  }
   function openDealContactForm(dealId, index) {
     const d = D().deals.find((x) => x.id === dealId); if (!d) return;
     const list = dealContacts(d);
     const isNew = index == null || index < 0;
-    const ct = isNew ? { role: 'Со-покупатель', rating: 'B' } : (list[index] || {});
-    const roleSel = '<select id="dc_role">' + CONTACT_ROLES.map((r) => '<option' + (r === ct.role ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
-    const rateSel = '<select id="dc_rate">' + CONTACT_RATINGS.map((r) => '<option' + (r === (ct.rating || 'B') ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
+    const ct = isNew ? { role: 'Со-покупатель', influence: 'infl' } : (list[index] || {});
+    const cur = roleOf(ct);
+    // Группы в списке — не украшение: они говорят, чью сторону человек представляет,
+    // а от этого зависит, может ли он быть основным контактом сделки.
+    const roleSel = '<select id="dc_role">' + ROLE_GROUPS.map((g) => '<optgroup label="' + g.label + '">' +
+      g.roles.map((r) => '<option' + (r === cur ? ' selected' : '') + '>' + r + '</option>').join('') + '</optgroup>').join('') + '</select>';
+    const inf = influenceOf(ct);
+    const rateSel = '<select id="dc_rate">' + INFLUENCE.map((v) => '<option value="' + v.k + '"' + (v.k === inf ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select>';
+    const chSel = '<select id="dc_chan"><option value="">по контакту</option>' +
+      CHANNELS.map((c) => '<option value="' + c + '"' + (c === ct.channel ? ' selected' : '') + '>' + chanMeta(c)[1] + '</option>').join('') + '</select>';
+    const coSel = '<select id="dc_co"><option value="">—</option>' +
+      (D().companies || []).map((c) => '<option value="' + c.id + '"' + (c.id === ct.companyId ? ' selected' : '') + '>' + escAttr(c.name) + '</option>').join('') + '</select>';
     const nameField = ct.clientId
       ? '<label class="fld"><span>Контакт</span><input type="text" value="' + contactDisplayName(ct).replace(/"/g, '&quot;') + '" disabled></label>'
       : '<label class="fld"><span>Имя</span><input id="dc_name" type="text" value="' + ((ct.name || '').replace(/"/g, '&quot;')) + '" placeholder="Напр.: Пётр Петров"></label>';
     const phoneField = ct.clientId ? '' : '<label class="fld"><span>Телефон</span><input id="dc_phone" type="text" value="' + ((ct.phone || '').replace(/"/g, '&quot;')) + '" placeholder="+971 …"></label>';
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Контакт участвует в сделке. Рейтинг A/B/C — влияние на решение.</p>' +
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Участник сделки. Роль говорит, чью сторону он представляет; влияние — как он решает. Основным может быть только участник со стороны клиента: основной — тот, чьё решение мы ведём.</p>' +
       '<div class="match-grid">' + nameField +
       '<label class="fld"><span>Роль в сделке</span>' + roleSel + '</label>' +
-      '<label class="fld"><span>Рейтинг (влияние)</span>' + rateSel + '</label>' + phoneField + '</div>' +
+      '<label class="fld"><span>Влияние на решение</span>' + rateSel + '</label>' +
+      '<label class="fld"><span>Предпочитаемый канал</span>' + chSel + '</label>' +
+      '<label class="fld"><span>От какой компании</span>' + coSel + '</label>' + phoneField + '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="dc_primary"' + (ct.primary ? ' checked' : '') + '> Основной контакт сделки</label>';
     openModal((isNew ? 'Добавить контакт' : 'Контакт · ' + contactDisplayName(ct)) + ' · ' + d.title, body,
       '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDealContact" data-deal="' + dealId + '" data-idx="' + (isNew ? -1 : index) + '">' + I('check') + 'Сохранить</button>');
@@ -3131,12 +3199,24 @@
     const isNew = index == null || index < 0;
     const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
     const rec = isNew ? {} : (d.contacts[index] || {});
-    rec.role = g('dc_role') || rec.role || 'Со-покупатель';
-    rec.rating = g('dc_rate') || rec.rating || 'B';
+    rec.role = g('dc_role') || roleOf(rec);
+    rec.influence = g('dc_rate') || influenceOf(rec);
+    delete rec.rating;                                  // буквенная шкала уходит вместе с правкой
+    rec.channel = g('dc_chan') || undefined;
+    rec.companyId = g('dc_co') || undefined;
     if (!rec.clientId) { rec.name = g('dc_name') || rec.name || 'Без имени'; const ph = g('dc_phone'); if (ph) rec.phone = ph; }
-    rec.primary = !!(document.getElementById('dc_primary') || {}).checked;
+    /* Основным может быть только участник со стороны клиента. Прежде код синхронизировал
+       клиента сделки, лишь если у участника была ссылка на контакт, и молча оставлял
+       в шапке прежнего: менеджер девелопера получал звёздочку, а сделка — чужое имя. */
+    const wantsPrimary = !!(document.getElementById('dc_primary') || {}).checked;
+    rec.primary = wantsPrimary && roleGroupOf(rec) === 'client';
+    if (wantsPrimary && !rec.primary) WS.storeApi.toast('Основным может быть только участник со стороны клиента');
     if (isNew) d.contacts.push(rec);
     if (rec.primary) d.contacts.forEach((x) => { if (x !== rec) x.primary = false; });
+    if (!d.contacts.some((x) => x.primary)) {
+      const back = d.contacts.find((x) => roleGroupOf(x) === 'client');
+      if (back) back.primary = true;                    // сделка без основного контакта не бывает
+    }
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId; // keep the deal's primary client in sync
     // Правка участника пережила только перерисовку карточки: без save() она исчезала на F5.
@@ -3149,7 +3229,12 @@
     if (!Array.isArray(d.contacts)) d.contacts = dealContacts(d).slice();
     if (d.contacts.length <= 1) { WS.storeApi.toast('Нельзя убрать единственный контакт'); return; }
     const removed = d.contacts.splice(index, 1)[0];
-    if (removed && removed.primary && d.contacts.length) d.contacts[0].primary = true;
+    // Замена основного ищется среди стороны клиента, а не берётся первой попавшейся строкой:
+    // иначе после открепления покупателя основным становится юрист застройщика.
+    if (removed && removed.primary && d.contacts.length) {
+      const back = d.contacts.find((x) => roleGroupOf(x) === 'client') || d.contacts[0];
+      back.primary = true;
+    }
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId;
     WS.storeApi.save();
@@ -8080,6 +8165,7 @@
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
-    cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
+    ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});

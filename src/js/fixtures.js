@@ -298,9 +298,13 @@
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
       consideredProjects: ['Creekline Residences', 'Bay Central Tower'], stageDays: 1, requestId: 'r_anna',
       nextDue: 'сегодня 16:00', deposit: { kind: 'EOI', amount: 100000, paid: false, refundable: true },
+      // Роли пересекают стол: сторона клиента, другая сторона и посредники. Влияние — словом,
+      // тем же словарём, что у контактов компаний; буквенная шкала A/B/C ушла.
       contacts: [
-        { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
-        { name: 'Пётр Петров', role: 'Супруг — со-решение', rating: 'B', phone: '+971 55 210 6642' },
+        { clientId: 'c_anna', role: 'Клиент', influence: 'lpr', primary: true, channel: 'whatsapp' },
+        { name: 'Пётр Петров', role: 'Супруг', influence: 'infl', phone: '+971 55 210 6642', channel: 'call' },
+        { name: 'Mohammed Al Mazrouei', role: 'Менеджер девелопера', influence: 'exec',
+          phone: '+971 50 123 4456', channel: 'email', companyId: 'co_emaar' },
       ],
       gates: { kyc: true },
       prov: { budget: 'confirmed', source: 'ai', paymentForm: 'ai', objectType: 'confirmed', goal: 'ai' } },
