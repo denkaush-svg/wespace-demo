@@ -6111,13 +6111,51 @@
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
+  //
+  // Строка НЕ уводит в раздел Консьержа: `data-thread` делал именно это — открывал тред и уходил
+  // на другой экран, так что от сделки не оставалось ничего. Диалог открывается здесь же, над
+  // рабочей областью, и рабочая область остаётся на месте: объекты, запланированное, история
+  // видны под ним, левая колонка с фактами и участниками не двигается вовсе.
   function dealComposer(d) {
+    // Пока диалог свёрнут — это приглашение; как только он открыт, та же строка становится
+    // настоящим полем ввода. Второй строки не появляется: два поля ввода на одном экране и были
+    // тем дублем, из-за которого «Работать через Консьержа» убрали.
+    if (S().dealChat === d.id) {
+      return '<div class="dcard-composer">' +
+        '<div class="dx-cbar live"><div class="w">W</div>' +
+        '<input id="dealChatPrompt" class="ph-in" autocomplete="off" ' +
+        'placeholder="Поручите Консьержу по этой сделке — Enter отправит…">' +
+        '<button class="send" data-act="dealChatSend" aria-label="Отправить">' + I('arrowRight') + '</button></div></div>';
+    }
     return '<div class="dcard-composer">' +
-      '<div class="dx-cbar" data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase">' +
+      '<div class="dx-cbar" data-dealchat="' + d.id + '">' +
       '<div class="w">W</div>' +
       '<div class="ph">Записать заметку или поручить Консьержу — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
       '<div class="send">' + I('arrowRight') + '</div></div></div>';
   }
+  // Диалог внутри карточки. Занимает собственную высоту и прокручивается внутри себя, а не
+  // выталкивает работу за экран: макет партнёра отдавал Консьержу всю правую колонку, и объекты
+  // с событиями исчезали — он просил «не выходить из сделки», а нарисовал экран без сделки.
+  function dealChatPanel(d) {
+    if (S().dealChat !== d.id) return '';
+    const t = WS.engine.activeThread() || { label: d.title || 'Сделка', icon: 'briefcase' };
+    return '<div class="dcard-chat">' +
+      '<div class="dcard-chat-h">' + I('sparkle') +
+      '<span class="dcard-chat-t">Консьерж · ' + escAttr(t.label || d.title || 'сделка') + '</span>' +
+      '<span class="dcard-chat-n">знает контекст этой сделки</span>' +
+      '<button class="btn xs ghost" data-act="dealChatClose" title="Свернуть диалог">' + I('x') + 'Свернуть</button></div>' +
+      '<div class="chat" id="chat"></div></div>';
+  }
+  // Открыть/закрыть диалог — это состояние экрана, а не переход. Маршрут не меняется, история
+  // навигации не растёт, кнопка «назад» по-прежнему ведёт к списку сделок, а не к чату.
+  function openDealChat(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    S().dealChat = dealId;
+    WS.engine.bindThread('deal:' + dealId, (c.name ? c.name + ' · ' : '') + (d.title || 'сделка'), 'briefcase');
+    WS.storeApi.emit();
+  }
+  function closeDealChat() { S().dealChat = null; WS.storeApi.emit(); }
   function viewDealDetail(id) {
     const spec = dealSpec(id);
     if (!spec) return viewClients();
@@ -6134,7 +6172,7 @@
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + dealAside(d) + '</aside>' +
       aside +
-      '<div class="dcard-main">' + entityActionBar(dealActions(d)) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
+      '<div class="dcard-main">' + entityActionBar(dealActions(d)) + dealChatPanel(d) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
       '</div>' + dealComposer(d) + '</div>';
   }
   // Вкладки карточки (параметры, контакты, задачи, документы, история) остаются как были —
@@ -8814,6 +8852,8 @@
     document.getElementById('drawer').innerHTML = drawer();
 
     if (st.view === 'concierge') mountConcierge();
+    // Лента внутри карточки — тот же движок и тот же тред, что и в разделе: второго чата нет.
+    if (st.view === 'dealDetail' && st.dealChat) mountConcierge();
     if (st.view === 'objects') bindObjects();
     bindListSearch();
     if (st.view === 'finance') renderFinance();
@@ -8842,7 +8882,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

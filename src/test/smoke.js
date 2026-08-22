@@ -5146,6 +5146,79 @@ setTimeout(async () => {
     }
   }
 
+  // ---- Консьерж работает внутри карточки: без перехода и без потери экрана ----
+  {
+    WS.store.dealChat = null;
+    WS.ui.dealCard('d_anna');
+    const viewWas = WS.store.view;
+    const stackWas = (WS.store.navStack || []).length;
+    const before = doc.querySelector('#app .view').textContent;
+    // Строка ввода внизу больше не помечена как переход в раздел: именно это и уводило.
+    const cbar = doc.querySelector('#app .view .dcard-composer .dx-cbar');
+    check('консьерж · строка ввода в карточке не ведёт в раздел',
+      !!cbar && !cbar.hasAttribute('data-thread') && cbar.hasAttribute('data-dealchat'),
+      cbar ? cbar.outerHTML.slice(0, 90) : 'строки нет');
+
+    // Настоящий клик — не вызов функции: именно на клике старое поведение и уходило с экрана.
+    const errsWas = errors.length;
+    cbar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('консьерж · клик по строке ничего не сломал', errors.length === errsWas, errors.slice(errsWas).join('; '));
+    check('консьерж · экран не сменился', WS.store.view === viewWas, 'было ' + viewWas + ', стало ' + WS.store.view);
+    check('консьерж · перехода в историю навигации не записано',
+      (WS.store.navStack || []).length === stackWas, (WS.store.navStack || []).length + ' против ' + stackWas);
+    check('консьерж · диалог открылся именно по этой сделке', WS.store.dealChat === 'd_anna', String(WS.store.dealChat));
+
+    // Читаем защищённо: если экран всё-таки сменился, `.view` может не существовать —
+    // проверка должна показать провал, а не уронить весь прогон на null.
+    const afterEl = doc.querySelector('#app .view');
+    const after = afterEl ? afterEl.textContent : '';
+    check('консьерж · лента диалога появилась в карточке', !!doc.querySelector('#app .view .dcard-chat .chat'));
+    check('консьерж · и это тот же тред, что и в разделе',
+      (WS.engine.activeThread() || {}).id === 'deal:d_anna', ((WS.engine.activeThread() || {}).id) || 'нет треда');
+    // Главное требование: остальное на экране осталось видимым, а не свернулось и не исчезло.
+    check('консьерж · левая колонка с фактами и участниками осталась',
+      !!doc.querySelector('#app .view .dcard-aside') &&
+      /Участники/.test((doc.querySelector('#app .view .dcard-aside') || { textContent: '' }).textContent));
+    // Не по заголовку, а по существу: объект сделки назван на экране поимённо.
+    {
+      const annaDeal = dd().deals.find((x) => x.id === 'd_anna');
+      const lotNames = (WS.ui.dealLots ? WS.ui.dealLots(annaDeal) : []).map((o) => o.name.split(',')[0]);
+      check('консьерж · объекты сделки остались на экране',
+        lotNames.length > 0 && lotNames.every((n) => after.indexOf(n) >= 0),
+        'ожидались: ' + lotNames.join(', '));
+    }
+    check('консьерж · история и работа не исчезли', after.indexOf('Последние события') >= 0);
+    check('консьерж · лента шагов сделки осталась', doc.querySelectorAll('#app .view .dx-path .dx-step').length > 0);
+    // Ничего из того, что было до открытия, не должно было пропасть.
+    const lost = ['Участники', 'Последние события', 'Клиент · связь']
+      .filter((w) => before.indexOf(w) >= 0 && after.indexOf(w) < 0);
+    check('консьерж · открытие диалога ничего с экрана не унесло', lost.length === 0, lost.join(', '));
+    // Второй строки ввода не появилось — два поля и были тем дублем, который убирали.
+    check('консьерж · поле ввода на экране одно',
+      doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1 &&
+      !!doc.getElementById('dealChatPrompt'));
+    // Лента обязана иметь собственный предел высоты, иначе она вытолкнет работу за экран.
+    // В jsdom стили не применяются — правило проверяется по самому CSS.
+    {
+      const cssSrc = read('css/app.css');
+      check('консьерж · у ленты в карточке есть свой предел высоты и своя прокрутка',
+        /\.dcard-chat \.chat \{[^}]*max-height[^}]*overflow-y:\s*auto/.test(cssSrc),
+        (cssSrc.match(/\.dcard-chat \.chat \{[^}]*\}/) || ['правила нет'])[0].slice(0, 110));
+    }
+    // Свернуть — вернуться к прежнему виду, снова без перехода.
+    const closeBtn = doc.querySelector('#app .view [data-act="dealChatClose"]');
+    check('консьерж · есть чем свернуть', !!closeBtn);
+    if (closeBtn) closeBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('консьерж · свёрнут без смены экрана',
+      WS.store.dealChat === null && WS.store.view === viewWas, WS.store.view + ' / ' + WS.store.dealChat);
+    check('консьерж · и карточка вернулась к прежнему виду',
+      !doc.querySelector('#app .view .dcard-chat') && !!doc.querySelector('#app .view .dcard-composer .dx-cbar'));
+    // Раздел Консьержа при этом продолжает открываться отдельно — второй вход не сломан.
+    WS.engine.openThread('deal:d_anna', 'Проверка', 'briefcase');
+    check('консьерж · раздел Консьержа по-прежнему открывается сам по себе', WS.store.view === 'concierge', WS.store.view);
+    WS.ui.dealCard('d_anna');
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

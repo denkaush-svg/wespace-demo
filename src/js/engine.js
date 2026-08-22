@@ -421,13 +421,19 @@
     setTimeout(() => advance(), 60);
   }
 
-  function openThread(threadId, label, icon) {
+  // Выбрать тред, НЕ уходя с текущего экрана. Диалог внутри карточки сделки и раздел Консьержа —
+  // это один и тот же тред, показанный в двух местах; разница только в том, меняется ли маршрут.
+  function bindThread(threadId, label, icon) {
     const t = ensureThread(threadId);
     if (label) t.label = label;
     if (icon) t.icon = icon;
     engine.activeThreadId = threadId;
     engine.session = null;
     markSeen(threadId);
+    return t;
+  }
+  function openThread(threadId, label, icon) {
+    bindThread(threadId, label, icon);
     WS.router.go('concierge');
   }
   function closeThread() { engine.activeThreadId = null; engine.session = null; WS.storeApi.emit(); }
@@ -1106,7 +1112,7 @@
     // A getter alone meant a test could not set up that situation at all.
     get lastReply() { return engine.lastReply; },
     set lastReply(v) { engine.lastReply = v; },
-    openThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
+    openThread, bindThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     pendingAction, setPendingAction, clearPendingAction,
     activeThreadId: () => engine.activeThreadId,
