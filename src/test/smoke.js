@@ -1317,21 +1317,39 @@ setTimeout(async () => {
     // Путь на карточке стал сквозным: слева пройденный пресейл, справа шаги договора.
     // Прежняя проверка считала ВСЕ шаги ленты и после перекладки ловила бы пресейл как лишний —
     // считаем собственные шаги сделки (у них есть data-dealstage), пресейл проверяется отдельно ниже.
-    const off = [], nopre = [];
+    const off = [], nopre = [], pathLen = [];
     (dd().deals || []).forEach((d) => {
       const want = ((WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || []).filter((k) => k !== 'lost');
       WS.ui.dealCard(d.id);
       const n = doc.querySelectorAll('#app .view .dx-path .dx-step[data-dealstage]').length;
       if (n !== want.length) off.push(d.id + ': ' + n + ' против ' + want.length);
       // Пресейл рисуется только у сделки, выросшей из запроса, и всегда неинтерактивен:
-      // стадия запроса вычисляется из фактов, руками её не выставляют.
-      const pre = doc.querySelectorAll('#app .view .dx-path .dx-step.pre');
-      if (d.requestId && !pre.length) nopre.push(d.id + ': пресейла нет');
-      if (!d.requestId && pre.length) nopre.push(d.id + ': пресейл без запроса');
-      [].slice.call(pre).forEach((el) => { if (el.tagName === 'BUTTON' || el.hasAttribute('data-dealstage')) nopre.push(d.id + ': пресейл кликабелен'); });
+      // стадия запроса вычисляется из фактов, руками её не выставляют. Он представлен одной плашкой.
+      const preSum = doc.querySelectorAll('#app .view .dx-path .dx-pre-sum');
+      if (d.requestId && !preSum.length) nopre.push(d.id + ': пресейла нет');
+      if (!d.requestId && preSum.length) nopre.push(d.id + ': пресейл без запроса');
+      [].slice.call(preSum).forEach((el) => { if (el.tagName === 'BUTTON' || el.hasAttribute('data-dealstage')) nopre.push(d.id + ': пресейл кликабелен'); });
+      // Путь не должен содержать более: 1 чипа пресейла + 1 границы + N шагов договора
+      const pathEl = doc.querySelector('#app .view .dx-path');
+      if (pathEl && pathEl.children.length > n + 2) pathLen.push(d.id + ': ' + pathEl.children.length + ' > ' + (n + 2));
     });
     check('сделка · путь рисует ровно шаги своего договора', off.length === 0, off.join(' | '));
     check('сделка · и пресейл впереди — пройденным неинтерактивным участком', nopre.length === 0, nopre.slice(0, 4).join(' | '));
+    check('сделка · путь не переполнен (≤ свои шаги + 2)', pathLen.length === 0, pathLen.join(' | '));
+    /* Плашка пресейла — единственное, что говорит «этот участок пройден», после того как пять
+       отдельных шагов из ленты убрали. Она жила в медиазапросе для узкого экрана: убрав шаги и
+       оставив её там, пресейл стёрли бы с десктопа целиком. В jsdom это невидимо — стили не
+       применяются, элемент находится селектором в любом случае, — поэтому правило проверяется
+       по самому CSS: показ должен стоять ВНЕ медиазапроса. */
+    {
+      const cssSrc = read('css/app.css');
+      const shown = cssSrc.indexOf('.dx-pre-sum { display: inline-flex');
+      const inMedia = shown > 0 && /@media[^{]*\{(?:[^{}]|\{[^{}]*\})*$/.test(cssSrc.slice(0, shown));
+      check('сделка · плашка пресейла видна на любой ширине, а не только на телефоне',
+        shown > 0 && !inMedia,
+        shown < 0 ? 'правила «.dx-pre-sum { display: inline-flex» в CSS нет — пресейл не показан нигде'
+          : (inMedia ? 'правило спрятано в медиазапросе — на широком экране пресейла не видно' : ''));
+    }
     WS.ui.dealCard('d_anna');
     check('сделка · граница «условия согласованы» нарисована между пресейлом и договором',
       doc.querySelectorAll('#app .view .dx-path .dx-bound').length === 1,

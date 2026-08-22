@@ -2019,17 +2019,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcard-title .deal-title-text:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--acc); }
 .dcard-sub { font-size: 12.5px; color: var(--mut); margin: 4px 0 14px; }
 .dcard-pathrow { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
-.dx-path { display: flex; align-items: flex-start; flex: 1 1 460px; min-width: 0; overflow-x: auto; padding-bottom: 4px; }
-.dx-path .dx-step { flex: 1 0 auto; min-width: 74px; }
+.dx-path { display: flex; align-items: flex-start; flex: 1 1 460px; min-width: 0; padding-bottom: 4px; }
+.dx-path .dx-step { flex: 1; min-width: 0; }
 .dx-path.long .dx-step { min-width: 62px; }
 .dx-path.long .dx-step .l { font-size: 10.5px; max-width: 84px; margin-top: 6px; }
 .dx-path.long .dx-step .d { width: 26px; height: 26px; font-size: 11.5px; }
 .dx-path.long .dx-step::before { top: 12px; }
-/* Пресейл — пройденный участок: он приглушён и не кликается, потому что стадия запроса
-   вычисляется из фактов, а не выставляется рукой. Кликабельный вид обещал бы обратное. */
-.dx-path .dx-step.pre { cursor: default; opacity: .62; }
-.dx-path .dx-step.pre .d { background: var(--mut); border-color: var(--mut); }
-.dx-path .dx-step.pre::before { background: var(--mut); }
 /* Граница «условия согласованы» — тот самый переход, из-за которого шёл весь спор.
    Она рисуется явно: невидимая читается как «всё это одно и то же». */
 /* Граница держит собственную колонку, а не висит поверх соседних подписей: подпись шириной
@@ -2067,16 +2062,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .dcard-main { min-width: 0; }
 }
 
-/* Свёрнутый пресейл — только на узком экране. Пять пройденных шагов там занимают весь экран,
-   и агент при открытии карточки видит ровно то, что уже позади. Плашка говорит то же самое
-   одной строкой, а полный список остаётся в подсказке и в карточке запроса. */
-.dx-pre-sum { display: none; }
+/* Свёрнутый пресейл — на ЛЮБОЙ ширине. Пятью отдельными шагами лента превращалась в
+   одиннадцать элементов в горизонтальной прокрутке, и шаги договора — то, ради чего карточку
+   открывают, — теряли собственные пропорции. Плашка говорит то же самое одной строкой,
+   полный список остаётся в подсказке и в карточке запроса. */
+.dx-pre-sum { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; align-self: center;
+  font-size: 11px; font-weight: 600; color: var(--mut); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; margin-right: 8px; white-space: nowrap; }
+.dx-pre-sum svg { width: 12px; height: 12px; opacity: .7; }
 @media (max-width: 899.98px) {
-  .dx-path .dx-step.pre { display: none; }
-  .dx-pre-sum { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; align-self: center;
-    font-size: 11px; font-weight: 600; color: var(--mut); background: var(--surface-2);
-    border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; margin-right: 4px; white-space: nowrap; }
-  .dx-pre-sum svg { width: 12px; height: 12px; opacity: .7; }
+  .dx-pre-sum { margin-right: 4px; }
   /* На телефоне подпись границы снимается: плашка «пресейл пройден» уже сказала то же самое,
      а 54 пикселя текста поверх подписи текущего шага делают нечитаемыми обе. */
   .dx-bound { width: 20px; }

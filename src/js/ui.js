@@ -3294,8 +3294,6 @@
   function dealThroughPath(d) {
     const r = d.requestId ? requestById(d.requestId) : null;
     const pre = r ? ['new', 'qual', 'offer', 'meet', 'talks'].map((k) => reqStageLabel(k, r)) : [];
-    const preHtml = pre.map((l) => '<span class="dx-step done pre" title="Участок до согласования условий — стадии запроса вычисляются из фактов и вручную не выставляются">' +
-      '<span class="d">' + I('check') + '</span><span class="l">' + l + '</span></span>').join('');
     const s = funnelSteps(d);
     const own = s.cols.map((c, i) => {
       const cls = s.lost ? 'todo' : (i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo'));
@@ -3303,15 +3301,16 @@
       return '<button class="dx-step ' + cls + '" data-dealstage="' + d.id + '" data-stage="' + s.order[i] + '">' +
         '<span class="d">' + inner + '</span><span class="l">' + c + '</span></button>';
     }).join('');
-    // На узком экране пройденный участок сворачивается в одну плашку, а не прокручивается пятью
-    // шагами: иначе при открытии карточки видно только то, что уже позади, а текущий шаг —
-    // за краем экрана. Свёртка чисто оформительская (CSS), поэтому работает и без скриптов.
+    // Пройденный пресейл — ОДНА плашка, а не пять шагов, и на любой ширине. Пятью шагами лента
+    // становилась одиннадцатью элементами в горизонтальной прокрутке: шаги договора, ради которых
+    // карточку открывают, сжимались до 62 пикселей и подписи в 10.5. Суть сохранена — участок
+    // виден пройденным, граница нарисована, стадии запроса перечислены в подсказке.
     const preSum = pre.length ? '<span class="dx-pre-sum" title="' + escAttr(pre.join(' → ')) + '">' +
       I('check') + 'пресейл пройден · ' + pre.length + '</span>' : '';
     const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
       '<span class="dx-bound-l">условия согласованы</span></span>' : '';
     const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
-    return '<div class="dx-path' + (pre.length + s.cols.length > 7 ? ' long' : '') + '">' + preSum + preHtml + bound + own + '</div>' + lost;
+    return '<div class="dx-path' + (s.cols.length > 7 ? ' long' : '') + '">' + preSum + bound + own + '</div>' + lost;
   }
   // Справа от пути: когда запрос стал сделкой и сколько она стоит на текущем шаге.
   function dealPathMeta(d) {

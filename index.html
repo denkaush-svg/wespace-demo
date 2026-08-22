@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:26</title>
+  <title>WESPACE · сборка 15:27</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:26';
+    window.WS_BUILD='15:27';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -937,10 +937,16 @@ button { font-family: inherit; cursor: pointer; }
 .dc-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .c-star { color: var(--acc); display: inline-flex; margin-left: 4px; }
 .c-star svg { width: 13px; height: 13px; }
-.c-rate { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11.5px; font-weight: 700; }
-.c-rate-a { background: var(--ok-soft); color: var(--ok); }
-.c-rate-b { background: #FDECD8; color: #B8690F; }
-.c-rate-c { background: var(--surface-3); color: var(--mut); }
+/* Влияние участника — подпись, а не буква в круге: «A» ничего не говорит человеку, открывшему
+   карточку впервые. Класс берётся из ключа, а не из слова, — смена подписи вёрстку не ломает. */
+.c-infl { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 9px;
+  font-size: 11px; font-weight: 700; white-space: nowrap; }
+.c-infl-lpr { background: var(--ok-soft); color: var(--ok); }
+.c-infl-infl { background: #FDECD8; color: #B8690F; }
+.c-infl-exec { background: var(--surface-3); color: var(--mut); }
+.dc-ch { display: inline-grid; place-items: center; color: var(--mut); }
+.dc-ch svg { width: 14px; height: 14px; }
+.dc-co { border-bottom: 1px solid var(--acc-line); }
 /* Tabbed entity card (P3 redesign) */
 .dx-stepper { display: flex; margin: 2px 0 12px; }
 .dx-sec .dx-stepper { margin: 12px 0 4px; }
@@ -2163,17 +2169,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcard-title .deal-title-text:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--acc); }
 .dcard-sub { font-size: 12.5px; color: var(--mut); margin: 4px 0 14px; }
 .dcard-pathrow { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
-.dx-path { display: flex; align-items: flex-start; flex: 1 1 460px; min-width: 0; overflow-x: auto; padding-bottom: 4px; }
-.dx-path .dx-step { flex: 1 0 auto; min-width: 74px; }
+.dx-path { display: flex; align-items: flex-start; flex: 1 1 460px; min-width: 0; padding-bottom: 4px; }
+.dx-path .dx-step { flex: 1; min-width: 0; }
 .dx-path.long .dx-step { min-width: 62px; }
 .dx-path.long .dx-step .l { font-size: 10.5px; max-width: 84px; margin-top: 6px; }
 .dx-path.long .dx-step .d { width: 26px; height: 26px; font-size: 11.5px; }
 .dx-path.long .dx-step::before { top: 12px; }
-/* Пресейл — пройденный участок: он приглушён и не кликается, потому что стадия запроса
-   вычисляется из фактов, а не выставляется рукой. Кликабельный вид обещал бы обратное. */
-.dx-path .dx-step.pre { cursor: default; opacity: .62; }
-.dx-path .dx-step.pre .d { background: var(--mut); border-color: var(--mut); }
-.dx-path .dx-step.pre::before { background: var(--mut); }
 /* Граница «условия согласованы» — тот самый переход, из-за которого шёл весь спор.
    Она рисуется явно: невидимая читается как «всё это одно и то же». */
 /* Граница держит собственную колонку, а не висит поверх соседних подписей: подпись шириной
@@ -2211,16 +2212,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .dcard-main { min-width: 0; }
 }
 
-/* Свёрнутый пресейл — только на узком экране. Пять пройденных шагов там занимают весь экран,
-   и агент при открытии карточки видит ровно то, что уже позади. Плашка говорит то же самое
-   одной строкой, а полный список остаётся в подсказке и в карточке запроса. */
-.dx-pre-sum { display: none; }
+/* Свёрнутый пресейл — на ЛЮБОЙ ширине. Пятью отдельными шагами лента превращалась в
+   одиннадцать элементов в горизонтальной прокрутке, и шаги договора — то, ради чего карточку
+   открывают, — теряли собственные пропорции. Плашка говорит то же самое одной строкой,
+   полный список остаётся в подсказке и в карточке запроса. */
+.dx-pre-sum { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; align-self: center;
+  font-size: 11px; font-weight: 600; color: var(--mut); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; margin-right: 8px; white-space: nowrap; }
+.dx-pre-sum svg { width: 12px; height: 12px; opacity: .7; }
 @media (max-width: 899.98px) {
-  .dx-path .dx-step.pre { display: none; }
-  .dx-pre-sum { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; align-self: center;
-    font-size: 11px; font-weight: 600; color: var(--mut); background: var(--surface-2);
-    border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; margin-right: 4px; white-space: nowrap; }
-  .dx-pre-sum svg { width: 12px; height: 12px; opacity: .7; }
+  .dx-pre-sum { margin-right: 4px; }
   /* На телефоне подпись границы снимается: плашка «пресейл пройден» уже сказала то же самое,
      а 54 пикселя текста поверх подписи текущего шага делают нечитаемыми обе. */
   .dx-bound { width: 20px; }
@@ -2233,6 +2234,53 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 }
 /* Последний блок карточки не должен навсегда оставаться под прилипшей строкой ввода. */
 .dcard { padding-bottom: 8px; }
+
+/* ---- Отношения с клиентом (волна 3) ----
+   Одна лента, два источника. Обязательство и повод отличаются не цветом строки, а меткой
+   справа: цвет уже занят срочностью, и два значения на одном канале читаются как одно. */
+.rel-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.rel-pill { font: inherit; font-size: 12px; font-weight: 600; color: var(--mut); cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  display: inline-flex; align-items: center; gap: 5px; }
+.rel-pill svg { width: 12px; height: 12px; }
+.rel-pill.on { color: var(--acc-ink, var(--ink)); background: var(--acc-soft, var(--surface-3)); border-color: var(--acc-line); }
+.rel-why { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; color: var(--faint);
+  margin-top: 8px; line-height: 1.45; }
+.rel-why svg { width: 13px; height: 13px; flex: 0 0 auto; margin-top: 1px; opacity: .7; }
+.rel-list { display: flex; flex-direction: column; }
+.rel-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.rel-row:last-child { border-bottom: 0; }
+.rel-row .ft { flex: 1 1 auto; min-width: 0; }
+.rel-row .ft .t { font-size: 13px; font-weight: 600; }
+.rel-row .ft .m { font-size: 11.5px; color: var(--mut); }
+.rel-tag { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+  color: var(--faint); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+.rel-tag.stop { color: var(--stop-ink, #b42318); border-color: var(--stop-line, var(--line)); }
+.rel-acts { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+@media (max-width: 599.98px) {
+  /* На телефоне метка и кнопки не помещаются в строку — они уходят под текст, а не режут его. */
+  .rel-row { flex-wrap: wrap; }
+  .rel-row .ft { flex: 1 1 100%; order: 2; }
+  .rel-tag { order: 3; }
+  .rel-acts { order: 4; margin-left: auto; }
+}
+
+/* ---- Лоты сделки (волна 3) ----
+   Строка лота = объект + то, что принадлежит именно этому лоту в этой сделке: своя
+   регистрация, своя ставка, свой исход. Вышедший лот не удаляется со страницы: агенту
+   нужно видеть, что с ним стало, а не обнаружить, что он исчез. */
+.lot-row { border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; }
+.lot-row:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.lot-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.lot-out .obj-mini { opacity: .55; }
+.lot-out .obj-mini-n { text-decoration: line-through; }
+
+/* Неподтверждённый итог виден бледным: он в ленте, но не в выводах. Отклонённый остаётся
+   со следом — иначе непонятно, почему Консьерж больше не предлагает вчерашнее. */
+.evc.oc-draft { opacity: .82; border-style: dashed; }
+.evc.oc-rejected { opacity: .55; border-style: dashed; }
+.evc.oc-rejected .evc-text { text-decoration: line-through; }
+.evc.oc-draft .evc-tags, .evc.oc-rejected .evc-tags { align-items: center; }
 
 
 /* ============================================================
@@ -2723,6 +2771,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const clients = [
     {
       id: 'c_anna', name: 'Анна Петрова', tag: 'main', lang: 'RU', channel: 'whatsapp',
+      // Тип клиента — правило движка поводов («инвестор покупает раз в год»), а не ярлык.
+      ctype: 'investor', birthday: '18 мая',
       consent: true, goal: 'Инвестиционная квартира', budget: 2000000,
       areas: ['Business Bay', 'Dubai Creek Harbour', 'JVC'], horizon: '1–3 месяца',
       note: 'Действующее согласие на сообщения. Активная история G1→G2→G3.',
@@ -2734,13 +2784,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         triggers: ['График первого платежа', 'Подтверждённая доходность'], bestTime: 'Будни, вечер',
         source: 'выведено из переписки G1–G3 (сигналы стиля)' },
     },
-    { id: 'c_lead15', name: 'Дмитрий Соколов', tag: 's15', lang: 'RU', channel: 'whatsapp', consent: true,
+    { id: 'c_lead15', name: 'Дмитрий Соколов', tag: 's15', lang: 'RU', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Инвестиционная квартира до 1,5 млн', budget: 1500000, areas: ['Дубай — район не указан'], horizon: 'не указан',
       note: 'Новый неквалифицированный лид. «Ищу инвестиционную квартиру в Дубае до 1,5 млн».', phone: '+971 52 •••• ••11 (DEMO)' },
-    { id: 'c_night', name: 'Sarah Mansour', tag: 's14', lang: 'EN', channel: 'whatsapp', consent: true,
+    { id: 'c_night', name: 'Sarah Mansour', tag: 's14', lang: 'EN', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Квартира 1BR под аренду', budget: 1300000, areas: ['JVC', 'Business Bay'], horizon: '2–4 месяца',
       note: 'Ночное входящее в 02:14. Ожидает агента.', phone: '+971 50 •••• ••77 (DEMO)' },
-    { id: 'c_overdue', name: 'Игорь Лебедев', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true,
+    { id: 'c_overdue', name: 'Игорь Лебедев', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Апартаменты под перепродажу', budget: 2400000, areas: ['Business Bay'], horizon: '1–2 месяца',
       note: 'Просроченное касание (обещали КП 12 мая).', phone: '+971 55 •••• ••02 (DEMO)',
       psych: { filled: true, decision: 'Статусный — важны престиж и «первым узнать»', values: ['Статус/престиж', 'Скорость'],
@@ -2748,19 +2798,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         channel: 'WhatsApp + звонок; любит голосовые', tone: 'Коротко, с эксклюзивом и срочностью',
         triggers: ['Эксклюзив/закрытый доступ', 'Ограниченность предложения'], bestTime: 'Утро',
         source: 'выведено из истории касаний (сигналы стиля)' } },
-    { id: 'c_noconsent', name: 'Марат Ибрагимов', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false,
+    { id: 'c_noconsent', name: 'Марат Ибрагимов', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false, ctype: 'enduser',
       goal: 'Квартира у воды', budget: 1800000, areas: ['Dubai Creek Harbour'], horizon: '3–6 месяцев',
       note: 'Нет действующего согласия — исключается из адресных отправок.', phone: '+971 54 •••• ••90 (DEMO)' },
-    { id: 'c_ambig', name: 'Елена Крылова', tag: 'g3', lang: 'RU', channel: 'whatsapp', consent: true,
+    { id: 'c_ambig', name: 'Елена Крылова', tag: 'g3', lang: 'RU', channel: 'whatsapp', consent: true, ctype: 'owner',
       goal: 'Офис под сдачу после отделки', budget: 2100000, areas: ['Business Bay'], horizon: '1–3 месяца',
       note: 'Две активные сделки — неоднозначная привязка заметки в G3.', phone: '+971 56 •••• ••45 (DEMO)' },
-    { id: 'c_docs', name: 'Виктор Орлов', tag: 's4', lang: 'RU', channel: 'email', consent: true,
+    { id: 'c_docs', name: 'Виктор Орлов', tag: 's4', lang: 'RU', channel: 'email', consent: true, ctype: 'enduser',
       goal: 'Квартира у воды под инвестицию', budget: 1950000, areas: ['Dubai Creek Harbour', 'DIFC'], horizon: '1–3 месяца',
       note: 'Документ в подготовке (S4).', phone: '+971 55 •••• ••28 (DEMO)' },
-    { id: 'c_partner', name: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true,
+    { id: 'c_partner', name: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true, ctype: 'investor',
       goal: 'Резиденция в Downtown для семьи', budget: 2600000, areas: ['Downtown'], horizon: '1–2 месяца',
       note: 'Требуется подключение клубного партнёра (S6).', phone: '+971 50 •••• ••63 (DEMO)' },
-    { id: 'c_owner', name: 'Сергей Орлов', tag: 'own', lang: 'RU', channel: 'email', consent: true,
+    { id: 'c_owner', name: 'Сергей Орлов', tag: 'own', lang: 'RU', channel: 'email', consent: true, ctype: 'owner',
       goal: 'Реализовать офисный блок в DIFC', budget: 12000000, areas: ['DIFC'], horizon: '3–6 месяцев',
       note: 'Управляющий портфелем Altura Capital. Собственник со стороны продажи — отдаёт блок на эксклюзив.',
       phone: '+971 4 401 9900 (DEMO)' },
@@ -2965,9 +3015,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       paymentForm: 'Рассрочка от застройщика', vat: false, source: 'Instagram', partnerAgent: null, companyId: null,
       consideredProjects: ['Creekline Residences', 'Bay Central Tower'], stageDays: 1, requestId: 'r_anna',
       nextDue: 'сегодня 16:00', deposit: { kind: 'EOI', amount: 100000, paid: false, refundable: true },
+      // Роли пересекают стол: сторона клиента, другая сторона и посредники. Влияние — словом,
+      // тем же словарём, что у контактов компаний; буквенная шкала A/B/C ушла.
       contacts: [
-        { clientId: 'c_anna', role: 'Покупатель', rating: 'A', primary: true },
-        { name: 'Пётр Петров', role: 'Супруг — со-решение', rating: 'B', phone: '+971 55 210 6642' },
+        { clientId: 'c_anna', role: 'Клиент', influence: 'lpr', primary: true, channel: 'whatsapp' },
+        { name: 'Пётр Петров', role: 'Супруг', influence: 'infl', phone: '+971 55 210 6642', channel: 'call' },
+        { name: 'Mohammed Al Mazrouei', role: 'Менеджер девелопера', influence: 'exec',
+          phone: '+971 50 123 4456', channel: 'email', companyId: 'co_emaar' },
       ],
       gates: { kyc: true },
       prov: { budget: 'confirmed', source: 'ai', paymentForm: 'ai', objectType: 'confirmed', goal: 'ai' } },
@@ -2984,6 +3038,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       funnel: 'sale', dealType: 'Продажа', objectType: 'ГАБ', readiness: 'готовый', saleKind: 'вторичка', side: 'покупатель', goal: 'Доходный актив',
       paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: null, companyId: 'co_altura',
       consideredProjects: ['DIFC Gate District'], stageDays: 2, requestId: 'r_viktor', lots: ['o_difc_a', 'o_difc_b'],
+      /* Регистрация идёт по каждому юниту отдельно — это подтверждено, а один договор на два
+         юнита нет. Поэтому состояние заводится картой на сделке, ключом по объекту: первый лот
+         уже зарегистрирован и идёт по своей ставке, второй записи не имеет и наследует ставку
+         объекта. Отсутствие записи — это «как у сделки», а не «пусто». */
+      lotState: { o_difc_a: { regNo: 'Title-2026-4471', regAt: '12 мая', commissionPct: 2.5 } },
       gates: { kyc: true, title: true, leases: true },
       prov: { budget: 'confirmed', source: 'confirmed', objectType: 'confirmed', goal: 'confirmed' } },
     // Сорвавшаяся сделка. Без неё воронка показывала 100% успеха на одном наблюдении — число,
@@ -3625,8 +3684,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   const events = [
     // Показ Creekline прошёл 9 мая (см. requestTimeline.r_anna) — в календаре стоит то, что
     // действительно впереди: разговор про график первого платежа, который держит бронирование.
-    { id: 'e_call_anna', clientId: 'c_anna', title: 'Звонок Анне — график первого платежа', when: 'сегодня 16:00', kind: 'call' },
-    { id: 'e_call_karim', clientId: 'c_partner', title: 'Звонок Karim Aziz', when: 'завтра 11:30', kind: 'call' },
+    // Запись календаря несёт ту же тройную область, что и задача. Прежде она знала только
+    // контакт — и встреча по одной сделке закрывала инвариант «нет живой сделки без
+    // запланированного события» по второй сделке того же человека.
+    { id: 'e_call_anna', clientId: 'c_anna', dealId: 'd_anna', title: 'Звонок Анне — график первого платежа', when: 'сегодня 16:00', kind: 'call' },
+    { id: 'e_call_karim', clientId: 'c_partner', dealId: 'd_karim_cross', title: 'Звонок Karim Aziz', when: 'завтра 11:30', kind: 'call' },
   ];
 
   // Night inbox (S14) + overdue signals for the start screen feed.
@@ -3805,8 +3867,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     district('arjan', 'Arjan', 11600, 8.1, { yoy: 13, dom: 31, offplan: 55 }),
   ];
 
+  /* Пороги, которые придётся калибровать на живых клиентах. Держим их данными, а не числами
+     внутри кода: выдумывать точное значение оснований нет, а менять его придётся по первым же
+     наблюдениям. `dormantDays` — когда контакт перестаёт считаться живым; `silenceDays` — когда
+     тишина становится поводом написать; `cueSilenceDays` — сколько молчит отклонённый повод. */
+  const settings = { dormantDays: 90, silenceDays: 30, cueSilenceDays: 30 };
+
+  /* Итог разговора, написанный Консьержем и ещё не подтверждённый. Он намеренно НЕ лежит
+     в ленте сделки: пока агент его не подтвердил, он не должен попадаться ни справке,
+     ни следующему шагу, ни ответу Консьержа. Факт контакта при этом уже записан — звонок
+     был, и это наблюдаемое событие. */
+  const outcomes = [
+    { id: 'oc_deal_d_anna_1', scope: 'deal', entityId: 'd_anna', factId: null, at: '13 мая · 19:05', ord: 131906,
+      by: 'Консьерж', state: 'draft',
+      text: 'Итог звонка: клиент согласен на рассрочку 60/40, просит зафиксировать цену до конца недели и прислать график платежей.' },
+  ];
+
   WS.fixtures = {
-    version: 1,
+    version: 1, settings, outcomes,
     DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
@@ -4242,7 +4320,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 24; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает. 23→24: tasks[].dealId / tasks[].requestId — область задачи (сделка → заявка → контакт); без неё у двух сделок одного клиента был общий список задач.
+  const SCHEMA = 25; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает. 23→24: tasks[].dealId / tasks[].requestId — область задачи (сделка → заявка → контакт); без неё у двух сделок одного клиента был общий список задач. 24→25: волна 3 — settings (пороги отношений и поводов), cueState (решение агента по поводу касания), clients[].birthday/ctype, clients[].relStage/relStageOver (ручная правка стадии отношений), deals[].lotState (пер-лотовое состояние), deals[].convertedAt, offers[] (версии коммерческих предложений), tasks[].outcome, участники сделки на новом словаре ролей и влияния плюс канал и компания.
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -4308,6 +4386,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       attribution: clone(f.attribution),
       clientSignals: clone(f.clientSignals),
       contracts: clone(f.contracts),
+      settings: clone(f.settings),
+      // Решение агента по поводу касания. Сам повод выводится из данных при каждом чтении —
+      // здесь остаётся только то, чего из данных не выведешь: что человек с ним сделал.
+      cueState: {},
+      // Коммерческие предложения по заявке и по сделке — версиями. Снимок, на котором заведена
+      // сделка, живёт отдельно (deals[].kpSnapshot) и остаётся неизменяемым.
+      offers: [],
+      /* Итоги, написанные моделью и ещё не подтверждённые. Живут ОТДЕЛЬНО от лент: пока
+         итог не подтверждён, он не должен попадаться никому, кто читает историю ради вывода. */
+      outcomes: clone(f.outcomes || []),
     };
   }
   // Funnel taxonomy is static config, not mutable state — expose it without cloning per reset.
@@ -4474,6 +4562,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function setView(v) { store.view = v; emit(); }
   function setScenarioStatus(id, s) { store.scenarioStatus[id] = s; save(); emit(); }
 
+  /* Договор рождается на подписании — и привязан к СМЕНЕ СТАДИИ, а не к нажатию кнопки.
+     Стадию двигают доска, Консьерж, сценарии и слой записи; если повесить создание на одну
+     из этих дверей, остальные три дадут сделку на подписании без договора. Операция
+     идемпотентна: второй договор по той же сделке не появляется. */
+  const CONTRACT_FROM = ['sign', 'reg', 'exec', 'won'];
+  function afterDealStage(rec) {
+    if (!rec || CONTRACT_FROM.indexOf(rec.stage) < 0) return;
+    if (WS.ui && WS.ui.ensureContract) WS.ui.ensureContract(rec.id);
+  }
+
   // ---- declarative effects: scenarios mutate shared data on result (spec §18.2)
   function applyEffects(effects) {
     if (!effects || !effects.length) return;
@@ -4481,10 +4579,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     effects.forEach((e) => {
       if (e.op === 'updateDeal') {
         const dl = d.deals.find((x) => x.id === e.id);
-        if (dl) Object.assign(dl, e.patch);
+        if (dl) { Object.assign(dl, e.patch); if (e.patch && e.patch.stage) afterDealStage(dl); }
       } else if (e.op === 'dealStage') {
         const dl = d.deals.find((x) => x.id === e.id);
-        if (dl) dl.stage = e.stage;
+        if (dl) { dl.stage = e.stage; afterDealStage(dl); }
       } else if (e.op === 'updateRequest') {
         // Пресейл живёт на заявке, а не на сделке: сценарии, которые раньше двигали стадию
         // сделки на «в работе», записывают факт сюда. Стадии здесь нет намеренно — она
@@ -4553,7 +4651,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     tasks: {
       safe: ['title', 'due', 'kind', 'assignee'],
       // Область задачи — структурное поле: от неё зависит, в какой карточке задача видна.
-      guarded: ['status', 'when', 'dealId', 'requestId'],
+      guarded: ['status', 'when', 'dealId', 'requestId', 'contractId'],
     },
     // У заявки нет строки «стадия»: она вычисляется из фактов. Поэтому guarded здесь — это
     // то, из чего стадия следует (что предложено, что выбрано, собрано ли КП) плюс деньги.
@@ -4632,7 +4730,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // from the data rather than from a sentence.
   const REFS = {
     clientId: 'clients', companyId: 'companies', objectId: 'objects',
-    dealId: 'deals', requestId: 'requests', assignee: 'users', agent: 'users',
+    dealId: 'deals', requestId: 'requests', contractId: 'contracts', assignee: 'users', agent: 'users',
   };
   /* `coming` holds what EARLIER operations in the same batch will create.
 
@@ -4824,7 +4922,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       if (bad) return bad;
       return { ok: true, tier: 'guarded',
         summary: recordRu(spec.coll, rec) + ' · стадия: ' + stageRu(rec.stage) + ' → ' + stageRu(o.stage),
-        run: () => { rec.stage = o.stage; } };
+        run: () => { rec.stage = o.stage; afterDealStage(rec); } };
     }
 
     const patch = o.patch;
@@ -4856,7 +4954,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       ok: true, tier: tier,
       summary: recordRu(spec.coll, rec) + ' · ' +
         keys.map((f) => fieldRu(f) + ': ' + shown(rec[f]) + ' → ' + shown(patch[f])).join('; '),
-      run: () => { Object.assign(rec, patch); },
+      run: () => { Object.assign(rec, patch); if (spec.coll === 'deals' && patch.stage) afterDealStage(rec); },
     };
   }
 
@@ -4934,6 +5032,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const dl = store.data.deals.find((x) => x.id === id);
     if (!dl || dl.stage === stage) return;
     dl.stage = stage;
+    afterDealStage(dl);
     store.dataRevision++; save(); emit();
   }
 
@@ -6791,19 +6890,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Комиссия сделки. У сделки с несколькими лотами ставка у каждого своя, а брать ставку первого
   // и умножать на всю сумму — это ровно та ошибка, которую брокер замечает первой. Считаем по лотам,
   // и только если их цены не складываются в сумму сделки, возвращаемся к ставке ведущего объекта.
+  /* Комиссия считается ПО ЛОТАМ и по их собственным ставкам — прежде ставка первого лота
+     применялась ко всей сумме сделки, то есть один объект назначал процент всем остальным.
+     Вышедший из сделки лот в расчёт не входит: это и есть пересчёт при частичном отказе.
+     Один лот или ни одного — база остаётся суммой сделки: она могла быть выторгована ниже
+     прайса, и подменять её ценой объекта значило бы считать не ту сделку. */
   function dealCommission(deal) {
     if (!deal) return 0;
     const objs = D().objects || [];
-    const byId = (id) => objs.find((o) => o.id === id);
-    const lots = (deal.lots && deal.lots.length) ? deal.lots.map(byId).filter(Boolean) : [];
-    if (lots.length > 1) {
-      const sum = lots.reduce((a, o) => a + (o.price || 0), 0);
-      if (sum && Math.abs(sum - (deal.amount || 0)) <= 1) {
-        return Math.round(lots.reduce((a, o) => a + (o.price || 0) * ((o.commissionPct || DEFAULT_COMM_PCT) / 100), 0));
-      }
+    const all = (deal.lots && deal.lots.length) ? deal.lots.map((id) => objs.find((o) => o.id === id)).filter(Boolean) : [];
+    if (all.length > 1) {
+      const live = all.filter((o) => !lotIsOut(lotState(deal, o.id)));
+      return Math.round(live.reduce((a, o) => a + (o.price || 0) * (lotCommissionPct(deal, o) / 100), 0));
     }
-    const obj = byId(deal.objectId);
-    const pct = (obj && obj.commissionPct) || DEFAULT_COMM_PCT;
+    const obj = objs.find((o) => o.id === deal.objectId) || all[0];
+    const pct = obj ? lotCommissionPct(deal, obj) : DEFAULT_COMM_PCT;
     return Math.round((deal.amount || 0) * pct / 100);
   }
 
@@ -7182,6 +7283,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     } else {
       queueBlock = pulseMyDay();
     }
+    // Разбираемый список сделок без следующего шага. У руководителя — по всей команде,
+    // с ответственным в строке. Пустой список блок не рисует.
+    queueBlock += pulseNoNextStep();
 
     // Пульс (rev.3): первая строка — ввод Консьержа, затем приветствие, событие дня, очередь, аналитика.
     const eventsPlayed = (S().eventsPlayed || []).length;
@@ -8629,6 +8733,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="btn sm" data-act="psychForm" data-cid="' + c.id + '">' + I('pencil') + 'Изменить</button></div>';
   }
   // Communication channels — Telegram + WhatsApp основные, плюс Instagram, Email, телефон.
+  /* Один словарь каналов на всё: контакт, участник сделки, лента событий. Порталы площадок
+     (Property Finder, Bayut) каналом связи не считаются — это источник обращения, а не способ
+     связаться с человеком, и они живут в поле источника заявки. */
+  const CHANNELS = ['whatsapp', 'telegram', 'email', 'call'];
   function chanMeta(ch) {
     return ({
       phone: ['phone', 'Телефон'],
@@ -8893,6 +9001,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (tab === 'profile') {
       return dxSec('sparkle', 'Портрет клиента', '', psychInner(c));
     }
+    // Отношения: стадия, портфель и одна лента, где рядом стоят «через 12 дней платёж
+    // по графику» и «через неделю день рождения».
+    if (tab === 'relations') {
+      return relStageBlock(c) +
+        '<div style="margin-top:14px">' + clientPortfolio(c) + '</div>' +
+        '<div style="margin-top:14px">' + relationsBlock(c) + '</div>';
+    }
     if (tab === 'kyc') {
       const k = kycOf(c);
       const kycInner = '<div class="prov">' +
@@ -9066,6 +9181,259 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="of-list">' + rows + '</div>' +
       '<div class="of-foot">' + I('sparkle') + 'Отобрано по бюджету, районам и профилю решений; уже показанное исключено.</div>');
   }
+  // ---------------- ОТНОШЕНИЯ С КЛИЕНТОМ (волна 3) ----------------
+  /* Отношения — состояние контакта, а не сущность: у них нет ни своих часов, ни условия конца,
+     ни отдельного хозяина (клиент пожизненно закреплён за агентом). Поэтому стадия ВЫВОДИТСЯ
+     из фактов при каждом чтении и не хранится второй копией: сохранённое значение расходится
+     с данными ровно так же, как расходилась «ближайшая задача», угаданная по клиенту.
+     Хранится только ручная правка — вместе с тем выводом, поверх которого её поставили. */
+  /* Подпись `active` — «Активный», а НЕ «В работе», как записано в §1.1 решений: этими словами
+     уже называется стадия сделки, и одна фраза о двух разных вещах на одном экране — это то,
+     от чего мы весь август уходим. Ключ значения не меняется. */
+  const REL_STAGES = [
+    { k: 'new', label: 'Новый', tone: '' },
+    { k: 'active', label: 'Активный', tone: 'ok' },
+    { k: 'dormant', label: 'Спящий', tone: 'warn' },
+    { k: 'lost', label: 'Потерян', tone: 'stop' },
+  ];
+  const relLabel = (k) => (REL_STAGES.find((x) => x.k === k) || {}).label || k;
+  const relTone = (k) => (REL_STAGES.find((x) => x.k === k) || {}).tone || '';
+  // Пороги — рабочие числа, вынесенные в данные: их придётся калибровать на живых клиентах,
+  // и выдумывать точное значение оснований нет.
+  function settingOf(k, dflt) { const s = D().settings || {}; return s[k] == null ? dflt : s[k]; }
+  const REQ_OPEN = ['new', 'qual', 'offer', 'meet', 'talks'];
+  function requestsOfClient(id) { return (D().requests || []).filter((r) => r.clientId === id); }
+  function dealsOfClient(id) { return (D().deals || []).filter((d) => d.clientId === id); }
+  // Был ли хоть один успех. Не стадия, а факт биографии: пара «спящий + был успех» — это
+  // не потерянный лид, а клиент, о котором забыли, и она и есть цель удержания.
+  function clientHasWon(id) {
+    return dealsOfClient(id).some((d) => d.stage === 'won') || contractsOfClient(id).length > 0;
+  }
+  // «13 мая» → день года. Даты в стенде написаны словами, а не отметками времени.
+  function dayNumOf(s) {
+    const m = /(\d{1,2})\s+([а-яё]+)/i.exec(String(s || ''));
+    if (!m) return null;
+    const mi = RU_MONTHS.indexOf(m[2].toLowerCase());
+    if (mi < 0) return null;
+    return dayOfYear(parseInt(m[1], 10), mi + 1);
+  }
+  function todayNum() { const n = demoNow(); return dayOfYear(n.d, n.mo); }
+  // Сколько дней молчим — по всем лентам клиента разом.
+  function lastTouchDays(cid) {
+    const n = dayNumOf(lastTouchOf(cid));
+    if (n == null) return null;
+    const days = todayNum() - n;
+    return days >= 0 ? days : null;
+  }
+  function relStageDerived(c) {
+    const id = c.id;
+    const reqs = requestsOfClient(id);
+    const deals = dealsOfClient(id);
+    const liveContract = contractsOfClient(id).some((k) => k.status !== 'closed');
+    if (!reqs.length && !deals.length && !contractsOfClient(id).length) return 'new';
+    const openReq = reqs.some((r) => REQ_OPEN.indexOf(reqStage(r)) >= 0);
+    const liveDeal = deals.some((d) => d.stage !== 'won' && d.stage !== 'lost');
+    if (openReq || liveDeal || liveContract) return 'active';
+    // Открытой работы нет. Отказ без единого успеха — «потерян»; иначе решает тишина.
+    const refused = reqs.some((r) => reqStage(r) === 'lost') || deals.some((d) => d.stage === 'lost');
+    if (refused && !clientHasWon(id)) return 'lost';
+    // Работа закрыта, но разговор идёт — это ещё не «спящий»: порог и есть та граница,
+    // на которой контакт перестаёт быть живым.
+    const silent = lastTouchDays(id);
+    return (silent == null || silent >= settingOf('dormantDays', 90)) ? 'dormant' : 'active';
+  }
+  /* Ручное значение побеждает вывод — но не навсегда. Оно держится, пока вывод не изменился:
+     иначе пометка, поставленная в мае, будет утверждать «потерян» и через год после покупки. */
+  function relStageOf(c) {
+    const derived = relStageDerived(c);
+    const manual = (c.relStage && c.relStageOver === derived) ? c.relStage : null;
+    return { k: manual || derived, derived: derived, manual: !!manual };
+  }
+  function setRelStage(id, k) {
+    const c = D().clients.find((x) => x.id === id); if (!c) return;
+    if (!k || k === 'auto') { delete c.relStage; delete c.relStageOver; }
+    else { c.relStage = k; c.relStageOver = relStageDerived(c); }
+    WS.storeApi.touch();
+  }
+
+  /* ---- Движок поводов касания (§2.1 решений) ----
+     Повод ВЫВОДИТСЯ из данных, а хранится только решение агента по нему. Иначе пришлось бы
+     писать коллекцию во время отрисовки и следить, чтобы повторный запуск не порождал второй
+     повод той же причины — «правило одного повода» и идемпотентность здесь выполняются сами.
+     `why` обязателен: повод без основания не показывается. */
+  const CUE_REASONS = {
+    birthday: 'день рождения', deal_anniversary: 'годовщина сделки', handover: 'передача ключей',
+    lease_90d: 'до конца аренды 90 дней', silence: 'молчим', match_object: 'объект под профиль',
+    rent_index: 'сдвиг индекса аренды', new_launch: 'старт продаж в его районе',
+    payment_due: 'платёж по графику', milestone_near: 'веха договора близко',
+  };
+  const cueKey = (cid, reason) => cid + '~' + reason;
+  function cueDecision(cid, reason) { return (D().cueState || {})[cueKey(cid, reason)] || null; }
+  // Отклонённый повод той же причины не повторяется 30 дней — иначе к концу недели
+  // у клиента шесть одинаковых напоминаний.
+  function cueSuppressed(cid, reason) {
+    const st = cueDecision(cid, reason);
+    if (!st) return false;
+    if (st.state === 'accepted' || st.state === 'done') return true;
+    if (st.state !== 'dismissed') return false;
+    const at = st.at == null ? null : st.at;
+    return at == null || (todayNum() - at) < settingOf('cueSilenceDays', 30);
+  }
+  function cuesFor(cid) {
+    const c = D().clients.find((x) => x.id === cid);
+    if (!c) return [];
+    const out = [];
+    const add = (reason, title, why, dueAt, payload) => {
+      if (!why || cueSuppressed(cid, reason)) return;
+      out.push({ key: cueKey(cid, reason), contactId: cid, reason: reason, title: title, why: why,
+        dueAt: dueAt || '', payload: payload || {}, source: CUE_SOURCE[reason] || 'state' });
+    };
+    // Время
+    if (c.birthday) {
+      const n = dayNumOf(c.birthday), t = todayNum();
+      if (n != null && n - t >= 0 && n - t <= 14) add('birthday', 'Поздравить с днём рождения', c.birthday + ' — через ' + (n - t) + ' ' + plural(n - t, 'день', 'дня', 'дней'), c.birthday);
+    }
+    contractsOfClient(cid).forEach((k) => {
+      const sd = dayNumOf(k.signedAt), t = todayNum();
+      if (sd != null && Math.abs(t - sd) <= 30) {
+        add('deal_anniversary', 'Написать к годовщине покупки', 'договор подписан ' + k.signedAt, k.signedAt, { contractId: k.id });
+      }
+      const due = (k.schedule || []).find((s) => s.state === 'overdue') || (k.schedule || []).find((s) => s.state === 'due');
+      if (due) add('payment_due', 'Напомнить о платеже: ' + due.label, 'по графику договора — ' + due.due, due.due, { contractId: k.id });
+      const near = (k.milestones || []).find((m) => m.state === 'now' && !m.internalOnly);
+      if (near) add('milestone_near', near.label, 'веха договора ' + (k.number || '') + ' — ' + near.at, near.at, { contractId: k.id, milestoneKey: near.k });
+      const ren = k.kind === 'lease' && (k.milestones || []).find((m) => m.k === 'renewal');
+      if (ren) add('lease_90d', 'Начать разговор о продлении', 'аренда заканчивается: ' + ren.at, ren.at, { contractId: k.id });
+    });
+    // Состояние
+    const silent = lastTouchDays(cid);
+    if (silent != null && silent >= settingOf('silenceDays', 30) && relStageOf(c).k !== 'lost') {
+      add('silence', 'Возобновить разговор', 'молчим ' + silent + ' ' + plural(silent, 'день', 'дня', 'дней'), '');
+    }
+    // Событие: появился объект под профиль. Только то, чего он ещё не видел.
+    const seen = {};
+    requestsOfClient(cid).forEach((r) => (r.offered || []).forEach((o) => { seen[o.id] = 1; }));
+    const areas = c.areas || [];
+    const match = (D().objects || []).find((o) => !seen[o.id] && areas.indexOf(o.area) >= 0 &&
+      c.budget && o.price && o.price <= c.budget * 1.05);
+    if (match) add('match_object', 'Показать новый объект: ' + match.name, match.area + ' · ' + WS.AED(match.price) + ' — в его районах и в бюджете', '', { objectId: match.id });
+    return out;
+  }
+  const CUE_SOURCE = { birthday: 'time', deal_anniversary: 'time', lease_90d: 'time', silence: 'time',
+    match_object: 'event', rent_index: 'event', new_launch: 'event', handover: 'event',
+    payment_due: 'state', milestone_near: 'state' };
+  function cueDecide(key, state) {
+    const cs = D().cueState || (D().cueState = {});
+    cs[key] = { state: state, at: todayNum() };
+    WS.storeApi.touch();
+  }
+  // Принять повод — значит создать задачу. Повод сам по себе ничего не двигает.
+  function acceptCue(key) {
+    const cid = String(key).split('~')[0];
+    const cue = cuesFor(cid).find((x) => x.key === key);
+    if (!cue) return;
+    WS.storeApi.addTask({ id: 'tk_cue_' + key.replace(/[^a-z0-9_]/gi, '_'), title: cue.title,
+      clientId: cid, kind: 'touch', due: cue.dueAt || 'сегодня', when: 'today',
+      // Повод, пришедший от договора, оставляет ссылку на него: иначе задача «напомнить
+      // о платеже» висит на человеке и не находится там, где платёж живёт.
+      contractId: (cue.payload && cue.payload.contractId) || undefined });
+    cueDecide(key, 'accepted');
+    WS.storeApi.toast('Повод принят — задача поставлена', 'ok');
+  }
+  function dismissCue(key) { cueDecide(key, 'dismissed'); WS.storeApi.toast('Повод отклонён — не повторится ' + settingOf('cueSilenceDays', 30) + ' дней'); }
+
+  /* ---- Лента «Отношения» (§4.3 решений): один список, два источника, две секции.
+     Брокер видит одну работу и не переключает режимы. Система различает источники и считает
+     их отдельно: срок обязательства пропустить нельзя, повод касания — можно. */
+  function relationsAhead(c) {
+    const rows = [];
+    contractsOfClient(c.id).forEach((k) => {
+      const kind = contractKind(k).label;
+      (k.schedule || []).filter((s) => s.state === 'due' || s.state === 'overdue').forEach((s) => {
+        rows.push({ ord: dayNumOf(s.due), kind: 'duty', icon: 'money', tone: s.state === 'overdue' ? 'stop' : '',
+          title: s.label + ' · ' + WS.AED(s.amount), meta: kind + ' · срок ' + s.due, tag: 'обязательство', to: 'data-contract="' + k.id + '"' });
+      });
+      (k.milestones || []).filter((m) => m.state === 'now' && !m.internalOnly).forEach((m) => {
+        rows.push({ ord: dayNumOf(m.at), kind: 'duty', icon: 'flag', tone: '',
+          title: m.label, meta: kind + ' · ' + m.at, tag: 'обязательство', to: 'data-contract="' + k.id + '"' });
+      });
+    });
+    cuesFor(c.id).forEach((q) => {
+      rows.push({ ord: dayNumOf(q.dueAt), kind: 'cue', icon: 'sparkle', tone: 'acc',
+        title: q.title, meta: q.why, tag: 'повод', key: q.key });
+    });
+    // Без разобранной даты запись не новость: она уходит в конец, а не возглавляет список.
+    return rows.sort((a, b) => (a.ord == null ? 1e9 : a.ord) - (b.ord == null ? 1e9 : b.ord));
+  }
+  function relationsPast(c) {
+    const rows = [];
+    contractsOfClient(c.id).forEach((k) => {
+      const kind = contractKind(k).label;
+      (k.milestones || []).filter((m) => m.state === 'done').forEach((m) => {
+        rows.push({ ord: dayNumOf(m.at), icon: 'check', title: m.label, meta: kind + ' · ' + m.at, tag: 'веха пройдена', to: 'data-contract="' + k.id + '"' });
+      });
+      (k.schedule || []).filter((s) => s.state === 'paid').forEach((s) => {
+        rows.push({ ord: dayNumOf(s.due), icon: 'money', title: s.label + ' · ' + WS.AED(s.amount), meta: kind + ' · оплачен ' + s.due, tag: 'платёж', to: 'data-contract="' + k.id + '"' });
+      });
+    });
+    (D().tasks || []).filter((t) => t.clientId === c.id && t.status === 'done').forEach((t) => {
+      rows.push({ ord: dayNumOf(t.due), icon: 'checkCircle', title: t.title, meta: 'задача выполнена' + (t.outcome ? ' · ' + t.outcome : ''), tag: 'касание' });
+    });
+    return rows.sort((a, b) => (b.ord == null ? -1 : b.ord) - (a.ord == null ? -1 : a.ord));
+  }
+  function relRow(r) {
+    const acts = r.key
+      ? '<div class="rel-acts"><button class="btn xs primary" data-cueok="' + r.key + '">' + I('check') + 'Принять</button>' +
+        '<button class="tl-ic-btn" data-cueno="' + r.key + '" title="Отклонить повод">' + I('x') + '</button></div>'
+      : '';
+    const nav = r.to ? ' ' + r.to + ' style="cursor:pointer"' : '';
+    return '<div class="rel-row"' + nav + '><div class="fi i-' + (r.tone === 'stop' ? 'hot' : r.tone === 'acc' ? 'acc' : 'mut') + '">' + I(r.icon) + '</div>' +
+      '<div class="ft"><div class="t">' + escAttr(r.title) + '</div><div class="m">' + escAttr(r.meta) + '</div></div>' +
+      '<span class="rel-tag' + (r.tone === 'stop' ? ' stop' : '') + '">' + r.tag + '</span>' + acts + '</div>';
+  }
+  function relationsBlock(c) {
+    const ahead = relationsAhead(c), past = relationsPast(c);
+    const aheadHtml = ahead.length ? ahead.map(relRow).join('')
+      : '<div style="font-size:12px;color:var(--faint);padding:6px 0">впереди ничего не запланировано</div>';
+    const pastHtml = past.length ? past.slice(0, 12).map(relRow).join('')
+      : '<div style="font-size:12px;color:var(--faint);padding:6px 0">пока ничего не завершено</div>';
+    const why = '<div class="rel-why">' + I('sparkle') +
+      '<span>Обязательства приходят из договоров, поводы — из профиля и состояния. Срок обязательства пропустить нельзя, повод касания — можно.</span></div>';
+    return dxSec('clock', 'Впереди · ' + ahead.length, '', why + '<div class="rel-list">' + aheadHtml + '</div>') +
+      '<div style="margin-top:14px">' + dxSec('check', 'Было · ' + past.length, '', '<div class="rel-list">' + pastHtml + '</div>') + '</div>';
+  }
+  /* Портфель: все заявки, сделки и договоры человека одним списком. Общего прогресса
+     у них нет и рисовать его нечем — у каждой строки своя стадия и свой срок. */
+  function clientPortfolio(c) {
+    const rows = [];
+    requestsOfClient(c.id).forEach((r) => rows.push('<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer">' +
+      '<div class="fi i-mut">' + I('mail') + '</div><div class="ft"><div class="t">' + escAttr(r.title || 'Запрос') + '</div>' +
+      '<div class="m">запрос · ' + reqStageLabel(reqStage(r), r) + (r.budget ? ' · ' + WS.AED(r.budget) : '') + '</div></div>' + I('arrowRight') + '</div>'));
+    dealsOfClient(c.id).forEach((d) => rows.push('<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+      '<div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
+      '<div class="m">сделка · ' + stageLabel(d.stage) + (d.amount ? ' · ' + WS.AED(d.amount) : '') + '</div></div>' + I('arrowRight') + '</div>'));
+    contractsOfClient(c.id).forEach((k) => rows.push('<div class="feed-row" data-contract="' + k.id + '" style="cursor:pointer">' +
+      '<div class="fi i-ok">' + I(contractKind(k).icon) + '</div><div class="ft"><div class="t">' + contractKind(k).label + ' · ' + (k.number || '') + '</div>' +
+      '<div class="m">договор · ' + (k.status === 'closed' ? 'закрыт' : 'действует') + (k.nextDue ? ' · ' + k.nextDue : '') + '</div></div>' + I('arrowRight') + '</div>'));
+    const inner = rows.length ? rows.join('') : '<div style="font-size:12px;color:var(--faint);padding:6px 0">работы по этому контакту ещё не было</div>';
+    return dxSec('grid', 'Портфель · ' + rows.length, '', '<div class="feed">' + inner + '</div>');
+  }
+  // Стадия отношений с переключателем: вывод виден рядом с ручным значением, чтобы правка
+  // не выглядела единственной правдой.
+  function relStageBlock(c) {
+    const st = relStageOf(c);
+    const pills = REL_STAGES.map((s) => '<button class="rel-pill' + (s.k === st.k ? ' on' : '') + '" data-relstage="' + c.id + ':' + s.k + '">' + s.label + '</button>').join('') +
+      (st.manual ? '<button class="rel-pill" data-relstage="' + c.id + ':auto" title="Вернуть автоматический вывод">' + I('sparkle') + 'авто</button>' : '');
+    const note = st.manual
+      ? 'Поставлено вручную поверх вывода «' + relLabel(st.derived) + '». Держится, пока вывод не изменится.'
+      : 'Выведено из фактов: заявки, сделки, договоры и дата последнего касания.';
+    const won = clientHasWon(c.id)
+      ? '<span class="badge ok">' + I('star') + 'Был успех</span>'
+      : '<span class="badge">' + I('dot') + 'Успехов ещё не было</span>';
+    return dxSec('users', 'Отношения', won, '<div class="rel-pills">' + pills + '</div>' +
+      '<div class="rel-why">' + I('sparkle') + '<span>' + note + '</span></div>');
+  }
+
   function clientSpec(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return null;
     // Разговор на карточке контакта принадлежит контакту. Прежде тред брался у первой
@@ -9085,7 +9453,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       hero: clientHero(c) + status,
       acts: entityActionBar(clientActions(c)),
       state: clientOps(c),
-      tabs: [['overview', 'Обзор'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
+      tabs: [['overview', 'Обзор'], ['relations', 'Отношения'], ['profile', 'Портрет клиента'], ['kyc', 'KYC · документы'], ['deals', 'Сделки · ' + dealsCount], ['history', 'История']],
       render: function (tab) { return clientTabContent(c, tab); },
       concierge: entityConcierge('Спросите Консьержа по контакту — «подбери объекты», «бриф к звонку», «что важно клиенту»…', clientTid, c.name, 'users'),
     };
@@ -9291,7 +9659,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       .join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">' + (kind === 'contact' ? 'по контакту пока нет событий' : 'по компании пока нет событий') + '</div>';
     const more = (limit && total > limit)
       ? '<button class="btn xs" data-etab="' + kind + '~' + ent.id + '~history" style="margin-top:8px">' + I('clock') + 'Вся лента · ' + total + '</button>' : '';
-    return '<div class="timeline">' + rows + '</div>' + more;
+    // Черновики итогов по этому контакту — над лентой и только на полной истории: в превью
+    // они вытеснили бы настоящие события, которых там и так три строки.
+    const drafts = limit ? '' : outcomesBlock(kind === 'contact' ? 'contact' : 'company', ent.id);
+    return '<div class="timeline">' + drafts + rows + '</div>' + more;
   }
   function contactFeedEntries(c) { return entityFeedEntries('contact', c); }
   function contactFeedInner(c, limit) { return entityFeedInner('contact', c, limit); }
@@ -9396,8 +9767,39 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     el.innerHTML = spec.render(p[2]);
   }
   // ---- Deal contacts (P3): a deal can involve several people, each with a role + influence rating (A/B/C).
-  const CONTACT_ROLES = ['Покупатель', 'Со-покупатель', 'Инвестор', 'ЛПР', 'Супруг — со-решение', 'Юрист сделки', 'Референт', 'Представитель'];
-  const CONTACT_RATINGS = ['A', 'B', 'C'];
+  /* Справочник ролей участника — двенадцать ролей в трёх группах. Прежние восемь описывали
+     только сторону клиента, а партнёр просил роли, которые пересекают стол. Группа нужна
+     не для порядка в списке, а для правила: основным контактом сделки может быть только тот,
+     чьё решение мы ведём, — менеджер девелопера основным быть не может. */
+  const ROLE_GROUPS = [
+    { k: 'client', label: 'Сторона клиента', roles: ['Клиент', 'Со-покупатель', 'Инвестор', 'Супруг', 'Представитель по доверенности', 'Юрист клиента', 'Финансист клиента', 'Референт'] },
+    { k: 'other', label: 'Другая сторона', roles: ['Собственник', 'Менеджер девелопера'] },
+    { k: 'broker', label: 'Посредники', roles: ['Агент-партнёр', 'Ипотечный брокер'] },
+  ];
+  const CONTACT_ROLES = ROLE_GROUPS.reduce((a, g) => a.concat(g.roles), []);
+  /* Таблица перехода со старого справочника. Строка «ЛПР» уходит из ролей совсем: это мера
+     влияния, а не роль, и держать её в обоих словарях значит позволить участнику быть
+     «ЛПР по роли и исполнителем по влиянию». Партнёрское «Клиент-ЛПР» раскладывается
+     ровно на эту пару. Переход читается и на старых данных, а не только на новых. */
+  const ROLE_WAS = { 'Покупатель': 'Клиент', 'ЛПР': 'Клиент', 'Супруг — со-решение': 'Супруг',
+    'Юрист сделки': 'Юрист клиента', 'Представитель': 'Представитель по доверенности' };
+  function roleOf(ct) { const r = ct && ct.role; return ROLE_WAS[r] || r || 'Клиент'; }
+  function roleGroupOf(ct) {
+    const r = roleOf(ct);
+    const g = ROLE_GROUPS.find((x) => x.roles.indexOf(r) >= 0);
+    return g ? g.k : 'client';
+  }
+  // Влияние — тот же словарь, что уже используется у контактов компаний. Буквенная шкала
+  // уходит: «A» ничего не говорит человеку, открывшему карточку впервые.
+  const INFLUENCE = [{ k: 'lpr', label: 'ЛПР' }, { k: 'infl', label: 'влияет' }, { k: 'exec', label: 'исполнитель' }];
+  const INFL_WAS = { A: 'lpr', B: 'infl', C: 'exec', 'ЛПР': 'lpr', 'влияет': 'infl', 'исполнитель': 'exec' };
+  function influenceOf(ct) {
+    const raw = ct && (ct.influence || ct.rating);
+    // Роль «ЛПР» из старого справочника несла влияние в себе — при переносе оно не теряется.
+    if (!raw && ct && ct.role === 'ЛПР') return 'lpr';
+    return INFL_WAS[raw] || (INFLUENCE.some((x) => x.k === raw) ? raw : 'infl');
+  }
+  const inflLabel = (k) => (INFLUENCE.find((x) => x.k === k) || INFLUENCE[1]).label;
   // Область задачи — первое попадание: есть сделка → задача сделки; иначе заявка → задача заявки;
   // иначе задача по контакту. Клиентская задача законна: касания и поздравления не относятся
   // ни к какой сделке, и требовать привязку значило бы запретить половину работы по удержанию.
@@ -9412,48 +9814,81 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function dealContacts(d) {
     if (Array.isArray(d.contacts) && d.contacts.length) return d.contacts;
-    if (d.clientId) return [{ clientId: d.clientId, role: 'Покупатель', rating: 'A', primary: true }];
+    if (d.clientId) return [{ clientId: d.clientId, role: 'Клиент', influence: 'lpr', primary: true }];
     return [];
   }
   function contactDisplayName(ct) {
     if (ct.clientId) { const c = D().clients.find((x) => x.id === ct.clientId); if (c) return c.name; }
     return ct.name || '—';
   }
-  function ratingBadge(r) {
-    const R = r || 'C';
-    return '<span class="c-rate c-rate-' + R.toLowerCase() + '" title="Влияние на решение: ' + R + '">' + R + '</span>';
+  // Канал участника: свой, если задан, иначе тот, которым мы связываемся с этим контактом.
+  function partChannel(ct) {
+    if (ct.channel) return ct.channel;
+    const c = ct.clientId ? D().clients.find((x) => x.id === ct.clientId) : null;
+    return (c && c.channel) || null;
+  }
+  // Значок влияния стал подписью-пилюлей: слово в круг 22 на 22 не помещается. Класс берётся
+  // из КЛЮЧА, а не из отображаемого текста, — иначе смена подписи сломает вёрстку.
+  function inflPill(k) {
+    const v = INFLUENCE.find((x) => x.k === k) || INFLUENCE[1];
+    return '<span class="c-infl c-infl-' + v.k + '" title="Влияние на решение">' + v.label + '</span>';
   }
   function dealContactsInner(d) {
     const list = dealContacts(d);
     const rows = list.map((ct, i) => {
       const c = ct.clientId ? D().clients.find((x) => x.id === ct.clientId) : null;
-      const sub = [ct.role, (c && c.goal) || ct.phone].filter(Boolean).join(' · ');
+      const co = ct.companyId ? (D().companies || []).find((x) => x.id === ct.companyId) : null;
+      const ch = partChannel(ct);
+      const chan = ch ? '<span class="dc-ch" title="Предпочитаемый канал: ' + chanMeta(ch)[1] + '">' + I(chanMeta(ch)[0]) + '</span>' : '';
+      const from = co ? '<span class="dc-co" data-company="' + co.id + '" style="cursor:pointer">' + co.name + '</span>' : '';
+      const sub = [roleOf(ct), from, (c && c.goal) || ct.phone].filter(Boolean).join(' · ');
       const star = ct.primary ? '<span class="c-star" title="Основной контакт">' + I('star') + '</span>' : '';
       const main = '<div class="dc-main"' + (ct.clientId ? ' data-client="' + ct.clientId + '" style="cursor:pointer"' : '') + '>' +
         '<div class="fi i-acc">' + I('users') + '</div>' +
         '<div class="ft"><div class="t">' + contactDisplayName(ct) + star + '</div><div class="m">' + (sub || '') + '</div></div></div>';
-      const acts = '<div class="dc-acts">' + ratingBadge(ct.rating) +
-        '<button class="tl-ic-btn" data-dcedit="' + d.id + ':' + i + '" title="Изменить роль/рейтинг">' + I('pencil') + '</button>' +
+      const acts = '<div class="dc-acts">' + chan + inflPill(influenceOf(ct)) +
+        '<button class="tl-ic-btn" data-dcedit="' + d.id + ':' + i + '" title="Изменить роль и влияние">' + I('pencil') + '</button>' +
         (list.length > 1 ? '<button class="tl-ic-btn" data-dcdel="' + d.id + ':' + i + '" title="Убрать из сделки">' + I('x') + '</button>' : '') + '</div>';
       return '<div class="dc-row">' + main + acts + '</div>';
     }).join('');
     return '<div class="dc-list">' + rows + '</div>';
   }
+  // Участники сделки так, как их читает Консьерж: имя, роль словом, влияние, канал, компания
+  // и пометка основного. Одна форма для экрана и для модели — иначе они разойдутся.
+  function dealParticipants(d) {
+    return dealContacts(d).map((ct) => ({
+      имя: contactDisplayName(ct), контакт: ct.clientId || null, роль: roleOf(ct),
+      сторона: ({ client: 'клиент', other: 'другая сторона', broker: 'посредник' })[roleGroupOf(ct)],
+      влияние: inflLabel(influenceOf(ct)), канал: partChannel(ct) || null,
+      компания: ct.companyId || null, основной: !!ct.primary,
+    }));
+  }
   function openDealContactForm(dealId, index) {
     const d = D().deals.find((x) => x.id === dealId); if (!d) return;
     const list = dealContacts(d);
     const isNew = index == null || index < 0;
-    const ct = isNew ? { role: 'Со-покупатель', rating: 'B' } : (list[index] || {});
-    const roleSel = '<select id="dc_role">' + CONTACT_ROLES.map((r) => '<option' + (r === ct.role ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
-    const rateSel = '<select id="dc_rate">' + CONTACT_RATINGS.map((r) => '<option' + (r === (ct.rating || 'B') ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
+    const ct = isNew ? { role: 'Со-покупатель', influence: 'infl' } : (list[index] || {});
+    const cur = roleOf(ct);
+    // Группы в списке — не украшение: они говорят, чью сторону человек представляет,
+    // а от этого зависит, может ли он быть основным контактом сделки.
+    const roleSel = '<select id="dc_role">' + ROLE_GROUPS.map((g) => '<optgroup label="' + g.label + '">' +
+      g.roles.map((r) => '<option' + (r === cur ? ' selected' : '') + '>' + r + '</option>').join('') + '</optgroup>').join('') + '</select>';
+    const inf = influenceOf(ct);
+    const rateSel = '<select id="dc_rate">' + INFLUENCE.map((v) => '<option value="' + v.k + '"' + (v.k === inf ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select>';
+    const chSel = '<select id="dc_chan"><option value="">по контакту</option>' +
+      CHANNELS.map((c) => '<option value="' + c + '"' + (c === ct.channel ? ' selected' : '') + '>' + chanMeta(c)[1] + '</option>').join('') + '</select>';
+    const coSel = '<select id="dc_co"><option value="">—</option>' +
+      (D().companies || []).map((c) => '<option value="' + c.id + '"' + (c.id === ct.companyId ? ' selected' : '') + '>' + escAttr(c.name) + '</option>').join('') + '</select>';
     const nameField = ct.clientId
       ? '<label class="fld"><span>Контакт</span><input type="text" value="' + contactDisplayName(ct).replace(/"/g, '&quot;') + '" disabled></label>'
       : '<label class="fld"><span>Имя</span><input id="dc_name" type="text" value="' + ((ct.name || '').replace(/"/g, '&quot;')) + '" placeholder="Напр.: Пётр Петров"></label>';
     const phoneField = ct.clientId ? '' : '<label class="fld"><span>Телефон</span><input id="dc_phone" type="text" value="' + ((ct.phone || '').replace(/"/g, '&quot;')) + '" placeholder="+971 …"></label>';
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Контакт участвует в сделке. Рейтинг A/B/C — влияние на решение.</p>' +
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Участник сделки. Роль говорит, чью сторону он представляет; влияние — как он решает. Основным может быть только участник со стороны клиента: основной — тот, чьё решение мы ведём.</p>' +
       '<div class="match-grid">' + nameField +
       '<label class="fld"><span>Роль в сделке</span>' + roleSel + '</label>' +
-      '<label class="fld"><span>Рейтинг (влияние)</span>' + rateSel + '</label>' + phoneField + '</div>' +
+      '<label class="fld"><span>Влияние на решение</span>' + rateSel + '</label>' +
+      '<label class="fld"><span>Предпочитаемый канал</span>' + chSel + '</label>' +
+      '<label class="fld"><span>От какой компании</span>' + coSel + '</label>' + phoneField + '</div>' +
       '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="dc_primary"' + (ct.primary ? ' checked' : '') + '> Основной контакт сделки</label>';
     openModal((isNew ? 'Добавить контакт' : 'Контакт · ' + contactDisplayName(ct)) + ' · ' + d.title, body,
       '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="saveDealContact" data-deal="' + dealId + '" data-idx="' + (isNew ? -1 : index) + '">' + I('check') + 'Сохранить</button>');
@@ -9464,12 +9899,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const isNew = index == null || index < 0;
     const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
     const rec = isNew ? {} : (d.contacts[index] || {});
-    rec.role = g('dc_role') || rec.role || 'Со-покупатель';
-    rec.rating = g('dc_rate') || rec.rating || 'B';
+    rec.role = g('dc_role') || roleOf(rec);
+    rec.influence = g('dc_rate') || influenceOf(rec);
+    delete rec.rating;                                  // буквенная шкала уходит вместе с правкой
+    rec.channel = g('dc_chan') || undefined;
+    rec.companyId = g('dc_co') || undefined;
     if (!rec.clientId) { rec.name = g('dc_name') || rec.name || 'Без имени'; const ph = g('dc_phone'); if (ph) rec.phone = ph; }
-    rec.primary = !!(document.getElementById('dc_primary') || {}).checked;
+    /* Основным может быть только участник со стороны клиента. Прежде код синхронизировал
+       клиента сделки, лишь если у участника была ссылка на контакт, и молча оставлял
+       в шапке прежнего: менеджер девелопера получал звёздочку, а сделка — чужое имя. */
+    const wantsPrimary = !!(document.getElementById('dc_primary') || {}).checked;
+    rec.primary = wantsPrimary && roleGroupOf(rec) === 'client';
+    if (wantsPrimary && !rec.primary) WS.storeApi.toast('Основным может быть только участник со стороны клиента');
     if (isNew) d.contacts.push(rec);
     if (rec.primary) d.contacts.forEach((x) => { if (x !== rec) x.primary = false; });
+    if (!d.contacts.some((x) => x.primary)) {
+      const back = d.contacts.find((x) => roleGroupOf(x) === 'client');
+      if (back) back.primary = true;                    // сделка без основного контакта не бывает
+    }
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId; // keep the deal's primary client in sync
     // Правка участника пережила только перерисовку карточки: без save() она исчезала на F5.
@@ -9482,7 +9929,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (!Array.isArray(d.contacts)) d.contacts = dealContacts(d).slice();
     if (d.contacts.length <= 1) { WS.storeApi.toast('Нельзя убрать единственный контакт'); return; }
     const removed = d.contacts.splice(index, 1)[0];
-    if (removed && removed.primary && d.contacts.length) d.contacts[0].primary = true;
+    // Замена основного ищется среди стороны клиента, а не берётся первой попавшейся строкой:
+    // иначе после открепления покупателя основным становится юрист застройщика.
+    if (removed && removed.primary && d.contacts.length) {
+      const back = d.contacts.find((x) => roleGroupOf(x) === 'client') || d.contacts[0];
+      back.primary = true;
+    }
     const prim = d.contacts.find((x) => x.primary) || d.contacts[0];
     if (prim && prim.clientId) d.clientId = prim.clientId;
     WS.storeApi.save();
@@ -9531,8 +9983,6 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealThroughPath(d) {
     const r = d.requestId ? requestById(d.requestId) : null;
     const pre = r ? ['new', 'qual', 'offer', 'meet', 'talks'].map((k) => reqStageLabel(k, r)) : [];
-    const preHtml = pre.map((l) => '<span class="dx-step done pre" title="Участок до согласования условий — стадии запроса вычисляются из фактов и вручную не выставляются">' +
-      '<span class="d">' + I('check') + '</span><span class="l">' + l + '</span></span>').join('');
     const s = funnelSteps(d);
     const own = s.cols.map((c, i) => {
       const cls = s.lost ? 'todo' : (i < s.idx ? 'done' : (i === s.idx ? 'cur' : 'todo'));
@@ -9540,20 +9990,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       return '<button class="dx-step ' + cls + '" data-dealstage="' + d.id + '" data-stage="' + s.order[i] + '">' +
         '<span class="d">' + inner + '</span><span class="l">' + c + '</span></button>';
     }).join('');
-    // На узком экране пройденный участок сворачивается в одну плашку, а не прокручивается пятью
-    // шагами: иначе при открытии карточки видно только то, что уже позади, а текущий шаг —
-    // за краем экрана. Свёртка чисто оформительская (CSS), поэтому работает и без скриптов.
+    // Пройденный пресейл — ОДНА плашка, а не пять шагов, и на любой ширине. Пятью шагами лента
+    // становилась одиннадцатью элементами в горизонтальной прокрутке: шаги договора, ради которых
+    // карточку открывают, сжимались до 62 пикселей и подписи в 10.5. Суть сохранена — участок
+    // виден пройденным, граница нарисована, стадии запроса перечислены в подсказке.
     const preSum = pre.length ? '<span class="dx-pre-sum" title="' + escAttr(pre.join(' → ')) + '">' +
       I('check') + 'пресейл пройден · ' + pre.length + '</span>' : '';
     const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
       '<span class="dx-bound-l">условия согласованы</span></span>' : '';
     const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
-    return '<div class="dx-path' + (pre.length + s.cols.length > 7 ? ' long' : '') + '">' + preSum + preHtml + bound + own + '</div>' + lost;
+    return '<div class="dx-path' + (s.cols.length > 7 ? ' long' : '') + '">' + preSum + bound + own + '</div>' + lost;
   }
   // Справа от пути: когда запрос стал сделкой и сколько она стоит на текущем шаге.
   function dealPathMeta(d) {
     const ago = createdAgoLabel(d);
-    const conv = d.createdAt ? ('стала сделкой ' + d.createdAt + (ago ? ' · ' + ago : '')) : '';
+    // Дата конверсии, когда она записана, главнее даты создания: «стала сделкой» — это
+    // момент согласования условий, а не момент заведения карточки.
+    const when = d.convertedAt || d.createdAt;
+    const conv = when ? ('стала сделкой ' + when + (ago ? ' · ' + ago : '')) : '';
     const days = d.stageDays != null ? ('на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней')) : '';
     const both = [conv, days].filter(Boolean);
     return both.length ? '<div class="dx-path-meta">' + both.map((t) => '<span>' + t + '</span>').join('') + '</div>' : '';
@@ -9729,7 +10183,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const cm = chanMeta(prefChannel(c));
     const since = clientSince(c);
     const nDeals = (D().deals || []).filter((x) => x.clientId === c.id).length;
+    const rel = relStageOf(c);
     const facts = [
+      // Стадия отношений стоит первой: она отвечает на «что у нас с этим человеком вообще»,
+      // а всё остальное в обложке — подробности.
+      ['users', relLabel(rel.k) + (clientHasWon(c.id) ? ' · был успех' : '')],
       since ? ['calendar', 'в работе с ' + since.at] : null,
       nDeals ? ['briefcase', nDeals + ' ' + plural(nDeals, 'сделка', 'сделки', 'сделок')] : null,
       [kycIcon, k.label],
@@ -9853,8 +10311,66 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', ''],
       ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
       ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', ''],
+      // Завершение — отдельное действие с двумя исходами, а не «поставить последний шаг»:
+      // успех означает полученное вознаграждение, а не подписанный договор.
+      dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', ''],
+      dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', ''],
+      dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
+  }
+  /* ---- Передать против привлечь (§3.1 решений) ----
+     Сейчас это смешано в одном поле, а операции разные. ПЕРЕДАТЬ — меняется ответственный,
+     открытые задачи переназначаются, в ленте остаётся след, прежний ответственный сохраняет
+     доступ на чтение: он отвечал перед клиентом и должен видеть, чем кончилось. ПРИВЛЕЧЬ —
+     ответственный не меняется, это со-брокеридж. Разница названа словами, а не оттенком. */
+  function dealTransferForm(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const who = TEAM.filter((m) => m.id !== d.agent);
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Передача меняет ответственного и переназначает открытые задачи. Прежний ответственный сохранит доступ на чтение — он отвечал перед клиентом. Если нужно разделить вознаграждение, а не передать сделку, это «Привлечь партнёра».</p>' +
+      '<div class="match-grid"><label class="fld"><span>Кому передаём</span><select id="tr_to">' +
+      who.map((m) => '<option value="' + m.id + '">' + escAttr(m.name) + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Причина</span><input id="tr_why" type="text" placeholder="Напр.: ухожу в отпуск с 20 мая"></label></div>';
+    openModal('Передать сделку · ' + escAttr(d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveTransfer" data-deal="' + dealId + '">' + I('check') + 'Передать</button>');
+  }
+  function saveTransfer(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const to = g('tr_to'), why = g('tr_why');
+    if (!to || to === d.agent) { WS.storeApi.toast('Выберите, кому передаёте'); return; }
+    const from = d.agent;
+    d.agent = to;
+    // Прежний ответственный остаётся свидетелем: карточку и историю видит, менять не может.
+    d.witness = (d.witness || []).concat(from ? [from] : []);
+    (D().tasks || []).forEach((t) => { if (t.dealId === dealId && t.status !== 'done') t.assignee = to; });
+    addEventEntry('deal', dealId, { type: 'note', text: 'Сделка передана: ' + agentName(from) + ' → ' + agentName(to) + (why ? '. Причина: ' + why : '') + '.' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Сделка передана — ' + agentName(to), 'ok');
+    dealCard(dealId);
+  }
+  function dealPartnerForm(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const who = TEAM.filter((m) => m.id !== d.agent);
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Привлечение партнёра не меняет ответственного: это со-брокеридж. Ответственным по сделке остаётесь вы.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Агент-партнёр</span><select id="pa_who">' +
+      who.map((m) => '<option value="' + m.id + '"' + (m.id === d.partnerAgent ? ' selected' : '') + '>' + escAttr(m.name) + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Условия разделения</span><input id="pa_split" type="text" value="' + escAttr(d.split || '50 / 50') + '"></label></div>';
+    openModal('Привлечь партнёра · ' + escAttr(d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="savePartner" data-deal="' + dealId + '">' + I('check') + 'Привлечь</button>');
+  }
+  function savePartner(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const who = g('pa_who'); if (!who) return;
+    d.partnerAgent = who;
+    d.split = g('pa_split') || '50 / 50';
+    addEventEntry('deal', dealId, { type: 'note', text: 'Привлечён партнёр: ' + agentName(who) + ' · разделение ' + d.split + '. Ответственный не менялся.' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Партнёр привлечён — ' + agentName(who), 'ok');
+    dealCard(dealId);
   }
   function dealChipRow(d) {
     const c = D().clients.find((x) => x.id === d.clientId) || {};
@@ -9907,10 +10423,113 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="obj-mini-badges">' + avail + '<span class="badge">' + I('money') + 'комиссия ' + (o.commissionPct || '—') + '%</span></div></div>' +
       I('arrowRight') + '</div>';
   }
+  /* ---- Пер-лотовое состояние (§2.3 решений) ----
+     Массив лотов формы НЕ меняет: его читают около десяти мест кода и восемь проверок,
+     и смена формы без переходника дала бы не ошибку, а тихие пустые выборки. Состояние
+     заводится отдельной картой на сделке, ключом по объекту. Отсутствие записи — это
+     не «пусто», а «как у сделки»: лот без своей записи наследует шаг и ставку объекта. */
+  const LOT_EXITS = [
+    { k: 'returned', label: 'Вернуть в подбор', done: 'возвращён в подбор' },
+    { k: 'rejected', label: 'Отклонить', done: 'отклонён клиентом' },
+    { k: 'replaced', label: 'Заменить', done: 'заменён другим объектом' },
+    { k: 'blocked', label: 'Заблокировать', done: 'заблокирован' },
+  ];
+  const exitLabel = (k) => (LOT_EXITS.find((x) => x.k === k) || {}).done || k;
+  function lotState(d, objId) { return ((d && d.lotState) || {})[objId] || null; }
+  // Заблокированный лот остаётся в сделке — он помечен как непредлагаемый, а не выведен.
+  function lotIsOut(st) { return !!(st && st.exit && st.exit !== 'blocked'); }
+  // Лоты, которые считаются: вышедшие из сделки в сумму и комиссию не входят.
+  function dealLiveLots(d) { return dealLots(d).filter((o) => !lotIsOut(lotState(d, o.id))); }
+  function lotCommissionPct(d, o) {
+    const st = lotState(d, o.id);
+    return (st && st.commissionPct != null) ? st.commissionPct : (o.commissionPct || DEFAULT_COMM_PCT);
+  }
+  /* Сумма сделки, собранная из лотов, пересчитывается по оставшимся. Введённая вручную —
+     не трогается: молча переписать число, которое агент ввёл сам, хуже, чем показать,
+     что оно разошлось с суммой лотов. */
+  function lotsSum(d) { return dealLiveLots(d).reduce((a, o) => a + (o.price || 0), 0); }
+  /* Собрана ли сумма из лотов — решается ОДИН раз и запоминается. Если спрашивать заново
+     после каждого вывода, второй лот сравнивался бы уже с пересчитанной суммой, не сходился
+     бы с полным списком, и сделка молча переставала бы считаться собранной из лотов. */
+  function amountFromLots(d) {
+    if (d.amountFromLots != null) return !!d.amountFromLots;
+    const all = dealLots(d).reduce((a, o) => a + (o.price || 0), 0);
+    return all > 0 && Math.abs(all - (d.amount || 0)) <= 1;
+  }
+  function lotsMismatch(d) {
+    const s = lotsSum(d);
+    return (s && d.amount && Math.abs(s - d.amount) > 1) ? { lots: s, deal: d.amount } : null;
+  }
+  function lotExitForm(dealId, objId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const o = (D().objects || []).find((x) => x.id === objId) || {};
+    const opts = LOT_EXITS.map((e) => '<option value="' + e.k + '">' + e.label + '</option>').join('');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Исход обязателен: причины разные, и последствия у них разные — автоматически вернуть лот в подбор нельзя. Договор при этом не пересобирается: вехи и график согласованы с другой стороной.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Что происходит с лотом</span><select id="lot_exit">' + opts + '</select></label>' +
+      '<label class="fld"><span>Причина</span><input id="lot_why" type="text" placeholder="Напр.: клиент выбрал другой этаж"></label></div>';
+    openModal('Вывести из сделки · ' + (o.name || objId), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveLotExit" data-deal="' + dealId + '" data-obj="' + objId + '">' + I('check') + 'Применить</button>');
+  }
+  function saveLotExit(dealId, objId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const exit = g('lot_exit') || 'returned';
+    const why = g('lot_why');
+    const fromLots = amountFromLots(d);
+    if (d.amountFromLots == null) d.amountFromLots = fromLots;
+    if (!d.lotState) d.lotState = {};
+    d.lotState[objId] = Object.assign({}, d.lotState[objId], { exit: exit, exitReason: why, exitAt: WS.storeApi.clockLabel().date });
+    if (exit === 'returned' || exit === 'rejected') {
+      // Лот выходит из подборки заявки в то состояние, которое назвал агент: возврат — снова
+      // доступен и ход наш; отказ — помечен отказом клиента.
+      const r = d.requestId ? requestById(d.requestId) : null;
+      const off = r && (r.offered || []).find((x) => x.id === objId);
+      if (off) { off.state = exit === 'rejected' ? 'rejected' : 'offered'; if (exit === 'returned') off.turn = 'us'; }
+    }
+    if (fromLots) d.amount = lotsSum(d);
+    // Договор автоматически не пересобирается — он помечается как требующий пересмотра.
+    contractsOfDeal(d.id).forEach((k) => { k.review = 'вышел лот: ' + ((D().objects || []).find((x) => x.id === objId) || {}).name; });
+    addEventEntry('deal', d.id, { type: 'note', text: 'Лот ' + (((D().objects || []).find((x) => x.id === objId) || {}).name || objId) + ' — ' + exitLabel(exit) + (why ? ': ' + why : '') + '.' });
+    WS.storeApi.touch();
+    closeModal();
+    if (!dealLiveLots(d).length) WS.storeApi.toast('Лотов не осталось. Сделку можно закрыть проигрышем — или поставить другой лот', 'warn');
+    else WS.storeApi.toast('Лот ' + exitLabel(exit), 'ok');
+    dealCard(dealId);
+  }
+  function undoLotBlock(dealId, objId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d || !d.lotState || !d.lotState[objId]) return;
+    delete d.lotState[objId].exit; delete d.lotState[objId].exitReason; delete d.lotState[objId].exitAt;
+    WS.storeApi.touch(); WS.storeApi.toast('Блокировка снята', 'ok'); dealCard(dealId);
+  }
+  // Строка лота: своя регистрация, свой срок, своя ставка — и кнопка вывода из сделки.
+  function lotRow(d, o) {
+    const st = lotState(d, o.id) || {};
+    const out = lotIsOut(st);
+    const reg = st.regNo ? '<span class="badge ok">' + I('shield') + (st.regNo) + (st.regAt ? ' · ' + st.regAt : '') + '</span>' : '';
+    const pct = lotCommissionPct(d, o);
+    const own = (st.commissionPct != null) ? ' (своя)' : '';
+    const mark = out ? '<span class="badge stop">' + I('x') + exitLabel(st.exit) + '</span>'
+      : (st.exit === 'blocked' ? '<span class="badge warn">' + I('lock') + 'заблокирован' + (st.exitReason ? ' · ' + escAttr(st.exitReason) : '') + '</span>' : '');
+    const act = out ? ''
+      : (st.exit === 'blocked'
+        ? '<button class="btn xs" data-lotunblock="' + d.id + ':' + o.id + '">' + I('check') + 'Снять блокировку</button>'
+        : '<button class="btn xs" data-lotexit="' + d.id + ':' + o.id + '">' + I('x') + 'Вывести из сделки</button>');
+    return '<div class="lot-row' + (out ? ' lot-out' : '') + '">' + dealObjectMini(o) +
+      '<div class="lot-meta"><span class="badge">' + I('money') + 'комиссия ' + pct + '%' + own + ' · ' + WS.AED(Math.round((o.price || 0) * pct / 100)) + '</span>' +
+      reg + mark + act + '</div></div>';
+  }
   function dealLotsBlock(d) {
     const lots = dealLots(d);
-    const title = lots.length > 1 ? 'Объекты сделки · ' + lots.length + ' лота' : 'Объект сделки';
-    return dxSec('building', title, '', lots.map(dealObjectMini).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>');
+    const live = dealLiveLots(d);
+    const title = lots.length > 1 ? 'Объекты сделки · ' + live.length + ' ' + plural(live.length, 'лот', 'лота', 'лотов') : 'Объект сделки';
+    const mism = lotsMismatch(d);
+    // Расхождение показывается, а не исправляется молча: сумма могла быть введена рукой.
+    const warn = mism ? '<div class="rel-why">' + I('warn') + '<span>Сумма лотов ' + WS.AED(mism.lots) +
+      ' расходится с суммой сделки ' + WS.AED(mism.deal) + '. Введённое вручную число мы не переписываем.</span></div>' : '';
+    const body = lots.length ? warn + lots.map((o) => lotRow(d, o)).join('')
+      : '<div style="font-size:12px;color:var(--faint);padding:6px 0">объект ещё не выбран</div>';
+    return dxSec('building', title, '', body);
   }
   // EOI / booking deposit — amount, paid?, date, refundable (Codex IA review: a P0 for a live deal).
   function depositLabel(d) {
@@ -9927,7 +10546,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       : d.funnel === 'rent' ? 'арендатор'
       : (d.funnel === 'manage' || d.funnel === 'exclusive') ? 'собственник'
       : d.funnel === 'cross' ? 'партнёр' : 'по договору';
-    const comm = o0 && o0.commissionPct ? o0.commissionPct + '% · ' + WS.AED(Math.round((d.amount || 0) * o0.commissionPct / 100)) + ' · платит ' + commPayer : '—';
+    // Итог остаётся в шапке, но раскрывается построчно: с несколькими лотами одного процента
+    // не существует, и «5%» в шапке было бы ставкой первого объекта, выданной за общую.
+    const live = dealLiveLots(d);
+    const commSum = dealCommission(d);
+    const comm = commSum
+      ? (live.length > 1
+        ? WS.AED(commSum) + ' · по лотам: ' + live.map((o) => lotCommissionPct(d, o) + '%').join(' · ') + ' · платит ' + commPayer
+        : (o0 ? lotCommissionPct(d, o0) + '% · ' + WS.AED(commSum) + ' · платит ' + commPayer : WS.AED(commSum)))
+      : '—';
     const cobro = d.partnerAgent ? agentName(d.partnerAgent) + ' · co-broking' : 'нет';
     const dep = depositLabel(d);
     return dxSec('briefcase', 'Ключевое', '<button class="btn xs" data-act="editDeal" data-deal="' + d.id + '">' + I('pencil') + 'Изменить</button>', '<div class="dfields">' +
@@ -10258,8 +10885,36 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       (d.lots && d.lots.length ? d.lots : [d.objectId]).forEach((oid) => { if (oid) dealObjIds[oid] = done ? 'done' : 'active'; });
     });
     if (dealObjIds[off.id]) return dealObjIds[off.id] === 'done' ? { label: 'Сделка закрыта', tone: 'ok', icon: 'check' } : { label: 'В сделке', tone: 'acc', icon: 'briefcase' };
-    const m = ({ selected: ['Выбран', 'ok', 'check'], rejected: ['Отклонён', 'stop', 'x'] })[off.state] || ['На рассмотрении', '', 'clock'];
-    return { label: m[0], tone: m[1], icon: m[2] };
+    if (off.state === 'selected') return { label: 'Акцептован, работаем', tone: 'ok', icon: 'check' };
+    if (off.state === 'rejected') return { label: 'Отказ', tone: 'stop', icon: 'x' };
+    // Решение клиента и «чей ход» — два разных поля. Первое не переосмысливается: от него
+    // зависят сбор КП, вычисляемая стадия заявки, право создать сделку и профиль предпочтений.
+    // Подпись собирается из пары, по словарю партнёра.
+    return turnOf(r, off) === 'us'
+      ? { label: 'За нами — подготовить ответ', tone: 'acc', icon: 'clock' }
+      : { label: 'Ждём обратную связь', tone: '', icon: 'clock' };
+  }
+  /* Чей ход. Выводится по умолчанию, правится вручную; ручная правка держится, ПОКА не произойдёт
+     следующее переключающее событие, — иначе поставленная пометка застынет навсегда и будет врать.
+     При отказе и при выборе ход ничей: там подпись говорит сама за себя. */
+  function turnDerived(r) {
+    const tl = (D().requestTimeline || {})[r.id] || [];
+    const last = tl.reduce((m, e) => ((e.ord != null && (!m || e.ord > m.ord)) ? e : m), null);
+    // Ход переключается на нас, когда по заявке появляется входящая запись от клиента,
+    // и на клиента — в момент отправки подборки или предложения.
+    return (last && (last.by === 'Клиент' || last.dir === 'in')) ? 'us' : 'client';
+  }
+  function turnOf(r, off) {
+    if (!off || off.state === 'rejected' || off.state === 'selected') return null;
+    const derived = turnDerived(r);
+    return (off.turn && off.turnOver === derived) ? off.turn : derived;
+  }
+  function setTurn(reqId, objId, v) {
+    const r = requestById(reqId); if (!r) return;
+    const off = (r.offered || []).find((x) => x.id === objId); if (!off) return;
+    if (!v || v === 'auto') { delete off.turn; delete off.turnOver; }
+    else { off.turn = v; off.turnOver = turnDerived(r); }
+    WS.storeApi.touch();
   }
   // Full-width подбор with the status model + INLINE decision editing (pick / in-work / reject right
   // in the tile — no separate edit page). Under it the КП scenario: отметить выбранное → собрать КП
@@ -10272,6 +10927,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       const locked = st.label === 'В сделке' || st.label === 'Сделка закрыта';
       const ph = (WS.photos && WS.photos[obj.id]) || '';
       const reason = (o.state === 'rejected' && o.reason) ? '<div class="reqo-reason">' + I('warn') + o.reason + '</div>' : '';
+      // Переключатель хода стоит рядом с решением клиента и не подменяет его: это второе поле.
+      const turn = turnOf(r, o);
+      const turnSeg = (locked || !turn) ? '' : '<div class="obj-seg obj-seg-turn">' +
+        [['client', 'Ход клиента', 'users'], ['us', 'Ход наш', 'briefcase']].map((v) =>
+          '<button class="obj-seg-b' + (turn === v[0] ? ' on' : '') + '" data-reqturn="' + r.id + '~' + obj.id + '~' + v[0] + '">' + I(v[2] || 'dot') + v[1] + '</button>').join('') + '</div>';
       const seg = locked ? '' : '<div class="obj-seg">' +
         [['selected', 'Выбран', 'check'], ['offered', 'В работе', 'clock'], ['rejected', 'Отклонён', 'x']].map((s) =>
           '<button class="obj-seg-b' + (o.state === s[0] ? ' on' : '') + '" data-reqobj="' + r.id + '~' + obj.id + '~' + s[0] + '">' + I(s[2]) + s[1] + '</button>').join('') + '</div>';
@@ -10280,7 +10940,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         '<div class="obj-mini-b' + (seg ? ' obj-mini-b-row' : '') + '"><div class="obj-mini-info"><div class="obj-mini-n">' + obj.name + '</div>' +
         '<div class="obj-mini-m">' + obj.area + ' · ' + WS.AED(obj.price) + ' · ' + obj.br + '</div>' +
         '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
-        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + '</div>' +
+        '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + turnSeg + '</div>' +
         I('arrowRight') + '</div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
     const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить</button>';
@@ -10594,6 +11254,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           funnel: fk, readiness: readiness, side: r.side || null,
           stage: steps[0], stageDays: 0, amount: g.objs.reduce((s, o) => s + (o.price || 0), 0), hot: false,
           createdAt: 'сегодня', updated: 'только что', tags: [],
+          // Дата конверсии запроса в сделку. Без неё «сколько идёт от лида до сделки» считать
+          // нечем: createdAt отвечает на «когда завели», а не на «когда согласовали условия».
+          convertedAt: WS.storeApi.clockLabel().date,
           goal: r.goal, dealType: r.dealType, paymentForm: r.paymentForm, source: r.source,
           objectType: r.objectType, vat: r.vat, horizon: r.horizon, funding: r.funding,
           requestId: r.id, lots: lots, objectId: lots[0],
@@ -10694,6 +11357,109 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const ids = (d.kpSnapshot && d.kpSnapshot.objectIds) ||
       (d.requestId && requestById(d.requestId) && requestById(d.requestId).kp ? requestById(d.requestId).kp.objectIds : null) || [];
     return ids.map((oid) => D().objects.find((o) => o.id === oid)).filter(Boolean);
+  }
+  /* ---- Коммерческие предложения: версии, а не правки (§2.4 и §7.7 решений) ----
+     Снимок КП, зафиксированный при создании сделки, остаётся неизменяемым — это то основание,
+     на котором сделка заведена, и переписывать его нельзя. Правка предложения СОЗДАЁТ новую
+     версию: так история переговоров остаётся читаемой, и видно, на что клиент отвечал. */
+  function offersOf(scope, id) {
+    const key = scope === 'deal' ? 'dealId' : 'requestId';
+    return (D().offers || []).filter((x) => x[key] === id).sort((a, b) => b.version - a.version);
+  }
+  function offerTerms(src) {
+    return { paymentForm: src.paymentForm || null, vat: !!src.vat, horizon: src.horizon || null, funding: src.funding || null };
+  }
+  function newOffer(scope, id) {
+    const isDeal = scope === 'deal';
+    const src = isDeal ? D().deals.find((x) => x.id === id) : requestById(id);
+    if (!src) return null;
+    const prev = offersOf(scope, id)[0];
+    const objectIds = prev ? prev.objectIds.slice()
+      : (isDeal ? dealLiveLots(src).map((o) => o.id)
+        : (src.offered || []).filter((o) => o.state === 'selected').map((o) => o.id));
+    const o = {
+      id: 'of_' + id + '_' + ((prev ? prev.version : 0) + 1),
+      dealId: isDeal ? id : null, requestId: isDeal ? (src.requestId || null) : id,
+      version: (prev ? prev.version : 0) + 1, objectIds: objectIds,
+      terms: prev ? Object.assign({}, prev.terms) : offerTerms(src),
+      body: prev ? prev.body : 'Предлагаем к рассмотрению объекты ниже. Условия — в таблице; готовы обсудить график платежей.',
+      state: 'draft', sentTo: null, sentAt: null,
+    };
+    (D().offers || (D().offers = [])).unshift(o);
+    return o;
+  }
+  function offerById(id) { return (D().offers || []).find((x) => x.id === id) || null; }
+  // Правка ОТПРАВЛЕННОЙ версии не меняет её, а порождает следующую: иначе исчезнет то,
+  // на что клиент отвечал.
+  function editOffer(offerId) {
+    const o = offerById(offerId); if (!o) return;
+    const target = o.state === 'sent' ? newOffer(o.dealId ? 'deal' : 'request', o.dealId || o.requestId) : o;
+    if (o.state === 'sent' && target) { target.body = o.body; target.objectIds = o.objectIds.slice(); target.terms = Object.assign({}, o.terms); }
+    openOfferForm((target || o).id, o.state === 'sent');
+  }
+  function openOfferForm(offerId, forked) {
+    const o = offerById(offerId); if (!o) return;
+    const objs = (o.objectIds || []).map((id) => (D().objects || []).find((x) => x.id === id)).filter(Boolean);
+    const who = o.dealId ? D().deals.find((x) => x.id === o.dealId) : requestById(o.requestId);
+    const c = who ? D().clients.find((x) => x.id === who.clientId) : null;
+    const note = forked ? 'Отправленная версия не меняется — это версия ' + o.version + ', её копия. Предыдущая осталась в истории.' : null;
+    const body = kpDocBody((c && c.name) || 'Клиент', 'версия ' + o.version + ' · черновик', objs, o.terms || {}, note) +
+      '<label class="fld" style="margin-top:10px"><span>Текст предложения</span>' +
+      '<textarea id="of_body" rows="3">' + escAttr(o.body || '') + '</textarea></label>';
+    // Отправка адресуется участнику, а не «клиенту вообще»: у сделки их несколько,
+    // и юристу пишут не то же, что покупателю.
+    const parts = who && o.dealId ? dealContacts(who) : (c ? [{ clientId: c.id, role: 'Клиент' }] : []);
+    const to = '<label class="fld"><span>Кому отправить</span><select id="of_to">' +
+      parts.map((p, i) => '<option value="' + i + '">' + escAttr(contactDisplayName(p)) + ' · ' + roleOf(p) + '</option>').join('') + '</select></label>';
+    openModal('Предложение · версия ' + o.version, body + to,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn" data-act="saveOffer" data-offer="' + o.id + '">' + I('check') + 'Сохранить черновик</button>' +
+      '<button class="btn primary" data-act="sendOffer" data-offer="' + o.id + '">' + I('send') + 'Отправить клиенту</button>');
+  }
+  function readOfferForm(o) {
+    const el = document.getElementById('of_body');
+    if (el) o.body = el.value.trim();
+  }
+  function saveOffer(offerId) {
+    const o = offerById(offerId); if (!o) return;
+    readOfferForm(o); WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Черновик версии ' + o.version + ' сохранён', 'ok');
+  }
+  function sendOffer(offerId) {
+    const o = offerById(offerId); if (!o) return;
+    readOfferForm(o);
+    const who = o.dealId ? D().deals.find((x) => x.id === o.dealId) : requestById(o.requestId);
+    const parts = who && o.dealId ? dealContacts(who) : [];
+    const sel = document.getElementById('of_to');
+    const p = parts[sel ? +sel.value : 0] || (who ? { clientId: who.clientId } : {});
+    /* Отправка блокируется без согласия — тем же правилом, что и любая адресная рассылка.
+       У участника без своей карточки контакта собственного согласия нет: он появился в сделке
+       через клиента, и его согласием мы считаем клиентское. Пропускать такого адресата
+       «потому что записи нет» значило бы обойти правило именем в свободном поле. */
+    const cid = p.clientId || (who && who.clientId);
+    const c = cid ? D().clients.find((x) => x.id === cid) : null;
+    if (c && c.consent === false) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
+    o.state = 'sent';
+    o.sentTo = contactDisplayName(p);
+    o.sentAt = WS.storeApi.clockLabel().date;
+    if (who && o.dealId) addEventEntry('deal', who.id, { type: 'msg', text: 'Отправлено предложение, версия ' + o.version + ' — ' + o.sentTo + '. Отправка имитируется (DEMO).' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('Версия ' + o.version + ' отправлена — ' + o.sentTo + ' (имитация)', 'ok');
+    if (o.dealId) dealCard(o.dealId);
+  }
+  function dealOffersBlock(d) {
+    const list = offersOf('deal', d.id);
+    const add = '<button class="btn xs" data-offernew="deal:' + d.id + '">' + I('plus') + 'Новая версия</button>';
+    const rows = list.map((o) => {
+      const sent = o.state === 'sent';
+      return '<div class="rel-row"><div class="fi i-' + (sent ? 'ok' : 'mut') + '">' + I('doc') + '</div>' +
+        '<div class="ft"><div class="t">Версия ' + o.version + ' · ' + (o.objectIds || []).length + ' ' + plural((o.objectIds || []).length, 'объект', 'объекта', 'объектов') + '</div>' +
+        '<div class="m">' + (sent ? 'отправлена ' + o.sentAt + ' · ' + escAttr(o.sentTo || '') : 'черновик') + '</div></div>' +
+        '<div class="rel-acts"><button class="btn xs" data-offeredit="' + o.id + '">' + I('pencil') + (sent ? 'Новая версия из этой' : 'Открыть') + '</button></div></div>';
+    }).join('');
+    const empty = '<div style="font-size:12px;color:var(--faint);padding:6px 0">предложений по сделке ещё нет</div>';
+    const why = '<div class="rel-why">' + I('lock') + '<span>Снимок КП, на котором заведена сделка, не меняется — он открывается кнопкой «Собрать КП». Правка отправленной версии создаёт следующую.</span></div>';
+    return dxSec('doc', 'Предложения · ' + list.length, add, why + '<div class="rel-list">' + (rows || empty) + '</div>');
   }
   function openDealKp(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return;
@@ -11096,6 +11862,100 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // when: 'now' | { daysAgo: 0..N, h, mi }. Returns the stored entry, or null if the input is
   // not valid (unknown scope / unknown entity / empty text) — never writes a half-formed record.
   let taskSeq = 0;   // ids for tasks the Concierge creates; stable within a session
+  /* ---- Факт контакта и итог контакта (§2.2 и §7.1 решений) ----
+     Факт — «позвонили, написали, встретились» — наблюдаемое событие: пишется сразу, модель
+     здесь не ошибается. Итог — «о чём договорились» — модель додумывает, и её догадка иначе
+     ляжет в историю как факт, на который потом обопрётся другой ответ.
+
+     Поэтому машинный итог НЕ кладётся в ленту. Он живёт отдельным списком и попадает в ленту
+     только подтверждённым. Это не придирка к форме: правило «неподтверждённый итог не участвует
+     ни в одном выводе» иначе пришлось бы помнить в тринадцати местах, которые читают ленту, —
+     а так оно выполняется само, потому что читать нечего.
+
+     Итог, который набрал человек, сразу подтверждён: подтверждать нечего, это первоисточник. */
+  /* ---- Итог при закрытии задачи (§3.2 решений) ----
+     Форма из двух полей: что вышло и следующий шаг. Закрыть БЕЗ комментария можно — обязательное
+     поле здесь прямой путь к тому, что агент перестанет закрывать задачи вовсе, и мы потеряем
+     и комментарий, и сам факт закрытия. Комментарий пишется в ленту как итог в состоянии
+     «подтверждён»: его написал человек, а не модель, и подтверждать нечего. */
+  function taskDoneForm(taskId) {
+    const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
+    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующее касание');
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Закрыть можно и без комментария — тогда останется только факт выполнения. Что напишете здесь, ляжет в ленту как итог от вас.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Что вышло</span><input id="td_out" type="text" placeholder="Напр.: договорились о брони до пятницы"></label>' +
+      '<label class="fld"><span>Следующий шаг</span><input id="td_next" type="text" value="' + escAttr(next) + '"></label></div>' +
+      '<label class="pcheck" style="margin-top:10px"><input type="checkbox" id="td_mk" checked> Поставить следующий шаг задачей</label>';
+    openModal('Выполнить · ' + escAttr(t.title), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveTaskDone" data-task="' + taskId + '">' + I('check') + 'Выполнить</button>');
+  }
+  function saveTaskDone(taskId) {
+    const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const out = g('td_out'), next = g('td_next');
+    const mk = !!(document.getElementById('td_mk') || {}).checked;
+    t.outcome = out || undefined;
+    WS.storeApi.taskAction(taskId, 'done');
+    const scope = t.dealId ? ['deal', t.dealId] : (t.requestId ? ['request', t.requestId] : (t.clientId ? ['contact', t.clientId] : null));
+    if (out && scope) {
+      const e = addEventEntry(scope[0], scope[1], { type: 'note', text: 'Итог: ' + out });
+      if (e) { e.role = 'outcome'; e.state = 'confirmed'; }
+    }
+    if (mk && next) {
+      WS.storeApi.addTask({ id: 'tk_next_' + taskId, title: next, clientId: t.clientId,
+        dealId: t.dealId, requestId: t.requestId, contractId: t.contractId, due: 'завтра', when: 'tomorrow', kind: 'manual' });
+    }
+    closeModal();
+    WS.storeApi.toast('Задача выполнена' + (out ? ' · итог записан' : ''), 'ok');
+  }
+
+  function outcomesFor(scope, id) {
+    return (D().outcomes || []).filter((x) => x.scope === scope && x.entityId === id);
+  }
+  function addOutcomeDraft(scope, id, opts) {
+    const o = opts || {};
+    const txt = String(o.text == null ? '' : o.text).trim();
+    if (!txt || !feedOwner(scope, id)) return null;
+    const rec = { id: 'oc_' + scope + '_' + id + '_' + ((D().outcomes || []).length + 1),
+      scope: scope, entityId: id, factId: o.factId || null, text: txt,
+      by: o.by || 'Консьерж', at: 'сейчас', ord: NOW_ORD + 1, state: 'draft' };
+    (D().outcomes || (D().outcomes = [])).push(rec);
+    WS.storeApi.touch();
+    return rec;
+  }
+  function confirmOutcome(oid) {
+    const rec = (D().outcomes || []).find((x) => x.id === oid); if (!rec) return;
+    D().outcomes = (D().outcomes || []).filter((x) => x !== rec);
+    const e = addEventEntry(rec.scope, rec.entityId, { type: 'note', text: rec.text, by: rec.by });
+    if (e) { e.role = 'outcome'; e.state = 'confirmed'; e.factId = rec.factId; }
+    WS.storeApi.touch();
+    WS.storeApi.toast('Итог подтверждён — теперь он участвует в выводах', 'ok');
+  }
+  function rejectOutcome(oid) {
+    const rec = (D().outcomes || []).find((x) => x.id === oid); if (!rec) return;
+    // Отклонённый черновик остаётся со следом отклонения: иначе непонятно, почему Консьерж
+    // больше не предлагает то, что предлагал вчера.
+    rec.state = 'rejected';
+    WS.storeApi.touch();
+    WS.storeApi.toast('Итог отклонён — след остался в ленте');
+  }
+  function outcomeRow(rec) {
+    const acts = rec.state === 'draft'
+      ? '<div class="rel-acts"><button class="btn xs primary" data-ocok="' + rec.id + '">' + I('check') + 'Подтвердить</button>' +
+        '<button class="tl-ic-btn" data-ocno="' + rec.id + '" title="Отклонить итог">' + I('x') + '</button></div>'
+      : '<span class="rel-tag stop">отклонён</span>';
+    return '<div class="evc ai oc-' + rec.state + '">' +
+      '<div class="evc-top"><span class="evc-ic ai">' + I('sparkle') + '</span>' +
+      '<span class="evc-name">Итог разговора · ' + (rec.state === 'draft' ? 'черновик' : 'отклонён') + '</span>' +
+      '<span class="evc-by ai">' + I('sparkle') + escAttr(rec.by) + '<i>AI-агент</i></span>' +
+      '<span class="evc-when">' + escAttr(rec.at) + '</span></div>' +
+      '<div class="evc-text">' + escAttr(rec.text) + '</div>' +
+      '<div class="evc-tags"><span class="tl-src">' + I('lock') + 'не участвует в выводах, пока не подтверждён</span>' + acts + '</div></div>';
+  }
+  function outcomesBlock(scope, id) {
+    const list = outcomesFor(scope, id);
+    return list.length ? list.map(outcomeRow).join('') : '';
+  }
   function addEventEntry(scope, id, opts) {
     const o = opts || {};
     const txt = String(o.text == null ? '' : o.text).trim();
@@ -11830,7 +12690,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
-    return dealNextStepCard(d) + dealLotsBlock(d) + dealRecentCard(d);
+    /* Черновик итога стоит в РАБОЧЕЙ области, а не в истории: он не часть истории, пока его
+       не подтвердили, и это дело на сегодня — «подтвердите или отклоните», — а не запись
+       о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
+    const drafts = outcomesBlock('deal', d.id);
+    const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
+    return dealNextStepCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -12599,6 +13464,35 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     return rows + doneBlock;
   }
   // Пульс разгружен: вместо полной очереди — только «Мой день» (сегодня/просрочено) + вход на экран «Задачи».
+  /* ---- Сделки без следующего шага (§3.3 решений) ----
+     Требование партнёра «сделок без запланированных событий быть не должно» превращается
+     не в предупреждение, а в РАЗБИРАЕМЫЙ СПИСОК: предупреждение без списка бесполезно —
+     агент видит, что что-то не так, и не знает, где именно. */
+  function dealHasNextStep(d) {
+    // Клиентская задача следующим шагом сделки не считается: «поздравить с днём рождения»
+    // сделку не двигает, и засчитывать её значило бы прятать настоящую дыру.
+    const task = (D().tasks || []).some((t) => t.dealId === d.id && t.status !== 'done' && t.when !== 'overdue');
+    if (task) return true;
+    return (D().events || []).some((e) => e.dealId === d.id && e.status !== 'canceled');
+  }
+  function dealsWithoutNextStep(agentId) {
+    return (D().deals || []).filter((d) => !dealClosed(d) && (!agentId || d.agent === agentId) && !dealHasNextStep(d));
+  }
+  function pulseNoNextStep() {
+    const mgr = S().role === 'manager';
+    const list = dealsWithoutNextStep(mgr ? null : (D().users[S().role] || {}).id);
+    if (!list.length) return '';                       // пустой список блок не рисует
+    const rows = list.map((d) => {
+      const c = D().clients.find((x) => x.id === d.clientId) || {};
+      const who = mgr && d.agent ? ' · ' + agentName(d.agent) : '';
+      return '<div class="rel-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+        '<div class="fi i-hot">' + I('warn') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
+        '<div class="m">' + (c.name || '—') + ' · ' + stageLabel(d.stage) + who + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('');
+    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Без следующего шага · ' + list.length + '</div></div>' +
+      '<div class="card" style="padding:4px 16px"><div class="rel-list">' + rows + '</div></div>';
+  }
   function pulseMyDay() {
     const all = D().tasks || [];
     const open = all.filter((t) => t.status !== 'done');
@@ -14042,24 +14936,146 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const label = !total ? '—' : (got >= total ? 'получена' : (got > 0 ? 'получена частично' : ((c.entries || []).some((e) => e.k === 'invoiced' && e.state !== 'wait') ? 'счёт выставлен' : 'начислена')));
     return { total: total, got: got, label: label, tone: got >= total && total ? 'ok' : (got > 0 ? 'acc' : ''), payer: c.payer || 'по договору', vat: !!c.vat };
   }
+  /* Договор требует внимания, когда просрочена веха или платёж. Это не оттенок строки,
+     а группа списка: «требуют внимания» — то, ради чего раздел открывают. */
+  function contractOverdue(k) {
+    return (k.schedule || []).some((s) => s.state === 'overdue') ||
+      (k.milestones || []).some((m) => m.state === 'overdue');
+  }
+  function contractGroup(k) {
+    if (k.status === 'closed') return 'closed';
+    return (contractOverdue(k) || k.review) ? 'attention' : 'active';
+  }
   function contractRow(k) {
     const c = D().clients.find((x) => x.id === k.clientId) || {};
     const st = contractStep(k), money = commissionState(k);
     const now = st.cur.length ? st.cur.map((m) => m.label).join(' · ') : 'все вехи пройдены';
+    const obj = (D().objects || []).find((o) => o.id === k.objectId);
+    const dl = k.dealId ? D().deals.find((x) => x.id === k.dealId) : null;
+    // Строка списка называет всё, по чему договор ищут: клиент · объект · вид · ближайшая
+    // веха со сроком · сумма · ответственный. Прежде объекта, суммы и ответственного не было.
+    const meta = [obj ? obj.name.split(',')[0] : null, now + ' · веха ' + Math.min(st.done + 1, st.total) + ' из ' + st.total,
+      k.nextDue || null, k.amount ? WS.AED(k.amount) : null, dl && dl.agent ? agentName(dl.agent) : null].filter(Boolean).join(' · ');
+    const flag = k.review ? '<span class="badge warn">' + I('warn') + 'требует пересмотра</span>' : '';
     return '<div class="feed-row" data-contract="' + k.id + '" style="cursor:pointer">' +
       '<div class="fi i-acc">' + I(contractKind(k).icon) + '</div>' +
       '<div class="ft"><div class="t">' + contractKind(k).label + ' · ' + (c.name || '—') + '</div>' +
-      '<div class="m">' + now + ' · веха ' + Math.min(st.done + 1, st.total) + ' из ' + st.total +
-      (k.nextDue ? ' · ' + k.nextDue : '') + '</div></div>' +
+      '<div class="m">' + meta + '</div></div>' + flag +
       '<span class="badge ' + money.tone + '">' + I('money') + 'Комиссия · ' + money.label + '</span>' +
       I('arrowRight') + '</div>';
+  }
+  // Задачи по договору. Ссылка на договор — четвёртый вид привязки задачи рядом с тремя
+  // существующими: сопровождение живёт месяцами, и дела по нему принадлежат договору,
+  // а не сделке, которая закрылась вознаграждением.
+  function tasksOfContract(id) { return (D().tasks || []).filter((t) => t.contractId === id); }
+  /* ---- Рождение договора и завершение сделки (§2.5 решений) ----
+     Это два разных момента, и их нельзя складывать в одну кнопку. Договор рождается
+     на шаге «Подписание»; сделка закрывается тогда, когда получено вознаграждение.
+     Создание привязано к СМЕНЕ СТАДИИ, а не к нажатию кнопки, поэтому доска, Консьерж
+     и кнопка дают один и тот же результат. */
+  const CONTRACT_TEMPLATES = {
+    offplan_spa: {
+      ms: [['active', 'Договор активен', 'Договор подписан и вступил в силу'], ['pay10', 'Первый платёж на escrow', 'Первый платёж принят застройщиком'],
+        ['oqood', 'Регистрация Oqood', 'Сделка зарегистрирована в реестре DLD'], ['built', 'Объект построен', 'Строительство завершено'],
+        ['keys', 'Ключи переданы, snag list закрыт', 'Приёмка объекта и передача ключей'], ['title', 'Title Deed получен', 'Право собственности оформлено']],
+      pay: [['Первый платёж', 10], ['Второй платёж', 25], ['Третий платёж', 40], ['Финальный платёж', 25]],
+    },
+    resale_title: {
+      ms: [['active', 'Договор активен', 'Договор подписан'], ['noc', 'NOC получен', 'Согласие застройщика получено'],
+        ['trustee', 'Встреча в trustee-офисе', 'Переоформление в офисе регистратора'], ['title', 'Title Deed переоформлен', 'Право собственности переоформлено']],
+      pay: [['Задаток 10%', 10], ['Остаток на переоформлении', 90]],
+    },
+    lease: { ms: [['active', 'Договор активен', 'Договор аренды зарегистрирован в Ejari'], ['cheques', 'Оплата по чекам', 'Оплата по графику'],
+      ['renewal', 'Уведомление за 90 дней', 'Подготовка к продлению договора'], ['closed', 'Продлён либо выезд', 'Продление или завершение аренды']],
+      pay: [['Чек 1 · квартал', 25], ['Чек 2 · квартал', 25], ['Чек 3 · квартал', 25], ['Чек 4 · квартал', 25]] },
+    lease_comm: { ms: [['active', 'Договор активен', 'Договор аренды подписан'], ['fitout', 'Отделка и приёмка помещения', 'Помещение принято'],
+      ['cheques', 'Оплата по чекам', 'Оплата по графику']], pay: [['Чек 1 · полугодие', 50], ['Чек 2 · полугодие', 50]] },
+    management: { ms: [['active', 'Договор управления активен', 'Объект принят в управление'], ['tenant', 'Арендатор найден', 'Найден арендатор'],
+      ['payments', 'Контроль оплат от арендатора', 'Платежи поступают по графику'], ['report', 'Отчётность собственнику', 'Отчёт по объекту за период']], pay: [] },
+    exclusive: { ms: [['active', 'Мандат активен', 'Эксклюзивный мандат подписан'], ['listing', 'Объект выставлен', 'Объявление опубликовано'],
+      ['offers', 'Сбор предложений', 'Предложения от покупателей'], ['closed', 'Мандат исполнен либо истёк', 'Итог мандата']], pay: [] },
+    service: { ms: [['active', 'Соглашение активно', 'Соглашение подписано'], ['done', 'Услуга оказана', 'Работа завершена']], pay: [] },
+  };
+  function contractFromDeal(d) {
+    const kind = WS.contractKindFor ? WS.contractKindFor(d.funnel || 'sale', d.readiness) : 'service';
+    const tpl = CONTRACT_TEMPLATES[kind] || CONTRACT_TEMPLATES.service;
+    const at = WS.storeApi.clockLabel().date;
+    const lots = dealLiveLots(d);
+    const comm = dealCommission(d);
+    /* Всё, чего шаблон знать не может, остаётся пустым и подсвечивается как незаполненное:
+       номер договора, точные даты платежей. Подставить сюда правдоподобное значит выдать
+       догадку за факт ровно там, где потом будут сверять с реестром. */
+    return {
+      id: 'k_' + d.id, dealId: d.id, clientId: d.clientId, companyId: d.companyId || null,
+      objectId: lots.length === 1 ? lots[0].id : (d.objectId || null),
+      lots: lots.map((o) => o.id),
+      kind: kind, number: '', signedAt: at, status: 'active', amount: d.amount || 0,
+      nextDue: (tpl.pay[0] ? tpl.pay[0][0] + ' — дата не назначена' : 'дата не назначена'),
+      milestones: tpl.ms.map((m, i) => ({ k: m[0], label: m[1], client: m[2], at: i === 0 ? at : '—', state: i === 0 ? 'done' : (i === 1 ? 'now' : 'wait') })),
+      schedule: tpl.pay.map((p, i) => ({ label: p[0] + ' · ' + p[1] + '%', pct: p[1],
+        amount: Math.round((d.amount || 0) * p[1] / 100), due: '—', state: i === 0 ? 'due' : 'wait' })),
+      documents: [{ name: contractKind({ kind: kind }).label, at: at, state: 'ok' }],
+      commission: { total: comm, payer: 'по договору', vat: !!d.vat, split: d.partnerAgent ? 'co-broking' : null,
+        entries: [{ k: 'accrued', label: 'Начислено', amount: comm, at: at, state: 'done' }] },
+      timeline: [{ at: at, ord: NOW_ORD, ch: 'crm', kind: 'raw', by: 'Система', text: 'Договор создан из сделки «' + (d.title || d.id) + '».' }],
+      fromDeal: true,
+    };
+  }
+  // Одна операция, повторно ничего не создающая: если договор с этой сделкой уже есть,
+  // второй не появляется — ни с доски, ни из Консьержа, ни кнопкой.
+  function ensureContract(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return null;
+    const have = contractsOfDeal(dealId)[0];
+    if (have) return have;
+    const k = contractFromDeal(d);
+    (D().contracts || (D().contracts = [])).unshift(k);
+    return k;
+  }
+  function finishDealForm(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Успех — это полученное вознаграждение, а не подписанный договор: договор рождается раньше, на подписании. Проигрыш освобождает все лоты сделки.</p>' +
+      '<div class="match-grid"><label class="fld"><span>Исход</span><select id="fin_out">' +
+      '<option value="won">Успех — вознаграждение получено</option><option value="lost">Проигрыш</option></select></label>' +
+      '<label class="fld"><span>Причина или комментарий</span><input id="fin_why" type="text" placeholder="Напр.: комиссия пришла двумя траншами"></label></div>';
+    openModal('Завершить сделку · ' + (d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveFinishDeal" data-deal="' + dealId + '">' + I('check') + 'Завершить</button>');
+  }
+  function saveFinishDeal(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const out = g('fin_out') === 'lost' ? 'lost' : 'won';
+    const why = g('fin_why');
+    d.stage = out;
+    if (out === 'won') {
+      // Услуга может не иметь шага подписания — тогда договор рождается здесь.
+      ensureContract(dealId);
+    } else {
+      // Проигрыш освобождает все лоты по тому же правилу, что и частичный отказ.
+      if (!d.lotState) d.lotState = {};
+      dealLiveLots(d).forEach((o) => {
+        d.lotState[o.id] = Object.assign({}, d.lotState[o.id], { exit: 'returned', exitReason: why || 'сделка проиграна', exitAt: WS.storeApi.clockLabel().date });
+      });
+    }
+    addEventEntry('deal', d.id, { type: 'note', text: (out === 'won' ? 'Сделка завершена успехом' : 'Сделка проиграна') + (why ? ': ' + why : '') + '.' });
+    WS.storeApi.touch();
+    closeModal();
+    WS.storeApi.toast(out === 'won' ? 'Сделка закрыта успехом' : 'Сделка закрыта проигрышем', out === 'won' ? 'ok' : '');
+    dealCard(dealId);
   }
   function viewContracts() {
     const list = contractsAll();
     const active = list.filter((k) => k.status !== 'closed');
     const due = active.filter((k) => k.nextDue).length;
     const owed = active.reduce((sum, k) => { const m = commissionState(k); return sum + Math.max(0, m.total - m.got); }, 0);
-    const rows = list.map(contractRow).join('') ||
+    // Группировка по состоянию: сначала то, что горит, потом остальное.
+    const GROUPS = [['attention', 'Требуют внимания'], ['active', 'Действующие'], ['closed', 'Закрытые']];
+    const rows = GROUPS.map((g) => {
+      const part = list.filter((k) => contractGroup(k) === g[0]);
+      if (!part.length) return '';
+      return '<div class="section-label" style="margin-top:10px">' + g[1] + ' · ' + part.length + '</div>' +
+        part.map(contractRow).join('');
+    }).join('') ||
       '<div style="font-size:12px;color:var(--faint);padding:10px 0">договоров пока нет — они открываются после успешной сделки</div>';
     return heroBand('Сопровождение', 'Что идёт после подписания: платежи по графику, регистрация права, продления — и работа с самим клиентом, пока он клиент. Сделка закрывается вознаграждением, договор живёт дальше.', 'o_bayline') +
       '<div class="tiles" style="margin-top:20px">' +
@@ -14273,6 +15289,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function contractTabContent(k, tab) {
     if (tab === 'docs') return contractDocs(k);
+    /* Задачи по договору. Сопровождение живёт месяцами, и дела по нему принадлежат договору,
+       а не сделке: сделка закрылась вознаграждением и своих задач больше не порождает. */
+    if (tab === 'tasks') {
+      const list = tasksOfContract(k.id);
+      const add = '<button class="btn xs" data-act="newTask">' + I('plus') + 'Задача</button>';
+      const rows = list.map(taskRow).join('') ||
+        '<div style="font-size:12px;color:var(--faint);padding:6px 0">задач по договору нет. Они появляются из поводов касания и вручную</div>';
+      return dxSec('checkCircle', 'Задачи по договору · ' + list.length, add, '<div class="feed">' + rows + '</div>');
+    }
     if (tab === 'money') return dxSec('money', 'Комиссия', '<span class="badge ' + commissionState(k).tone + '">' + commissionState(k).label + '</span>', contractMoney(k));
     if (tab === 'client') {
       return dxSec('users', 'Что видит клиент', '<span class="badge demo">' + I('lock') + 'предпросмотр</span>',
@@ -14309,7 +15334,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       hero: contractHero2(k),
       acts: entityActionBar(contractActions(k)),
       state: contractState(k),
-      tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
+      tabs: [['milestones', 'Вехи'], ['money', 'Комиссия'], ['tasks', 'Задачи · ' + tasksOfContract(id).filter((t) => t.status !== 'done').length], ['docs', 'Документы · ' + (k.documents || []).length], ['client', 'Что видит клиент'], ['history', 'История']],
       render: (tab) => contractTabContent(k, tab),
       concierge: entityConcierge('Поручите Консьержу по договору — «что просрочено», «когда следующий платёж», «письмо клиенту о статусе»…', 'contract:' + k.id, escAttr(contractKind(k).label), 'doc'),
     };
@@ -14407,7 +15432,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
-    addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
+    outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
+    taskDoneForm, saveTaskDone,
+    REL_STAGES, relStageOf, relStageDerived, setRelStage, clientHasWon, lastTouchDays,
+    cuesFor, acceptCue, dismissCue, cueDecision, relationsAhead, relationsPast,
+    ROLE_GROUPS, CONTACT_ROLES, INFLUENCE, CHANNELS, roleOf, roleGroupOf, influenceOf, dealParticipants, dealContacts,
+    LOT_EXITS, lotState, lotIsOut, dealLiveLots, lotCommissionPct, lotsMismatch, lotExitForm, saveLotExit, undoLotBlock,
+    contractFromDeal, ensureContract, finishDealForm, saveFinishDeal, contractsOfDeal,
+    contractGroup, contractOverdue, tasksOfContract,
+    turnOf, turnDerived, setTurn, reqOfferStatus,
+    dealHasNextStep, dealsWithoutNextStep, pulseNoNextStep,
+    dealTransferForm, saveTransfer, dealPartnerForm, savePartner,
+    offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
 })(window.WS = window.WS || {});
 
@@ -15411,6 +16448,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         // and the store refuses the guess after the person has read it.
         шаги: (WS.ui.dealSteps ? WS.ui.dealSteps(x) : []).map((k) => ({ код: k, шаг: WS.ui.stageLabel(k) })),
         контакт: x.clientId, компания: x.companyId, объект: x.objectId, лоты: x.lots || null,
+        /* Участники сделки. Сводка отдавала клиента, компанию и лоты — и молчала о том, кто ещё
+           за столом: расширенный справочник ролей остался бы невидимым ровно для того, кто
+           должен им пользоваться. Без этого Консьерж не может ни выбрать адресата, ни объяснить,
+           почему пишет юристу, а не покупателю. */
+        участники: (WS.ui.dealParticipants ? WS.ui.dealParticipants(x) : []),
         заявка: x.requestId || null, горячая: !!x.hot,
         срок_шага: x.nextDue || null, дней_на_стадии: x.stageDays,
         задаток: x.deposit ? { вид: x.deposit.kind, сумма: x.deposit.amount, оплачен: !!x.deposit.paid, возвратный: !!x.deposit.refundable } : null,
@@ -16707,7 +17749,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -16771,7 +17813,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.oggal) { e.stopPropagation(); return WS.ui.objGalleryNav(+d.oggal); }
     if (d.scen) return WS.ui.finScenario(d.scen);
     if (d.podbor) { store.podborClient = d.podbor; return api.emit(); }
-    if (d.taskdone) { api.taskAction(d.taskdone, 'done'); return api.toast('Задача выполнена', 'ok'); }
+    // Выполнение открывает короткую форму итога. Комментарий необязателен: обязательное поле
+    // здесь — прямой путь к тому, что задачи перестанут закрывать вовсе.
+    if (d.taskdone) return WS.ui.taskDoneForm(d.taskdone);
     if (d.taskreopen) { return api.taskAction(d.taskreopen, 'reopen'); }
     if (d.tasksnooze) { api.taskAction(d.tasksnooze, 'snooze'); return api.toast('Отложено на завтра'); }
     if (d.dealmove) { e.stopPropagation(); return WS.ui.moveDealDir(d.dealmove, d.dir); }
@@ -16829,6 +17873,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.agsay != null) return WS.voice.sayReply(d.agsay);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }
+    // Вывод лота из сделки: исход обязателен, поэтому сначала форма, а не немедленное действие.
+    if (d.lotexit) { const p = d.lotexit.split(':'); return WS.ui.lotExitForm(p[0], p[1]); }
+    if (d.lotunblock) { const p = d.lotunblock.split(':'); return WS.ui.undoLotBlock(p[0], p[1]); }
+    // Предложение: новая версия заводится явно, правка отправленной — порождает следующую.
+    if (d.offernew) { const p = d.offernew.split(':'); const o = WS.ui.newOffer(p[0], p[1]); return o ? WS.ui.openOfferForm(o.id) : api.toast('Нечего предлагать — выберите объекты'); }
+    if (d.offeredit) return WS.ui.editOffer(d.offeredit);
+    if (d.reqturn) { const p = d.reqturn.split('~'); WS.ui.setTurn(p[0], p[1], p[2]); return api.emit(); }
+    // Итог, написанный моделью, входит в историю только подтверждённым.
+    if (d.ocok) { const sc = WS.ui.outcomesFor; WS.ui.confirmOutcome(d.ocok); return api.emit(); }
+    if (d.ocno) { WS.ui.rejectOutcome(d.ocno); return api.emit(); }
+    // Отношения: стадия правится вручную, повод принимается задачей или отклоняется.
+    if (d.relstage) { const p = d.relstage.split(':'); WS.ui.setRelStage(p[0], p[1]); return WS.ui.clientCard(p[0]); }
+    if (d.cueok) { WS.ui.acceptCue(d.cueok); return WS.ui.clientCard(d.cueok.split('~')[0]); }
+    if (d.cueno) { WS.ui.dismissCue(d.cueno); return WS.ui.clientCard(d.cueno.split('~')[0]); }
     // «Все воронки» — состояние списка, а не воронка: выбранная воронка при этом запоминается,
     // чтобы переход на доску не потерял её. Ровно то, на что жаловался партнёр.
     if (d.funnel) {
@@ -16909,6 +17967,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'saveEventEntry': WS.ui.saveEventEntry(t.dataset.scope || 'deal', t.dataset.eid); break;
       case 'addDealContact': WS.ui.openDealContactForm(t.dataset.deal, -1); break;
       case 'saveDealContact': WS.ui.saveDealContact(t.dataset.deal, +t.dataset.idx); break;
+      case 'saveLotExit': WS.ui.saveLotExit(t.dataset.deal, t.dataset.obj); break;
+      case 'finishDeal': WS.ui.finishDealForm(t.dataset.deal); break;
+      case 'transferDeal': WS.ui.dealTransferForm(t.dataset.deal); break;
+      case 'saveTransfer': WS.ui.saveTransfer(t.dataset.deal); break;
+      case 'partnerDeal': WS.ui.dealPartnerForm(t.dataset.deal); break;
+      case 'savePartner': WS.ui.savePartner(t.dataset.deal); break;
+      case 'saveOffer': WS.ui.saveOffer(t.dataset.offer); break;
+      case 'saveTaskDone': WS.ui.saveTaskDone(t.dataset.task); break;
+      case 'sendOffer': WS.ui.sendOffer(t.dataset.offer); break;
+      case 'saveFinishDeal': WS.ui.saveFinishDeal(t.dataset.deal); break;
       case 'capToggle': { const id = t.dataset.deal; store.capture = store.capture || {}; const cur = (id in store.capture) ? store.capture[id] : true; store.capture[id] = !cur; api.toast('Запись разговоров: ' + (store.capture[id] ? 'включена' : 'выключена'), 'ok'); WS.ui.dealCard(id); break; }
       case 'cgFeatureStub': WS.ui.closeModal(); api.toast('Настройка сохранена (демо)', 'ok'); break;
       case 'cgAttach': store.cgMenu = store.cgMenu === 'attach' ? null : 'attach'; api.emit(); break;
