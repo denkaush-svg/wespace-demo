@@ -5069,6 +5069,83 @@ setTimeout(async () => {
     }
   }
 
+  // ---- волна 4, блок 2: карточка сделки — кнопки, правка в поле, запланированное ----
+  {
+    WS.ui.dealCard('d_anna');
+    const bar = doc.querySelector('#app .view .qa-bar');
+    const primary = [].slice.call(doc.querySelectorAll('#app .view .qa-bar > .qa-act.primary'));
+    const names = primary.map((b) => b.textContent.trim());
+    check('карточка · в основном ряду ровно три действия', primary.length === 3, names.join(' | '));
+    check('карточка · это «Собрать КП», «Назначить показ», «Записать событие»',
+      names.join('|') === 'Собрать КП|Назначить показ|Записать событие', names.join('|'));
+    const barText = bar ? bar.textContent : '';
+    // «Чат по сделке» был дублем строки ввода внизу, «Открыть контакт» — третьим путём к клиенту.
+    check('карточка · нет кнопки «Чат по сделке» — строка ввода внизу это она и есть',
+      barText.indexOf('Чат по сделке') < 0, barText.slice(0, 120));
+    check('карточка · нет кнопки «Открыть контакт» — имя клиента слева кликабельно',
+      barText.indexOf('Открыть контакт') < 0, barText.slice(0, 120));
+    check('карточка · имя клиента при этом действительно кликабельно',
+      !!doc.querySelector('#app .view .dcli-name[data-client]'));
+    check('карточка · в блоке клиента нет третьей кнопки «Карточка»',
+      (doc.querySelector('#app .view .dcli-acts') || { textContent: '' }).textContent.indexOf('Карточка') < 0);
+    // Спрятанное под «Ещё» должно остаться достижимым — иначе сокращение ряда это удаление функций.
+    const more = [].slice.call(doc.querySelectorAll('#app .view .qa-more-item')).map((b) => b.textContent.trim());
+    ['Поставить задачу', 'Параметры сделки', 'Завершить сделку', 'Передать сделку', 'Привлечь партнёра']
+      .forEach((n) => check('карточка · «' + n + '» доступно под «Ещё»', more.indexOf(n) >= 0, more.join(' | ')));
+
+    // Правка условия — В ПОЛЕ, а не в модальном окне: именно модальное окно и было претензией.
+    const ed = doc.querySelectorAll('#app .view .dcard-aside .dv-edit[data-dfedit]');
+    check('условия · правятся прямо в поле, а не кнопкой', ed.length >= 5, 'полей: ' + ed.length);
+    check('условия · поле — настоящий редактируемый текст',
+      [].slice.call(ed).every((e) => e.getAttribute('contenteditable') === 'true'));
+    check('условия · отдельной кнопки правки у поля нет',
+      !doc.querySelector('#app .view .dcard-aside .dfield button[data-act="editDeal"]'));
+
+    // Сумма на экране — «2 400 000 AED», в данных — число, которое складывают в комиссии
+    // и в пайплайне. Запись строки в это поле сломала бы все суммы разом.
+    const anna = dd().deals.find((x) => x.id === 'd_anna');
+    const amtWas = anna.amount;
+    WS.ui.saveDealField('d_anna', 'amount', '3 100 000 AED');
+    check('условия · из «3 100 000 AED» в данные попадает число', anna.amount === 3100000,
+      JSON.stringify(anna.amount) + ' (' + typeof anna.amount + ')');
+    check('условия · прежнее значение сохранено, а не затёрто',
+      anna.was && anna.was.amount === amtWas, JSON.stringify(anna.was));
+    check('условия · поле помечено как правленное рукой', (anna.prov || {}).amount === 'manual', (anna.prov || {}).amount);
+    WS.ui.dealCard('d_anna');
+    check('условия · пометка «изменено вручную» видна с прежним значением в подсказке',
+      /изменено вручную/i.test(doc.querySelector('#app .view .dcard-aside').textContent) &&
+      ((doc.querySelector('#app .view .dv-was') || {}).title || '').indexOf(WS.AED(amtWas)) >= 0,
+      'ожидалось «' + WS.AED(amtWas) + '» в подсказке, получено: ' +
+        ((doc.querySelector('#app .view .dv-was') || {}).title || 'пометки нет'));
+    // Вторая правка не должна подменить оригинал: «прежнее» — это то, что было до руки, а не до
+    // предыдущей правки, иначе исходный факт из документа теряется после двух исправлений.
+    WS.ui.saveDealField('d_anna', 'amount', '3 300 000 AED');
+    check('условия · вторая правка не съедает исходное значение', anna.was.amount === amtWas, JSON.stringify(anna.was));
+    // Неразбираемый ввод не должен обнулять сумму.
+    WS.ui.saveDealField('d_anna', 'amount', 'примерно столько же');
+    check('условия · неразобранный ввод оставляет прежнее число', anna.amount === 3300000, JSON.stringify(anna.amount));
+    anna.amount = amtWas; delete anna.was; if (anna.prov) delete anna.prov.amount;
+
+    // Запланированное: будущее и просроченное списком под одной выделенной строкой следующего шага.
+    const withTask = (dd().deals || []).find((d) =>
+      (dd().tasks || []).some((t) => t.dealId === d.id && t.status !== 'done' && t.due));
+    if (withTask) {
+      WS.ui.dealCard(withTask.id);
+      const rows = doc.querySelectorAll('#app .view .plev-row');
+      check('карточка · запланированное показано списком', rows.length > 0, 'строк: ' + rows.length);
+      check('карточка · и одна выделенная строка следующего шага осталась над ним',
+        !!doc.querySelector('#app .view .nxt, #app .view .dnb-next, #app .view .next-step') ||
+        /Следующий шаг|Сейчас/.test(doc.querySelector('#app .view').textContent));
+      // Просроченное идёт первым — оно и есть повод открыть карточку.
+      const html = WS.ui.dealPlannedEventsCard(withTask);
+      const firstOver = html.indexOf('plev-row over');
+      const anyOver = /plev-row over/.test(html);
+      check('карточка · просроченное стоит выше непросроченного',
+        !anyOver || firstOver === html.indexOf('plev-row'),
+        anyOver ? ('первая просроченная на ' + firstOver + ', первая вообще на ' + html.indexOf('plev-row')) : 'просроченных нет');
+    }
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

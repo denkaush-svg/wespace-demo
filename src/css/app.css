@@ -553,6 +553,17 @@ button { font-family: inherit; cursor: pointer; }
 .qa-act.primary:hover { color: #fff; filter: brightness(1.05); }
 .qa-act.danger:hover { border-color: var(--stop); color: var(--stop); }
 @media (prefers-reduced-motion: reduce) { .qa-act { transition: none; } }
+/* Secondary actions dropdown. */
+.qa-more { position: relative; }
+.qa-more-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 1000; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-top: 4px; min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .15); }
+.qa-more-menu.open { display: block; }
+.qa-more-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none;
+  background: none; color: var(--ink); font-size: 12px; text-align: left; cursor: pointer;
+  transition: background .15s ease; }
+.qa-more-item:hover { background: var(--acc-soft); }
+.qa-more-item svg { width: 14px; height: 14px; flex: none; }
 /* A contract's title is a fact, not a field — same line, no edit affordance. */
 .deal-title-text.is-static { cursor: default; border-color: transparent; background: none; }
 .kanban-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint);
@@ -1324,6 +1335,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }
 .prov-i svg { width: 13px; height: 13px; }
 .dfield .mini-confirm { vertical-align: middle; }
+/* Editable fields: show as clickable when in editable mode. */
 /* Request card: accent hero (the ask + budget) + two labelled groups of stacked cells,
    replacing the flat 13-row parameter list. */
 .req-hero { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: stretch;
@@ -1918,6 +1930,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dnb-ev-t { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
 .dnb-ev-m { font-size: 11px; color: var(--faint); margin-top: 1px; }
 .dnb-ev-empty { font-size: 12px; color: var(--faint); }
+/* Planned events and tasks list. */
+.plev-list { display: flex; flex-direction: column; gap: 6px; }
+.plev-row { display: flex; gap: 9px; align-items: flex-start; padding: 6px 8px; border-radius: 4px; }
+.plev-row.over { background: rgba(255, 152, 0, .08); }
+.plev-icon { flex: 0 0 auto; margin-top: 2px; }
+.plev-icon svg { width: 14px; height: 14px; color: var(--acc); }
+.plev-row.over .plev-icon svg { color: var(--stop); }
+.plev-info { flex: 1; min-width: 0; }
+.plev-info > div:first-child { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.plev-date { font-size: 11px; color: var(--faint); margin-top: 1px; }
+.plev-row.over .plev-date { color: var(--stop); font-weight: 600; }
 @media (max-width: 760px) { .dhero-name { font-size: 19px; } .dhero-content { padding: 14px 16px; } }
 .obj-mini { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: .15s var(--ease); }
 .obj-mini:hover { background: var(--surface-2); border-color: var(--line-2); }
@@ -2131,3 +2154,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .evc.oc-rejected { opacity: .55; border-style: dashed; }
 .evc.oc-rejected .evc-text { text-decoration: line-through; }
 .evc.oc-draft .evc-tags, .evc.oc-rejected .evc-tags { align-items: center; }
+
+/* Условие правится прямо в поле. Подчёркивание пунктиром — единственная подсказка, что текст
+   редактируемый: кнопка рядом с каждым полем и была тем «рядом кнопок», который просили убрать. */
+.dfield.editable .dv-edit { cursor: text; border-bottom: 1px dashed var(--line); border-radius: 3px;
+  padding: 0 2px; transition: border-color .12s ease, background .12s ease; }
+.dfield.editable .dv-edit:hover { border-bottom-color: var(--acc-line); background: var(--surface-2); }
+.dfield.editable .dv-edit:focus { outline: none; background: var(--surface); border-bottom-color: var(--acc);
+  box-shadow: 0 0 0 2px var(--acc-soft); }
+/* «Изменено вручную» — след того, что подтверждённое значение заменили рукой; прежнее в подсказке. */
+.dv-was { font-size: 10px; font-weight: 700; color: var(--mut); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; margin-left: 6px; white-space: nowrap; cursor: help; }

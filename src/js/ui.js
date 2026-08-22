@@ -2780,9 +2780,61 @@
     if (st === 'ai') return '<span class="prov-i" title="Предложено AI — подтвердите">' + I('sparkle') + '</span>';
     return '';
   }
-  function dealField(label, val, provSt, confirmId) {
+  /* Условие сделки правится ПРЯМО В ПОЛЕ — так же, как суть сделки в шапке: одно нажатие,
+     Enter сохраняет, Esc отменяет. Модального окна здесь нет намеренно, это и была претензия.
+
+     Что делает правку неочевидной: у каждого поля есть провенанс — откуда факт взялся (из письма
+     клиента, из документа, от Консьержа). Молча затереть подтверждённое документом значение
+     значит потерять след, поэтому прежнее значение сохраняется в `d.was[поле]`, а само поле
+     помечается «изменено вручную» с прежним значением в подсказке.
+
+     Числовые поля отдельно: на экране стоит «2 400 000 AED», а в данных лежит число, которое
+     складывают в комиссии и в пайплайне. Записать туда строку с пробелами и валютой — сломать
+     все суммы разом, поэтому у числового поля своя разборка ввода. */
+  const DFIELD_NUM = { amount: 1 };
+  function dealField(label, val, provSt, confirmId, dealId, fieldKey) {
     const confirm = provSt === 'ai' && confirmId ? '<button class="mini-confirm" data-dfconfirm="' + confirmId + '" title="Подтвердить значение">' + I('check') + '</button>' : '';
-    return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
+    const d = dealId ? D().deals.find((x) => x.id === dealId) : null;
+    const was = (d && d.was && d.was[fieldKey] != null) ? d.was[fieldKey] : null;
+    const wasTag = was != null ? '<span class="dv-was" title="Изменено вручную. Прежнее значение: ' +
+      escAttr(DFIELD_NUM[fieldKey] ? WS.AED(was) : String(was)) + '">изменено вручную</span>' : '';
+    if (!dealId || !fieldKey) {
+      return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
+    }
+    return '<div class="dfield editable"><div class="dk">' + label + '</div>' +
+      '<div class="dv"><span class="dv-edit" contenteditable="true" role="textbox" ' +
+      'data-dfedit="' + dealId + '~' + fieldKey + '" ' +
+      'aria-label="' + escAttr(label) + ' — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + (val || '—') + '</span> ' +
+      provBadge(provSt) + confirm + wasTag + '</div></div>';
+  }
+  // Разбор введённого: у числового поля из «2 400 000 AED» достаётся число, всё остальное — текст
+  // как есть. Пустой ввод и «—» означают «не заполнено», а не строку из одного тире.
+  function dfieldParse(fieldKey, raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s || s === '—') return DFIELD_NUM[fieldKey] ? 0 : '';
+    if (!DFIELD_NUM[fieldKey]) return s;
+    const n = parseInt(s.replace(/[^\d]/g, ''), 10);
+    return isNaN(n) ? null : n;                       // null = ввод не разобран, правку не применяем
+  }
+  function saveDealField(dealId, fieldKey, raw) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return false;
+    const next = dfieldParse(fieldKey, raw);
+    if (next === null) {                              // число не разобрано — молча не портим данные
+      WS.storeApi.toast('Не понял значение — оставил прежнее');
+      dealCard(dealId);
+      return false;
+    }
+    const prev = d[fieldKey];
+    if (String(prev == null ? '' : prev) === String(next)) return false;
+    d.was = d.was || {};
+    if (d.was[fieldKey] == null) d.was[fieldKey] = prev;   // первый оригинал, а не предыдущая правка
+    d[fieldKey] = next;
+    d.prov = d.prov || {};
+    d.prov[fieldKey] = 'manual';
+    WS.storeApi.touch();
+    WS.storeApi.toast('Значение изменено — прежнее сохранено', 'ok');
+    return true;
   }
   // Params tab shows only what the header «Ключевое» doesn't (no Бюджет/Форма оплаты/Цель/Тип —
   // those are up top). Источник is inherited from the заявка, labelled as such.
@@ -3359,9 +3411,30 @@
   function entityActionBar(items) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
-    return '<div class="qa-bar" role="group" aria-label="Действия">' +
-      list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
-        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
+    const primary = list.filter((a) => a[3] === 'primary');
+    const secondary = list.filter((a) => a[3] === 'secondary');
+    const other = list.filter((a) => a[3] !== 'primary' && a[3] !== 'secondary');
+    // If no primary/secondary specified, show all flat (backward compat for contract, etc.).
+    if (primary.length === 0 && secondary.length === 0) {
+      return '<div class="qa-bar" role="group" aria-label="Действия">' +
+        list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
+          I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
+    }
+    // Primary/secondary specified: show primary + non-classified in bar, secondary in dropdown
+    let html = '<div class="qa-bar" role="group" aria-label="Действия">' +
+      primary.map((a) => '<button class="qa-act primary" ' + a[2] + '>' +
+        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
+      other.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
+        I(a[0]) + '<span>' + a[1] + '</span></button>').join('');
+    if (secondary.length) {
+      html += '<div class="qa-more"><button class="qa-act secondary" data-act="toggleQaMore">' +
+        I('menu') + '<span>Ещё</span></button><div class="qa-more-menu">' +
+        secondary.map((a) => '<button class="qa-more-item" ' + a[2] + '>' +
+          I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
+        '</div></div>';
+    }
+    html += '</div>';
+    return html;
   }
   function dxSec(icon, title, rightHtml, inner) {
     return '<div class="dx-sec"><div class="dx-sec-h"><span class="ic">' + I(icon) + '</span>' + title +
@@ -3585,8 +3658,7 @@
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
-      '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
+      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
   // ---- Shared "now" cards (deal + request use the SAME treatment so related process cards don't
@@ -3614,20 +3686,20 @@
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   // What an agent opens a deal to do. Ordered by how often it is the reason for opening it.
   function dealActions(d) {
-    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    // Primary row: the three most-frequent actions. All others behind «Ещё».
+    // Чат по сделке is removed — the composer line at the bottom is the same entrance.
+    // Открыть контакт is removed — the client's name in the left column is already clickable.
     return [
-      ['chat', 'Чат по сделке', 'data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase"', 'primary'],
-      ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
-      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
-      ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', ''],
-      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
-      ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', ''],
+      ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', 'primary'],
+      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', 'primary'],
+      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', 'primary'],
+      ['clock', 'Поставить задачу', 'data-act="newTask"', 'secondary'],
+      ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', 'secondary'],
       // Завершение — отдельное действие с двумя исходами, а не «поставить последний шаг»:
       // успех означает полученное вознаграждение, а не подписанный договор.
-      dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', ''],
-      dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', ''],
-      dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', ''],
-      c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
+      dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', 'secondary'],
+      dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', 'secondary'],
+      dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', 'secondary'],
     ];
   }
   /* ---- Передать против привлечь (§3.1 решений) ----
@@ -3696,6 +3768,36 @@
     const a = nbaActions(d);
     const over = /просроч/i.test(d.nextDue || '');
     return nextStepCard(agentName(d.agent), d.nextDue || '', over, a.doIt[0], a.why || '');
+  }
+  // Planned events block: open tasks and calendar events with dates. Overdue first, marked visibly.
+  // Past events live in dealRecentCard, not duplicated here.
+  function dealPlannedEventsCard(d) {
+    const tasks = (D().tasks || []).filter((t) => t.dealId === d.id && t.status !== 'done');
+    const events = (D().events || []).filter((e) => e.dealId === d.id && e.status !== 'canceled');
+    const items = [];
+    // Collect all events and tasks with due dates.
+    // Порядок внутри «когда» задаёт словарь срочности, а не строка даты: «14 мая» и «6 июня»
+    // сравненные как текст встают наоборот, потому что «1» меньше «6».
+    const WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+    tasks.forEach((t) => {
+      if (t.due) items.push({ type: 'task', label: t.title || t.text || 'Задача', due: t.due,
+        overdue: t.when === 'overdue', ord: WHEN_ORD[t.when] == null ? 9 : WHEN_ORD[t.when] });
+    });
+    events.forEach((e) => {
+      if (e.at) items.push({ type: 'event', label: e.text || 'Событие', due: e.at, overdue: false,
+        ord: (WHEN_ORD[e.when] == null ? 5 : WHEN_ORD[e.when]) });
+    });
+    if (!items.length) return '';
+    items.sort((a, b) => a.ord - b.ord);
+    const html = items.map((it) => {
+      const icon = it.type === 'task' ? 'checkCircle' : 'calendar';
+      const overClass = it.overdue ? ' over' : '';
+      return '<div class="plev-row' + overClass + '">' +
+        '<span class="plev-icon">' + I(icon) + '</span>' +
+        '<div class="plev-info"><div>' + escAttr(it.label) + '</div>' +
+        '<div class="plev-date">' + (it.due || '—') + (it.overdue ? ' · просрочено' : '') + '</div></div></div>';
+    }).join('');
+    return html.length ? dxSec('clock', 'Запланировано', '', '<div class="plev-list">' + html + '</div>') : '';
   }
   // Entries the client authored, across the deal, its заявка and the contact — the client's own
   // moves, separated from ours. `by` is the author of a timeline entry; inbound raw channel capture
@@ -4180,8 +4282,7 @@
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · запрос" data-ticon="mail">' + I('whatsapp') + 'Написать</button>' +
-      '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
+      '<button class="btn sm" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · запрос" data-ticon="mail">' + I('whatsapp') + 'Написать</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
   // Status of one offered object: whether it became a deal (the final state), else the client's
@@ -5989,12 +6090,12 @@
   function dealAside(d) {
     const p = d.prov || {};
     const params = '<div class="dcard-params">' +
-      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
-      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
-      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
-      dealField('Готовность', d.readiness, 'confirmed') +
-      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
-      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source') + '</div>';
+      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget', d.id, 'amount') +
+      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm', d.id, 'paymentForm') +
+      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType', d.id, 'objectType') +
+      dealField('Готовность', d.readiness, 'confirmed', '', d.id, 'readiness') +
+      dealField('Цель', d.goal, p.goal, d.id + ':goal', d.id, 'goal') +
+      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source', d.id, 'source') + '</div>';
     const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
     return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) + params +
       dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
@@ -6006,7 +6107,7 @@
        о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
     const drafts = outcomesBlock('deal', d.id);
     const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
-    return dealNextStepCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
+    return dealNextStepCard(d) + dealPlannedEventsCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -8741,7 +8842,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:27</title>
+  <title>WESPACE · сборка 16:53</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:27';
+    window.WS_BUILD='16:53';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -703,6 +703,17 @@ button { font-family: inherit; cursor: pointer; }
 .qa-act.primary:hover { color: #fff; filter: brightness(1.05); }
 .qa-act.danger:hover { border-color: var(--stop); color: var(--stop); }
 @media (prefers-reduced-motion: reduce) { .qa-act { transition: none; } }
+/* Secondary actions dropdown. */
+.qa-more { position: relative; }
+.qa-more-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 1000; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-top: 4px; min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .15); }
+.qa-more-menu.open { display: block; }
+.qa-more-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none;
+  background: none; color: var(--ink); font-size: 12px; text-align: left; cursor: pointer;
+  transition: background .15s ease; }
+.qa-more-item:hover { background: var(--acc-soft); }
+.qa-more-item svg { width: 14px; height: 14px; flex: none; }
 /* A contract's title is a fact, not a field — same line, no edit affordance. */
 .deal-title-text.is-static { cursor: default; border-color: transparent; background: none; }
 .kanban-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint);
@@ -1474,6 +1485,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prov-i { display: inline-flex; vertical-align: middle; margin-left: 5px; color: var(--acc-ink); }
 .prov-i svg { width: 13px; height: 13px; }
 .dfield .mini-confirm { vertical-align: middle; }
+/* Editable fields: show as clickable when in editable mode. */
 /* Request card: accent hero (the ask + budget) + two labelled groups of stacked cells,
    replacing the flat 13-row parameter list. */
 .req-hero { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: stretch;
@@ -2068,6 +2080,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dnb-ev-t { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
 .dnb-ev-m { font-size: 11px; color: var(--faint); margin-top: 1px; }
 .dnb-ev-empty { font-size: 12px; color: var(--faint); }
+/* Planned events and tasks list. */
+.plev-list { display: flex; flex-direction: column; gap: 6px; }
+.plev-row { display: flex; gap: 9px; align-items: flex-start; padding: 6px 8px; border-radius: 4px; }
+.plev-row.over { background: rgba(255, 152, 0, .08); }
+.plev-icon { flex: 0 0 auto; margin-top: 2px; }
+.plev-icon svg { width: 14px; height: 14px; color: var(--acc); }
+.plev-row.over .plev-icon svg { color: var(--stop); }
+.plev-info { flex: 1; min-width: 0; }
+.plev-info > div:first-child { font-size: 12.5px; color: var(--ink); line-height: 1.35; }
+.plev-date { font-size: 11px; color: var(--faint); margin-top: 1px; }
+.plev-row.over .plev-date { color: var(--stop); font-weight: 600; }
 @media (max-width: 760px) { .dhero-name { font-size: 19px; } .dhero-content { padding: 14px 16px; } }
 .obj-mini { display: flex; align-items: center; gap: 12px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: .15s var(--ease); }
 .obj-mini:hover { background: var(--surface-2); border-color: var(--line-2); }
@@ -2281,6 +2304,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .evc.oc-rejected { opacity: .55; border-style: dashed; }
 .evc.oc-rejected .evc-text { text-decoration: line-through; }
 .evc.oc-draft .evc-tags, .evc.oc-rejected .evc-tags { align-items: center; }
+
+/* Условие правится прямо в поле. Подчёркивание пунктиром — единственная подсказка, что текст
+   редактируемый: кнопка рядом с каждым полем и была тем «рядом кнопок», который просили убрать. */
+.dfield.editable .dv-edit { cursor: text; border-bottom: 1px dashed var(--line); border-radius: 3px;
+  padding: 0 2px; transition: border-color .12s ease, background .12s ease; }
+.dfield.editable .dv-edit:hover { border-bottom-color: var(--acc-line); background: var(--surface-2); }
+.dfield.editable .dv-edit:focus { outline: none; background: var(--surface); border-bottom-color: var(--acc);
+  box-shadow: 0 0 0 2px var(--acc-soft); }
+/* «Изменено вручную» — след того, что подтверждённое значение заменили рукой; прежнее в подсказке. */
+.dv-was { font-size: 10px; font-weight: 700; color: var(--mut); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; margin-left: 6px; white-space: nowrap; cursor: help; }
 
 
 /* ============================================================
@@ -9469,9 +9503,61 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (st === 'ai') return '<span class="prov-i" title="Предложено AI — подтвердите">' + I('sparkle') + '</span>';
     return '';
   }
-  function dealField(label, val, provSt, confirmId) {
+  /* Условие сделки правится ПРЯМО В ПОЛЕ — так же, как суть сделки в шапке: одно нажатие,
+     Enter сохраняет, Esc отменяет. Модального окна здесь нет намеренно, это и была претензия.
+
+     Что делает правку неочевидной: у каждого поля есть провенанс — откуда факт взялся (из письма
+     клиента, из документа, от Консьержа). Молча затереть подтверждённое документом значение
+     значит потерять след, поэтому прежнее значение сохраняется в `d.was[поле]`, а само поле
+     помечается «изменено вручную» с прежним значением в подсказке.
+
+     Числовые поля отдельно: на экране стоит «2 400 000 AED», а в данных лежит число, которое
+     складывают в комиссии и в пайплайне. Записать туда строку с пробелами и валютой — сломать
+     все суммы разом, поэтому у числового поля своя разборка ввода. */
+  const DFIELD_NUM = { amount: 1 };
+  function dealField(label, val, provSt, confirmId, dealId, fieldKey) {
     const confirm = provSt === 'ai' && confirmId ? '<button class="mini-confirm" data-dfconfirm="' + confirmId + '" title="Подтвердить значение">' + I('check') + '</button>' : '';
-    return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
+    const d = dealId ? D().deals.find((x) => x.id === dealId) : null;
+    const was = (d && d.was && d.was[fieldKey] != null) ? d.was[fieldKey] : null;
+    const wasTag = was != null ? '<span class="dv-was" title="Изменено вручную. Прежнее значение: ' +
+      escAttr(DFIELD_NUM[fieldKey] ? WS.AED(was) : String(was)) + '">изменено вручную</span>' : '';
+    if (!dealId || !fieldKey) {
+      return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
+    }
+    return '<div class="dfield editable"><div class="dk">' + label + '</div>' +
+      '<div class="dv"><span class="dv-edit" contenteditable="true" role="textbox" ' +
+      'data-dfedit="' + dealId + '~' + fieldKey + '" ' +
+      'aria-label="' + escAttr(label) + ' — нажмите, чтобы изменить" ' +
+      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + (val || '—') + '</span> ' +
+      provBadge(provSt) + confirm + wasTag + '</div></div>';
+  }
+  // Разбор введённого: у числового поля из «2 400 000 AED» достаётся число, всё остальное — текст
+  // как есть. Пустой ввод и «—» означают «не заполнено», а не строку из одного тире.
+  function dfieldParse(fieldKey, raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s || s === '—') return DFIELD_NUM[fieldKey] ? 0 : '';
+    if (!DFIELD_NUM[fieldKey]) return s;
+    const n = parseInt(s.replace(/[^\d]/g, ''), 10);
+    return isNaN(n) ? null : n;                       // null = ввод не разобран, правку не применяем
+  }
+  function saveDealField(dealId, fieldKey, raw) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return false;
+    const next = dfieldParse(fieldKey, raw);
+    if (next === null) {                              // число не разобрано — молча не портим данные
+      WS.storeApi.toast('Не понял значение — оставил прежнее');
+      dealCard(dealId);
+      return false;
+    }
+    const prev = d[fieldKey];
+    if (String(prev == null ? '' : prev) === String(next)) return false;
+    d.was = d.was || {};
+    if (d.was[fieldKey] == null) d.was[fieldKey] = prev;   // первый оригинал, а не предыдущая правка
+    d[fieldKey] = next;
+    d.prov = d.prov || {};
+    d.prov[fieldKey] = 'manual';
+    WS.storeApi.touch();
+    WS.storeApi.toast('Значение изменено — прежнее сохранено', 'ok');
+    return true;
   }
   // Params tab shows only what the header «Ключевое» doesn't (no Бюджет/Форма оплаты/Цель/Тип —
   // those are up top). Источник is inherited from the заявка, labelled as such.
@@ -10048,9 +10134,30 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function entityActionBar(items) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
-    return '<div class="qa-bar" role="group" aria-label="Действия">' +
-      list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
-        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
+    const primary = list.filter((a) => a[3] === 'primary');
+    const secondary = list.filter((a) => a[3] === 'secondary');
+    const other = list.filter((a) => a[3] !== 'primary' && a[3] !== 'secondary');
+    // If no primary/secondary specified, show all flat (backward compat for contract, etc.).
+    if (primary.length === 0 && secondary.length === 0) {
+      return '<div class="qa-bar" role="group" aria-label="Действия">' +
+        list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
+          I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
+    }
+    // Primary/secondary specified: show primary + non-classified in bar, secondary in dropdown
+    let html = '<div class="qa-bar" role="group" aria-label="Действия">' +
+      primary.map((a) => '<button class="qa-act primary" ' + a[2] + '>' +
+        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
+      other.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
+        I(a[0]) + '<span>' + a[1] + '</span></button>').join('');
+    if (secondary.length) {
+      html += '<div class="qa-more"><button class="qa-act secondary" data-act="toggleQaMore">' +
+        I('menu') + '<span>Ещё</span></button><div class="qa-more-menu">' +
+        secondary.map((a) => '<button class="qa-more-item" ' + a[2] + '>' +
+          I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
+        '</div></div>';
+    }
+    html += '</div>';
+    return html;
   }
   function dxSec(icon, title, rightHtml, inner) {
     return '<div class="dx-sec"><div class="dx-sec-h"><span class="ic">' + I(icon) + '</span>' + title +
@@ -10274,8 +10381,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
-      '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
+      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
   // ---- Shared "now" cards (deal + request use the SAME treatment so related process cards don't
@@ -10303,20 +10409,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   // What an agent opens a deal to do. Ordered by how often it is the reason for opening it.
   function dealActions(d) {
-    const c = D().clients.find((x) => x.id === d.clientId) || {};
+    // Primary row: the three most-frequent actions. All others behind «Ещё».
+    // Чат по сделке is removed — the composer line at the bottom is the same entrance.
+    // Открыть контакт is removed — the client's name in the left column is already clickable.
     return [
-      ['chat', 'Чат по сделке', 'data-thread="deal:' + d.id + '" data-tlabel="' + escAttr(d.title) + '" data-ticon="briefcase"', 'primary'],
-      ['clock', 'Поставить задачу', 'data-act="newTask"', ''],
-      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
-      ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', ''],
-      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', ''],
-      ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', ''],
+      ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', 'primary'],
+      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', 'primary'],
+      ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', 'primary'],
+      ['clock', 'Поставить задачу', 'data-act="newTask"', 'secondary'],
+      ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', 'secondary'],
       // Завершение — отдельное действие с двумя исходами, а не «поставить последний шаг»:
       // успех означает полученное вознаграждение, а не подписанный договор.
-      dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', ''],
-      dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', ''],
-      dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', ''],
-      c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
+      dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', 'secondary'],
+      dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', 'secondary'],
+      dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', 'secondary'],
     ];
   }
   /* ---- Передать против привлечь (§3.1 решений) ----
@@ -10385,6 +10491,36 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const a = nbaActions(d);
     const over = /просроч/i.test(d.nextDue || '');
     return nextStepCard(agentName(d.agent), d.nextDue || '', over, a.doIt[0], a.why || '');
+  }
+  // Planned events block: open tasks and calendar events with dates. Overdue first, marked visibly.
+  // Past events live in dealRecentCard, not duplicated here.
+  function dealPlannedEventsCard(d) {
+    const tasks = (D().tasks || []).filter((t) => t.dealId === d.id && t.status !== 'done');
+    const events = (D().events || []).filter((e) => e.dealId === d.id && e.status !== 'canceled');
+    const items = [];
+    // Collect all events and tasks with due dates.
+    // Порядок внутри «когда» задаёт словарь срочности, а не строка даты: «14 мая» и «6 июня»
+    // сравненные как текст встают наоборот, потому что «1» меньше «6».
+    const WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+    tasks.forEach((t) => {
+      if (t.due) items.push({ type: 'task', label: t.title || t.text || 'Задача', due: t.due,
+        overdue: t.when === 'overdue', ord: WHEN_ORD[t.when] == null ? 9 : WHEN_ORD[t.when] });
+    });
+    events.forEach((e) => {
+      if (e.at) items.push({ type: 'event', label: e.text || 'Событие', due: e.at, overdue: false,
+        ord: (WHEN_ORD[e.when] == null ? 5 : WHEN_ORD[e.when]) });
+    });
+    if (!items.length) return '';
+    items.sort((a, b) => a.ord - b.ord);
+    const html = items.map((it) => {
+      const icon = it.type === 'task' ? 'checkCircle' : 'calendar';
+      const overClass = it.overdue ? ' over' : '';
+      return '<div class="plev-row' + overClass + '">' +
+        '<span class="plev-icon">' + I(icon) + '</span>' +
+        '<div class="plev-info"><div>' + escAttr(it.label) + '</div>' +
+        '<div class="plev-date">' + (it.due || '—') + (it.overdue ? ' · просрочено' : '') + '</div></div></div>';
+    }).join('');
+    return html.length ? dxSec('clock', 'Запланировано', '', '<div class="plev-list">' + html + '</div>') : '';
   }
   // Entries the client authored, across the deal, its заявка and the contact — the client's own
   // moves, separated from ours. `by` is the author of a timeline entry; inbound raw channel capture
@@ -10869,8 +11005,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · запрос" data-ticon="mail">' + I('whatsapp') + 'Написать</button>' +
-      '<button class="btn sm ghost" data-client="' + c.id + '">' + I('users') + 'Карточка</button></div>';
+      '<button class="btn sm" data-thread="' + tid + '" data-tlabel="' + escAttr(c.name) + ' · запрос" data-ticon="mail">' + I('whatsapp') + 'Написать</button></div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
   // Status of one offered object: whether it became a deal (the final state), else the client's
@@ -12678,12 +12813,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealAside(d) {
     const p = d.prov || {};
     const params = '<div class="dcard-params">' +
-      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget') +
-      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm') +
-      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
-      dealField('Готовность', d.readiness, 'confirmed') +
-      dealField('Цель', d.goal, p.goal, d.id + ':goal') +
-      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source') + '</div>';
+      dealField('Бюджет', d.amount ? WS.AED(d.amount) : '—', p.budget, d.id + ':budget', d.id, 'amount') +
+      dealField('Форма оплаты', d.paymentForm, p.paymentForm, d.id + ':paymentForm', d.id, 'paymentForm') +
+      dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType', d.id, 'objectType') +
+      dealField('Готовность', d.readiness, 'confirmed', '', d.id, 'readiness') +
+      dealField('Цель', d.goal, p.goal, d.id + ':goal', d.id, 'goal') +
+      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source', d.id, 'source') + '</div>';
     const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
     return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) + params +
       dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
@@ -12695,7 +12830,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
        о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
     const drafts = outcomesBlock('deal', d.id);
     const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
-    return dealNextStepCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
+    return dealNextStepCard(d) + dealPlannedEventsCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -15430,7 +15565,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -18076,6 +18211,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'valPdf': api.toast('PDF-презентация для инвестора сформирована из расчёта (демо-скачивание)', 'ok'); break;
       case 'valXls': api.toast('Excel-финмодель сформирована из расчёта (демо-скачивание)', 'ok'); break;
       case 'download': api.toast('Файл сформирован из фикстур (демо-скачивание)', 'ok'); break;
+      case 'toggleQaMore': {
+        const menu = t.closest('.qa-more').querySelector('.qa-more-menu');
+        if (menu) menu.classList.toggle('open');
+        break;
+      }
     }
   }
 
@@ -18102,8 +18242,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         else if (d) { e.target.textContent = d.title || 'Сделка'; }
       }
     }
+    // Условие сделки — та же механика, что и у названия: Enter фиксирует и перерисовывает карточку
+    // (сумма участвует в комиссии и в подписи под названием, они разошлись бы с полем), Esc возвращает.
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.dfedit) {
+      e.preventDefault();
+      const [dealId, key] = e.target.dataset.dfedit.split('~');
+      WS.ui.saveDealField(dealId, key, e.target.textContent);
+      WS.ui.dealCard(dealId);
+    }
     if (e.key === 'Escape') {
-      if (e.target.classList && e.target.classList.contains('deal-title-text')) {
+      if (e.target.dataset && e.target.dataset.dfedit) {
+        e.preventDefault(); WS.ui.dealCard(e.target.dataset.dfedit.split('~')[0]);
+      } else if (e.target.classList && e.target.classList.contains('deal-title-text')) {
         e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.titledeal) { const d = store.data.deals.find((x) => x.id === box.dataset.titledeal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
       } else { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
     }
@@ -18176,6 +18326,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         if (d && newTitle && d.title !== newTitle) { d.title = newTitle; api.touch({ render: false }); }
         else if (d && !newTitle) { el.textContent = d.title || 'Сделка'; }
       }
+    }
+    // Уход из поля условия сохраняет тихо — текст на экране и есть подтверждение. Перерисовки нет:
+    // она заменила бы узел под курсором, а это и читается как мигание.
+    if (el && el.dataset && el.dataset.dfedit) {
+      const [dealId, key] = el.dataset.dfedit.split('~');
+      WS.ui.saveDealField(dealId, key, el.textContent);
     }
   }, true);
 

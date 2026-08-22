@@ -416,6 +416,11 @@
       case 'valPdf': api.toast('PDF-презентация для инвестора сформирована из расчёта (демо-скачивание)', 'ok'); break;
       case 'valXls': api.toast('Excel-финмодель сформирована из расчёта (демо-скачивание)', 'ok'); break;
       case 'download': api.toast('Файл сформирован из фикстур (демо-скачивание)', 'ok'); break;
+      case 'toggleQaMore': {
+        const menu = t.closest('.qa-more').querySelector('.qa-more-menu');
+        if (menu) menu.classList.toggle('open');
+        break;
+      }
     }
   }
 
@@ -442,8 +447,18 @@
         else if (d) { e.target.textContent = d.title || 'Сделка'; }
       }
     }
+    // Условие сделки — та же механика, что и у названия: Enter фиксирует и перерисовывает карточку
+    // (сумма участвует в комиссии и в подписи под названием, они разошлись бы с полем), Esc возвращает.
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.dfedit) {
+      e.preventDefault();
+      const [dealId, key] = e.target.dataset.dfedit.split('~');
+      WS.ui.saveDealField(dealId, key, e.target.textContent);
+      WS.ui.dealCard(dealId);
+    }
     if (e.key === 'Escape') {
-      if (e.target.classList && e.target.classList.contains('deal-title-text')) {
+      if (e.target.dataset && e.target.dataset.dfedit) {
+        e.preventDefault(); WS.ui.dealCard(e.target.dataset.dfedit.split('~')[0]);
+      } else if (e.target.classList && e.target.classList.contains('deal-title-text')) {
         e.preventDefault(); const box = e.target.closest('.deal-title-edit'); if (box && box.dataset.titledeal) { const d = store.data.deals.find((x) => x.id === box.dataset.titledeal); if (d) { e.target.textContent = d.title || 'Сделка'; } }
       } else { store.navOpen = false; WS.ui.closeModal(); api.emit(); }
     }
@@ -516,6 +531,12 @@
         if (d && newTitle && d.title !== newTitle) { d.title = newTitle; api.touch({ render: false }); }
         else if (d && !newTitle) { el.textContent = d.title || 'Сделка'; }
       }
+    }
+    // Уход из поля условия сохраняет тихо — текст на экране и есть подтверждение. Перерисовки нет:
+    // она заменила бы узел под курсором, а это и читается как мигание.
+    if (el && el.dataset && el.dataset.dfedit) {
+      const [dealId, key] = el.dataset.dfedit.split('~');
+      WS.ui.saveDealField(dealId, key, el.textContent);
     }
   }, true);
 
