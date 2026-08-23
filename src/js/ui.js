@@ -2806,20 +2806,40 @@
      складывают в комиссии и в пайплайне. Записать туда строку с пробелами и валютой — сломать
      все суммы разом, поэтому у числового поля своя разборка ввода. */
   const DFIELD_NUM = { amount: 1 };
+  /* Поле карточки и поле данных названы по-разному: на экране «Бюджет», в записи `amount`,
+     а происхождение факта лежит под ключом `budget`. Без этой таблицы ручная правка бюджета
+     помечала бы происхождение несуществующего поля, и значок «предложено AI» оставался бы
+     висеть на цифре, которую человек уже заменил своей. */
+  const DFIELD_PROV = { amount: 'budget' };
+  /* Часть полей — это словари, а не свободный текст: по «готовности» выбирается вид договора,
+     а из вида договора следуют шаги сделки. Опечатка здесь не косметическая — «офплан» вместо
+     «оффплан» переводит сделку во вторичку, у которой нет брони, и сделка оказывается на шаге,
+     которого нет в её пути. Поэтому свободный ввод в такие поля не принимается. */
+  const DFIELD_ENUM = { readiness: 'readiness', objectType: 'objectType', saleKind: 'saleKind', side: 'side' };
+  function dfieldAllowed(fieldKey) {
+    const k = DFIELD_ENUM[fieldKey];
+    return k ? (DEAL_ENUMS[k] || []).filter(Boolean) : null;
+  }
   function dealField(label, val, provSt, confirmId, dealId, fieldKey) {
     const confirm = provSt === 'ai' && confirmId ? '<button class="mini-confirm" data-dfconfirm="' + confirmId + '" title="Подтвердить значение">' + I('check') + '</button>' : '';
     const d = dealId ? D().deals.find((x) => x.id === dealId) : null;
     const was = (d && d.was && d.was[fieldKey] != null) ? d.was[fieldKey] : null;
     const wasTag = was != null ? '<span class="dv-was" title="Изменено вручную. Прежнее значение: ' +
       escAttr(DFIELD_NUM[fieldKey] ? WS.AED(was) : String(was)) + '">изменено вручную</span>' : '';
+    // Значение приходит из того, что человек напечатал в поле, и уходит в разметку. Без
+    // экранирования набранная разметка исполнилась бы при следующей отрисовке.
+    const shown = escAttr(val == null || val === '' ? '—' : String(val));
     if (!dealId || !fieldKey) {
-      return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
+      return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + shown + ' ' + provBadge(provSt) + confirm + '</div></div>';
     }
+    const allowed = dfieldAllowed(fieldKey);
+    const hint = allowed ? 'Допустимые значения: ' + allowed.join(', ') + '. Enter — сохранить, Esc — отменить'
+      : 'Кликните, чтобы изменить. Enter — сохранить, Esc — отменить';
     return '<div class="dfield editable"><div class="dk">' + label + '</div>' +
       '<div class="dv"><span class="dv-edit" contenteditable="true" role="textbox" ' +
       'data-dfedit="' + dealId + '~' + fieldKey + '" ' +
       'aria-label="' + escAttr(label) + ' — нажмите, чтобы изменить" ' +
-      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + (val || '—') + '</span> ' +
+      'title="' + escAttr(hint) + '">' + shown + '</span> ' +
       provBadge(provSt) + confirm + wasTag + '</div></div>';
   }
   // Разбор введённого: у числового поля из «2 400 000 AED» достаётся число, всё остальное — текст
@@ -2831,11 +2851,19 @@
     const n = parseInt(s.replace(/[^\d]/g, ''), 10);
     return isNaN(n) ? null : n;                       // null = ввод не разобран, правку не применяем
   }
-  function saveDealField(dealId, fieldKey, raw) {
+  function saveDealField(dealId, fieldKey, raw, opts) {
     const d = D().deals.find((x) => x.id === dealId); if (!d) return false;
     const next = dfieldParse(fieldKey, raw);
     if (next === null) {                              // число не разобрано — молча не портим данные
       WS.storeApi.toast('Не понял значение — оставил прежнее');
+      dealCard(dealId);
+      return false;
+    }
+    // Словарное поле принимает только своё значение. Отказ громкий и называет допустимые:
+    // молча оставить прежнее значило бы, что человек уверен, будто правка применилась.
+    const allowed = dfieldAllowed(fieldKey);
+    if (allowed && String(next) !== '' && allowed.indexOf(String(next)) < 0) {
+      WS.storeApi.toast('«' + next + '» — не из этого списка. Допустимо: ' + allowed.join(', '));
       dealCard(dealId);
       return false;
     }
@@ -2845,8 +2873,11 @@
     if (d.was[fieldKey] == null) d.was[fieldKey] = prev;   // первый оригинал, а не предыдущая правка
     d[fieldKey] = next;
     d.prov = d.prov || {};
-    d.prov[fieldKey] = 'manual';
-    WS.storeApi.touch();
+    d.prov[DFIELD_PROV[fieldKey] || fieldKey] = 'manual';
+    // Уход из поля не перерисовывает приложение: отрисовка заменяет узел, по которому человек
+    // только что кликнул, и его клик пропадает — кнопка выглядит мёртвой. То же правило уже
+    // действует для правки названия сделки, здесь оно повторено намеренно.
+    WS.storeApi.touch(opts && opts.render === false ? { render: false } : undefined);
     WS.storeApi.toast('Значение изменено — прежнее сохранено', 'ok');
     return true;
   }
@@ -3797,9 +3828,14 @@
       if (t.due) items.push({ type: 'task', label: t.title || t.text || 'Задача', due: t.due,
         overdue: t.when === 'overdue', ord: WHEN_ORD[t.when] == null ? 9 : WHEN_ORD[t.when] });
     });
+    // Запись календаря несёт `title` и `when` — не `text`/`at`, как запись ленты. Чтение по
+    // чужой форме молча выбрасывало КАЖДОЕ событие, и блок показывал только задачи.
     events.forEach((e) => {
-      if (e.at) items.push({ type: 'event', label: e.text || 'Событие', due: e.at, overdue: false,
-        ord: (WHEN_ORD[e.when] == null ? 5 : WHEN_ORD[e.when]) });
+      const when = e.when || e.at;
+      if (!when) return;
+      items.push({ type: 'event', label: e.title || e.text || 'Событие', due: when,
+        overdue: /просроч/i.test(String(when)),
+        ord: (WHEN_ORD[when] == null ? 5 : WHEN_ORD[when]) });
     });
     if (!items.length) return '';
     items.sort((a, b) => a.ord - b.ord);
@@ -8953,7 +8989,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

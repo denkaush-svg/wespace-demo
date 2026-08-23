@@ -5110,7 +5110,15 @@ setTimeout(async () => {
       JSON.stringify(anna.amount) + ' (' + typeof anna.amount + ')');
     check('условия · прежнее значение сохранено, а не затёрто',
       anna.was && anna.was.amount === amtWas, JSON.stringify(anna.was));
-    check('условия · поле помечено как правленное рукой', (anna.prov || {}).amount === 'manual', (anna.prov || {}).amount);
+    /* Пометка обязана лечь на тот ключ, ИЗ КОТОРОГО поле рисуется. Бюджет показывается из
+       `prov.budget`, а лежит в `amount` — записав пометку в `amount`, мы бы оставили на цифре,
+       которую человек уже заменил своей, значок «предложено AI» и кнопку подтверждения. */
+    check('условия · пометка легла на тот ключ, из которого поле рисуется',
+      (anna.prov || {}).budget === 'manual', JSON.stringify(anna.prov));
+    WS.ui.dealCard('d_anna');
+    check('условия · и значок «предложено AI» с правленого поля ушёл',
+      !(doc.querySelector('#app .view .dcard-aside') || { innerHTML: '' }).innerHTML
+        .match(/data-dfconfirm="d_anna:budget"/), 'кнопка подтверждения ещё висит');
     WS.ui.dealCard('d_anna');
     check('условия · пометка «изменено вручную» видна с прежним значением в подсказке',
       /изменено вручную/i.test(doc.querySelector('#app .view .dcard-aside').textContent) &&
@@ -5421,6 +5429,92 @@ setTimeout(async () => {
       both.indexOf('d.' + camel(a)) < 0);
     check('интерфейс · у каждого нарисованного data-атрибута есть кто-то, кто его читает',
       orphans.length === 0, orphans.join(', '));
+  }
+
+  // ---- что нашла кросс-модельная вычитка: четыре дыры без единой проверки ----
+  {
+    const anna = dd().deals.find((x) => x.id === 'd_anna');
+
+    // 1. Словарное поле. По «готовности» выбирается вид договора, а из него — шаги сделки.
+    // «офплан» вместо «оффплан» переводит сделку во вторичку, у которой брони нет, и сделка
+    // оказывается на шаге, которого нет в её собственном пути.
+    const rWas = anna.readiness, stWas = anna.stage;
+    const ok = WS.ui.saveDealField('d_anna', 'readiness', 'офплан');
+    check('словарь · опечатка в готовности не принимается', ok === false && anna.readiness === rWas,
+      anna.readiness + ' (было ' + rWas + ')');
+    check('словарь · и шаг сделки остался в её собственном пути',
+      ((WS.DEAL_STEPS || {})[WS.contractKindFor(anna.funnel, anna.readiness)] || []).indexOf(anna.stage) >= 0,
+      anna.stage + ' / ' + WS.contractKindFor(anna.funnel, anna.readiness));
+    check('словарь · законное значение из списка принимается',
+      WS.ui.saveDealField('d_anna', 'readiness', 'готовый') === true && anna.readiness === 'готовый');
+    WS.ui.saveDealField('d_anna', 'readiness', rWas); anna.stage = stWas; delete anna.was;
+    check('словарь · свободный текст там, где список не задан, по-прежнему принимается',
+      WS.ui.dfieldAllowed('goal') === null && WS.ui.dfieldAllowed('readiness') !== null);
+
+    // 2. Набранная разметка не должна исполняться при следующей отрисовке.
+    const gWas = anna.goal;
+    WS.ui.saveDealField('d_anna', 'goal', '<img src=x onerror=alert(1)>');
+    WS.ui.dealCard('d_anna');
+    const aside = doc.querySelector('#app .view .dcard-aside');
+    check('правка · набранная разметка не становится разметкой',
+      !!aside && aside.querySelectorAll('img').length === 0 && aside.textContent.indexOf('onerror') >= 0,
+      aside ? ('img: ' + aside.querySelectorAll('img').length) : 'блока нет');
+    anna.goal = gWas; delete anna.was; if (anna.prov) delete anna.prov.goal;
+
+    // 3. Уход из поля не перерисовывает приложение: отрисовка заменяет узел, по которому только
+    // что кликнули, и клик пропадает — кнопка выглядит мёртвой. Для названия сделки это правило
+    // уже действует; проверяем, что правка условия ведёт себя так же.
+    {
+      // touch() зовёт отрисовку изнутри store.js, поэтому подмена внешнего emit её не видит.
+      // Проверяем сам контракт: с каким аргументом сохранение просит перерисовать.
+      const revWas = WS.store.dataRevision;
+      const seen = [];
+      const touchWas = WS.storeApi.touch;
+      WS.storeApi.touch = function (o) { seen.push(o && o.render === false ? 'тихо' : 'с отрисовкой'); return touchWas.apply(this, arguments); };
+      WS.ui.saveDealField('d_anna', 'paymentForm', 'рассрочка 60/40', { render: false });
+      check('правка · уход из поля сохраняет, но не перерисовывает экран',
+        seen.join('') === 'тихо' && WS.store.dataRevision > revWas, seen.join(', ') || 'сохранения не было');
+      WS.ui.saveDealField('d_anna', 'paymentForm', 'рассрочка 70/30');
+      check('правка · а подтверждение по Enter перерисовывает',
+        seen[1] === 'с отрисовкой', seen.join(', '));
+      WS.storeApi.touch = touchWas;
+      delete anna.was; if (anna.prov) delete anna.prov.paymentForm;
+    }
+
+    // 4. Событие календаря несёт `title`/`when`, запись ленты — `text`/`at`. Чтение по чужой
+    // форме молча выбрасывало КАЖДОЕ событие, и «Запланировано» показывало только задачи.
+    {
+      const ev = (dd().events || []).find((e) => e.dealId);
+      check('данные · на стенде есть событие календаря, привязанное к сделке', !!ev,
+        (dd().events || []).length + ' событий');
+      if (ev) {
+        const d2 = dd().deals.find((x) => x.id === ev.dealId);
+        const html = WS.ui.dealPlannedEventsCard(d2);
+        check('запланированное · событие календаря попало в блок, а не только задачи',
+          html.indexOf(ev.title || ev.text) >= 0, 'нет «' + (ev.title || ev.text) + '»');
+      }
+    }
+
+    // 5. Форма фикстур изменилась — сохранённый снимок обязан быть отвергнут, иначе у того, кто
+    // уже открывал стенд, все обращения останутся в «Новом», а стадия «Не вышли на связь» — пустой.
+    {
+      const src = read('js/store.js');
+      const m = /const SCHEMA = (\d+);/.exec(src);
+      check('схема · версия поднята под новые поля волны 4', !!m && parseInt(m[1], 10) >= 26,
+        m ? m[1] : 'не найдена');
+      check('схема · и подъём объяснён в её же истории', /25→26/.test(src));
+    }
+
+    // 6. Доска или список решает ширина, и решение принимается один раз при отрисовке. Без
+    // пересборки на пересечении порога поворот телефона оставляет раздел пустым.
+    {
+      const mainSrc = read('js/main.js');
+      check('ширина · пересечение порога перерисовывает экран',
+        /matchMedia\(WS\.ui\.BOARD_MIN\)/.test(mainSrc) && /addEventListener\('change'|addListener\(/.test(mainSrc),
+        'слушателя порога нет');
+      check('ширина · и порог берётся из одного места, а не пишется заново',
+        mainSrc.indexOf('WS.ui.BOARD_MIN') >= 0 && !/main\.js[\s\S]*min-width: 9/.test(mainSrc));
+    }
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));

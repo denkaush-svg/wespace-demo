@@ -542,7 +542,7 @@
     // она заменила бы узел под курсором, а это и читается как мигание.
     if (el && el.dataset && el.dataset.dfedit) {
       const [dealId, key] = el.dataset.dfedit.split('~');
-      WS.ui.saveDealField(dealId, key, el.textContent);
+      WS.ui.saveDealField(dealId, key, el.textContent, { render: false });
     }
   }, true);
 
@@ -589,6 +589,16 @@
     pop.style.maxHeight = Math.min(DESIRED, space) + 'px';
     if (openUp) { pop.style.top = 'auto'; pop.style.bottom = 'calc(100% + 8px)'; }
     else { pop.style.bottom = 'auto'; pop.style.top = 'calc(100% + 8px)'; }
+  }
+  /* Доска или список решает ширина, и решение принимается ОДИН РАЗ при отрисовке. Поверни
+     телефон или сузь окно — разметка остаётся прежней, а CSS прячет доску: раздел становится
+     пустым. Поэтому пересечение порога само перерисовывает экран. Порог берётся у ui.js,
+     чтобы третьего числа в проекте не появилось. */
+  if (window.matchMedia && WS.ui && WS.ui.BOARD_MIN) {
+    const mq = window.matchMedia(WS.ui.BOARD_MIN);
+    const onCross = () => api.emit();
+    if (mq.addEventListener) mq.addEventListener('change', onCross);
+    else if (mq.addListener) mq.addListener(onCross);
   }
   window.addEventListener('resize', () => { if (store.cgMenu) placeCgPop(); });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (store.cgMenu) placeCgPop(); });

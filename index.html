@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:52</title>
+  <title>WESPACE · сборка 19:20</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:52';
+    window.WS_BUILD='19:20';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -4407,7 +4407,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================ */
 (function (WS) {
   const KEY = 'wespace_demo_state';
-  const SCHEMA = 25; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает. 23→24: tasks[].dealId / tasks[].requestId — область задачи (сделка → заявка → контакт); без неё у двух сделок одного клиента был общий список задач. 24→25: волна 3 — settings (пороги отношений и поводов), cueState (решение агента по поводу касания), clients[].birthday/ctype, clients[].relStage/relStageOver (ручная правка стадии отношений), deals[].lotState (пер-лотовое состояние), deals[].convertedAt, offers[] (версии коммерческих предложений), tasks[].outcome, участники сделки на новом словаре ролей и влияния плюс канал и компания.
+  const SCHEMA = 26; // bump on any fixtures-shape change so stale localStorage is discarded. 2→3: users[].photo. 3→4: deals[].contacts (multi-contact with rating). 4→5: companies[] requisites. 5→6: objects[] address + commissionPct. 6→7: contactTimeline[] + dealTimeline for every deal + ord sort keys. 7→8: companyTimeline[]. 8→9: roster[] + dead analytics counters removed. 9→10: requests[] (заявка → сделки → лоты) + deals[].requestId + deals[].lots. 10→11: requests[] brief attributes + offered[] (selection state) + kp. 11→12: requestTimeline enriched (recent events 09–13 мая) — force re-seed so stale snapshots without them are discarded. 12→13: deals[].createdAt (creation date for each deal). 13→14: companies[].people[] (roles, decision-makers, communication channels). 14→15: users[agent].goals[] (configurable goals with metrics and progress tracking). 15→16: funnels by service (sale/rent/manage/exclusive/cross/consult) with per-funnel stage lists; deals[].readiness/saleKind/side; terminal stage split into won/lost. 16→17: objects[].attrs.floor as a storey number + floors/floorBand, objects[].usp, AREAS[] market snapshot per district. 17→18: DIFC office objects (o_difc_a/o_difc_b) + AREAS[DIFC]; d_rentbiz lots point at one development; r_viktor.offered/kp rebuilt. 18→19: o_jvcpark (the JVC listing Anna rejected, instead of the unit she already owns); d_karim/d_fitout/k_jvc lose object ids copied from unrelated records. 19→20: seven pre-sale records became requests (r_igor/r_karim/r_lease/r_fitout/r_manage/r_exclusive/r_consult) + r_won as the parent of the closed purchase; requests[].funnel; conflicts keyed by request. 20→21: r_sarah_apr + r_villa + d_sarah_apr — a lost deal and a lost request, so the conversion rates measure something. 21→22: o_bbloft + five request/deal pairs so every service has a live example (rent/manage/exclusive/cross/consult); client goal fields no longer carry deal state. 22→23: market[] (районы Дубая с происхождением цифр) — срез рынка, из которого Консьерж отвечает. 23→24: tasks[].dealId / tasks[].requestId — область задачи (сделка → заявка → контакт); без неё у двух сделок одного клиента был общий список задач. 24→25: волна 3 — settings (пороги отношений и поводов), cueState (решение агента по поводу касания), clients[].birthday/ctype, clients[].relStage/relStageOver (ручная правка стадии отношений), deals[].lotState (пер-лотовое состояние), deals[].convertedAt, offers[] (версии коммерческих предложений), tasks[].outcome, участники сделки на новом словаре ролей и влияния плюс канал и компания. 25→26: волна 4 — inbox[].stage (четыре стадии разбора входящего обращения) и задача по сделке на доске; без подъёма сохранённый снимок оставлял все обращения в «Новом» и прятал стадию «Не вышли на связь».
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
   const subs = [];
@@ -9590,20 +9590,40 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      складывают в комиссии и в пайплайне. Записать туда строку с пробелами и валютой — сломать
      все суммы разом, поэтому у числового поля своя разборка ввода. */
   const DFIELD_NUM = { amount: 1 };
+  /* Поле карточки и поле данных названы по-разному: на экране «Бюджет», в записи `amount`,
+     а происхождение факта лежит под ключом `budget`. Без этой таблицы ручная правка бюджета
+     помечала бы происхождение несуществующего поля, и значок «предложено AI» оставался бы
+     висеть на цифре, которую человек уже заменил своей. */
+  const DFIELD_PROV = { amount: 'budget' };
+  /* Часть полей — это словари, а не свободный текст: по «готовности» выбирается вид договора,
+     а из вида договора следуют шаги сделки. Опечатка здесь не косметическая — «офплан» вместо
+     «оффплан» переводит сделку во вторичку, у которой нет брони, и сделка оказывается на шаге,
+     которого нет в её пути. Поэтому свободный ввод в такие поля не принимается. */
+  const DFIELD_ENUM = { readiness: 'readiness', objectType: 'objectType', saleKind: 'saleKind', side: 'side' };
+  function dfieldAllowed(fieldKey) {
+    const k = DFIELD_ENUM[fieldKey];
+    return k ? (DEAL_ENUMS[k] || []).filter(Boolean) : null;
+  }
   function dealField(label, val, provSt, confirmId, dealId, fieldKey) {
     const confirm = provSt === 'ai' && confirmId ? '<button class="mini-confirm" data-dfconfirm="' + confirmId + '" title="Подтвердить значение">' + I('check') + '</button>' : '';
     const d = dealId ? D().deals.find((x) => x.id === dealId) : null;
     const was = (d && d.was && d.was[fieldKey] != null) ? d.was[fieldKey] : null;
     const wasTag = was != null ? '<span class="dv-was" title="Изменено вручную. Прежнее значение: ' +
       escAttr(DFIELD_NUM[fieldKey] ? WS.AED(was) : String(was)) + '">изменено вручную</span>' : '';
+    // Значение приходит из того, что человек напечатал в поле, и уходит в разметку. Без
+    // экранирования набранная разметка исполнилась бы при следующей отрисовке.
+    const shown = escAttr(val == null || val === '' ? '—' : String(val));
     if (!dealId || !fieldKey) {
-      return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + (val || '—') + ' ' + provBadge(provSt) + confirm + '</div></div>';
+      return '<div class="dfield"><div class="dk">' + label + '</div><div class="dv">' + shown + ' ' + provBadge(provSt) + confirm + '</div></div>';
     }
+    const allowed = dfieldAllowed(fieldKey);
+    const hint = allowed ? 'Допустимые значения: ' + allowed.join(', ') + '. Enter — сохранить, Esc — отменить'
+      : 'Кликните, чтобы изменить. Enter — сохранить, Esc — отменить';
     return '<div class="dfield editable"><div class="dk">' + label + '</div>' +
       '<div class="dv"><span class="dv-edit" contenteditable="true" role="textbox" ' +
       'data-dfedit="' + dealId + '~' + fieldKey + '" ' +
       'aria-label="' + escAttr(label) + ' — нажмите, чтобы изменить" ' +
-      'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + (val || '—') + '</span> ' +
+      'title="' + escAttr(hint) + '">' + shown + '</span> ' +
       provBadge(provSt) + confirm + wasTag + '</div></div>';
   }
   // Разбор введённого: у числового поля из «2 400 000 AED» достаётся число, всё остальное — текст
@@ -9615,11 +9635,19 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const n = parseInt(s.replace(/[^\d]/g, ''), 10);
     return isNaN(n) ? null : n;                       // null = ввод не разобран, правку не применяем
   }
-  function saveDealField(dealId, fieldKey, raw) {
+  function saveDealField(dealId, fieldKey, raw, opts) {
     const d = D().deals.find((x) => x.id === dealId); if (!d) return false;
     const next = dfieldParse(fieldKey, raw);
     if (next === null) {                              // число не разобрано — молча не портим данные
       WS.storeApi.toast('Не понял значение — оставил прежнее');
+      dealCard(dealId);
+      return false;
+    }
+    // Словарное поле принимает только своё значение. Отказ громкий и называет допустимые:
+    // молча оставить прежнее значило бы, что человек уверен, будто правка применилась.
+    const allowed = dfieldAllowed(fieldKey);
+    if (allowed && String(next) !== '' && allowed.indexOf(String(next)) < 0) {
+      WS.storeApi.toast('«' + next + '» — не из этого списка. Допустимо: ' + allowed.join(', '));
       dealCard(dealId);
       return false;
     }
@@ -9629,8 +9657,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.was[fieldKey] == null) d.was[fieldKey] = prev;   // первый оригинал, а не предыдущая правка
     d[fieldKey] = next;
     d.prov = d.prov || {};
-    d.prov[fieldKey] = 'manual';
-    WS.storeApi.touch();
+    d.prov[DFIELD_PROV[fieldKey] || fieldKey] = 'manual';
+    // Уход из поля не перерисовывает приложение: отрисовка заменяет узел, по которому человек
+    // только что кликнул, и его клик пропадает — кнопка выглядит мёртвой. То же правило уже
+    // действует для правки названия сделки, здесь оно повторено намеренно.
+    WS.storeApi.touch(opts && opts.render === false ? { render: false } : undefined);
     WS.storeApi.toast('Значение изменено — прежнее сохранено', 'ok');
     return true;
   }
@@ -10581,9 +10612,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       if (t.due) items.push({ type: 'task', label: t.title || t.text || 'Задача', due: t.due,
         overdue: t.when === 'overdue', ord: WHEN_ORD[t.when] == null ? 9 : WHEN_ORD[t.when] });
     });
+    // Запись календаря несёт `title` и `when` — не `text`/`at`, как запись ленты. Чтение по
+    // чужой форме молча выбрасывало КАЖДОЕ событие, и блок показывал только задачи.
     events.forEach((e) => {
-      if (e.at) items.push({ type: 'event', label: e.text || 'Событие', due: e.at, overdue: false,
-        ord: (WHEN_ORD[e.when] == null ? 5 : WHEN_ORD[e.when]) });
+      const when = e.when || e.at;
+      if (!when) return;
+      items.push({ type: 'event', label: e.title || e.text || 'Событие', due: when,
+        overdue: /просроч/i.test(String(when)),
+        ord: (WHEN_ORD[when] == null ? 5 : WHEN_ORD[when]) });
     });
     if (!items.length) return '';
     items.sort((a, b) => a.ord - b.ord);
@@ -15737,7 +15773,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -18509,7 +18545,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // она заменила бы узел под курсором, а это и читается как мигание.
     if (el && el.dataset && el.dataset.dfedit) {
       const [dealId, key] = el.dataset.dfedit.split('~');
-      WS.ui.saveDealField(dealId, key, el.textContent);
+      WS.ui.saveDealField(dealId, key, el.textContent, { render: false });
     }
   }, true);
 
@@ -18556,6 +18592,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     pop.style.maxHeight = Math.min(DESIRED, space) + 'px';
     if (openUp) { pop.style.top = 'auto'; pop.style.bottom = 'calc(100% + 8px)'; }
     else { pop.style.bottom = 'auto'; pop.style.top = 'calc(100% + 8px)'; }
+  }
+  /* Доска или список решает ширина, и решение принимается ОДИН РАЗ при отрисовке. Поверни
+     телефон или сузь окно — разметка остаётся прежней, а CSS прячет доску: раздел становится
+     пустым. Поэтому пересечение порога само перерисовывает экран. Порог берётся у ui.js,
+     чтобы третьего числа в проекте не появилось. */
+  if (window.matchMedia && WS.ui && WS.ui.BOARD_MIN) {
+    const mq = window.matchMedia(WS.ui.BOARD_MIN);
+    const onCross = () => api.emit();
+    if (mq.addEventListener) mq.addEventListener('change', onCross);
+    else if (mq.addListener) mq.addListener(onCross);
   }
   window.addEventListener('resize', () => { if (store.cgMenu) placeCgPop(); });
   if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (store.cgMenu) placeCgPop(); });
