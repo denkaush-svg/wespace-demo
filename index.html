@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 00:56</title>
+  <title>WESPACE · сборка 01:28</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='00:56';
+    window.WS_BUILD='01:28';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2355,6 +2355,28 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Кнопка звонка на карточке доски: набирает, номер не печатает. */
 .deal .kcall { color: var(--acc); }
 
+/* ---- Первый экран: Консьерж пустым, как привычная нейросеть ---------------------------------- */
+.cg-home { max-width: 720px; margin: 0 auto; padding-top: 6vh; }
+.cg-greet { text-align: center; margin-bottom: 22px; }
+.cg-greet-w { width: 46px; height: 46px; margin: 0 auto 14px; border-radius: 14px;
+  display: grid; place-items: center; font-weight: 800; font-size: 18px; color: #fff;
+  background: linear-gradient(145deg, var(--acc), var(--acc-ink)); box-shadow: var(--shadow-sm); }
+.cg-greet-t { font-size: 26px; line-height: 1.2; font-weight: 800; color: var(--ink); margin: 0 0 8px; }
+.cg-greet-m { font-size: 13px; line-height: 1.5; color: var(--mut); margin: 0 auto; max-width: 520px; }
+/* Подсказки собраны из этих данных, а не выдуманы: они снимают пустоту первого экрана
+   и сразу показывают, что Консьерж знает рабочее место. */
+.cg-starters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.cg-start { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; font-size: 12.5px;
+  font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; cursor: pointer; transition: .15s var(--ease); max-width: 100%; }
+.cg-start:hover { border-color: var(--acc-line); background: var(--acc-soft); color: var(--acc-ink); }
+.cg-start svg { width: 14px; height: 14px; flex: none; opacity: .75; }
+.cg-start span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 599.98px) {
+  .cg-home { padding-top: 3vh; }
+  .cg-greet-t { font-size: 21px; }
+}
+
 
 /* ============================================================
    WESPACE preview theme — faithful to the OLD CRM palette,
@@ -4415,7 +4437,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     schema: SCHEMA,
     theme: null,          // null = follow system
     role: 'agent',
-    view: 'start',
+    view: 'concierge',
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
@@ -4433,7 +4455,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -6797,8 +6819,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // v3 first level (by frequency): Пульс · Консьерж · Входящие · Сделки · Клиенты · Объекты · Оценка
   const NAV = [
-    { id: 'start', label: 'Пульс', icon: 'pulse' },
+    // Консьерж стоит первым, потому что он и есть вход: приложение открывается им, а не сводкой.
+    // Порядок пунктов — это заявление о том, чем система является: рабочее место с ИИ сбоку
+    // и ИИ, под которым лежит рабочее место, — разные продукты, и мы делаем второй.
     { id: 'concierge', label: 'Консьерж', icon: 'sparkle' },
+    { id: 'start', label: 'Пульс', icon: 'pulse' },
     // «Входящие», а не «Заявки»: у агента раздел — разбор того, что пришло, и дальше работа идёт
     // в «Сделках» одним путём. Слово «заявка» остаётся руководителю и внутри данных: у агента оно
     // означало то же, что «сделка», и именно на этом разошлись с партнёром.
@@ -7717,10 +7742,40 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const cnt = document.querySelector('.cg-rail-count');
     if (cnt) cnt.textContent = 'Диалоги · ' + conciergeThreads().length;
   }
+  /* Первый экран агента — Консьерж, и он открывается пустым: приветствие, строка, подсказки.
+     Список диалогов скрыт, как у любой привычной нейросети, и разворачивается кнопкой.
+
+     Возражение к пустому экрану очевидное: систему открывают, чтобы увидеть систему, а строка
+     ввода на белом поле читается как «здесь ничего нет». Отвечают на него подсказки — но не
+     выдуманные, а собранные из ЭТИХ данных: они и снимают пустоту, и с первой секунды
+     показывают, что Консьерж знает рабочее место, а не отвечает вообще. */
+  function conciergeStarters() {
+    const out = [];
+    const overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
+    if (overdue.length) out.push(['clock', 'Что просрочено', 'что просрочено']);
+    // Клиент, которому уже отобрали объекты, — на нём КП собирается одним поручением.
+    const withSel = (D().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'selected'));
+    if (withSel) {
+      const c = (D().clients || []).find((x) => x.id === withSel.clientId);
+      if (c) out.push(['doc', 'Собрать КП по ' + c.name.split(' ')[0], 'собери КП по ' + c.name]);
+    }
+    const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d));
+    if (live.length) out.push(['money', 'Сколько сейчас в работе', 'сколько денег в работе по моим сделкам']);
+    const silent = (D().clients || []).find((c) => !lastTouchOf(c.id));
+    out.push(['users', silent ? 'Кто давно молчит' : 'Кого стоит коснуться', 'кто из клиентов давно не выходил на связь']);
+    return out.slice(0, 4).map((s) =>
+      '<button class="cg-start" data-cgask="' + escAttr(s[2]) + '">' + I(s[0]) + '<span>' + s[1] + '</span></button>').join('');
+  }
   function conciergeHomeMain(st) {
-    return '<div class="cg-main-inner">' +
-      heroViz('concierge', 'Консьерж', 'Опишите задачу — начнётся новый диалог. Голосом или текстом; вся история — слева.') +
-      cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос — начнётся новый диалог…', 'cgSend', 'cg-hero') +
+    const me = (D().users[S().role] || {}).name || '';
+    const hi = 'Чем помочь' + (me ? ', ' + me.split(' ')[0] : '') + '?';
+    const starters = conciergeStarters();
+    return '<div class="cg-main-inner cg-home">' +
+      '<div class="cg-greet"><div class="cg-greet-w">W</div>' +
+      '<h1 class="cg-greet-t">' + hi + '</h1>' +
+      '<p class="cg-greet-m">Напишите задачу словами — «собери КП», «подготовь к звонку», «что просрочено». Консьерж видит ваши сделки, клиентов и объекты, поэтому спрашивать «по какому клиенту» не нужно.</p></div>' +
+      cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос…', 'cgSend', 'cg-hero') +
+      (starters ? '<div class="cg-starters">' + starters + '</div>' : '') +
       conciergeWorkshop(st) +
     '</div>';
   }
@@ -18181,7 +18236,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-dealchat],[data-instage],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-dealchat],[data-instage],[data-cgask],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -18305,6 +18360,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // the tests called the handlers directly and never saw it.
     if (d.agev != null) return WS.ui.openAgentEvidence(d.agev);
     if (d.agnext != null) return WS.engine.agentNext(d.agnext);
+    // Подсказка первого экрана — это тот же ввод, что и напечатанный руками, поэтому идёт
+    // через общий разбор запроса, а не в обход него.
+    if (d.cgask) return routePrompt(d.cgask);
     if (d.agsay != null) return WS.voice.sayReply(d.agsay);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }

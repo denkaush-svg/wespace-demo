@@ -5588,6 +5588,61 @@ setTimeout(async () => {
     }
   }
 
+  // ---- первый экран: Консьерж, диалоги скрыты, подсказки из этих данных ----
+  {
+    // Читаем стартовое состояние из самого store.js: живой store к этому месту уже исхожен
+    // предыдущими блоками, и проверка «что видит агент при первом запуске» по нему солгала бы.
+    const st = read('js/store.js');
+    check('вход · приложение открывается Консьержем, а не сводкой',
+      /view: 'concierge'/.test(st), (st.match(/view: '[a-z]+'/) || [])[0]);
+    check('вход · список диалогов при этом скрыт, как у привычной нейросети',
+      /cgRailOpen: false/.test(st), (st.match(/cgRailOpen: \w+/) || [])[0]);
+    const uiSrc = read('js/ui.js');
+    const navOrder = (uiSrc.match(/\{ id: '(concierge|start)', label: '([^']+)'/g) || []).slice(0, 2);
+    check('вход · в меню Консьерж стоит перед Пульсом',
+      navOrder.length === 2 && navOrder[0].indexOf("'concierge'") >= 0 && navOrder[1].indexOf("'start'") >= 0,
+      navOrder.join(' | '));
+
+    WS.store.cgRailOpen = false;
+    WS.engine.closeThread();
+    WS.router.go('concierge');
+    const view = doc.querySelector('#app .view') || doc.getElementById('app');
+    check('вход · экран здоровается и спрашивает, чем помочь',
+      /Чем помочь/.test(view.textContent), view.textContent.slice(0, 80));
+    check('вход · строка ввода на месте', !!doc.getElementById('cgPrompt'));
+    check('вход · список диалогов не показан',
+      !doc.querySelector('#app .cg2:not(.cg2--railhidden)'),
+      'колонка диалогов развёрнута');
+    check('вход · но развернуть его есть чем', !!doc.querySelector('#app [data-act="cgRailToggle"]'));
+
+    // Подсказки — не украшение: они снимают пустоту первого экрана и обязаны быть про ЭТИ данные.
+    const starters = [].slice.call(doc.querySelectorAll('#app .cg-start'));
+    check('вход · подсказки показаны', starters.length >= 3, 'подсказок: ' + starters.length);
+    check('вход · каждая подсказка что-то отправляет Консьержу',
+      starters.every((b) => (b.getAttribute('data-cgask') || '').length > 3),
+      starters.map((b) => b.getAttribute('data-cgask')).join(' | '));
+    // Хотя бы одна обязана называть живую запись стенда — иначе это выдуманные примеры.
+    const names = (dd().clients || []).map((c) => c.name.split(' ')[0]);
+    const txt = starters.map((b) => b.textContent + ' ' + b.getAttribute('data-cgask')).join(' ');
+    check('вход · подсказки говорят про реальные данные, а не про абстрактный пример',
+      names.some((n) => txt.indexOf(n) >= 0), txt.slice(0, 140));
+    // И подсказка не должна предлагать то, чего на стенде нет.
+    const overdue = (dd().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
+    if (!overdue.length) {
+      check('вход · про просроченное не предлагается, когда его нет', txt.indexOf('просрочен') < 0, txt.slice(0, 100));
+    } else {
+      check('вход · про просроченное предложено, раз оно есть', txt.indexOf('просрочен') >= 0, txt.slice(0, 100));
+    }
+    // Нажатие должно доходить до Консьержа, а не только рисоваться.
+    if (starters.length) {
+      const errsWas = errors.length;
+      starters[0].dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('вход · нажатие на подсказку ничего не ломает', errors.length === errsWas, errors.slice(errsWas).join('; '));
+      check('вход · и открывает диалог', !!WS.engine.activeThreadId(), String(WS.engine.activeThreadId()));
+    }
+    WS.engine.closeThread();
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

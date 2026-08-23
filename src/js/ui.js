@@ -13,8 +13,11 @@
 
   // v3 first level (by frequency): Пульс · Консьерж · Входящие · Сделки · Клиенты · Объекты · Оценка
   const NAV = [
-    { id: 'start', label: 'Пульс', icon: 'pulse' },
+    // Консьерж стоит первым, потому что он и есть вход: приложение открывается им, а не сводкой.
+    // Порядок пунктов — это заявление о том, чем система является: рабочее место с ИИ сбоку
+    // и ИИ, под которым лежит рабочее место, — разные продукты, и мы делаем второй.
     { id: 'concierge', label: 'Консьерж', icon: 'sparkle' },
+    { id: 'start', label: 'Пульс', icon: 'pulse' },
     // «Входящие», а не «Заявки»: у агента раздел — разбор того, что пришло, и дальше работа идёт
     // в «Сделках» одним путём. Слово «заявка» остаётся руководителю и внутри данных: у агента оно
     // означало то же, что «сделка», и именно на этом разошлись с партнёром.
@@ -933,10 +936,40 @@
     const cnt = document.querySelector('.cg-rail-count');
     if (cnt) cnt.textContent = 'Диалоги · ' + conciergeThreads().length;
   }
+  /* Первый экран агента — Консьерж, и он открывается пустым: приветствие, строка, подсказки.
+     Список диалогов скрыт, как у любой привычной нейросети, и разворачивается кнопкой.
+
+     Возражение к пустому экрану очевидное: систему открывают, чтобы увидеть систему, а строка
+     ввода на белом поле читается как «здесь ничего нет». Отвечают на него подсказки — но не
+     выдуманные, а собранные из ЭТИХ данных: они и снимают пустоту, и с первой секунды
+     показывают, что Консьерж знает рабочее место, а не отвечает вообще. */
+  function conciergeStarters() {
+    const out = [];
+    const overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
+    if (overdue.length) out.push(['clock', 'Что просрочено', 'что просрочено']);
+    // Клиент, которому уже отобрали объекты, — на нём КП собирается одним поручением.
+    const withSel = (D().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'selected'));
+    if (withSel) {
+      const c = (D().clients || []).find((x) => x.id === withSel.clientId);
+      if (c) out.push(['doc', 'Собрать КП по ' + c.name.split(' ')[0], 'собери КП по ' + c.name]);
+    }
+    const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d));
+    if (live.length) out.push(['money', 'Сколько сейчас в работе', 'сколько денег в работе по моим сделкам']);
+    const silent = (D().clients || []).find((c) => !lastTouchOf(c.id));
+    out.push(['users', silent ? 'Кто давно молчит' : 'Кого стоит коснуться', 'кто из клиентов давно не выходил на связь']);
+    return out.slice(0, 4).map((s) =>
+      '<button class="cg-start" data-cgask="' + escAttr(s[2]) + '">' + I(s[0]) + '<span>' + s[1] + '</span></button>').join('');
+  }
   function conciergeHomeMain(st) {
-    return '<div class="cg-main-inner">' +
-      heroViz('concierge', 'Консьерж', 'Опишите задачу — начнётся новый диалог. Голосом или текстом; вся история — слева.') +
-      cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос — начнётся новый диалог…', 'cgSend', 'cg-hero') +
+    const me = (D().users[S().role] || {}).name || '';
+    const hi = 'Чем помочь' + (me ? ', ' + me.split(' ')[0] : '') + '?';
+    const starters = conciergeStarters();
+    return '<div class="cg-main-inner cg-home">' +
+      '<div class="cg-greet"><div class="cg-greet-w">W</div>' +
+      '<h1 class="cg-greet-t">' + hi + '</h1>' +
+      '<p class="cg-greet-m">Напишите задачу словами — «собери КП», «подготовь к звонку», «что просрочено». Консьерж видит ваши сделки, клиентов и объекты, поэтому спрашивать «по какому клиенту» не нужно.</p></div>' +
+      cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос…', 'cgSend', 'cg-hero') +
+      (starters ? '<div class="cg-starters">' + starters + '</div>' : '') +
       conciergeWorkshop(st) +
     '</div>';
   }
