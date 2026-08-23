@@ -5643,6 +5643,104 @@ setTimeout(async () => {
     WS.engine.closeThread();
   }
 
+  // ---- Пульс: разделы по схеме партнёра, числа — из этих данных ----
+  // Проверки написаны после того, как перестройка Пульса снесла строку Консьержа, «Сюжет дня»,
+  // «Инсайты» и очередь дня, а весь набор из 1480 проверок остался зелёным. Раз состав экрана
+  // ничем не удерживался, он и уехал. Дальше держится здесь.
+  {
+    WS.store.navStack = [];
+    if (WS.store.role !== 'agent') WS.storeApi.setRole('agent');
+    WS.store.pulseTab = 'deals';
+    WS.router.go('start');
+    const pulse = doc.querySelector('#app .start') || doc.getElementById('app');
+    const labels = [].slice.call(pulse.querySelectorAll('.section-label')).map((e) => e.textContent.trim());
+    const order = ['Мои цели', 'Мои дела', 'Перспективные сделки', 'Аналитика'];
+    const idx = order.map((t) => labels.findIndex((l) => l.indexOf(t) === 0));
+    check('Пульс · все четыре раздела на экране', idx.every((i) => i >= 0),
+      order.filter((t, i) => idx[i] < 0).join(', ') + ' | есть: ' + labels.join(' / '));
+    check('Пульс · разделы идут в порядке схемы партнёра',
+      idx.every((v, i) => i === 0 || (v > idx[i - 1])), idx.join(','));
+
+    // То, что уже было выверено, перестройка сносить не имеет права.
+    check('Пульс · строка Консьержа осталась первой', !!doc.getElementById('startPrompt'));
+    check('Пульс · вход в «Сюжет дня» не потерян', !!pulse.querySelector('[data-act="presenter"]'));
+    check('Пульс · «Инсайты» на месте', /Инсайты/.test(pulse.textContent));
+    check('Пульс · очередь дня показывает задачи или говорит, что их нет',
+      /Мои дела · сегодня/.test(pulse.textContent));
+    // Разбор просроченных был отдельной плиткой; она уехала во вкладки, и путь к записям
+    // обязан остаться — иначе список просроченных с Пульса больше не открыть.
+    const odN = (dd().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
+    if (odN) {
+      check('Пульс · просроченные открываются с Пульса, а не только считаются',
+        !!pulse.querySelector('[data-analytics="overdue"]'), 'просрочено: ' + odN);
+    }
+    // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
+    check('Пульс · ввод Консьержа один, а не задвоен',
+      pulse.querySelectorAll('.prompt input').length === 1,
+      String(pulse.querySelectorAll('.prompt input').length));
+
+    // Пять тем аналитики — по схеме партнёра.
+    const tabs = [].slice.call(pulse.querySelectorAll('[data-pulsetab]'));
+    check('Пульс · пять тем аналитики', tabs.length === 5, tabs.map((b) => b.textContent.trim()).join(' | '));
+    const want = ['Сделки', 'Заявки', 'Клиенты', 'Партнёры', 'Стоимость'];
+    check('Пульс · темы названы как у партнёра',
+      want.every((w, i) => (tabs[i] || {}).textContent && tabs[i].textContent.indexOf(w) >= 0),
+      tabs.map((b) => b.textContent.trim()).join(' | '));
+
+    // Переключение обязано менять содержимое, а не только подсветку кнопки.
+    // Кнопки перечитываем перед каждым нажатием: после перерисовки прежние узлы уже вне документа,
+    // клик по ним никуда не всплывает и проверка молча «проходит» на старой панели.
+    const clickTab = (key) => {
+      const b = doc.querySelector('#app [data-pulsetab="' + key + '"]');
+      if (b) b.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      return ((doc.querySelector('#app .pulse-panel')) || {}).textContent || '';
+    };
+    const dealsPanel = (pulse.querySelector('.pulse-panel') || {}).textContent || '';
+    const errsWas = errors.length;
+    const clientsPanel = clickTab('clients');
+    check('Пульс · переключение темы меняет содержимое',
+      clientsPanel !== dealsPanel && clientsPanel.indexOf('Клиентов в базе') >= 0,
+      clientsPanel.slice(0, 90));
+    check('Пульс · переключение темы ничего не роняет', errors.length === errsWas, errors.slice(errsWas).join('; '));
+
+    // Числа считаются по стенду. Захардкоженное из макета партнёра здесь падает.
+    const clientsN = (dd().clients || []).length;
+    const investors = (dd().clients || []).filter((c) => c.ctype === 'investor').length;
+    check('Пульс · «клиентов в базе» равно тому, сколько их в данных',
+      clientsPanel.indexOf(String(clientsN)) >= 0 && clientsN > 0, 'в данных: ' + clientsN);
+    check('Пульс · разбивка по типу клиента посчитана, а не взята из макета',
+      clientsPanel.indexOf(String(investors)) >= 0, 'инвесторов в данных: ' + investors);
+
+    // Стоимость лида посчитать НЕ ИЗ ЧЕГО. Экран обязан сказать это словами и не показать числа.
+    const costPanel = clickTab('cost');
+    check('Пульс · стоимость лида названа непосчитанной, а не выдумана',
+      /не посчитан/.test(costPanel), costPanel.slice(0, 120));
+    check('Пульс · сказано, какого входа для этого не хватает',
+      /расход/.test(costPanel), costPanel.slice(0, 160));
+    check('Пульс · и никакой цифры CPL рядом не стоит',
+      !/CPL\s*[:—-]?\s*\d/.test(costPanel) && !/стоимость лида[^.]{0,20}\d/i.test(costPanel),
+      costPanel.slice(0, 160));
+
+    // Перспективные сделки: только живые, порядок — по ожидаемой комиссии.
+    clickTab('deals');
+    const prosp = [].slice.call(doc.querySelectorAll('#app .pulse-prospects .rel-row[data-deal]'));
+    const prospIds = prosp.map((r) => r.getAttribute('data-deal'));
+    const closedIn = prospIds.filter((id) => {
+      const d = (dd().deals || []).find((x) => x.id === id);
+      return d && (WS.ui.dealClosed(d) || d.archived);
+    });
+    check('Пульс · в перспективных нет закрытых и архивных сделок',
+      closedIn.length === 0, closedIn.join(', '));
+    const live = (dd().deals || []).filter((d) => !WS.ui.dealClosed(d) && !d.archived);
+    if (live.length > 1) {
+      const inSec = prospIds.map((id) => (dd().deals || []).find((x) => x.id === id)).filter(Boolean);
+      const comms = inSec.map((d) => WS.ui.dealCommission(d));
+      check('Пульс · перспективные отсортированы по ожидаемой комиссии',
+        comms.every((v, i) => i === 0 || v <= comms[i - 1] + 0.5), comms.join(' > '));
+    }
+    WS.store.pulseTab = 'deals';
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

@@ -471,10 +471,19 @@
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0;display:flex;align-items:center;gap:8px">Инсайты <span class="badge ai-b">' + I('sparkle') + 'собрано AI</span></div>' +
       '<button class="btn sm" data-nav="concierge">' + I('chat') + 'Спросить Консьержа</button></div>' + insightCards();
   }
+  // Качество источника — одна лента для «канонических метрик» руководителя и вкладки «Заявки»
+  // на Пульсе агента. Две копии этой таблицы разошлись бы при первой же правке формулы.
+  function srcQualityList() {
+    const rows = computeMetrics().attribution.map((a) => {
+      const won = (D().deals || []).filter((x) => x.source === a.source).length;
+      const conv = a.leads ? Math.round((won / a.leads) * 100) : 0;
+      return '<button class="src-row" data-analytics="src:' + a.source + '"><span class="sn">' + a.source + '</span><span class="sc">' + conv + '% · ' + won + '/' + a.leads + '</span><span class="scomm">' + WS.AED(a.commission) + '</span></button>';
+    }).join('');
+    return '<div class="src-list">' + rows + '</div>';
+  }
   function canonMetrics() {
     const m = computeMetrics();
     const mtile = (label, val, sub, act) => '<button class="mtile" ' + act + '><div class="ml">' + label + '</div><div class="mv">' + val + '</div><div class="ms">' + sub + '</div></button>';
-    const srcRows = m.attribution.map((a) => { const won = (D().deals || []).filter((x) => x.source === a.source).length; const conv = a.leads ? Math.round((won / a.leads) * 100) : 0; return '<button class="src-row" data-analytics="src:' + a.source + '"><span class="sn">' + a.source + '</span><span class="sc">' + conv + '% · ' + won + '/' + a.leads + '</span><span class="scomm">' + WS.AED(a.commission) + '</span></button>'; }).join('');
     const loss = LOSS_REASONS.map((l) => '<div class="loss-row"><span>' + l.r + '</span><span class="badge">' + l.n + '</span></div>').join('');
     return '<div class="section-label" style="margin-top:24px">Аналитика · канонические метрики <span class="badge demo">' + I('lock') + 'демо</span></div>' +
       '<div class="mtiles">' +
@@ -482,7 +491,7 @@
       mtile('Ожидаемая комиссия', WS.AED(m.expectedComm), 'из активного пайплайна', 'data-analytics="pipeline"') +
       mtile('Закрыто сделок', m.closedCount, m.closedSum ? WS.AED(m.closedSum) : '—', 'data-analytics="closed"') +
       '</div>' +
-      '<div class="section-label" style="margin-top:14px">Качество источника</div><div class="src-list">' + srcRows + '</div>' +
+      '<div class="section-label" style="margin-top:14px">Качество источника</div>' + srcQualityList() +
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">Одинаковый запрос → одинаковые числа. Клик по цифре — до записей. Комиссия платформы не показывается.</div>';
   }
@@ -530,12 +539,143 @@
     return '<div class="section-label" style="margin-top:22px">Рекомендуемые действия <span class="badge acc">' + I('sparkle') + 'Консьерж</span></div>' +
       '<div class="nba-feed">' + rows + '</div>';
   }
+  // ---- Пульс агента: разделы по схеме партнёра ---------------------------------------------
+  // Взято РАСПОЛОЖЕНИЕ СОДЕРЖАНИЯ — цели сверху, «Мои дела», «Перспективные сделки», аналитика
+  // пятью темами. Рисунок остался наш: плитки, ленты и сегменты, которые мы выверяли три волны.
+  // Ни одно число не перенесено из макета — всё считается по данным стенда.
+  function pulseHead(title, right) {
+    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">' + title + '</div>' +
+      (right || '') + '</div>';
+  }
+  // «Перспективная» — не просто дорогая: сортируем по ожидаемой комиссии, то есть по тому, чем
+  // сделка отличается лично для агента, и в строке объясняем, почему она здесь.
+  function pulseProspects() {
+    const mine = (D().users[S().role] || {}).id;
+    const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d) && (!mine || d.agent === mine));
+    const top = live.slice().sort((x, y) => dealCommission(y) - dealCommission(x)).slice(0, 4);
+    const head = pulseHead('Перспективные сделки' + (live.length ? ' · ' + live.length : ''),
+      live.length > top.length ? '<button class="btn sm" data-nav="deals">' + I('arrowRight') + 'Все сделки</button>' : '');
+    if (!top.length) {
+      return head + '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Активных сделок за вами сейчас нет. Как только появится первая, она встанет сюда — с ожидаемой комиссией и ближайшим шагом.</div>';
+    }
+    const rows = top.map((d) => {
+      const c = D().clients.find((x) => x.id === d.clientId) || {};
+      const r = (D().requests || []).find((x) => x.id === d.requestId);
+      const why = [];
+      if (d.hot) why.push('горячая');
+      if (r && (r.offered || []).some((o) => o.state === 'selected')) why.push('объект выбран');
+      if (!dealHasNextStep(d)) why.push('нет следующего шага');
+      const marks = why.map((w) => '<span class="badge' + (w === 'нет следующего шага' ? ' warn' : ' acc') + '">' + w + '</span>').join('');
+      return '<div class="rel-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+        '<div class="fi i-acc">' + I('briefcase') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(d.title) + ' ' + marks + '</div>' +
+        '<div class="m">' + escAttr(c.name || '—') + ' · ' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) +
+        ' · комиссия ' + WS.AED(Math.round(dealCommission(d))) + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('');
+    return head + '<div class="card pulse-prospects" style="padding:4px 16px"><div class="rel-list">' + rows + '</div></div>';
+  }
+  const PULSE_TABS = [
+    ['deals', 'Сделки', 'briefcase'],
+    ['requests', 'Заявки', 'mail'],
+    ['clients', 'Клиенты', 'users'],
+    ['partners', 'Партнёры', 'handshake'],
+    ['cost', 'Стоимость', 'money'],
+  ];
+  function pulseTabDeals() {
+    const all = D().deals || [];
+    const live = all.filter((d) => !dealClosed(d) && !dealArchived(d));
+    const won = all.filter(dealWon);
+    const lost = all.filter((d) => d.stage === 'lost');
+    const a = D().analytics;
+    const pipeline = Math.round(live.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
+    const spark = a.sparks.map((v, i) => '<i class="' + (i === a.sparks.length - 1 ? 'on' : '') + '" style="height:' + (30 + v * 4) + '%"></i>').join('');
+    return '<div class="tiles dash">' +
+      tile('briefcase', 'Сделки в работе', live.length, '', 'span 4', 'по всем воронкам', '', 'accent', 'data-analytics="pipeline"') +
+      tile('check', 'Закрыто успешно', won.length, '', 'span 4', won.length ? WS.AED(won.reduce((s, d) => s + (d.amount || 0), 0)) : '—', '', '', 'data-analytics="closed"') +
+      tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причины — в аналитике отдела', '', '', 'data-nav="analytics"') +
+      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'от заявки до закрытия', '', '', 'data-nav="analytics"') +
+      tile('money', 'Ожидаемая комиссия', WS.AED(computeMetrics().expectedComm), '', 'span 6', 'из активного пайплайна', '', '', 'data-analytics="pipeline"') +
+      '<button class="tile wide" data-analytics="pipeline"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
+        '<div class="val">' + pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
+        '<div class="spark">' + spark + '</div>' +
+        '<div class="sub">Тренд новых сделок · 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
+      '</div>';
+  }
+  function pulseTabRequests() {
+    const m = computeMetrics();
+    const a = D().analytics;
+    const open = (D().requests || []).filter((r) => !(r.offered || []).some((o) => o.state === 'selected'));
+    return '<div class="tiles dash">' +
+      tile('mail', 'Заявок в работе', open.length, '', 'span 4', 'из ' + (D().requests || []).length + ' всего', '', 'accent', 'data-nav="requests"') +
+      tile('target', 'Конверсия заявка → сделка', m.conv, '%', 'span 4', m.won + ' из ' + m.leads + ' лидов', '', '', 'data-analytics="conv"') +
+      tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'ждут вашего шага сегодня', '', '', 'data-analytics="hot"') +
+      '<button class="tile wide" data-nav="leads"><div class="th">' + I('target') + 'Отработка лидов</div>' +
+        '<div class="val">' + Math.round(a.coverage * 100) + '<span class="u">%</span></div>' +
+        '<div class="meter"><i style="width:' + (a.coverage * 100) + '%"></i></div>' +
+        '<div class="sub">Связались за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + ' лидов</div></button>' +
+      '</div>' +
+      '<div class="section-label" style="margin-top:16px">Качество источника</div>' + srcQualityList();
+  }
+  function pulseTabClients() {
+    const cl = D().clients || [];
+    const byType = (t) => cl.filter((c) => c.ctype === t).length;
+    const silent = cl.filter((c) => !lastTouchOf(c.id)).length;
+    return '<div class="tiles dash">' +
+      tile('users', 'Клиентов в базе', cl.length, '', 'span 4', 'закреплены за вами', '', 'accent', 'data-nav="contacts"') +
+      tile('trend', 'Инвесторы', byType('investor'), '', 'span 4', 'покупают ради доходности', '', '', 'data-nav="contacts"') +
+      tile('home', 'Для себя', byType('enduser'), '', 'span 4', 'покупают для проживания', '', '', 'data-nav="contacts"') +
+      tile('building', 'Собственники', byType('owner'), '', 'span 6', 'сдают или продают свой объект', '', '', 'data-nav="contacts"') +
+      tile('clock', 'Без единого касания', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="contacts"') +
+      '</div>';
+  }
+  function pulseTabPartners() {
+    const mutual = NET_AGENTS.filter((x) => x.mutual);
+    const co = (D().deals || []).filter((d) => d.partnerAgent);
+    const coComm = Math.round(co.reduce((s, d) => s + dealCommission(d), 0));
+    return '<div class="tiles dash">' +
+      tile('handshake', 'Взаимные партнёры', mutual.length, '', 'span 4', 'из ' + NET_AGENTS.length + ' контрагентов в сети', '', 'accent', 'data-nav="network"') +
+      tile('briefcase', 'Сделки в со-брокеридже', co.length, '', 'span 4', co.length ? 'делим комиссию с партнёром' : 'пока ни одной', '', '', 'data-nav="deals"') +
+      tile('money', 'Комиссия по клубным сделкам', WS.AED(coComm), '', 'span 4', 'до раздела с партнёром', '', '', 'data-analytics="pipeline"') +
+      '</div>' +
+      '<div class="card" style="padding:14px 16px;margin-top:14px;font-size:12.5px;color:var(--mut)">' +
+      'Раздел комиссии с партнёром в демо не считается: сплит согласуется в переписке по каждой сделке отдельно, единого поля под него ещё нет.' +
+      '</div>';
+  }
+  function pulseTabCost() {
+    const m = computeMetrics();
+    const commPerLead = m.leads ? Math.round((D().attribution || []).reduce((s, x) => s + (x.commission || 0), 0) / m.leads) : 0;
+    // Стоимость лида и стоимость привлечения посчитать НЕ ИЗ ЧЕГО: расходы на каналы в систему
+    // не приходят. Правдоподобная цифра здесь была бы выдумкой, поэтому её нет — вместо неё
+    // сказано, какого входа не хватает.
+    return '<div class="tiles dash">' +
+      tile('money', 'Комиссия на лид', WS.AED(commPerLead), '', 'span 6', 'из ' + m.leads + ' лидов по всем источникам', '', 'accent', 'data-analytics="conv"') +
+      tile('trend', 'Ожидаемая комиссия', WS.AED(m.expectedComm), '', 'span 6', 'из активного пайплайна', '', '', 'data-analytics="pipeline"') +
+      '</div>' +
+      '<div class="card" style="padding:16px;margin-top:14px">' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:6px">Стоимость лида и стоимость сделки не посчитаны</div>' +
+      '<div style="font-size:12.5px;color:var(--mut);max-width:64ch;line-height:1.55">Система видит, что лид пришёл из Property Finder или из клуба, но не видит, сколько за этот канал заплачено. ' +
+      'Чтобы появились CPL и стоимость привлечения, нужен один вход — расходы по каждому источнику за период. ' +
+      'Пока его нет, здесь показана только выручка на лид: подставлять правдоподобную цифру расходов было бы обманом.</div>' +
+      '</div>';
+  }
+  function pulseAnalytics() {
+    const tab = S().pulseTab || 'deals';
+    const btns = PULSE_TABS.map((t) => '<button class="seg-b' + (t[0] === tab ? ' on' : '') + '" data-pulsetab="' + t[0] + '">' +
+      I(t[2]) + '<span>' + t[1] + '</span></button>').join('');
+    let body = '';
+    if (tab === 'requests') body = pulseTabRequests();
+    else if (tab === 'clients') body = pulseTabClients();
+    else if (tab === 'partners') body = pulseTabPartners();
+    else if (tab === 'cost') body = pulseTabCost();
+    else body = pulseTabDeals();
+    return pulseHead('Аналитика') +
+      '<div class="pulse-tabs"><div class="seg">' + btns + '</div></div>' +
+      '<div class="pulse-panel">' + body + '</div>';
+  }
+
   function viewStart() {
     const st = S();
     const a = D().analytics;
-    const _active = (D().deals || []).filter((x) => !dealClosed(x));
-    const _dealsActive = _active.length;
-    const _pipeline = Math.round(_active.reduce((s2, x) => s2 + (x.amount || 0), 0) / 1e5) / 10;
     const hour = WS.fixtures.DEMO_NOW.h;
     const greet = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
     const isMgr = st.role === 'manager';
@@ -560,48 +700,13 @@
       '</div>';
     }
 
-    const spark = a.sparks.map((v, i) => '<i class="' + (i === a.sparks.length - 1 ? 'on' : '') + '" style="height:' + (30 + v * 4) + '%"></i>').join('');
-
-    const _overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
-    // KPI values (conversion, mean cycle, commission/lead) render as tiles inside the one dashboard block.
-    const _km = computeMetrics();
-    const _kCommPerLead = _km.leads ? Math.round((D().attribution || []).reduce((s2, x) => s2 + (x.commission || 0), 0) / _km.leads) : 0;
-    const _kCycle = (D().analytics || {}).avgCycleDays || 0;
-    const tiles = '' +
-      tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'Ждут вашего шага сегодня', '', 'accent', 'data-nav="clients"') +
-      tile('warn', 'Просроченные задачи', _overdue, '', 'span 4', 'Пора связаться с клиентом', '', '', 'data-analytics="overdue"') +
-      tile('briefcase', 'Сделки в работе', _dealsActive, '', 'span 4', '+1 за сегодня', 'up', '', 'data-nav="clients"') +
-      tile('target', 'Конверсия заявка → сделка', _km.conv, '%', 'span 4', _km.won + ' из ' + _km.leads + ' лидов', '', '', 'data-analytics="conv"') +
-      tile('clock', 'Средний цикл сделки', _kCycle, ' дн.', 'span 4', 'от заявки до закрытия', '', '', 'data-nav="analytics"') +
-      tile('money', 'Комиссия на лид', WS.AED(_kCommPerLead), '', 'span 4', 'из ' + _km.leads + ' лидов', '', '', 'data-analytics="pipeline"') +
-      '<button class="tile wide" data-nav="clients"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
-        '<div class="val">' + _pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
-        '<div class="spark">' + spark + '</div>' +
-        '<div class="sub">Тренд новых сделок · 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
-      '<button class="tile wide" data-nav="clients"><div class="th">' + I('target') + 'Отработка лидов</div>' +
-        '<div class="val">' + Math.round(a.coverage * 100) + '<span class="u">%</span></div>' +
-        '<div class="meter"><i style="width:' + (a.coverage * 100) + '%"></i></div>' +
-        '<div class="sub">Связались за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + ' лидов</div></button>';
-
-    // merged work queue (was a separate "Радар" tab) — role-aware
-    const eyebrow = isMgr
-      ? 'Обзор команды · штат AI-агентов на смене'
-      : 'Консьерж на связи · штат AI-агентов готов';
     const headline = greet + ', ' + firstName + '. ' + ((a.hotClients + a.kpPending) > 0
       ? 'С чего начнём?'
       : 'Срочных дел нет — хороший момент заняться базой.');
 
-    let queueBlock;
-    if (isMgr) {
-      queueBlock = '<div style="margin-top:28px" class="section-label">' + h('Команда и исключения') + '</div>' + workQueueManager();
-    } else {
-      queueBlock = pulseMyDay();
-    }
-    // Разбираемый список сделок без следующего шага. У руководителя — по всей команде,
-    // с ответственным в строке. Пустой список блок не рисует.
-    queueBlock += pulseNoNextStep();
-
-    // Пульс (rev.3): первая строка — ввод Консьержа, затем приветствие, событие дня, очередь, аналитика.
+    // Пульс (rev.4): порядок разделов по схеме партнёра — цели, «Мои дела», перспективные сделки,
+    // аналитика пятью темами. Кнопка «Работать через AI-консьержа» из его схемы не повторена:
+    // строка Консьержа уже стоит первой на экране, вторая была бы тем же самым дважды.
     const eventsPlayed = (S().eventsPlayed || []).length;
     const dayHint = '<button class="day-hint" data-act="presenter">' +
       '<div class="dh-ic">' + I('play') + '</div>' +
@@ -612,13 +717,13 @@
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
-      // Metrics first: the tiles + KPI plashki read as one grouped zone at the top;
-      // "Мой день" (today/overdue tasks) sits at the very bottom, where it was.
       pulseMyGoals() +
-      '<div class="tiles dash" style="margin-top:20px">' + tiles + '</div>' +
-      insightsBlock() + (isMgr ? canonMetrics() : '') +
+      // Мои дела: задачи на сегодня и просроченные + сделки, у которых не назначен следующий шаг.
+      pulseMyDay() + pulseNoNextStep() +
+      pulseProspects() +
+      pulseAnalytics() +
       dayHint +
-      queueBlock +
+      insightsBlock() +
     '</div>';
   }
 
@@ -7085,7 +7190,7 @@
       : '';
     return rows + doneBlock;
   }
-  // Пульс разгружен: вместо полной очереди — только «Мой день» (сегодня/просрочено) + вход на экран «Задачи».
+  // Пульс разгружен: вместо полной очереди — только «Мои дела» (сегодня/просрочено) + вход на экран «Задачи».
   /* ---- Сделки без следующего шага (§3.3 решений) ----
      Требование партнёра «сделок без запланированных событий быть не должно» превращается
      не в предупреждение, а в РАЗБИРАЕМЫЙ СПИСОК: предупреждение без списка бесполезно —
@@ -7122,8 +7227,10 @@
     const today = open.filter((t) => t.when === 'today');
     const top = overdue.concat(today).slice(0, 3).map(taskRow).join('') ||
       '<div class="empty" style="padding:16px">' + I('checkCircle') + '<div style="font-weight:700;color:var(--ink)">На сегодня всё разобрано</div></div>';
-    const od = overdue.length ? ' · <span style="color:var(--stop);font-weight:700">просрочено ' + overdue.length + '</span>' : '';
-    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Мой день · сегодня ' + today.length + od + '</div>' +
+    // «Просрочено» открывает сами записи: отдельная плитка с этим разбором ушла во вкладки аналитики,
+    // и без этой ссылки список просроченных стал бы недостижим с Пульса.
+    const od = overdue.length ? ' · <button class="lnk-stop" data-analytics="overdue">просрочено ' + overdue.length + '</button>' : '';
+    return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">Мои дела · сегодня ' + today.length + od + '</div>' +
       '<button class="btn sm" data-nav="tasks">' + I('arrowRight') + 'Все задачи</button></div>' + top;
   }
 
@@ -7164,7 +7271,7 @@
     const rows = list.map(taskRow).join('') || ('<div class="empty" style="padding:32px 20px">' + I('checkCircle') +
       '<div style="font-weight:700;color:var(--ink);margin-bottom:2px">' + (all.length ? 'Под фильтры задач нет' : 'Все задачи разобраны') + '</div>' +
       '<div>' + (all.length ? 'Измените статус или срок выше, чтобы увидеть остальные.' : 'Новые появятся из сделок и рекомендаций Консьержа.') + '</div></div>');
-    return head('Задачи', 'Все задачи по сделкам и клиентам: бэклог, сроки, приоритет. «Мой день» (сегодня/просрочено) остаётся в Пульсе — здесь полный список с фильтрами. Инсайты — автоматически сгенерированные Консьержем группы задач из рекомендательной системы.',
+    return head('Задачи', 'Все задачи по сделкам и клиентам: бэклог, сроки, приоритет. «Мои дела» (сегодня/просрочено) остаются в Пульсе — здесь полный список с фильтрами. Инсайты — автоматически сгенерированные Консьержем группы задач из рекомендательной системы.',
       '<button class="btn sm primary" data-act="newTask">' + I('plus') + 'Новая задача</button>') +
       tasksInsights() +
       (isMgr ? tasksHeatmap() : '') +
@@ -9111,7 +9218,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, pulseProspects, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

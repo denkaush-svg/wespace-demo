@@ -30,7 +30,7 @@
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', pulseTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.

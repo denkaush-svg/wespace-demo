@@ -115,6 +115,14 @@ button { font-family: inherit; cursor: pointer; }
 .seg button svg { width: 15px; height: 15px; }
 .seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
 
+/* Пульс · аналитика: пять тем в одном сегменте. На узком экране сегмент не переносится
+   и не сжимается — он уезжает в собственную прокрутку, страница вбок не едет. */
+.pulse-tabs { margin-top: 12px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.pulse-tabs .seg { flex: none; }
+.pulse-tabs .seg-b { white-space: nowrap; }
+.pulse-panel { margin-top: 14px; }
+.lnk-stop { border: 0; background: none; padding: 0; font: inherit; color: var(--stop); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+
 /* status / meta badges (icon + label, never color-only) */
 .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--surface-2); color: var(--mut); line-height: 1.4; white-space: nowrap; }
 .badge svg { width: 13px; height: 13px; }
