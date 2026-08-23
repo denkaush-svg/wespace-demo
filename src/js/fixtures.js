@@ -610,6 +610,18 @@
   const REQ_SIDE = { 'покупатель': 'buyer', 'арендатор': 'buyer', 'собственник': 'owner', 'партнёр': 'partner' };
 
   // ============================================================================================
+  // ВХОДЯЩЕЕ ОБРАЩЕНИЕ — четыре стадии разбора входящих обращений (inbox items).
+  // Отсеки канбана для распределения: новое → не вышли → квалифицирована → отказ.
+  // ============================================================================================
+  const INBOX_STAGES = ['new', 'unreached', 'qualified', 'rejected'];
+  const INBOX_STAGE_LABELS = {
+    new: 'Новое обращение',
+    unreached: 'Не вышли на связь',
+    qualified: 'Квалифицирована',
+    rejected: 'Отказ',
+  };
+
+  // ============================================================================================
   // СДЕЛКА — шаги не выбираются, а следуют из вида договора, которым сделка заканчивается.
   // Один список с необязательными шагами вместо шести списков: агент выбирает объекты и услугу,
   // остальное выводится. `book` появляется только у оффплана, `reg` — там, где есть регистрация,
@@ -959,6 +971,7 @@
     // Область задачи: сделка → заявка → контакт, первое непустое. Касание относится к человеку,
     // а не к сделке, поэтому у него области нет — и это законно, а не пропуск.
     { id: 't_anna_touch', clientId: 'c_anna', title: 'Следующее касание — Анна Петрова', due: 'сегодня', when: 'today', kind: 'touch' },
+    { id: 't_anna_call', clientId: 'c_anna', dealId: 'd_anna', title: 'Позвонить Анне — уточнить дату подписания', due: 'сегодня', when: 'today', kind: 'call' },
     { id: 't_igor_kp', clientId: 'c_overdue', requestId: 'r_igor', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
     { id: 't_viktor_doc', clientId: 'c_docs', dealId: 'd_viktor', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
   ];
@@ -977,12 +990,13 @@
   // Night inbox (S14) + overdue signals for the start screen feed.
   // Exception inbox (R6) — «Разобрать» becomes an exception queue. ex = exception type
   // (qualify / duplicate / noconsent / unknown_object / delivery_fail).
+  // stage: inbox item status in the board — new / unreached / qualified / rejected
   const inbox = [
-    { id: 'in_night', clientId: 'c_night', channel: 'whatsapp', at: '02:14', text: 'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?', kind: 'night', ex: 'qualify' },
-    { id: 'in_anna_vn', clientId: 'c_anna', channel: 'whatsapp', at: '09:05', text: 'Голосовое сообщение · 0:24', kind: 'voice', scenario: 'G1', ex: 'qualify' },
-    { id: 'in_dup', clientId: null, channel: 'email', at: '08:30', text: 'Новый запрос от «M. Ibragimov» — похоже на существующий контакт Марат Ибрагимов.', kind: 'exception', ex: 'duplicate' },
-    { id: 'in_unknownobj', clientId: null, channel: 'whatsapp', at: '09:02', text: 'Спрашивают по объекту, которого нет в инвентаре («Marina Vista, 32 этаж»).', kind: 'exception', ex: 'unknown_object' },
-    { id: 'in_faildeliver', clientId: 'c_overdue', channel: 'email', at: '09:08', text: 'КП Игорю Лебедеву не доставлено — адрес отклонил письмо (bounce).', kind: 'exception', ex: 'delivery_fail' },
+    { id: 'in_night', clientId: 'c_night', channel: 'whatsapp', at: '02:14', text: 'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?', kind: 'night', ex: 'qualify', stage: 'unreached' },
+    { id: 'in_anna_vn', clientId: 'c_anna', channel: 'whatsapp', at: '09:05', text: 'Голосовое сообщение · 0:24', kind: 'voice', scenario: 'G1', ex: 'qualify', stage: 'new' },
+    { id: 'in_dup', clientId: null, channel: 'email', at: '08:30', text: 'Новый запрос от «M. Ibragimov» — похоже на существующий контакт Марат Ибрагимов.', kind: 'exception', ex: 'duplicate', stage: 'new' },
+    { id: 'in_unknownobj', clientId: null, channel: 'whatsapp', at: '09:02', text: 'Спрашивают по объекту, которого нет в инвентаре («Marina Vista, 32 этаж»).', kind: 'exception', ex: 'unknown_object', stage: 'new' },
+    { id: 'in_faildeliver', clientId: 'c_overdue', channel: 'email', at: '09:08', text: 'КП Игорю Лебедеву не доставлено — адрес отклонил письмо (bounce).', kind: 'exception', ex: 'delivery_fail', stage: 'rejected' },
   ];
 
   // Analytics for the start screen tiles.
@@ -1170,7 +1184,7 @@
     version: 1, settings, outcomes,
     DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
     deals, requests, tasks, events, inbox, analytics,
-    FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, DEAL_STEPS, REG_LABELS, contractKindFor,
+    FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, INBOX_STAGES, INBOX_STAGE_LABELS, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
 })(window.WS = window.WS || {});

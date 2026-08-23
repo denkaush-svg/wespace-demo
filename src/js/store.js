@@ -91,6 +91,8 @@
   WS.REQ_STAGES = WS.fixtures.REQ_STAGES;
   WS.REQ_STAGE_LABELS = WS.fixtures.REQ_STAGE_LABELS;
   WS.REQ_SIDE = WS.fixtures.REQ_SIDE;
+  WS.INBOX_STAGES = WS.fixtures.INBOX_STAGES;
+  WS.INBOX_STAGE_LABELS = WS.fixtures.INBOX_STAGE_LABELS;
   WS.DEAL_STEPS = WS.fixtures.DEAL_STEPS;
   WS.REG_LABELS = WS.fixtures.REG_LABELS;
   WS.contractKindFor = WS.fixtures.contractKindFor;

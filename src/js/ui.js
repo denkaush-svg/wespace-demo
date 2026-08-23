@@ -1509,6 +1509,7 @@
   const STAGE_LABELS = (WS.fixtures && WS.fixtures.STAGE_LABELS) || {};
   const STAGES = Object.keys(STAGE_LABELS).map((k) => ({ k: k, label: STAGE_LABELS[k] }));
   function stageLabel(k) { return STAGE_LABELS[k] || k; }
+  function inboxStageLabel(k) { return (WS.INBOX_STAGE_LABELS || {})[k] || k; }
   function funnelOf(d) {
     return (WS.FUNNELS || []).find((x) => x.k === (d && d.funnel)) || (WS.FUNNELS || [])[0] || { k: '', label: '', stages: [] };
   }
@@ -1629,11 +1630,24 @@
     const move = '<div class="dmove">' +
       '<button class="kmv" data-dealmove="' + d.id + '" data-dir="prev" title="Назад по стадии"' + (canPrev ? '' : ' disabled') + '>' + I('chevLeft') + '</button>' +
       '<button class="kmv" data-dealmove="' + d.id + '" data-dir="next" title="Вперёд по стадии"' + (canNext ? '' : ' disabled') + '>' + I('chevRight') + '</button></div>';
+    // Ближайшая задача со сроком — то единственное, что отвечает на вопрос «трогать ли эту
+    // карточку сегодня». Просроченная выше сегодняшней: этим и занимается nextTaskOfDeal.
+    // Сделке без открытой задачи строка не рисуется вовсе — пустая строка или прочерк сообщали бы,
+    // что задача есть, просто её не видно.
+    const nt = nextTaskOfDeal(d);
+    const taskRow = nt ? '<div class="dtask"><span class="dtask-t' + (nt.when === 'overdue' ? ' over' : '') + '" title="' + escAttr(nt.title) + '">' + nt.title + '</span>' +
+      '<span class="dtask-when">' + nt.due + '</span></div>' : '';
+    // Звонок — отдельно от задачи: он нужен и у сделки, где задачи нет, а звонить всё равно надо.
+    // Номер на доске не печатается: её показывают на встречах и снимают скриншотами, а это
+    // персональные данные (PDPL в ОАЭ, 152-ФЗ в России). Кнопка набирает, номер не светит.
+    const callBtn = c.id ? '<button class="kmv kcall" data-act="callClient" data-cid="' + c.id + '" title="Позвонить клиенту">' + I('phone') + '</button>' : '';
     return '<div class="deal' + (dealHot(d) ? ' hot' : '') + '" data-deal="' + d.id + '">' +
       '<div class="deal-thumb" style="background-image:url(' + dealPhoto(d) + ')">' + (dealHot(d) ? dealFireBadge() : '') + '</div>' +
       '<div class="deal-body"><div class="dt">' + (c.name || d.title) + '</div>' +
       '<div class="dm">' + (o ? o.name.split(',')[0] : d.sub) + ' · ' + WS.AED(d.amount || 0) + '</div>' +
-      '<div class="dfoot"><div class="dtag"><span class="badge acc">' + stageLabel(d.stage) + '</span>' + tags + consent + agent + '</div>' + move + '</div></div></div>';
+      taskRow +
+      '<div class="dfoot"><div class="dtag"><span class="badge acc">' + stageLabel(d.stage) + '</span>' + tags + consent + agent + '</div>' +
+      '<div class="dmove">' + callBtn + move.replace('<div class="dmove">', '').replace('</div>', '') + '</div></div></div></div>';
   }
   // Table view of deals (item 3): sortable-feeling list with object photo + client + amount (+agent for manager)
   // Ближайшая задача сделки — открытая, самая срочная. Просроченная идёт впереди сегодняшней:
@@ -6452,7 +6466,7 @@
       : a.open.request ? '<button class="btn sm" data-request="' + a.open.request + '">' + I('eye') + 'Запрос</button>'
       : a.open.client ? '<button class="btn sm" data-client="' + a.open.client + '">' + I('eye') + 'К записи</button>'
       : '<button class="btn sm" data-nav="' + (a.open.nav || 'concierge') + '">' + I('arrowRight') + 'Открыть</button>';
-    return '<div class="radar-row" data-actrow="' + a.id + '"><div class="sev"></div><div class="icon-tile ' + tone + '">' + I(ic) + '</div>' +
+    return '<div class="radar-row"><div class="sev"></div><div class="icon-tile ' + tone + '">' + I(ic) + '</div>' +
       '<div class="rt"><div class="t">' + a.title + ' <span class="badge">' + a.type + '</span> <span class="badge">' + dirLabel + '</span></div>' +
       '<div class="why">' + a.when + ' · ' + a.sub + '</div></div><div class="ra">' + openBtn + '</div></div>';
   }
@@ -7596,7 +7610,7 @@
         const stCls = status === 'done' ? 'ok' : status === 'prog' ? 'warn' : '';
         const active = (st.tour.active && st.tour.scenarioId === s.id) ? ' active' : '';
         const betaTag = s.beta ? '<span class="badge beta">' + I('flame') + 'beta</span>' : '';
-        body += '<div class="scn' + active + '" data-scnrow="' + s.id + '">' +
+        body += '<div class="scn' + active + '">' +
           '<div class="sh"><span class="code">' + s.code + '</span>' + betaTag +
           '<span class="st"><span class="badge ' + stCls + '"><span class="scn-status ' + status + '"></span>' + stLabel + '</span></span></div>' +
           '<div class="name">' + s.title + '</div><div class="val">' + s.value + '</div>' +
@@ -7712,6 +7726,61 @@
       '<div class="match" style="margin-top:12px">' + I('sparkle') + '<span>Баланс после пополнения обновится в кошельке. Бонусы клуба начисляются автоматически.</span></div>',
       '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="walletTopupSend">' + I('check') + 'Пополнить</button>');
   }
+  // Доска входящих по четырём стадиям разбора. Карточка обязана нести то же действие, что несла
+  // строка списка: «Разобрать» — это единственное, ради чего раздел открывают, и доска без него
+  // была бы витриной. Стрелки двигают обращение по стадиям так же, как на доске сделок.
+  const INBOX_EX_LABEL = {
+    qualify: ['Квалифицировать', 'warn'], duplicate: ['Возможный дубль', 'warn'],
+    unknown_object: ['Объект вне инвентаря', 'warn'], delivery_fail: ['Ошибка доставки', 'stop'],
+    noconsent: ['Нет согласия', 'warn'],
+  };
+  function inboxTriageBtn(it) {
+    const scn = it.scenario || (it.ex === 'qualify' ? 'S15' : null);
+    return scn ? '<button class="btn xs" data-scn="' + scn + '">' + I('play') + 'Разобрать</button>'
+      : '<button class="btn xs" data-nav="concierge">' + I('sparkle') + 'Разобрать</button>';
+  }
+  function inboxKanban() {
+    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
+    const stages = WS.INBOX_STAGES || [];
+    const inboxCard = (it) => {
+      const c = (D().clients || []).find((x) => x.id === it.clientId);
+      const who = c ? c.name : 'Новый контакт';
+      const ex = INBOX_EX_LABEL[it.ex] || ['Входящее', ''];
+      const si = stages.indexOf(it.stage || 'new');
+      // Обращение не режется в JS: обрезанная строка врёт о том, что написал клиент.
+      // Ограничение по высоте держит CSS, а полный текст остаётся в подсказке.
+      const move = '<div class="dmove">' +
+        '<button class="kmv" data-instage="' + it.id + '~prev" title="Назад по стадии"' + (si > 0 ? '' : ' disabled') + '>' + I('chevLeft') + '</button>' +
+        '<button class="kmv" data-instage="' + it.id + '~next" title="Вперёд по стадии"' + (si >= 0 && si < stages.length - 1 ? '' : ' disabled') + '>' + I('chevRight') + '</button></div>';
+      return '<div class="deal">' +
+        '<div class="deal-body"><div class="dt">' + who + '</div>' +
+        '<div class="dm" style="font-size:11px">' + I(chanI[it.channel] || 'chat') + ' ' + it.at + '</div>' +
+        '<div class="dm in-txt" title="' + escAttr(it.text) + '">' + it.text + '</div>' +
+        '<div class="dfoot"><div class="dtag"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span></div>' + move + '</div>' +
+        '<div class="in-act">' + inboxTriageBtn(it) + '</div></div></div>';
+    };
+    const cols = (WS.INBOX_STAGES || []).map((stage) => {
+      const items = (D().inbox || []).filter((it) => (it.stage || 'new') === stage);
+      let cards = items.map(inboxCard).join('');
+      if (!cards) cards = '<div style="font-size:12px;color:var(--faint);padding:8px 6px">пусто</div>';
+      return '<div class="kcol"><div class="kh"><span>' + inboxStageLabel(stage) + '</span><span class="c">' + items.length + '</span></div>' +
+        cards + '</div>';
+    }).join('');
+    return '<div class="kanban">' + cols + '</div>';
+  }
+  // Сдвиг обращения по стадиям разбора. Крайние положения не «заворачиваются»: из «Отказа»
+  // вперёд идти некуда, и стрелка там выключена, а не молча ничего не делает.
+  function moveInboxStage(id, dir) {
+    const it = (D().inbox || []).find((x) => x.id === id); if (!it) return;
+    const stages = WS.INBOX_STAGES || [];
+    const i = stages.indexOf(it.stage || 'new');
+    const next = i + (dir === 'prev' ? -1 : 1);
+    if (i < 0 || next < 0 || next >= stages.length) return;
+    it.stage = stages[next];
+    WS.storeApi.touch();
+    WS.storeApi.toast('Обращение · ' + inboxStageLabel(it.stage), 'ok');
+  }
+
   // ---------------- "ЕЩЁ" SECTIONS (v3 framework) ----------------
   // Заявки — incoming requests from all channels (night leads, voice, exceptions).
   function viewRequests() {
@@ -7738,10 +7807,12 @@
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">запросов в разборе нет</div>';
     // Раздел сжат до разбора входящего: подбор, показы и переговоры переехали в «Сделки» одним
     // сквозным путём. Оставаться здесь запросу незачем — как только критерии сняты, работа идёт там.
+    const inboxSection = boardFits() ? inboxKanban() :
+      ('<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Новые · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>');
     return head('Входящие', 'Что пришло и ещё не разобрано, и что разобрано, но работа по объектам ещё не началась. «Разобрать» запускает Консьержа. Как только критерии сняты и подбор пошёл — запрос виден в «Сделках», одним путём до подписания.',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Запрос голосом (G1)</button>') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Разобрано, ждут подбора · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
-      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Новые · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>';
+      inboxSection;
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   // Компании — legal entities (developers, funds, corporates, agencies). The list, its search and
@@ -8882,7 +8953,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

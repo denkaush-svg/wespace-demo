@@ -606,6 +606,10 @@ button { font-family: inherit; cursor: pointer; }
 .deal:hover { border-color: var(--acc-line); transform: translateY(-1px); box-shadow: var(--shadow); }
 .deal .dt { font-weight: 650; color: var(--ink); font-size: 13px; }
 .deal .dm { font-size: 12px; color: var(--mut); margin-top: 3px; }
+.deal .dtask { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
+.deal .dtask-t { color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deal .dtask-t.over { color: var(--stop); font-weight: 550; }
+.deal .dtask-when { color: var(--mut); flex: none; font-size: 11px; white-space: nowrap; }
 .deal .dtag { display: flex; gap: 6px; flex-wrap: wrap; }
 .deal .dfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; }
 .deal .dmove { display: flex; gap: 4px; flex-shrink: 0; }
@@ -2190,3 +2194,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   font: inherit; font-size: 13px; color: var(--ink); padding: 0; }
 .dx-cbar .ph-in::placeholder { color: var(--faint); }
 .dx-cbar button.send { border: 0; cursor: pointer; }
+
+/* Карточка обращения на доске входящих: текст не режется в JS, высоту держит CSS,
+   полный текст — в подсказке. Действие «Разобрать» стоит на карточке, потому что доска
+   без него была бы витриной: разбор и есть то, ради чего раздел открывают. */
+.deal .in-txt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.35; }
+.deal .in-act { margin-top: 8px; }
+.deal .in-act .btn { width: 100%; justify-content: center; }
+/* Кнопка звонка на карточке доски: набирает, номер не печатает. */
+.deal .kcall { color: var(--acc); }

@@ -5219,6 +5219,210 @@ setTimeout(async () => {
     WS.ui.dealCard('d_anna');
   }
 
+  // ---- Gap A: board mini-card must show next task + call button ----
+  {
+    const d = data.deals.find((x) => x.id === 'd_anna');
+    if (d) {
+      const tasks = data.tasks.filter((t) => t.dealId === d.id && t.status !== 'done');
+      check('gap-a · deal d_anna has open tasks', tasks.length > 0, 'tasks=' + tasks.length);
+      check('gap-a · deal has call button attributes in code',
+        /data-act="callClient"/.test(read('js/ui.js')), 'attribute not found in ui.js');
+      // Check CSS for task row styling
+      const cssSrc = read('css/app.css');
+      check('gap-a · CSS has dtask class for task row',
+        /\.deal \.dtask/.test(cssSrc), 'dtask style not found');
+      check('gap-a · CSS has dtask-t for task title truncation',
+        /\.dtask-t.*overflow:\s*hidden/.test(cssSrc) || /\.dtask-t.*text-overflow/.test(cssSrc),
+        'truncation styles not found');
+      // Check inbox stages exposed
+      check('gap-b · INBOX_STAGES exists in WS',
+        WS.INBOX_STAGES && WS.INBOX_STAGES.length > 0, 'not exposed');
+      check('gap-b · INBOX_STAGE_LABELS exists in WS',
+        WS.INBOX_STAGE_LABELS && Object.keys(WS.INBOX_STAGE_LABELS).length > 0, 'not exposed');
+    } else { check('gap-a · deal d_anna exists', false); }
+  }
+
+  // ---- Gap B: inbox items have stage field ----
+  {
+    const inbox = data.inbox || [];
+    check('gap-b · inbox items exist', inbox.length > 0, 'count=' + inbox.length);
+    const haveStage = inbox.filter((i) => i.stage !== undefined);
+    check('gap-b · all inbox items have stage field', haveStage.length === inbox.length,
+      'have stage: ' + haveStage.length + ' / ' + inbox.length);
+    const validStages = (WS.INBOX_STAGES || []);
+    check('gap-b · INBOX_STAGES vocabulary exists', validStages.length > 0, 'stages=' + validStages.join(','));
+    const unreachedItems = inbox.filter((i) => i.stage === 'unreached');
+    check('gap-b · at least one inbox item is in «unreached» stage', unreachedItems.length > 0,
+      'unreached items: ' + unreachedItems.length);
+  }
+
+  // ---- Gap C: inbox kanban board with four columns ----
+  {
+    const cssSrc = read('css/app.css');
+    check('gap-c · CSS rule exists to hide kanban below 900px',
+      /@media \(max-width: 899\.98px\) \{[^}]*\.kanban[^}]*display:\s*none/.test(cssSrc),
+      'mobile breakpoint rule');
+    check('gap-c · JS breakpoint matches CSS (900px)',
+      /boardFits\(\)[^{]*\(min-width:\s*900px\)/.test(read('js/ui.js')),
+      'JS-CSS threshold');
+    // Render requests view and check for board when it fits
+    WS.storeApi.setView('requests');
+    WS.ui.render();
+    const reqView = doc.getElementById('app').innerHTML;
+    const hasKanbanStructure = /class="kanban"/.test(reqView);
+    check('gap-c · inbox board is rendered',
+      hasKanbanStructure,
+      hasKanbanStructure ? '✓ board markup present' : 'no board markup');
+    const stages = (WS.INBOX_STAGES || []);
+    if (stages.length === 4) {
+      check('gap-c · inbox kanban has exactly 4 stages', stages.length === 4,
+        'stages: ' + stages.join(' / '));
+      const stageLabels = (WS.INBOX_STAGE_LABELS || {});
+      const expected = ['new', 'unreached', 'qualified', 'rejected'];
+      expected.forEach((s) => {
+        check('gap-c · stage «' + s + '» has label',
+          stageLabels[s] !== undefined, 'label=' + stageLabels[s]);
+      });
+    } else { check('gap-c · INBOX_STAGES has 4 entries', stages.length === 4, 'actual=' + stages.length); }
+  }
+
+  // ---- доска входящих: она заменила список, значит обязана нести всё, что нёс список ----
+  {
+    WS.router.go('requests');
+    const view = doc.querySelector('#app .view') || doc.getElementById('app');
+    const board = view.querySelector('.kanban');
+    check('входящие · доска нарисована', !!board);
+    const cols = [].slice.call(view.querySelectorAll('.kanban .kcol .kh span:first-child')).map((e) => e.textContent.trim());
+    check('входящие · четыре отсека по стадиям разбора', cols.length === 4, cols.join(' | '));
+    check('входящие · и это стадии Евгения, слово в слово',
+      cols.join('|') === 'Новое обращение|Не вышли на связь|Квалифицирована|Отказ', cols.join('|'));
+    // Та самая стадия, ради которой всё затевалось, должна быть видна не пустой рамкой.
+    const unreached = (dd().inbox || []).filter((it) => it.stage === 'unreached');
+    check('входящие · на стенде есть обращение в стадии «Не вышли на связь»', unreached.length > 0,
+      (dd().inbox || []).map((it) => it.stage).join(' '));
+
+    // Доска заменила список — значит действие списка обязано было переехать вместе с ним.
+    // Раздел открывают ради разбора; доска без «Разобрать» — витрина.
+    const cards = [].slice.call(view.querySelectorAll('.kanban .kcol .deal'));
+    check('входящие · на доске есть карточки обращений', cards.length > 0, 'карточек: ' + cards.length);
+    const noTriage = cards.filter((el) => el.textContent.indexOf('Разобрать') < 0);
+    check('входящие · на каждой карточке есть «Разобрать»', noTriage.length === 0,
+      'без разбора: ' + noTriage.length + ' из ' + cards.length);
+
+    // Стадию должно быть чем сдвинуть, и крайние положения не заворачиваются.
+    check('входящие · стадию можно двигать с карточки', view.querySelectorAll('[data-instage]').length > 0);
+    const first = (WS.INBOX_STAGES || [])[0], last = (WS.INBOX_STAGES || []).slice(-1)[0];
+    const inNew = (dd().inbox || []).find((it) => it.stage === first);
+    if (inNew) {
+      WS.ui.moveInboxStage(inNew.id, 'prev');
+      check('входящие · из первой стадии назад не уходит', inNew.stage === first, inNew.stage);
+      WS.ui.moveInboxStage(inNew.id, 'next');
+      check('входящие · вперёд сдвигается', inNew.stage === (WS.INBOX_STAGES || [])[1], inNew.stage);
+      WS.ui.moveInboxStage(inNew.id, 'prev');
+      check('входящие · и возвращается назад', inNew.stage === first, inNew.stage);
+    }
+    const inLast = (dd().inbox || []).find((it) => it.stage === last);
+    if (inLast) {
+      WS.ui.moveInboxStage(inLast.id, 'next');
+      check('входящие · из последней стадии вперёд не уходит', inLast.stage === last, inLast.stage);
+    }
+    // Текст обращения не режется в JS: обрезанная строка врёт о том, что написал клиент.
+    const longest = (dd().inbox || []).reduce((m, it) => (!m || it.text.length > m.text.length ? it : m), null);
+    if (longest) {
+      const html = WS.ui.inboxKanban();
+      check('входящие · текст обращения не обрезан в коде', html.indexOf(longest.text) >= 0,
+        'полного текста нет: ' + longest.text.slice(0, 50));
+    }
+
+    // Узкий экран доску не получает — там она горизонтальная лента, в которой нельзя работать.
+    const mmWas = win.matchMedia;
+    win.matchMedia = (q) => ({ matches: false, media: q, addListener: () => {}, removeListener: () => {} });
+    WS.router.go('requests');
+    const narrow = doc.getElementById('app').innerHTML;
+    check('входящие · на узком экране доски нет', narrow.indexOf('class="kanban') < 0);
+    check('входящие · и вместо неё возвращается список с тем же «Разобрать»',
+      narrow.indexOf('Разобрать') >= 0 && narrow.indexOf('feed-row') >= 0);
+    win.matchMedia = mmWas;
+    WS.router.go('requests');
+  }
+
+  // ---- мини-карточка доски сделок отвечает «трогать ли её сегодня» ----
+  {
+    /* Предыдущие блоки закрывают задачи — к этому месту открытых по сделке может не остаться,
+       и проверка «на доске видна ближайшая задача» провалилась бы из-за порядка прогона, а не
+       из-за кода. Восстанавливаем из фикстур ровно то, что нужно этому блоку. */
+    // И сбрасываем фильтры доски: их оставил включёнными предыдущий блок, и сделки с задачами
+    // просто не попадали в выборку — провал был бы про порядок прогона, а не про карточку.
+    WS.store.dealSrc = 'all'; WS.store.dealObjType = 'all'; WS.store.dealReadiness = 'all';
+    WS.store.dealAgent = 'all'; WS.store.dealStage = 'all'; WS.store.dealSearch = '';
+    WS.store.dealBudFrom = ''; WS.store.dealBudTo = ''; WS.store.dealFunnel = 'sale'; WS.store.dealFunnelAll = true;
+    (WS.fixtures.tasks || []).forEach((ft) => {
+      if (!ft.dealId) return;
+      const cur = (dd().tasks || []).find((t) => t.id === ft.id);
+      if (cur) { cur.status = ft.status; cur.when = ft.when; cur.due = ft.due; }
+      else (dd().tasks || []).push(JSON.parse(JSON.stringify(ft)));
+    });
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const boardIds = [].slice.call(doc.querySelectorAll('#app .view .kanban .deal[data-deal]'))
+      .map((el) => el.getAttribute('data-deal'));
+    const withTask = (dd().deals || []).find((d) => boardIds.indexOf(d.id) >= 0 && WS.ui.nextTaskOfDeal(d));
+    check('доска · на стенде есть сделка с открытой задачей', !!withTask,
+      'на доске: [' + boardIds.join(', ') + '] · задачи по сделкам: ' +
+      (dd().tasks || []).filter((t) => t.dealId).map((t) => t.dealId + '/' + (t.status || 'open')).join(' '));
+    if (withTask) {
+      const card = doc.querySelector('#app .view .kanban .deal[data-deal="' + withTask.id + '"]');
+      check('доска · карточка сделки с задачей нарисована', !!card);
+      if (card) {
+        const t = WS.ui.nextTaskOfDeal(withTask);
+        check('доска · на карточке названа ближайшая задача', card.textContent.indexOf(t.title) >= 0, card.textContent.slice(0, 120));
+        check('доска · и её срок', card.textContent.indexOf(t.due) >= 0, card.textContent.slice(0, 120));
+      }
+    }
+    // Звонок нужен и там, где задачи нет: карточка без задачи всё равно про живого клиента.
+    // Ищем среди тех, кто РЕАЛЬНО на доске: закрытые сделки в отсеки не попадают, и «карточки нет»
+    // означало бы дефект теста, а не кода.
+    const onBoard = [].slice.call(doc.querySelectorAll('#app .view .kanban .deal[data-deal]'))
+      .map((el) => el.getAttribute('data-deal'));
+    const noTask = (dd().deals || []).find((d) => d.clientId && onBoard.indexOf(d.id) >= 0 && !WS.ui.nextTaskOfDeal(d));
+    if (noTask) {
+      const card2 = doc.querySelector('#app .view .kanban .deal[data-deal="' + noTask.id + '"]');
+      check('доска · кнопка звонка есть и у сделки без задачи',
+        !!card2 && !!card2.querySelector('[data-act="callClient"]'),
+        card2 ? 'кнопки нет' : 'карточки нет');
+    }
+    // Номер телефона на доске не печатается — её показывают на встречах и снимают скриншотами.
+    const boardEl = doc.querySelector('#app .view .kanban');
+    if (boardEl) {
+      const phones = (dd().clients || []).map((c) => c.phone).filter(Boolean);
+      const leaked = phones.filter((p) => boardEl.innerHTML.indexOf(p) >= 0);
+      check('доска · ни один номер телефона на доску не попал', leaked.length === 0, leaked.join(', '));
+    }
+  }
+
+  // ---- нарисованный элемент, который ничего не делает ----
+  // Проверка на data-act уже есть. Она не покрывает НАВИГАЦИОННЫЕ data-атрибуты: доска входящих
+  // приехала с `data-inbox` и курсором-пальцем, а обработчика для него не существовало —
+  // карточка обещала клик и молчала. Правило шире одного случая, поэтому и проверка шире.
+  {
+    const uiSrc = read('js/ui.js'), mainSrc = read('js/main.js');
+    // Все data-атрибуты, которые ui.js рисует, кроме заведомо оформительских.
+    const DECOR = ['data-act', 'data-mid', 'data-v', 'data-dir', 'data-scope', 'data-deal', 'data-req',
+      'data-obj', 'data-cid', 'data-tlabel', 'data-ticon', 'data-feat', 'data-stage', 'data-field', 'data-task'];
+    const rendered = Array.from(new Set((uiSrc.match(/data-[a-z]+(?:-[a-z]+)*=/g) || [])
+      .map((x) => x.slice(0, -1)))).filter((a) => DECOR.indexOf(a) < 0);
+    // Обработчик обязан хотя бы упоминать атрибут: либо в списке делегирования, либо как d.<имя>.
+    const camel = (a) => a.slice(5).replace(/-([a-z])/g, (m, ch) => ch.toUpperCase());
+    // Читателем считается либо строка делегирования `[data-x]`, либо обращение `dataset.x`
+    // где угодно в обработчиках или в самом ui.js. Узкая проверка «только d.x» давала одиннадцать
+    // ложных срабатываний: половина обработчиков читает атрибут через dataset у своей переменной.
+    const both = mainSrc + uiSrc;
+    const orphans = rendered.filter((a) =>
+      both.indexOf('[' + a + ']') < 0 && both.indexOf('dataset.' + camel(a)) < 0 &&
+      both.indexOf('d.' + camel(a)) < 0);
+    check('интерфейс · у каждого нарисованного data-атрибута есть кто-то, кто его читает',
+      orphans.length === 0, orphans.join(', '));
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);
