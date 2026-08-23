@@ -4848,9 +4848,9 @@
        У участника без своей карточки контакта собственного согласия нет: он появился в сделке
        через клиента, и его согласием мы считаем клиентское. Пропускать такого адресата
        «потому что записи нет» значило бы обойти правило именем в свободном поле. */
-    const cid = p.clientId || (who && who.clientId);
-    const c = cid ? D().clients.find((x) => x.id === cid) : null;
-    if (c && c.consent === false) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
+    const dealClient = who ? D().clients.find((x) => x.id === who.clientId) : null;
+    const audit = WS.audience.calculateAudience([p], { dealClients: dealClient ? [dealClient] : [] });
+    if (audit.excluded.length > 0) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
     o.state = 'sent';
     o.sentTo = contactDisplayName(p);
     o.sentAt = WS.storeApi.clockLabel().date;
@@ -8270,18 +8270,22 @@
     const creatives = [ph, WS.photos && WS.photos.o_interior, WS.photos && WS.photos.o_marina].filter(Boolean).slice(0, 3)
       .map((src) => '<div style="width:92px;height:66px;border-radius:8px;border:1px solid var(--line);background:#eee url(' + src + ') center/cover"></div>').join('');
     const recipRows = (typeof PARTNERS !== 'undefined' ? PARTNERS : []).map((p) => '<label class="feed-row" style="cursor:pointer"><input type="checkbox" checked style="margin:0 10px 0 0;accent-color:var(--acc)"><div class="ft"><div class="t">' + p.name + '</div><div class="m">' + p.focus + '</div></div></label>').join('');
+    const clubMembers = D().clients.filter(c => c.ctype === 'investor');
+    const auditClub = WS.audience.calculateAudience(clubMembers);
+    const contactsWithConsent = D().clients.filter(c => c.consent !== false).length;
     const CHANNELS = [
       ['handshake', 'Партнёрская сеть', recips + ' партнёра · co-broking', true],
       ['building', 'Property Finder', 'листинг · ~2 400 просмотров/нед', true],
       ['grid', 'Bayut', 'листинг · ~1 800 просмотров/нед', false],
       ['star', 'Соцсети (Instagram)', 'пост + сторис · ~5 000 охват', false],
       ['star', 'Клубная рассылка', 'инвесторы клуба · закрытый пул', true],
-      ['mail', 'Email-дайджест', 'база клиентов · 320 контактов', false],
+      ['mail', 'Email-дайджест', 'база клиентов · ' + contactsWithConsent + ' контактов', false],
     ];
     const channelRows = CHANNELS.map((c) => '<label class="feed-row" style="cursor:pointer"><input type="checkbox" ' + (c[3] ? 'checked' : '') + ' style="margin:0 10px 0 0;accent-color:var(--acc)"><div class="fi i-mut">' + I(c[0]) + '</div><div class="ft"><div class="t">' + c[1] + '</div><div class="m">' + c[2] + '</div></div></label>').join('');
     const focus =
       '<div class="promo-focus">' +
-      '<div class="pf-cell"><div class="pf-v">~9 200</div><div class="pf-l">охват · контактов</div></div>' +
+      '<div class="pf-cell"><div class="pf-v">' + contactsWithConsent + '</div><div class="pf-l">контактов клуба · инвесторы</div></div>' +
+      '<div class="pf-cell"><div class="pf-v">' + auditClub.excluded.length + ' исключены</div><div class="pf-l">без согласия</div></div>' +
       '<div class="pf-cell"><div class="pf-v">12–18</div><div class="pf-l">откликов за 7 дней</div></div>' +
       '<div class="pf-cell pf-cell--cost"><div class="pf-v">' + WS.AED(cost) + '</div><div class="pf-l">стоимость рассылки · ' + WS.AED(perMsg) + '/сообщение</div></div>' +
       '</div>';
@@ -8898,4 +8902,6 @@
     dealTransferForm, saveTransfer, dealPartnerForm, savePartner,
     offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
+  WS.partners = PARTNERS;
 })(window.WS = window.WS || {});
+
