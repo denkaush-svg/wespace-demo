@@ -27,7 +27,7 @@
     docSearch: '', docTab: 'all', calType: 'all', calDir: 'all', calObj: 'all', calClient: 'all', calWeek: 0, calDay: -1,
     contactsSearch: '', companiesSearch: '', conciergeSearch: '',
     contactsFilters: { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' },
-    dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true,
+    dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
     clientsTab: 'deals', dealsView: null, navOpen: false, cgRailOpen: true, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
@@ -186,7 +186,7 @@
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
     store.clientsTab = 'deals'; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.cgLang = 'ru'; store.cgDocLang = 'auto';
-    store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
+    store.dealArchivedOnly = false; store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
     store.navStack = []; store.navHere = null;
     store.incompatible = false;

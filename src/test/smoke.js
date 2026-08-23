@@ -5517,6 +5517,77 @@ setTimeout(async () => {
     }
   }
 
+  // ---- архив вместо удаления, и дубль условий ----
+  {
+    WS.store.dealArchivedOnly = false;
+    WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
+    const target = (dd().deals || []).find((d) => !WS.ui.dealArchived(d) && d.stage !== 'won' && d.stage !== 'lost');
+    check('архив · есть живая сделка, на которой можно проверить', !!target);
+    if (target) {
+      const tlWas = ((dd().dealTimeline || {})[target.id] || []).length;
+      const onBoardBefore = !!doc.querySelector('#app .view .kanban .deal[data-deal="' + target.id + '"]');
+      check('архив · до архивации сделка на доске', onBoardBefore);
+
+      WS.ui.archiveDeal(target.id);
+      check('архив · форма спрашивает причину', doc.getElementById('modal').innerHTML.indexOf('ar_why') >= 0);
+      WS.ui.saveArchive(target.id);
+      check('архив · сделка помечена архивной', WS.ui.dealArchived(target) === true);
+      // Удаления нет: запись, события и документы остаются на месте.
+      check('архив · запись из данных не исчезла', !!dd().deals.find((x) => x.id === target.id));
+      check('архив · история сохранена и пополнилась следом архивации',
+        ((dd().dealTimeline || {})[target.id] || []).length === tlWas + 1);
+      // Но из работы уходит: с доски, из списка и из сумм.
+      WS.router.go('clients');
+      check('архив · с доски убрана', !doc.querySelector('#app .view .kanban .deal[data-deal="' + target.id + '"]'));
+      WS.store.dealsView = 'table'; WS.router.go('clients');
+      check('архив · и из списка тоже',
+        (doc.querySelector('#app .view') || { innerHTML: '' }).innerHTML.indexOf('data-deal="' + target.id + '"') < 0);
+      WS.store.dealsView = 'kanban';
+      // Архив — не проигрыш: смешав их, мы испортили бы конверсию, которую сами же считаем.
+      check('архив · стадия сделки не подменена на проигрыш', target.stage !== 'lost', target.stage);
+      // Вернуться должно быть чем, иначе архив — это «спрятать навсегда».
+      WS.router.go('clients');
+      check('архив · в панели фильтров есть переключатель архива',
+        (doc.querySelector('#app .view') || { innerHTML: '' }).innerHTML.indexOf('data-act="dealsArchive"') >= 0);
+      WS.store.dealArchivedOnly = true; WS.router.go('clients');
+      check('архив · под переключателем сделка видна',
+        !!doc.querySelector('#app .view .kanban .deal[data-deal="' + target.id + '"]'));
+      WS.store.dealArchivedOnly = false;
+      WS.ui.unarchiveDeal(target.id);
+      check('архив · возвращается в работу', WS.ui.dealArchived(target) === false);
+      WS.router.go('clients');
+      check('архив · и снова на доске', !!doc.querySelector('#app .view .kanban .deal[data-deal="' + target.id + '"]'));
+    }
+
+    // Дубль копирует УСЛОВИЯ, а не историю: копия событий и денег удвоила бы пайплайн.
+    const src = (dd().deals || []).find((d) => d.clientId && (d.lots || []).length);
+    if (src) {
+      const nWas = dd().deals.length;
+      const copy = WS.ui.duplicateDeal(src.id);
+      check('дубль · создана новая запись', !!copy && dd().deals.length === nWas + 1);
+      check('дубль · со своим идентификатором', !!copy && copy.id !== src.id, copy && copy.id);
+      check('дубль · условия перенесены', !!copy && copy.clientId === src.clientId &&
+        copy.funnel === src.funnel && copy.readiness === src.readiness && copy.amount === src.amount);
+      check('дубль · участники перенесены', !!copy && (copy.contacts || []).length === WS.ui.dealContacts(src).length);
+      // Объект — предмет ВТОРОЙ сделки, он выбирается заново, иначе один лот окажется в двух договорах.
+      check('дубль · объект не скопирован — выбирается заново',
+        !!copy && (copy.lots || []).length === 0 && !copy.objectId, JSON.stringify(copy && copy.lots));
+      // История и деньги принадлежат той сделке, где произошли.
+      const ctl = (dd().dealTimeline || {})[copy.id] || [];
+      const stl = (dd().dealTimeline || {})[src.id] || [];
+      check('дубль · история исходной сделки не скопирована', ctl.length === 1 && ctl.length < stl.length,
+        ctl.length + ' против ' + stl.length);
+      check('дубль · в ленте копии сказано, откуда она', /копией условий/.test((ctl[0] || {}).text || ''));
+      check('дубль · задачи исходной сделки не удвоились',
+        (dd().tasks || []).filter((t) => t.dealId === copy.id).length === 0);
+      check('дубль · копия стартует с первого шага своего договора',
+        ((WS.DEAL_STEPS || {})[WS.contractKindFor(copy.funnel, copy.readiness)] || [])[0] === copy.stage,
+        copy.stage);
+      dd().deals = dd().deals.filter((d) => d.id !== copy.id);
+      delete (dd().dealTimeline || {})[copy.id];
+    }
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

@@ -225,7 +225,7 @@
     const won = A.reduce((s, x) => s + x.deals, 0);
     // Every funnel earns a commission now — the old list named four product boards, which is the
     // very distinction the service axis removed.
-    const activeSales = deals.filter((d) => !dealClosed(d));
+    const activeSales = deals.filter((d) => !dealClosed(d) && !dealArchived(d));
     const expectedComm = Math.round(activeSales.reduce((s, d) => s + dealCommission(d), 0));
     const closed = deals.filter(dealWon);
     return { leads, won, conv: leads ? Math.round((won / leads) * 100) : 0, expectedComm, closedCount: closed.length, closedSum: closed.reduce((s, d) => s + d.amount, 0), attribution: A };
@@ -283,7 +283,7 @@
     const deals = goalDeals(scope);
     if (goal.metric === 'commission') return closedBook(scope, goal.period).commission;
     if (goal.metric === 'deals') return closedBook(scope, goal.period).deals;
-    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => !dealClosed(d)).reduce((s2, d) => s2 + (d.amount || 0), 0));
+    if (goal.metric === 'pipeline') return Math.round(deals.filter((d) => !dealClosed(d) && !dealArchived(d)).reduce((s2, d) => s2 + (d.amount || 0), 0));
     if (goal.metric === 'shows') {
       // Events carry no owner, so a show counts as mine when its client is on one of my deals — and
       // only once it has actually happened: a viewing booked for 16:00 is not a показ at 9:12.
@@ -494,7 +494,7 @@
       let list = deals;
       if (kind === 'closed') { title = 'Успешные сделки'; list = deals.filter(dealWon); }
       else if (kind === 'hot') { title = 'Горячие сделки · SLA < 2 ч'; list = deals.filter((d) => d.hot); }
-      else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d)); }
+      else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d) && !dealArchived(d)); }
       else if (kind.indexOf('src:') === 0) { const s = kind.slice(4); title = 'Сделки · источник «' + s + '»'; list = deals.filter((d) => d.source === s); }
       rows = list.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') + '</div></div>' + I('arrowRight') + '</div>').join('');
     }
@@ -1347,6 +1347,9 @@
       .filter(Boolean).join(' ').toLowerCase();
   }
   function dealExtraPred(d) {
+    // Архив — это «не участвует в работе»: с доски, из списка и из сумм такая сделка уходит.
+    // Иначе пометка была бы косметикой, а партнёр просил убрать запись с глаз, а не покрасить её.
+    if (dealArchived(d) !== !!S().dealArchivedOnly) return false;
     const from = parseInt(S().dealBudFrom, 10) || 0, to = parseInt(S().dealBudTo, 10) || 0, src = S().dealSrc || 'all';
     const q = (S().dealSearch || '').trim().toLowerCase();
     if (q && dealSearchHay(d).indexOf(q) < 0) return false;
@@ -1397,8 +1400,19 @@
       selOf('dealObjType', S().dealObjType || 'all', objTypes) +
       selOf('dealReadiness', S().dealReadiness || 'all', readiness) +
       (isMgr ? selOf('dealAgent', S().dealAgent || 'all', agents) : '') +
+      // Переключатель архива — единственный путь обратно к убранной сделке. Без него архив
+      // означал бы «спрятать навсегда», а «Вернуть из архива» было бы недостижимой кнопкой.
+      archiveToggle() +
       (dealFilterCount() ? '<button class="view-clear" data-act="clearDealFilters">' + I('x') + 'сбросить · ' + dealFilterCount() + '</button>' : '') +
       '</div>';
+  }
+  function archiveToggle() {
+    const n = (D().deals || []).filter(dealArchived).length;
+    const on = !!S().dealArchivedOnly;
+    if (!n && !on) return '';                          // пустого архива в панели фильтров нет
+    return '<button class="chip' + (on ? '' : ' mut') + '" data-act="dealsArchive"' +
+      (on ? ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"' : '') +
+      '>' + I('lock') + 'Архив · ' + n + '</button>';
   }
   function agentName(id) { const u = D().users; for (const k in u) { if (u[k].id === id) return u[k].name; } const m = TEAM.find((x) => x.id === id); return m ? m.name : (id || '—'); }
   function dealObject(d) { return d.objectId ? D().objects.find((o) => o.id === d.objectId) : null; }
@@ -1436,7 +1450,7 @@
     // Pipeline is what is still in play. A won deal sitting inside it reports finished business as
     // forecast — the exact confusion the won/lost split exists to remove.
     const rs = D().requests || [];
-    const live = ds.filter((d) => !dealClosed(d));
+    const live = ds.filter((d) => !dealClosed(d) && !dealArchived(d));
     const totalVal = live.reduce((a, d) => a + (d.amount || 0), 0);
     // Бюджет заявки — намерение клиента, сумма сделки — согласованная цифра. Складывать их в
     // один пайплайн значит выдать надежду за прогноз, поэтому потенциал стоит отдельной строкой.
@@ -3745,8 +3759,83 @@
       dealClosed(d) ? null : ['check', 'Завершить сделку', 'data-act="finishDeal" data-deal="' + d.id + '"', 'secondary'],
       dealClosed(d) ? null : ['handshake', 'Передать сделку', 'data-act="transferDeal" data-deal="' + d.id + '"', 'secondary'],
       dealClosed(d) ? null : ['users', 'Привлечь партнёра', 'data-act="partnerDeal" data-deal="' + d.id + '"', 'secondary'],
+      ['layers', 'Дубль условий', 'data-act="duplicateDeal" data-deal="' + d.id + '"', 'secondary'],
+      // Удаления нет намеренно: удалённая сделка уносит основание комиссии. Архив убирает из
+      // работы и возвращается одним нажатием.
+      dealArchived(d)
+        ? ['replay', 'Вернуть из архива', 'data-act="unarchiveDeal" data-deal="' + d.id + '"', 'secondary']
+        : ['lock', 'В архив', 'data-act="archiveDeal" data-deal="' + d.id + '"', 'secondary'],
     ];
   }
+  /* ---- Архив вместо удаления, и дубль сделки (§3.5 разбора, пункт 31) ------------------------
+     Партнёр просил «удалить сделку». Удаления не будет: система обещает прослеживаемость, а
+     ошибочно удалённая сделка уносит с собой события, документы и основание комиссии — то есть
+     ровно то, чем потом доказывают, что вознаграждение заработано. Архив закрывает его задачу
+     («убрать с глаз ошибочно заведённое») и не закрывает историю: запись остаётся, помечена,
+     из работы уходит, и её можно вернуть.
+
+     Архив — не стадия. Стадия отвечает «где сделка в процессе», архив — «участвует ли она в
+     работе вообще». Заведённая по ошибке сделка не «проиграна»: проигрыш это исход переговоров,
+     и смешав их, мы испортили бы конверсию, которую сами же и считаем. */
+  function dealArchived(d) { return !!d && !!d.archived; }
+  function archiveDeal(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return false;
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Сделка уйдёт из работы: с доски, из списка, из воронки и из сумм. История, документы и события останутся — вернуть можно в любой момент. Удаления в системе нет намеренно: удалённая сделка уносит с собой основание комиссии.</p>' +
+      '<label class="fld wide"><span>Почему в архив</span><input id="ar_why" type="text" placeholder="Напр.: заведена по ошибке, дубль"></label>';
+    openModal('В архив · ' + escAttr(d.title || d.id), body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button class="btn primary" data-act="saveArchive" data-deal="' + dealId + '">' + I('check') + 'В архив</button>');
+    return true;
+  }
+  function saveArchive(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    const el = document.getElementById('ar_why');
+    const why = el ? el.value.trim() : '';
+    d.archived = true;
+    d.archivedWhy = why || undefined;
+    addEventEntry('deal', dealId, { type: 'note', text: 'Сделка убрана в архив' + (why ? ': ' + why : '') + '. История сохранена.' });
+    WS.storeApi.touch(); closeModal();
+    WS.storeApi.toast('В архиве — из работы убрана, история цела', 'ok');
+    dealCard(dealId);
+  }
+  function unarchiveDeal(dealId) {
+    const d = D().deals.find((x) => x.id === dealId); if (!d) return;
+    d.archived = false; delete d.archivedWhy;
+    addEventEntry('deal', dealId, { type: 'note', text: 'Сделка возвращена из архива в работу.' });
+    WS.storeApi.touch();
+    WS.storeApi.toast('Возвращена в работу', 'ok');
+    dealCard(dealId);
+  }
+  /* Дубль — это НЕ копия записи. Копируются условия и участники, то есть то, что переспрашивать
+     у клиента заново глупо; история, документы, задачи, предложения и деньги не копируются —
+     они принадлежат той сделке, в которой произошли. Скопировав их, мы получили бы вторую запись
+     о тех же событиях и удвоили бы пайплайн. */
+  function duplicateDeal(dealId) {
+    const src = D().deals.find((x) => x.id === dealId); if (!src) return null;
+    const id = 'd_copy_' + nextCopySeq();
+    const copy = {
+      id: id, clientId: src.clientId, requestId: src.requestId,
+      title: (src.title || 'Сделка') + ' · копия',
+      funnel: src.funnel, readiness: src.readiness, saleKind: src.saleKind, side: src.side,
+      objectType: src.objectType, paymentForm: src.paymentForm, goal: src.goal, source: src.source,
+      amount: src.amount, agent: src.agent, companyId: src.companyId, vat: src.vat,
+      contacts: JSON.parse(JSON.stringify(dealContacts(src))),
+      lots: [], objectId: null,                       // объект выбирается заново: он и есть предмет второй сделки
+      stage: ((WS.DEAL_STEPS || {})[WS.contractKindFor(src.funnel, src.readiness)] || ['prep'])[0],
+      stageDays: 0, createdAt: src.createdAt, prov: {},
+    };
+    D().deals.unshift(copy);
+    addEventEntry('deal', id, { type: 'note', text: 'Сделка заведена копией условий сделки «' + (src.title || src.id) + '». История и документы не копировались — они принадлежат исходной.' });
+    WS.storeApi.touch();
+    WS.storeApi.toast('Копия условий создана — выберите объект', 'ok');
+    dealCard(id);
+    return copy;
+  }
+  // Порядковый номер вместо часов: Date.now() в этом стенде запрещён — он ломает повторяемость
+  // прогона, а нужен здесь только неповторяющийся хвост идентификатора.
+  let _copySeq = 0;
+  function nextCopySeq() { _copySeq += 1; return String((D().deals || []).length) + '_' + _copySeq; }
+
   /* ---- Передать против привлечь (§3.1 решений) ----
      Сейчас это смешано в одном поле, а операции разные. ПЕРЕДАТЬ — меняется ответственный,
      открытые задачи переназначаются, в ленте остаётся след, прежний ответственный сохраняет
@@ -8989,7 +9078,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

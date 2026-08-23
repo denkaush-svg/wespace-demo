@@ -420,6 +420,11 @@
       case 'valXls': api.toast('Excel-финмодель сформирована из расчёта (демо-скачивание)', 'ok'); break;
       case 'download': api.toast('Файл сформирован из фикстур (демо-скачивание)', 'ok'); break;
       case 'dealChatClose': WS.ui.closeDealChat(); break;
+      case 'archiveDeal': WS.ui.archiveDeal(t.dataset.deal); break;
+      case 'saveArchive': WS.ui.saveArchive(t.dataset.deal); break;
+      case 'unarchiveDeal': WS.ui.unarchiveDeal(t.dataset.deal); break;
+      case 'duplicateDeal': WS.ui.duplicateDeal(t.dataset.deal); break;
+      case 'dealsArchive': store.dealArchivedOnly = !store.dealArchivedOnly; api.emit(); break;
       case 'dealChatSend': routePrompt(promptValue('dealChatPrompt')); break;
       case 'toggleQaMore': {
         const menu = t.closest('.qa-more').querySelector('.qa-more-menu');
