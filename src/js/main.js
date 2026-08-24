@@ -432,6 +432,10 @@
               api.toast('Клиент без согласия — КП не отправляется', 'warn');
               break;
             }
+            if (audit.suitable.length === 0) {
+              api.toast('Нет подходящих адресатов — КП отправлено не будет', 'warn');
+              break;
+            }
           }
         }
         WS.ui.closeModal();
@@ -450,6 +454,10 @@
         if (audit.excluded.length > 0) {
           api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
         }
+        if (audit.suitable.length === 0) {
+          api.toast('Нет подходящих адресатов — рассылка отправлена не будет', 'warn');
+          break;
+        }
         api.toast('Рассылка отправлена профильным партнёрам · отклики появятся во «Входящих»', 'ok');
         break;
       }
@@ -460,6 +468,10 @@
         WS.ui.closeModal();
         if (audit.excluded.length > 0) {
           api.toast('Некоторые инвесторы клуба без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+        }
+        if (audit.suitable.length === 0) {
+          api.toast('Нет подходящих адресатов — размещение отменяется', 'warn');
+          break;
         }
         api.toast('Объект размещён в клубной витрине (демо)', 'ok');
         break;

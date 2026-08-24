@@ -7780,10 +7780,10 @@
   }
   // Партнёры — co-broking network.
   const PARTNERS = [
-    { name: 'Whitewill', focus: 'Off-plan · Downtown, Business Bay', deals: 3, split: '50 / 50', status: 'active' },
-    { name: 'Metropolitan Premium', focus: 'Готовое жильё · Palm, Marina', deals: 2, split: '50 / 50', status: 'active' },
-    { name: 'STONE · застройщик', focus: 'Собственные проекты · эксклюзив', deals: 1, split: 'по проекту', status: 'active' },
-    { name: 'Кирилл · частный брокер', focus: 'Клубные покупатели', deals: 1, split: '50 / 50', status: 'pending' },
+    { id: 'p_whitewill', name: 'Whitewill', focus: 'Off-plan · Downtown, Business Bay', deals: 3, split: '50 / 50', status: 'active', channel: 'email', consent: true },
+    { id: 'p_metro', name: 'Metropolitan Premium', focus: 'Готовое жильё · Palm, Marina', deals: 2, split: '50 / 50', status: 'active', channel: 'email', consent: true },
+    { id: 'p_stone', name: 'STONE · застройщик', focus: 'Собственные проекты · эксклюзив', deals: 1, split: 'по проекту', status: 'active', channel: 'email', consent: true },
+    { id: 'p_kirill', name: 'Кирилл · частный брокер', focus: 'Клубные покупатели', deals: 1, split: '50 / 50', status: 'pending', channel: 'email', consent: false },
   ];
   // Профессиональная сеть за пределами co-broking: посредники, представители застройщиков, ипотека.
   const NETWORK_INTER = [
