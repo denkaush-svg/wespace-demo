@@ -27,7 +27,11 @@
     // подписанием, а дальше живёт договор — и живёт месяцами.
     { id: 'contracts', label: 'Сопровождение', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
-    { id: 'clients', tab: 'contacts', label: 'Клиенты', icon: 'users', count: () => (D().clients || []).length },
+    // «Контакты», а не «Клиенты»: роль — это то, кем человек оказался в конкретной сделке, а не
+    // то, чем он является. Сегодня покупатель, через год собственник, между делом агент-партнёр.
+    // Компании живут здесь же одним списком; их карточка остаётся отдельной — у юрлица есть KYC
+    // и контактные лица, которым в строке человека места нет.
+    { id: 'clients', tab: 'contacts', label: 'Контакты', icon: 'users', count: () => (D().clients || []).length + (D().companies || []).length },
     { id: 'objects', label: 'Объекты', icon: 'building', count: () => D().objects.length },
     { id: 'valuation', label: 'Оценка объекта', icon: 'calc' },
   ];
@@ -35,7 +39,6 @@
   // object/deal cards), so they are not first-level nav items.
   const NAV_MORE = [
     { id: 'partners', label: 'Сеть', icon: 'handshake' },
-    { id: 'companies', label: 'Компании', icon: 'building' },
     { id: 'shows', label: 'Календарь', icon: 'calendar' },
     { id: 'promotion', label: 'Продвижение', icon: 'radar' },
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
@@ -56,10 +59,9 @@
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
   ];
   const NAV_MGR_MORE = [
-    { id: 'clients', tab: 'contacts', label: 'Клиенты', icon: 'users' },
+    { id: 'clients', tab: 'contacts', label: 'Контакты', icon: 'users' },
     { id: 'objects', label: 'Объекты', icon: 'building' },
     { id: 'partners', label: 'Сеть', icon: 'handshake' },
-    { id: 'companies', label: 'Компании', icon: 'building' },
     { id: 'valuation', label: 'Оценка объекта', icon: 'calc' },
     { id: 'docs', label: 'Документы', icon: 'doc' },
   ];
@@ -1185,15 +1187,15 @@
     const st = S();
     const tab = st.clientsTab || 'deals';
     const isMgr = st.role === 'manager';
-    const title = tab === 'contacts' ? 'Клиенты' : 'Сделки';
+    const title = tab === 'contacts' ? 'Контакты' : 'Сделки';
     // Пояснение над списком сделок снято: экран объясняет себя переключателем, стадиями и
     // колонками, а абзац занимал первый экран у того, кто открывает раздел десять раз в день.
     const desc = tab === 'contacts'
-      ? 'Клиентская книга: покупатели, арендаторы и инвесторы. Портфель клиента и все его сделки, KYC и согласие. Партнёры, застройщики и посредники живут в разделе «Сеть».'
+      ? 'Своя книга: все, с кем уже идёт работа, — люди и компании одним списком. Тип контакта, интерес и способ связи фильтруются; строка компании ведёт на её карточку с KYC и контактными лицами. Найти того, кого у нас ещё нет, — в разделе «Сеть».'
       : '';
     const actions = tab === 'contacts'
       ? '<button class="btn sm" data-act="importContacts">' + I('download') + 'Импорт</button>' +
-        '<button class="btn sm primary" data-act="newContact">' + I('plus') + 'Создать клиента</button>'
+        '<button class="btn sm primary" data-act="newContact">' + I('plus') + 'Создать контакт</button>'
       : '<button class="btn sm" data-scn="G1">' + I('mic') + 'Запрос голосом</button>' +
         '<button class="btn sm primary" data-act="newDeal">' + I('plus') + 'Создать сделку</button>';
     let body;
@@ -1233,6 +1235,17 @@
   // Filter helpers
   function matchContactsFilters(c) {
     const st = S().contactsFilters || {};
+    // Тип контакта отбирает по ЛЮБОЙ роли, в которой человек выступал, а не только по основной:
+    // покупатель по своей сделке и собственник по чужой — один человек, и искать его будут
+    // и так, и так.
+    if (st.kind && st.kind !== 'all' && contactRoles(c).indexOf(st.kind) < 0) return false;
+    if (st.interest && st.interest !== 'all' && c.interest !== st.interest) return false;
+    if (st.objType && st.objType !== 'all' && (c.objTypes || []).indexOf(st.objType) < 0) return false;
+    if (st.success && st.success !== 'all') {
+      const won = hasWonDeal(c.id);
+      if (st.success === 'yes' ? !won : won) return false;
+    }
+    if (st.channel && st.channel !== 'all' && prefChannel(c) !== st.channel) return false;
     // Priority filter
     if (st.priority && st.priority !== 'all') {
       const sig = (D().clientSignals || {})[c.id];
@@ -1312,6 +1325,36 @@
     { k: 'all', t: 'Все' }, { k: 'client', t: 'Клиенты' }, { k: 'partner', t: 'Партнёры' },
     { k: 'intermediary', t: 'Посредники' }, { k: 'transferred', t: 'Замещение' },
   ];
+  // Три словаря из второго пула замечаний. Тип контакта — ОСНОВНАЯ роль; человек может быть
+  // покупателем по одной сделке и партнёром по другой, поэтому фильтр отбирает и по ролям,
+  // которые видны в сделках, а не только по записанному основному типу.
+  const CONTACT_KINDS = [['buyer', 'покупатель'], ['company', 'компания'], ['tenant', 'арендатор'],
+    ['partner', 'агент-партнёр'], ['developer', 'девелопер'], ['owner', 'собственник']];
+  const CONTACT_INTERESTS = [['invest', 'инвестиции'], ['live', 'проживание'], ['rent', 'аренда'],
+    ['office', 'размещение компании'], ['develop', 'девелопмент']];
+  const OBJ_INTERESTS = [['office', 'офисы'], ['retail', 'ритейл'], ['apart', 'апартаменты'],
+    ['warehouse', 'склады'], ['land', 'земельный участок'], ['gab', 'ГАБ']];
+  const CONTACT_KIND_LABEL = {}; CONTACT_KINDS.forEach((x) => { CONTACT_KIND_LABEL[x[0]] = x[1]; });
+  const CONTACT_INTEREST_LABEL = {}; CONTACT_INTERESTS.forEach((x) => { CONTACT_INTEREST_LABEL[x[0]] = x[1]; });
+  const OBJ_INTEREST_LABEL = {}; OBJ_INTERESTS.forEach((x) => { OBJ_INTEREST_LABEL[x[0]] = x[1]; });
+  // Тип компании из её собственного словаря («Застройщик», «Фонд», «Агентство») сводится
+  // к тому же перечню: иначе один фильтр отбирал бы по двум разным наборам значений.
+  function companyKind(co) { return /застройщик|девелопер/i.test(co.kind || '') ? 'developer' : 'company'; }
+  // «Есть успешная сделка» — не поле, а вычисление: хранимый признак разошёлся бы с фактами
+  // в первый же раз, когда сделку закрыли.
+  function hasWonDeal(id) { return (D().deals || []).some((d) => (d.clientId === id || d.companyId === id) && dealWon(d)); }
+  // Роли, в которых человек уже выступал: основной тип плюс то, чем он оказался в сделках.
+  function contactRoles(c) {
+    const out = [c.contactKind].filter(Boolean);
+    (D().deals || []).forEach((d) => {
+      if (d.clientId !== c.id) return;
+      const k = (d.funnel || '').indexOf('rent') >= 0 ? (d.side === 'owner' ? 'owner' : 'tenant')
+        : d.side === 'owner' ? 'owner' : 'buyer';
+      if (out.indexOf(k) < 0) out.push(k);
+    });
+    if (c.companyId && out.indexOf('company') < 0) out.push('company');
+    return out;
+  }
   // Text a broker would actually type into a contact search: the person, how to reach them, what
   // they want, where, and the company they sit behind.
   function contactHaystack(c) {
@@ -1321,14 +1364,31 @@
       clientContactVals(c).email, deals.map((d) => d.title).join(' '), cos.map((x) => x.name).join(' ')]
       .filter(Boolean).join(' ').toLowerCase();
   }
+  // Компания — контакт того же списка: покупателем бывает и человек, и юрлицо, а искать их
+  // брокер идёт в одно место. Объединён СПИСОК, не карточки: у юрлица есть KYC и контактные лица,
+  // которых в строке человека негде показать, поэтому строка компании ведёт на карточку компании.
+  function companyHaystack(co) {
+    return [co.name, co.kind, co.phone, co.email, co.address, co.contactPerson].filter(Boolean).join(' ').toLowerCase();
+  }
   function contactsSearchList() {
     const cur = S().contactType || 'all';
     const q = (S().contactsSearch || '').trim().toLowerCase();
     const cl = D().clients || [];
     let list = cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
-    if (cur === 'transferred') list = list.filter((p) => p.transferred);
-    if (q) list = list.filter((p) => contactHaystack(p.c).indexOf(q) >= 0);
-    return list.filter((p) => matchContactsFilters(p.c));
+    // Замещение — про переданных клиентов, компании в него не попадают.
+    if (cur !== 'transferred') {
+      list = list.concat((D().companies || []).map((co) => ({ id: co.id, name: co.name, co: co })));
+    } else {
+      list = list.filter((p) => p.transferred);
+    }
+    if (q) list = list.filter((p) => (p.co ? companyHaystack(p.co) : contactHaystack(p.c)).indexOf(q) >= 0);
+    return list.filter((p) => (p.co ? matchCompanyFilters(p.co) : matchContactsFilters(p.c)));
+  }
+  // Компания, за которой стоит человек: связь живёт на сделке, а не на контакте, — один и тот же
+  // человек может покупать себе и от лица работодателя.
+  function contactCompany(c) {
+    const d = (D().deals || []).find((x) => x.clientId === c.id && x.companyId);
+    return d ? (D().companies || []).find((x) => x.id === d.companyId) : null;
   }
   // Строка списка клиентов. Кнопка «Сделка» и стадия отсюда убраны: список клиентов — это
   // клиентская книга, а не второй вид воронки. Сделки агент смотрит в сделках; здесь ему нужно
@@ -1341,9 +1401,12 @@
     // основной канал, когда говорили в последний раз. Что он ищет, в каком районе и на какую
     // сумму — это запрос, а не свойство человека: оно живёт в заявке, а в книге клиентов
     // работает фильтрами. Стадия, сумма и счётчик заявок убраны отсюда по той же причине.
-    const sub = [c.phone || '', c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
+    // Компания в строке — прямая просьба партнёра: имя, телефон, компания, способ связи.
+    const co = contactCompany(c);
+    const sub = [c.phone || '', co ? co.name : '', chanMeta(prefChannel(c))[1],
       last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
-    const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') +
+    const kindB = c.contactKind ? '<span class="badge">' + CONTACT_KIND_LABEL[c.contactKind] + '</span>' : '';
+    const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') + kindB +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
       (c.consent ? '<span class="badge ok">' + I('check') + 'согласие</span>' : '<span class="badge stop">' + I('lock') + 'нет согласия</span>');
     return '<div class="feed-row" data-client="' + p.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
@@ -1351,7 +1414,93 @@
       '<div class="m">' + sub + '</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' + right + '</div></div>';
   }
-  const CONTACT_FILTER_KEYS = ['priority', 'psych', 'object', 'area', 'budget', 'state', 'consent'];
+  function contactCompanyRow(p) {
+    const co = p.co;
+    const deals = (D().deals || []).filter((d) => d.companyId === co.id);
+    const sub = [co.phone || '', co.kind || '', deals.length ? 'сделок ' + deals.length : ''].filter(Boolean).join(' · ');
+    const kyc = co.kyc === 'verified' ? '<span class="badge ok">' + I('shield') + 'KYC пройден</span>'
+      : '<span class="badge warn">' + I('shield') + 'KYC не подтверждён</span>';
+    return '<div class="feed-row" data-company="' + co.id + '" style="cursor:pointer"><div class="fi i-mut">' + I('building') + '</div>' +
+      '<div class="ft"><div class="t">' + escAttr(co.name) + '</div><div class="m">' + escAttr(sub) + '</div></div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">' +
+      '<span class="badge">' + CONTACT_KIND_LABEL[companyKind(co)] + '</span>' + kyc + '</div></div>';
+  }
+  // У компании нет портрета, бюджета и района — фильтры, к ней неприменимые, её не выкидывают,
+  // а те, что применимы (тип, успешные сделки), работают на общих основаниях.
+  function matchCompanyFilters(co) {
+    const st = S().contactsFilters || {};
+    if (st.kind && st.kind !== 'all' && companyKind(co) !== st.kind) return false;
+    if (st.success && st.success !== 'all') {
+      const won = hasWonDeal(co.id);
+      if (st.success === 'yes' ? !won : won) return false;
+    }
+    // Интерес, тип объекта, канал связи, портрет, бюджет, район и приоритет — свойства человека.
+    // Компания под такой фильтр не подходит по определению, а не «не подошла».
+    const personOnly = ['interest', 'objType', 'channel', 'psych', 'budget', 'area', 'priority', 'state'];
+    if (personOnly.some((k) => st[k] && st[k] !== 'all')) return false;
+    if (st.consent && st.consent !== 'all') return false;
+    return true;
+  }
+  const CONTACT_FILTER_KEYS = ['priority', 'psych', 'object', 'area', 'budget', 'state', 'consent',
+    'kind', 'interest', 'objType', 'success', 'channel'];
+  const CHANNEL_PICK_LABEL = { whatsapp: 'мессенджер', phone: 'звонок', email: 'e-mail' };
+  // Одной строкой — то, по чему собрана выборка. Это и подпись свёрнутого списка, и то,
+  // что уходит Консьержу контекстом: пересказывать выборку словами значит дать ему
+  // возможность понять её иначе, чем понял агент.
+  function contactsSelectionLabel() {
+    const f = S().contactsFilters || {};
+    const parts = [];
+    if (f.kind && f.kind !== 'all') parts.push(CONTACT_KIND_LABEL[f.kind]);
+    if (f.interest && f.interest !== 'all') parts.push(CONTACT_INTEREST_LABEL[f.interest]);
+    if (f.objType && f.objType !== 'all') parts.push(OBJ_INTEREST_LABEL[f.objType]);
+    if (f.success === 'yes') parts.push('с успешной сделкой');
+    if (f.success === 'no') parts.push('без успешных сделок');
+    if (f.channel && f.channel !== 'all') parts.push(CHANNEL_PICK_LABEL[f.channel] || f.channel);
+    if (f.consent === 'yes') parts.push('с согласием');
+    const q = (S().contactsSearch || '').trim();
+    if (q) parts.push('«' + q + '»');
+    return parts.length ? parts.join(' · ') : 'Вся книга';
+  }
+  // Массовая отправка по книге — ровно тот случай, где нарушение стоит денег (PDPL в ОАЭ,
+  // 152-ФЗ в России). Поэтому «сколько получат» и «сколько исключено» считаются ДО отправки
+  // и показываются числом, а не оговоркой мелким шрифтом.
+  function contactsReach() {
+    const list = contactsSearchList();
+    const people = list.filter((p) => !p.co);
+    const noConsent = people.filter((p) => !p.c.consent).length;
+    return { total: list.length, companies: list.length - people.length, people: people.length,
+      noConsent: noConsent, reachable: people.length - noConsent };
+  }
+  function contactsChatPanel() {
+    if (!S().contactsChat) return '';
+    const r = contactsReach();
+    const sel = contactsSelectionLabel();
+    const consent = r.noConsent
+      ? '<span class="badge stop">' + I('lock') + r.noConsent + ' без согласия — исключены</span>'
+      : '<span class="badge ok">' + I('check') + 'у всех есть согласие</span>';
+    return '<button class="contacts-sel" data-act="contactsChatClose" title="Вернуться к списку">' +
+      I('chevLeft') + '<span class="cs-t">' + escAttr(sel) + '</span>' +
+      '<span class="badge">' + I('users') + r.reachable + ' из ' + r.people + '</span>' + consent +
+      (r.companies ? '<span class="badge">' + I('building') + r.companies + ' компаний</span>' : '') +
+      '<span class="cs-back">развернуть список</span></button>' +
+      '<div class="dcard-chat" style="margin-top:12px">' +
+      '<div class="dcard-chat-h">' + I('sparkle') +
+      '<span class="dcard-chat-t">Консьерж · выборка контактов</span>' +
+      '<span class="dcard-chat-n">видит эту выборку, а не пересказ</span></div>' +
+      '<div class="chat" id="chat"></div></div>' +
+      '<div class="ws-flag" style="margin-top:12px">' + I('phone') +
+      ' Обзвон Консьерж готовит скриптом для агента: холодный автообзвон запрещён (первое дубайское интервью — «звонить нельзя, писать можно»), и мы его не делаем.</div>';
+  }
+  // Открытие диалога — состояние экрана, а не переход: маршрут не меняется, «назад» по-прежнему
+  // ведёт туда, откуда пришли в книгу, а не в чат.
+  function openContactsChat() {
+    const r = contactsReach();
+    S().contactsChat = true;
+    S().cgCtx = [{ icon: 'users', label: contactsSelectionLabel() + ' · ' + r.reachable + ' контактов' }];
+    WS.engine.bindThread('contacts:selection', 'Выборка · ' + contactsSelectionLabel(), 'users');
+    WS.storeApi.emit();
+  }
+  function closeContactsChat() { S().contactsChat = false; S().cgCtx = []; WS.storeApi.emit(); }
   function contactsFilterCount() {
     const f = S().contactsFilters || {};
     return CONTACT_FILTER_KEYS.filter((k) => f[k] && f[k] !== 'all').length;
@@ -1367,10 +1516,10 @@
   function contactsListInner() {
     const list = contactsSearchList();
     if (!list.length) return listEmptyState((S().contactsSearch || '').trim(), contactsFilterCount() > 0, 'clearContactsFilters');
-    return '<div class="feed" style="padding:0 16px 8px">' + list.map(contactRow).join('') + '</div>';
+    return '<div class="feed" style="padding:0 16px 8px">' + list.map((p) => (p.co ? contactCompanyRow(p) : contactRow(p))).join('') + '</div>';
   }
   function contactsCountLabel() {
-    return ((S().contactType === 'transferred') ? 'Замещение' : 'Клиенты') + ' · ' + contactsSearchList().length;
+    return ((S().contactType === 'transferred') ? 'Замещение' : 'Контакты') + ' · ' + contactsSearchList().length;
   }
   function contactsPeople() {
     const cur = S().contactType || 'all';
@@ -1379,7 +1528,7 @@
     const open = !!S().contactsFiltersOpen;
     const n = contactsFilterCount();
 
-    const FILTERS = [{ k: 'all', t: 'Все клиенты' }, { k: 'transferred', t: 'Замещение' }];
+    const FILTERS = [{ k: 'all', t: 'Все контакты' }, { k: 'transferred', t: 'Замещение' }];
     const on = ' style="border-color:var(--acc);background:var(--acc-soft);color:var(--acc-ink)"';
     const typeChips = FILTERS.map((ct) => '<button class="chip' + (cur === ct.k ? '' : ' mut') + '" data-contacttype="' + ct.k + '"' +
       (cur === ct.k ? on : '') + '>' + ct.t + '</button>').join('');
@@ -1392,6 +1541,10 @@
     const toggle = '<button class="chip' + (n ? '' : ' mut') + '" data-act="contactsFiltersToggle"' + (n ? on : '') + '>' +
       I('menu') + 'Фильтры' + (n ? ' · ' + n : '') + I(open ? 'chevUp' : 'chevDown') + '</button>';
     const clear = (n || q) ? '<button class="view-clear" data-act="clearContactsFilters">' + I('x') + 'сбросить</button>' : '';
+    const cgBtn = '<button class="chip" data-act="contactsChatOpen">' + I('sparkle') + 'Поручить Консьержу выборку</button>';
+    // Диалог занимает экран целиком: список и фильтры сворачиваются в одну строку над ним,
+    // и она же — путь назад. Это тот же механизм, что в карточке сделки.
+    if (S().contactsChat) return contactsChatPanel();
 
     let panel = '';
     if (open) {
@@ -1410,7 +1563,18 @@
       const stateOpts = [['all', 'Любое состояние'], ['open', 'есть открытый запрос'],
         ['done', 'всё закрыто'], ['none', 'заявок ещё не было']];
       const consentOpts = [['all', 'Согласие — неважно'], ['yes', 'есть согласие на связь'], ['no', 'нет согласия']];
+      const kindOpts = [['all', 'Любой тип контакта']].concat(CONTACT_KINDS);
+      const interestOpts = [['all', 'Любой интерес']].concat(CONTACT_INTERESTS);
+      const objTypeOpts = [['all', 'Любой тип объекта']].concat(OBJ_INTERESTS);
+      const successOpts = [['all', 'Успешные сделки — неважно'], ['yes', 'есть закрытая успехом'], ['no', 'успешных ещё нет']];
+      // «Мессенджер» — это WhatsApp и Telegram вместе: агент выбирает способ, а не приложение.
+      const channelOpts = [['all', 'Любой способ связи'], ['whatsapp', 'мессенджер'], ['phone', 'звонок'], ['email', 'e-mail']];
       panel = '<div class="list-filters">' +
+        '<label class="lf-fld"><span>Тип контакта</span>' + miniSel('cfKind', f.kind || 'all', kindOpts) + '</label>' +
+        '<label class="lf-fld"><span>Интерес сделок</span>' + miniSel('cfInterest', f.interest || 'all', interestOpts) + '</label>' +
+        '<label class="lf-fld"><span>Интерес к типу объектов</span>' + miniSel('cfObjType', f.objType || 'all', objTypeOpts) + '</label>' +
+        '<label class="lf-fld"><span>Успешные сделки</span>' + miniSel('cfSuccess', f.success || 'all', successOpts) + '</label>' +
+        '<label class="lf-fld"><span>Предпочитаемый способ связи</span>' + miniSel('cfChannel', f.channel || 'all', channelOpts) + '</label>' +
         '<label class="lf-fld"><span>Район поиска</span>' + miniSel('cfArea', f.area || 'all', areaOpts) + '</label>' +
         '<label class="lf-fld"><span>Бюджет</span>' + miniSel('cfBudget', f.budget || 'all', budgetOpts) + '</label>' +
         '<label class="lf-fld"><span>Состояние работы</span>' + miniSel('cfState', f.state || 'all', stateOpts) + '</label>' +
@@ -1425,7 +1589,7 @@
 
     return '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
       searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
-      '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + '</div>' + panel +
+      '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + cgBtn + '</div>' + panel +
       '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
       '<div class="contacts-list">' + contactsListInner() + '</div></div>';
   }
@@ -3686,7 +3850,7 @@
       case 'companyDetail': x = by(D().companies, r.id); return short(x ? x.name : 'компания');
       case 'requestDetail': x = by(D().requests, r.id); return short(x ? x.title : 'запрос');
       case 'contractDetail': x = by(D().contracts, r.id); return short(x ? 'договор ' + x.number : 'договор');
-      case 'clients': return r.tab === 'contacts' ? 'Клиенты' : 'Сделки';
+      case 'clients': return r.tab === 'contacts' ? 'Контакты' : 'Сделки';
       default: break;
     }
     const nav = NAV.concat(NAV_MORE, NAV_MGR, NAV_MGR_MORE).find((n) => n.id === r.view);
@@ -3721,7 +3885,7 @@
     if (tab === 'contacts') {
       const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
       const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">Рейтинг A/B/C — влияние контакта на решение. Основной помечен звездой.</div>';
-      return dxSec('users', 'Контакты сделки · ' + dealContacts(d).length, addBtn, dealContactsInner(d) + hint);
+      return dxSec('users', 'Участники сделки · ' + dealContacts(d).length, addBtn, dealContactsInner(d) + hint);
     }
     if (tab === 'docs') {
       const kpN = dealKpObjects(d).length;
@@ -4403,7 +4567,7 @@
       hero: dealHero2(d),
       acts: entityActionBar(dealActions(d)),
       state: dealState(d),
-      tabs: [['params', 'Параметры'], ['contacts', 'Контакты · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + tasksOfDeal(d).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: [['params', 'Параметры'], ['contacts', 'Участники · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + tasksOfDeal(d).length], ['docs', 'Документы'], ['history', 'История']],
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
@@ -5790,7 +5954,9 @@
     // Каждый фильтр списка клиентов пишет в своё поле — по одной строке на измерение, чтобы
     // добавленный фильтр без обработчика (селект, который ничего не делает) было видно сразу.
     [['cfPsych', 'psych'], ['cfObject', 'object'], ['cfArea', 'area'],
-     ['cfBudget', 'budget'], ['cfState', 'state'], ['cfConsent', 'consent']].forEach((p) =>
+     ['cfBudget', 'budget'], ['cfState', 'state'], ['cfConsent', 'consent'],
+     ['cfKind', 'kind'], ['cfInterest', 'interest'], ['cfObjType', 'objType'],
+     ['cfSuccess', 'success'], ['cfChannel', 'channel']].forEach((p) =>
       sel(p[0], (v) => { const patch = {}; patch[p[1]] = v; S().contactsFilters = Object.assign({}, S().contactsFilters, patch); WS.storeApi.emit(); }));
     ['dealObjType', 'dealReadiness', 'dealAgent', 'dealSrc', 'dealStage'].forEach((k) =>
       sel(k, (v) => { S()[k] = v; WS.storeApi.emit(); }));
@@ -6471,7 +6637,7 @@
   function viewCompanyDetail(id) {
     const spec = companySpec(id);
     if (!spec) return viewCompanies();
-    return entityPage(spec, 'companies', '', 'Назад к компаниям');
+    return entityPage(spec, 'clients', 'contacts', 'Назад к контактам');
   }
 
   // ---------------- ПОДБОР ПОД СДЕЛКУ (matching workspace) ----------------
@@ -7680,7 +7846,7 @@
     'Оценка объекта': { img: 'o_interior', chips: ['ROI · Project IRR · NPV', 'Финмодель в Excel', 'PDF-презентация инвестору'] },
     'Объекты и клуб': { img: 'o_creekline' },
     'Сделки': { img: 'o_bayline' },
-    'Клиенты': { img: 'o_palmcourt' },
+    'Контакты': { img: 'o_palmcourt' },
     'Входящие': { img: 'o_marina' },
     'Сопровождение': { img: 'o_bayline' },
     'Компании': { img: 'o_creekline' },
@@ -9190,6 +9356,8 @@
     if (st.view === 'concierge') mountConcierge();
     // Лента внутри карточки — тот же движок и тот же тред, что и в разделе: второго чата нет.
     if (st.view === 'dealDetail' && st.dealChat) mountConcierge();
+    // Диалог по выборке контактов — тот же движок и тот же тред: второго чата в системе нет.
+    if (st.view === 'clients' && (st.clientsTab || 'deals') === 'contacts' && st.contactsChat) mountConcierge();
     if (st.view === 'objects') bindObjects();
     bindListSearch();
     if (st.view === 'finance') renderFinance();
@@ -9218,7 +9386,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, pulseProspects, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, pulseProspects, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

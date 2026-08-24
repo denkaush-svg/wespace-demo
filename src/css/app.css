@@ -121,6 +121,15 @@ button { font-family: inherit; cursor: pointer; }
 .pulse-tabs .seg { flex: none; }
 .pulse-tabs .seg-b { white-space: nowrap; }
 .pulse-panel { margin-top: 14px; }
+/* Свёрнутая выборка контактов: одна строка над диалогом, она же — путь назад. */
+.contacts-sel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px;
+  box-shadow: var(--shadow-sm); transition: .14s var(--ease); }
+.contacts-sel:hover { border-color: var(--acc-line); background: var(--acc-soft); }
+.contacts-sel svg { width: 16px; height: 16px; color: var(--mut); flex: none; }
+.contacts-sel .cs-t { font-size: 13px; font-weight: 700; color: var(--ink); }
+.contacts-sel .cs-back { margin-left: auto; font-size: 11.5px; color: var(--mut); }
+
 .lnk-stop { border: 0; background: none; padding: 0; font: inherit; color: var(--stop); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* status / meta badges (icon + label, never color-only) */

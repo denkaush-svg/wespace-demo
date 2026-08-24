@@ -370,7 +370,7 @@
       case 'conciergeSearchClear': store.conciergeSearch = ''; api.emit(); break;
       case 'contactsFiltersToggle': store.contactsFiltersOpen = !store.contactsFiltersOpen; api.emit(); break;
       case 'clearCompaniesFilters': store.companiesSearch = ''; store.companiesFilters = { client: 'all' }; api.emit(); break;
-      case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' }; api.emit(); break;
+      case 'clearContactsFilters': store.contactsSearch = ''; store.contactsFilters = WS.CONTACT_FILTERS_DEFAULT(); api.emit(); break;
       case 'clearDealFilters': store.dealSrc = 'all'; store.dealObjType = 'all'; store.dealReadiness = 'all'; store.dealAgent = 'all'; store.dealStage = 'all'; store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSearch = ''; api.emit(); break;
       case 'closeNav': store.navOpen = false; api.emit(); break;
       case 'closeModal': WS.ui.closeModal(); break;
@@ -424,6 +424,8 @@
       case 'valXls': api.toast('Excel-финмодель сформирована из расчёта (демо-скачивание)', 'ok'); break;
       case 'download': api.toast('Файл сформирован из фикстур (демо-скачивание)', 'ok'); break;
       case 'dealChatClose': WS.ui.closeDealChat(); break;
+      case 'contactsChatOpen': WS.ui.openContactsChat(); break;
+      case 'contactsChatClose': WS.ui.closeContactsChat(); break;
       case 'archiveDeal': WS.ui.archiveDeal(t.dataset.deal); break;
       case 'saveArchive': WS.ui.saveArchive(t.dataset.deal); break;
       case 'unarchiveDeal': WS.ui.unarchiveDeal(t.dataset.deal); break;

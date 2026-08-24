@@ -1465,9 +1465,10 @@ setTimeout(async () => {
       (c.goal && subJoin.indexOf(c.goal) >= 0) || (c.areas || []).some((a) => subJoin.indexOf(a) >= 0)).map((c) => c.name);
     check('список клиентов · в строке нет запроса (цель, район)', briefLeak.length === 0, briefLeak.join(', '));
     // Взамен — то, чем человека находят и как к нему обращаются.
+    const noReach = rowSubs.filter((t) => !/\+/.test(t) && !/WhatsApp|Telegram|Email|Телефон/.test(t));
     check('список клиентов · показывает связь и последнее касание',
-      /касание/.test(subJoin) && rowSubs.every((t) => /\+/.test(t) || /WhatsApp|Telegram|Email|Телефон/.test(t)),
-      subJoin.slice(0, 120));
+      /касание/.test(subJoin) && noReach.length === 0,
+      noReach.length ? 'без способа связи: ' + noReach.join(' / ') : subJoin.slice(0, 120));
 
     // Блок связи внутри сделки и заявки — про связь, а не про условия страницы, на которой стоит.
     const metaBad = [];
@@ -5739,6 +5740,112 @@ setTimeout(async () => {
         comms.every((v, i) => i === 0 || v <= comms[i - 1] + 0.5), comms.join(' > '));
     }
     WS.store.pulseTab = 'deals';
+  }
+
+  // ---- «Контакты»: люди и компании одним списком, пять фильтров, Консьерж по выборке ----
+  {
+    WS.store.navStack = [];
+    if (WS.store.role !== 'agent') WS.storeApi.setRole('agent');
+    WS.store.contactsChat = false;
+    WS.store.contactsSearch = '';
+    WS.store.contactsFilters = WS.CONTACT_FILTERS_DEFAULT();
+    WS.store.contactType = 'all';
+    WS.store.contactsFiltersOpen = true;
+    WS.store.clientsTab = 'contacts';
+    WS.router.go('clients');
+    const view = doc.querySelector('#app .view') || doc.getElementById('app');
+
+    // 1. Раздел называется «Контакты», а не ролью одного из типов, которые в нём лежат.
+    const navLabels = [].slice.call(doc.querySelectorAll('#app .nav [data-nav], #app .drawer [data-nav]'))
+      .map((b) => b.textContent.trim());
+    check('контакты · раздел назван «Контакты»', /Контакты/.test(view.textContent), view.textContent.slice(0, 60));
+    check('контакты · отдельного пункта «Компании» в меню больше нет',
+      !navLabels.some((t) => /^Компании/.test(t)), navLabels.join(' | '));
+
+    // 2. Компании в том же списке, но ведут на свою карточку: у юрлица есть KYC и контактные лица.
+    const coRows = [].slice.call(doc.querySelectorAll('#app .contacts-list [data-company]'));
+    const peopleRows = [].slice.call(doc.querySelectorAll('#app .contacts-list [data-client]'));
+    check('контакты · компании стоят в том же списке, что и люди',
+      coRows.length === (dd().companies || []).length && peopleRows.length > 0,
+      'компаний в списке ' + coRows.length + ' из ' + (dd().companies || []).length);
+    check('контакты · строка компании ведёт на карточку компании, а не на карточку человека',
+      coRows.every((r) => !r.getAttribute('data-client')));
+
+    // 3. Компания видна в строке человека — прямая просьба партнёра.
+    const withCo = (dd().clients || []).find((c) => (dd().deals || []).some((d) => d.clientId === c.id && d.companyId));
+    if (withCo) {
+      const row = doc.querySelector('#app .contacts-list [data-client="' + withCo.id + '"]');
+      const co = (dd().companies || []).find((x) => x.id ===
+        ((dd().deals || []).find((d) => d.clientId === withCo.id && d.companyId) || {}).companyId);
+      check('контакты · в строке человека видна его компания',
+        !!row && !!co && row.textContent.indexOf(co.name) >= 0,
+        row ? row.textContent.slice(0, 100) : 'строки нет');
+    }
+
+    // 4. Пять фильтров второго пула — каждый со своим полем и своим обработчиком.
+    ['cfKind', 'cfInterest', 'cfObjType', 'cfSuccess', 'cfChannel'].forEach((id) => {
+      check('контакты · фильтр ' + id + ' есть на экране', !!doc.getElementById(id));
+    });
+    const uiSrc2 = read('js/ui.js');
+    ['kind', 'interest', 'objType', 'success', 'channel'].forEach((k) => {
+      check('контакты · фильтр «' + k + '» привязан к полю, а не нарисован',
+        uiSrc2.indexOf("['cf" + k[0].toUpperCase() + k.slice(1) + "', '" + k + "']") >= 0);
+    });
+
+    // 5. Фильтр обязан менять выборку. Тип «собственник» есть в данных — по нему и проверяем.
+    const ownersInData = (dd().clients || []).filter((c) => c.contactKind === 'owner').length;
+    check('контакты · тип контакта проставлен в данных', ownersInData > 0, 'собственников: ' + ownersInData);
+    const allN = WS.ui.contactsSearchList().length;
+    WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { kind: 'owner' });
+    const ownerList = WS.ui.contactsSearchList();
+    check('контакты · фильтр по типу сужает выборку', ownerList.length < allN && ownerList.length > 0,
+      ownerList.length + ' из ' + allN);
+    check('контакты · под фильтр «собственник» не попали компании',
+      ownerList.every((p) => !p.co), ownerList.filter((p) => p.co).map((p) => p.name).join(', '));
+    // «Есть успешная сделка» — вычисление, не поле: хранимый признак разошёлся бы с фактами.
+    WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { success: 'yes' });
+    const wonList = WS.ui.contactsSearchList();
+    const wrongWon = wonList.filter((p) => !(dd().deals || [])
+      .some((d) => (d.clientId === p.id || d.companyId === p.id) && d.stage === 'won'));
+    check('контакты · «есть успешная сделка» считается по сделкам, а не по полю',
+      wrongWon.length === 0, wrongWon.map((p) => p.name).join(', '));
+    WS.store.contactsFilters = WS.CONTACT_FILTERS_DEFAULT();
+
+    // 6. Консьерж по выборке: список сворачивается, согласие пересчитано ДО отправки.
+    WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { kind: 'buyer' });
+    WS.ui.openContactsChat();
+    const chatView = doc.querySelector('#app .view') || doc.getElementById('app');
+    check('контакты · Консьерж сворачивает выдачу в одну строку',
+      !!chatView.querySelector('.contacts-sel') && !chatView.querySelector('.contacts-list'),
+      'строка выборки: ' + !!chatView.querySelector('.contacts-sel'));
+    check('контакты · диалог открывается на этом же экране, без перехода',
+      WS.store.view === 'clients' && !!doc.getElementById('chat'), WS.store.view);
+    const reach = WS.ui.contactsReach();
+    const noConsentReal = WS.ui.contactsSearchList().filter((p) => !p.co && !p.c.consent).length;
+    check('контакты · без согласия посчитаны по данным, а не написаны словом',
+      reach.noConsent === noConsentReal && reach.reachable === reach.people - reach.noConsent,
+      'в выборке без согласия: ' + reach.noConsent + ', названо: ' + reach.noConsent);
+    if (reach.noConsent) {
+      check('контакты · и это сказано числом до отправки',
+        /без согласия/.test(chatView.textContent) && chatView.textContent.indexOf(String(reach.noConsent)) >= 0,
+        chatView.textContent.slice(0, 140));
+    }
+    // Автообзвон не делаем — и экран говорит почему, а не умалчивает.
+    check('контакты · про автообзвон сказано прямо, что мы его не делаем',
+      /автообзвон/i.test(chatView.textContent), chatView.textContent.slice(0, 200));
+    // Выборка уходит Консьержу контекстом, а не пересказом.
+    check('контакты · выборка передана Консьержу как контекст',
+      (WS.store.cgCtx || []).length === 1 && /покупатель/.test((WS.store.cgCtx[0] || {}).label || ''),
+      JSON.stringify(WS.store.cgCtx));
+    WS.ui.closeContactsChat();
+    check('контакты · возврат к списку одним касанием',
+      !!(doc.querySelector('#app .contacts-list')) && !doc.querySelector('#app .contacts-sel'));
+    WS.store.contactsFilters = WS.CONTACT_FILTERS_DEFAULT();
+    WS.store.contactsFiltersOpen = false;
+
+    // 7. Вкладка внутри сделки больше не спорит с разделом за одно слово.
+    check('контакты · вкладка внутри сделки называется «Участники»',
+      uiSrc2.indexOf("['contacts', 'Участники · '") >= 0);
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));
