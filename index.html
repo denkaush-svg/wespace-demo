@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:39</title>
+  <title>WESPACE · сборка 00:19</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:39';
+    window.WS_BUILD='00:19';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2480,6 +2480,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* История в правой части карточки: своя прокрутка, чтобы лента не выталкивала работу за экран. */
 .rp-scroll { max-height: 62vh; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
+
+/* След разобранного: с карточки не исчезает, но и не притворяется работой — свёрнут и не в счёте. */
+.ny-done > summary { cursor: pointer; font-size: 11.5px; color: var(--mut); padding: 6px 0; list-style: none; }
+.ny-done > summary::-webkit-details-marker { display: none; }
+.ny-done > summary::before { content: '▸ '; color: var(--faint); }
+.ny-done[open] > summary::before { content: '▾ '; }
 .dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
 .dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
 .dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }
@@ -14324,12 +14330,22 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      Черновик стоит здесь, а не в истории: он не часть истории, пока его не подтвердили. В ленту
      он попадает ровно в тот момент, когда становится правдой. */
   function needsYouCard(scope, id, extraHtml) {
-    const drafts = outcomesBlock(scope, id);
+    /* Требует решения только НЕразобранное: подтверждённый и отклонённый черновик решения уже
+       не ждут, и счётчик, который их считает, обещает работу, которой нет. Разобранное с карточки
+       не исчезает — иначе непонятно, почему Консьерж больше не предлагает вчерашнее, — но уходит
+       в свёрнутый след под ними и в счёт не входит. */
+    const all = outcomesFor(scope, id);
+    const pending = all.filter((x) => x.state === 'draft');
+    const settled = all.filter((x) => x.state !== 'draft');
     const rows = [];
-    if (drafts) rows.push('<div class="timeline">' + drafts + '</div>');
+    if (pending.length) rows.push('<div class="timeline">' + pending.map(outcomeRow).join('') + '</div>');
     if (extraHtml) rows.push(extraHtml);
+    if (settled.length) {
+      rows.push('<details class="ny-done"><summary>Уже разобрано · ' + settled.length + '</summary>' +
+        '<div class="timeline">' + settled.map(outcomeRow).join('') + '</div></details>');
+    }
     if (!rows.length) return '';
-    const n = outcomesFor(scope, id).length + (extraHtml ? 1 : 0);
+    const n = pending.length + (extraHtml ? 1 : 0);
     return dxSec('sparkle', 'Требует вашего решения · ' + n,
       '<span class="ny-hint">' + I('lock') + 'до подтверждения не идёт в выводы</span>',
       '<div class="ny-body">' + rows.join('') + '</div>');
@@ -14380,6 +14396,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<input class="ph-in" id="cardPrompt" type="text" autocomplete="off" placeholder="' + escAttr(placeholder) + '">' +
       '<button class="send" data-act="cardSend" aria-label="Отправить Консьержу">' + I('arrowRight') + '</button>' +
       '</div></div>';
+  }
+  // Отправка из панели: тот же экран — та же запись. Иначе панель, открытая на прошлой
+  // сделке, продолжала бы принимать поручения по ней с карточки другой.
+  function sendFromDock(text) {
+    bindDockToScreen();
+    WS.router.routePrompt(text);
   }
   /* Отправка из карточки: панель открывается привязанной к записи, экран под ней не
      перестраивается. Привязка делается ВСЕГДА, а не только при закрытой панели: панель,
@@ -17275,7 +17297,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    screenContext, screenContextLabel, toggleCgDock, sendFromCard, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -17458,9 +17480,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      не словесные символы, границы между ними нет. Первая версия этого правила молча не
      срабатывала ни разу, поэтому граница слова выписана явно. */
   const DEMONSTRATIVE = /(^|[^а-яёa-z])(эт(?:ой|у|ому|ом|от|а|о|и)|здесь|тут|текущ\w*|по ней|по нему)(?![а-яё])/i;
+  /* Вопрос про МНОЖЕСТВО, а не про открытую запись. Читается в двух местах — при разборе
+     области вопроса и при уточнении, — поэтому живёт одним определением: два списка слов
+     разъехались бы на первой же правке. */
+  const GLOBAL = /сколько|скольк|всего|все\s|всех|список|перечисл|покажи|показать|дай |выведи|в работе|по всем|у меня|воронк|конверси/i;
   // Слово, которым называют саму открытую запись. «Сделай саммари СДЕЛКИ», стоя на сделке, —
   // это вопрос про неё, даже когда указательного слова нет вовсе.
-  const KIND_WORD = { 'сделка': /сделк/i, 'запрос': /заявк|запрос/i, 'контакт': /контакт|клиент/i,
+  const KIND_WORD = { 'сделка': /сделк|сдело/i, 'запрос': /заяв|запрос/i, 'контакт': /контакт|клиент/i,
     'компания': /компан/i, 'объект': /объект|лот/i };
   /* Вопрос, заданный из-под карточки, — вопрос про эту карточку.
      Раньше «сделай саммари сделки» уходило в общую аналитику и возвращалось сводкой по всему
@@ -17473,11 +17499,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (!rec) return null;
     const t = lc(text || '');
     const named = findEntity(text);
-    // Назвали другого человека — значит, спрашивают не про открытую запись.
-    if (named && named.name && rec.клиент && lc(named.name) !== lc(rec.клиент)) return null;
+    /* Назвали кого-то вслух — значит, спрашивают не про открытую запись. Сверяем со ВСЕМИ
+       именами, которые эта запись законно покрывает: её клиентом и её собственным названием.
+       Прежняя проверка смотрела только на клиента, и на карточке компании вопрос «что по
+       компании N» возвращал сводку по открытой компании, а не по названной. */
+    const own = [rec.клиент, (rec.тип === 'контакт' || rec.тип === 'компания') ? rec.название : null]
+      .filter(Boolean).map(lc);
+    if (named && named.name && own.indexOf(lc(named.name)) < 0) return null;
     // «Сколько сделок в работе», «покажи все сделки» — вопрос про множество, а не про открытую
     // запись. Указательное слово перевешивает: «сколько задач по этой сделке» — снова про неё.
-    const GLOBAL = /сколько|скольк|всего|все\s|всех|список|в работе|по всем|у меня|воронк|конверси/i;
     if (GLOBAL.test(t) && !DEMONSTRATIVE.test(t)) return null;
     const kw = KIND_WORD[rec.тип];
     if (!DEMONSTRATIVE.test(t) && !(kw && kw.test(t))) return null;
@@ -17589,7 +17619,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     stage: /стади|перевед|перенеси\s+в|этап/,
     send: /отправ|напиши\s+(письмо|сообщ)|составь\s+письмо|подготовь\s+(письмо|сообщ)|whatsapp|ватсап/,
     nav: /открой|перейди|покажи\s+(экран|раздел)/,
-    ask: /сколько|скольк|какая|какой|каков|сумма|итог|статус|состояни|что\s+(по|с|у)|покажи|дай/,
+    ask: /сколько|скольк|какая|какой|каков|сумма|итог|статус|состояни|что\s+(по|с|у|просроч|горит|дальше|мешает)|покажи|дай/,
   };
 
   const METRIC_HINTS = [
@@ -17601,7 +17631,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     [/контакт|клиент/, ['clients_total', 'clients_no_consent']],
     [/объект/, ['objects_total']],
     [/компан/, ['companies_total']],
-    [/сделк|работе|активн|пайплайн|сумм/, ['deals_active', 'deals_active_sum']],
+    [/заяв|лид/, ['requests_total', 'requests_hot']],
+    [/сделк|сдело|работе|активн|пайплайн|сумм/, ['deals_active', 'deals_active_sum']],
   ];
 
   // Spoken stage names → keys. Ordered longest-intent first: «подготовк» must win over «работ»,
@@ -17721,13 +17752,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     /* Когда открыта карточка, «не понял» не должно превращаться в инвентарь рабочего места:
        брокер стоит на конкретной сделке, и общий список коллекций к его вопросу отношения не
        имеет. Уточняем — про ЭТУ запись, называя её по имени. */
-    const scrRec = (WS.ui && WS.ui.screenContext) ? (WS.ui.screenContext().запись || null) : null;
+    const scrRec = (!GLOBAL.test(t) && WS.ui && WS.ui.screenContext)
+      ? (WS.ui.screenContext().запись || null) : null;
     const lines = askedArea
       ? ['Этого района в нашем срезе рынка нет. Есть: ' + areas.join(', ') + '.',
          'Могу разобрать любой — цену за метр, доходность, срок экспозиции.']
       : scrRec
         ? ['Не понял вопрос. Вы стоите на записи «' + scrRec.название + '» — уточните, что по ней нужно:',
-           'бриф к звонку, что мешает закрыть, что просрочено, история переписки, следующий шаг.']
+           'что по этой сделке, что мешает закрыть эту сделку, что дальше по сделке, бриф к звонку.']
         : ['Такого у нас в данных нет. Что есть: ' + know.join(', ') + '.',
            'Скажите, что из этого посмотреть.'];
     return {
@@ -17863,7 +17895,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       /* Счётчик — ответ на вопрос «сколько». Когда открыта карточка, ответить счётчиком на
          вопрос о свойстве («какой этаж у объекта» → «12 объектов») значит выдать левую
          информацию вместо ответа; лучше уточнить. Вне карточки поведение прежнее. */
-      const QUANTITY = /сколько|скольк|количеств|сумм|итог|всего|объ[её]м|покажи|дай|список|выведи|статус|состояни/i;
+      const QUANTITY = /сколько|скольк|количеств|сумм|итог|всего|объ[её]м|покажи|дай|список|выведи|статус|состояни|что\s|чего\s/i;
       const onCard = !!((WS.ui && WS.ui.screenContext) ? WS.ui.screenContext().запись : null);
       const hit = (onCard && !QUANTITY.test(t)) ? null : METRIC_HINTS.find((h) => h[0].test(t));
       if (hit) {
@@ -19700,6 +19732,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return WS.engine.freeReply(text);
   }
   WS.router.routePrompt = routePrompt;
+  // Список фраз-ярлыков наружу: подсказка, которую система даёт брокеру, обязана состоять из
+  // того, что она понимает, — либо планировщиком, либо этим списком. Проверять это можно только
+  // зная обе половины.
+  WS.router.promptShortcuts = () => Object.keys(PROMPT_SHORTCUTS);
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
 
@@ -20050,7 +20086,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
-      case 'cgDockSend': routePrompt(promptValue('cgDockPrompt')); break;
+      case 'cgDockSend': WS.ui.sendFromDock(promptValue('cgDockPrompt')); break;
       // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
       case 'cardSend': WS.ui.sendFromCard(); break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
@@ -20146,7 +20182,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     }
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
-    if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
+    if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); WS.ui.sendFromDock(promptValue('cgDockPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cardPrompt') { e.preventDefault(); WS.ui.sendFromCard(); }
     if (e.key === 'Enter' && e.target.id === 'dealChatPrompt') { e.preventDefault(); routePrompt(promptValue('dealChatPrompt')); }
     // Deal title inline edit: save on Enter, restore on Escape

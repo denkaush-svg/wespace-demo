@@ -2330,6 +2330,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
 /* История в правой части карточки: своя прокрутка, чтобы лента не выталкивала работу за экран. */
 .rp-scroll { max-height: 62vh; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
+
+/* След разобранного: с карточки не исчезает, но и не притворяется работой — свёрнут и не в счёте. */
+.ny-done > summary { cursor: pointer; font-size: 11.5px; color: var(--mut); padding: 6px 0; list-style: none; }
+.ny-done > summary::-webkit-details-marker { display: none; }
+.ny-done > summary::before { content: '▸ '; color: var(--faint); }
+.ny-done[open] > summary::before { content: '▾ '; }
 .dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
 .dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
 .dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }

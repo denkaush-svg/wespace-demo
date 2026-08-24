@@ -84,6 +84,10 @@
     return WS.engine.freeReply(text);
   }
   WS.router.routePrompt = routePrompt;
+  // Список фраз-ярлыков наружу: подсказка, которую система даёт брокеру, обязана состоять из
+  // того, что она понимает, — либо планировщиком, либо этим списком. Проверять это можно только
+  // зная обе половины.
+  WS.router.promptShortcuts = () => Object.keys(PROMPT_SHORTCUTS);
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
 
@@ -434,7 +438,7 @@
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
-      case 'cgDockSend': routePrompt(promptValue('cgDockPrompt')); break;
+      case 'cgDockSend': WS.ui.sendFromDock(promptValue('cgDockPrompt')); break;
       // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
       case 'cardSend': WS.ui.sendFromCard(); break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
@@ -530,7 +534,7 @@
     }
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
-    if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
+    if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); WS.ui.sendFromDock(promptValue('cgDockPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cardPrompt') { e.preventDefault(); WS.ui.sendFromCard(); }
     if (e.key === 'Enter' && e.target.id === 'dealChatPrompt') { e.preventDefault(); routePrompt(promptValue('dealChatPrompt')); }
     // Deal title inline edit: save on Enter, restore on Escape

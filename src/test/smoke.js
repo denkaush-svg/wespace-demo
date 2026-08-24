@@ -4300,6 +4300,41 @@ setTimeout(async () => {
         iNeed === 0 && iPlan > iNeed, heads.slice(0, 4).join(' | '));
       check('карточка · и «Итогов на подтверждение» на экране больше нет',
         heads.every((h) => !/Итоги на подтверждение/.test(h)), heads.join(' | '));
+      /* Счёт в заголовке — обещание работы. Разобранный черновик работы не требует, и считать
+         его значит обещать то, чего нет; но с карточки он не исчезает — иначе непонятно, почему
+         Консьерж больше не предлагает вчерашнее. Он уходит в свёрнутый след и в счёт не входит. */
+      {
+        /* Разобранное заводится ЗДЕСЬ ЖЕ: иначе в фикстурах его может не быть вовсе, и проверка
+           «считает только неразобранное» окажется пустой — она пройдёт, ничего не измерив. */
+        const probe = WS.ui.addOutcomeDraft('deal', 'd_anna', { text: 'Пробный итог для проверки счётчика.' });
+        WS.ui.rejectOutcome(probe.id);
+        WS.ui.dealCard('d_anna');
+        const heads2 = [].slice.call(doc.querySelectorAll('#app .view .dcard-main .dx-sec-h'))
+          .map((h) => h.textContent.trim());
+        const all2 = (dd().outcomes || []).filter((x) => x.scope === 'deal' && x.entityId === 'd_anna');
+        const pend2 = all2.filter((x) => x.state === 'draft').length;
+        const done2 = all2.length - pend2;
+        const head2 = heads2[0] || '';
+        const shown = parseInt((head2.match(/·\s*(\d+)/) || [])[1], 10);
+        // Счёт складывается из неразобранных черновиков и строки о значениях, предложенных
+        // моделью. Считаем его состав, а не «примерно столько»: иначе разобранное могло бы
+        // попасть в счёт и остаться незамеченным.
+        const aiRows = doc.querySelectorAll('#app .view .dcard-main .ny-row').length;
+        check('карточка · счётчик считает только неразобранное',
+          done2 > 0 && shown === pend2 + aiRows,
+          head2 + ' при неразобранных ' + pend2 + ', разобранных ' + done2 + ', строках модели ' + aiRows);
+        check('карточка · и разобранное осталось следом, но свёрнутым',
+          !!doc.querySelector('#app .view .ny-done') &&
+          doc.querySelector('#app .view .ny-done').tagName === 'DETAILS' &&
+          !doc.querySelector('#app .view .ny-done').open &&
+          doc.querySelector('#app .view .ny-done').textContent.indexOf(String(done2)) >= 0,
+          'разобранных ' + done2);
+        // Пробную запись убираем: она была нужна ровно на две проверки.
+        const arr = dd().outcomes;
+        const at = arr.findIndex((x) => x.id === probe.id);
+        if (at >= 0) arr.splice(at, 1);
+        WS.ui.dealCard('d_anna');
+      }
       // Значения, предложенные моделью, названы счётом и путём к ним — а не продублированы.
       const dl = (dd().deals || []).find((x) => x.id === 'd_anna') || {};
       const aiN = Object.keys(dl.prov || {}).filter((k) => dl.prov[k] === 'ai').length;
@@ -5401,6 +5436,55 @@ setTimeout(async () => {
          ровно «о_чём» и «id», и контекст, уехавший отдельным полем, до модели не доходил. */
       check('консьерж · описание разговора называет открытую запись',
         /о_чём:\s*about/.test(liveSrc) && /WS\.ui\.screenContext/.test(liveSrc));
+      /* Вопрос про МНОЖЕСТВО остаётся глобальным при любом глаголе: «покажи сделки» и «дай
+         список заявок», заданные с карточки, — про коллекцию, а не про открытую запись. */
+      ['покажи сделки', 'дай список заявок', 'сколько сделок в работе'].forEach((q) => {
+        const a = WS.agent.ask(q);
+        check('консьерж · «' + q + '» остаётся вопросом про множество',
+          a.text.indexOf(dl.title) < 0 && /\d/.test(a.text), (a.text || '').slice(0, 110));
+      });
+      /* Родительный множественного роняет корень: «сделок» не содержит «сделк», «заявок» не
+         содержит «заявк». На этом молча ломались и разбор области, и подсказки показателей. */
+      ['сколько сделок', 'сколько заявок'].forEach((q) => {
+        const a = WS.agent.ask(q);
+        check('консьерж · «' + q + '» разобрано, а не отбито «такого нет в данных»',
+          /\d/.test(a.text) && a.text.indexOf('Такого у нас в данных нет') < 0, (a.text || '').slice(0, 110));
+      });
+      /* Уточнение не должно предлагать формулировки, которых планировщик сам не понимает:
+         это замкнутый круг — система советует спросить то, на что ответит «не понял». */
+      {
+        /* Разбираем то, что подсказка ДЕЙСТВИТЕЛЬНО предлагает, а не список, который проверка
+           сама же и ждёт: последнее предложение ответа, разобранное по запятым. Иначе проверка
+           подтверждает собственные ожидания и молчит, когда подсказку перепишут. */
+        const ask = WS.agent.ask('какой этаж у объекта');
+        const tail = String(ask.text || '').split(':').pop();
+        const offered = tail.replace(/[.«»]/g, '').split(/[,;]/)
+          .map((x) => x.trim()).filter((x) => x.length > 8);
+        const short = (WS.router.promptShortcuts ? WS.router.promptShortcuts() : []);
+        const deaf = offered.filter((q) => short.indexOf(q.toLowerCase()) < 0 &&
+          /Не понял вопрос|Такого у нас в данных нет/.test((WS.agent.ask(q) || {}).text || ''));
+        check('консьерж · уточнение предлагает только то, что сам понимает',
+          offered.length >= 2 && deaf.length === 0,
+          'не понял: ' + deaf.join(' | ') + ' (предложено: ' + offered.join(' | ') + ')');
+      }
+      /* Ввод в самой панели привязывается к открытому экрану так же, как ввод из карточки:
+         иначе панель, открытая на прошлой сделке, принимала бы поручения по ней с карточки другой. */
+      const otherDeal = (dd().deals || []).find((x) => x.id !== 'd_anna' && !WS.ui.dealArchived(x));
+      if (otherDeal) {
+        WS.store.cgDock = false;
+        WS.ui.dealCard('d_anna');
+        WS.ui.toggleCgDock();
+        WS.ui.dealCard(otherDeal.id);
+        // Настоящий клик по кнопке отправки в панели, а не вызов функции: именно на этом пути
+        // поручение и доставалось прошлой сделке.
+        const dockSend = doc.querySelector('#cgdock [data-act="cgDockSend"]');
+        if (dockSend) dockSend.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        else WS.ui.sendFromDock('');
+        check('консьерж · ввод в панели тоже уходит в тред открытой записи',
+          (WS.engine.activeThread() || {}).id === 'deal:' + otherDeal.id,
+          ((WS.engine.activeThread() || {}).id || 'нет треда') + ' вместо deal:' + otherDeal.id);
+        WS.store.cgDock = false; WS.ui.renderCgDock(); WS.ui.dealCard('d_anna');
+      }
       // Панель, открытая круглой кнопкой, привязывается к тому, что открыто. Тред сбрасывается
       // напрямую: openThread уводит на раздел Консьержа, и экран перестал бы быть сделкой.
       WS.store.cgDock = false;

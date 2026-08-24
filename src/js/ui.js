@@ -7119,12 +7119,22 @@
      Черновик стоит здесь, а не в истории: он не часть истории, пока его не подтвердили. В ленту
      он попадает ровно в тот момент, когда становится правдой. */
   function needsYouCard(scope, id, extraHtml) {
-    const drafts = outcomesBlock(scope, id);
+    /* Требует решения только НЕразобранное: подтверждённый и отклонённый черновик решения уже
+       не ждут, и счётчик, который их считает, обещает работу, которой нет. Разобранное с карточки
+       не исчезает — иначе непонятно, почему Консьерж больше не предлагает вчерашнее, — но уходит
+       в свёрнутый след под ними и в счёт не входит. */
+    const all = outcomesFor(scope, id);
+    const pending = all.filter((x) => x.state === 'draft');
+    const settled = all.filter((x) => x.state !== 'draft');
     const rows = [];
-    if (drafts) rows.push('<div class="timeline">' + drafts + '</div>');
+    if (pending.length) rows.push('<div class="timeline">' + pending.map(outcomeRow).join('') + '</div>');
     if (extraHtml) rows.push(extraHtml);
+    if (settled.length) {
+      rows.push('<details class="ny-done"><summary>Уже разобрано · ' + settled.length + '</summary>' +
+        '<div class="timeline">' + settled.map(outcomeRow).join('') + '</div></details>');
+    }
     if (!rows.length) return '';
-    const n = outcomesFor(scope, id).length + (extraHtml ? 1 : 0);
+    const n = pending.length + (extraHtml ? 1 : 0);
     return dxSec('sparkle', 'Требует вашего решения · ' + n,
       '<span class="ny-hint">' + I('lock') + 'до подтверждения не идёт в выводы</span>',
       '<div class="ny-body">' + rows.join('') + '</div>');
@@ -7175,6 +7185,12 @@
       '<input class="ph-in" id="cardPrompt" type="text" autocomplete="off" placeholder="' + escAttr(placeholder) + '">' +
       '<button class="send" data-act="cardSend" aria-label="Отправить Консьержу">' + I('arrowRight') + '</button>' +
       '</div></div>';
+  }
+  // Отправка из панели: тот же экран — та же запись. Иначе панель, открытая на прошлой
+  // сделке, продолжала бы принимать поручения по ней с карточки другой.
+  function sendFromDock(text) {
+    bindDockToScreen();
+    WS.router.routePrompt(text);
   }
   /* Отправка из карточки: панель открывается привязанной к записи, экран под ней не
      перестраивается. Привязка делается ВСЕГДА, а не только при закрытой панели: панель,
@@ -10070,7 +10086,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    screenContext, screenContextLabel, toggleCgDock, sendFromCard, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
