@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 14:08</title>
+  <title>WESPACE · сборка 14:30</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='14:08';
+    window.WS_BUILD='14:30';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5458,6 +5458,113 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
 
   WS.query = { run: run, collections: collections, operators: () => Object.keys(OPS), aggregates: () => AGGS.slice() };
+})(window.WS = window.WS || {});
+
+</script>
+  <script>
+// Unified audience calculation module
+// Calculates who can be contacted based on consent rules
+(function (WS) {
+  const EXCLUSION_REASONS = [
+    'нет согласия',
+    'согласие унаследовано, источник его не имеет',
+    'нет канала связи'
+  ];
+
+  function getEffectiveConsent(recipient, options, allClients) {
+    // Recipient has direct consent field: use it immediately
+    if (recipient.consent !== undefined) {
+      return recipient.consent;
+    }
+
+    // Recipient has own clientId: look up consent in allClients
+    if (recipient.clientId) {
+      const client = allClients.find(c => c.id === recipient.clientId);
+      return client ? client.consent : undefined;
+    }
+
+    // Recipient is participant without own clientId: inherit from deal client
+    if (options && options.dealClients && options.dealClients.length > 0) {
+      const dealClient = options.dealClients[0];
+      return dealClient.consent;
+    }
+
+    return undefined;
+  }
+
+  function calculateAudience(recipients, options) {
+    // Handle the case where recipients is empty or not provided
+    if (!recipients || !Array.isArray(recipients)) {
+      recipients = [];
+    }
+
+    // Get all clients from WS.store.data
+    const allClients = (typeof WS !== 'undefined' && WS.store && WS.store.data && WS.store.data.clients)
+      ? WS.store.data.clients
+      : [];
+
+    const suitable = [];
+    const excluded = [];
+
+    recipients.forEach(recipient => {
+      const consent = getEffectiveConsent(recipient, options, allClients);
+
+      // Check for channel before consent: if there is no channel to contact, exclude immediately
+      if (!recipient.channel && consent !== false) {
+        excluded.push({
+          id: recipient.id,
+          consent: consent,
+          reason: 'нет канала связи'
+        });
+        return;
+      }
+
+      if (consent === true) {
+        suitable.push({
+          id: recipient.id,
+          consent: true
+        });
+      } else if (consent === false) {
+        excluded.push({
+          id: recipient.id,
+          consent: false,
+          reason: 'нет согласия'
+        });
+      } else if (consent === undefined && options && options.dealClients) {
+        // Inherited consent is undefined: means deal client had no consent field
+        excluded.push({
+          id: recipient.id,
+          consent: undefined,
+          reason: 'согласие унаследовано, источник его не имеет'
+        });
+      } else {
+        // No consent information available
+        excluded.push({
+          id: recipient.id,
+          consent: undefined,
+          reason: 'нет согласия'
+        });
+      }
+    });
+
+    return {
+      suitable: suitable,
+      excluded: excluded,
+      stats: {
+        total: recipients.length,
+        excluded: excluded.length
+      }
+    };
+  }
+
+  function getExclusionReasons() {
+    return EXCLUSION_REASONS;
+  }
+
+  return WS.audience = {
+    calculateAudience: calculateAudience,
+    getExclusionReasons: getExclusionReasons
+  };
 })(window.WS = window.WS || {});
 
 </script>
@@ -12568,9 +12675,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
        У участника без своей карточки контакта собственного согласия нет: он появился в сделке
        через клиента, и его согласием мы считаем клиентское. Пропускать такого адресата
        «потому что записи нет» значило бы обойти правило именем в свободном поле. */
-    const cid = p.clientId || (who && who.clientId);
-    const c = cid ? D().clients.find((x) => x.id === cid) : null;
-    if (c && c.consent === false) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
+    const dealClient = who ? D().clients.find((x) => x.id === who.clientId) : null;
+    const audit = WS.audience.calculateAudience([p], { dealClients: dealClient ? [dealClient] : [] });
+    if (audit.excluded.length > 0) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
     o.state = 'sent';
     o.sentTo = contactDisplayName(p);
     o.sentAt = WS.storeApi.clockLabel().date;
@@ -15593,10 +15700,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   // Партнёры — co-broking network.
   const PARTNERS = [
-    { name: 'Whitewill', focus: 'Off-plan · Downtown, Business Bay', deals: 3, split: '50 / 50', status: 'active' },
-    { name: 'Metropolitan Premium', focus: 'Готовое жильё · Palm, Marina', deals: 2, split: '50 / 50', status: 'active' },
-    { name: 'STONE · застройщик', focus: 'Собственные проекты · эксклюзив', deals: 1, split: 'по проекту', status: 'active' },
-    { name: 'Кирилл · частный брокер', focus: 'Клубные покупатели', deals: 1, split: '50 / 50', status: 'pending' },
+    { id: 'p_whitewill', name: 'Whitewill', focus: 'Off-plan · Downtown, Business Bay', deals: 3, split: '50 / 50', status: 'active', channel: 'email', consent: true },
+    { id: 'p_metro', name: 'Metropolitan Premium', focus: 'Готовое жильё · Palm, Marina', deals: 2, split: '50 / 50', status: 'active', channel: 'email', consent: true },
+    { id: 'p_stone', name: 'STONE · застройщик', focus: 'Собственные проекты · эксклюзив', deals: 1, split: 'по проекту', status: 'active', channel: 'email', consent: true },
+    { id: 'p_kirill', name: 'Кирилл · частный брокер', focus: 'Клубные покупатели', deals: 1, split: '50 / 50', status: 'pending', channel: 'email', consent: false },
   ];
   // Профессиональная сеть за пределами co-broking: посредники, представители застройщиков, ипотека.
   const NETWORK_INTER = [
@@ -16083,18 +16190,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const creatives = [ph, WS.photos && WS.photos.o_interior, WS.photos && WS.photos.o_marina].filter(Boolean).slice(0, 3)
       .map((src) => '<div style="width:92px;height:66px;border-radius:8px;border:1px solid var(--line);background:#eee url(' + src + ') center/cover"></div>').join('');
     const recipRows = (typeof PARTNERS !== 'undefined' ? PARTNERS : []).map((p) => '<label class="feed-row" style="cursor:pointer"><input type="checkbox" checked style="margin:0 10px 0 0;accent-color:var(--acc)"><div class="ft"><div class="t">' + p.name + '</div><div class="m">' + p.focus + '</div></div></label>').join('');
+    const clubMembers = D().clients.filter(c => c.ctype === 'investor');
+    const auditClub = WS.audience.calculateAudience(clubMembers);
+    const contactsWithConsent = D().clients.filter(c => c.consent !== false).length;
     const CHANNELS = [
       ['handshake', 'Партнёрская сеть', recips + ' партнёра · co-broking', true],
       ['building', 'Property Finder', 'листинг · ~2 400 просмотров/нед', true],
       ['grid', 'Bayut', 'листинг · ~1 800 просмотров/нед', false],
       ['star', 'Соцсети (Instagram)', 'пост + сторис · ~5 000 охват', false],
       ['star', 'Клубная рассылка', 'инвесторы клуба · закрытый пул', true],
-      ['mail', 'Email-дайджест', 'база клиентов · 320 контактов', false],
+      ['mail', 'Email-дайджест', 'база клиентов · ' + contactsWithConsent + ' контактов', false],
     ];
     const channelRows = CHANNELS.map((c) => '<label class="feed-row" style="cursor:pointer"><input type="checkbox" ' + (c[3] ? 'checked' : '') + ' style="margin:0 10px 0 0;accent-color:var(--acc)"><div class="fi i-mut">' + I(c[0]) + '</div><div class="ft"><div class="t">' + c[1] + '</div><div class="m">' + c[2] + '</div></div></label>').join('');
     const focus =
       '<div class="promo-focus">' +
-      '<div class="pf-cell"><div class="pf-v">~9 200</div><div class="pf-l">охват · контактов</div></div>' +
+      '<div class="pf-cell"><div class="pf-v">' + contactsWithConsent + '</div><div class="pf-l">контактов клуба · инвесторы</div></div>' +
+      '<div class="pf-cell"><div class="pf-v">' + auditClub.excluded.length + ' исключены</div><div class="pf-l">без согласия</div></div>' +
       '<div class="pf-cell"><div class="pf-v">12–18</div><div class="pf-l">откликов за 7 дней</div></div>' +
       '<div class="pf-cell pf-cell--cost"><div class="pf-v">' + WS.AED(cost) + '</div><div class="pf-l">стоимость рассылки · ' + WS.AED(perMsg) + '/сообщение</div></div>' +
       '</div>';
@@ -16711,7 +16822,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     dealTransferForm, saveTransfer, dealPartnerForm, savePartner,
     offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
+  WS.partners = PARTNERS;
 })(window.WS = window.WS || {});
+
 
 </script>
   <script>
@@ -19265,7 +19378,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'psychSave': WS.ui.savePsychForm(t.dataset.cid); break;
       case 'dealsView': store.dealsView = t.dataset.v; api.emit(); break;
       case 'netTab': store.netTab = t.dataset.nettab; api.emit(); break;
-      case 'netMsg': store.netSel = t.dataset.nettarget; store.netTab = 'contacts'; api.emit(); break;
+      case 'netMsg': {
+        store.netSel = t.dataset.nettarget;
+        store.netTab = 'contacts';
+        // Check partner consent before enabling message
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен', 'warn');
+          break;
+        }
+        const partners = WS.partners;
+        if (partners.length > 0) {
+          const audit = WS.audience.calculateAudience(partners);
+          if (audit.excluded.length > 0) {
+            api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+          }
+        }
+        api.emit();
+        break;
+      }
       case 'toggleMenuSet': store.setMenuOpen = !store.setMenuOpen; api.emit(); break;
       case 'newDeal': WS.ui.openDealForm(t.dataset.cid); break;
       case 'createDeal': WS.ui.createDeal(); break;
@@ -19345,11 +19475,60 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'newThread': WS.ui.openNewThread(); break;
       case 'finReset': if (store.finModel) { const o = store.data.objects.find((x) => x.id === store.finModel.objectId); store.finModel = Object.assign(api.clone(store.data.refModel), { objectId: o ? o.id : 'o_creekline', price: o ? o.price : store.data.refModel.price, scenario: 'base' }); WS.ui.openFinance(store.finModel.objectId); } break;
       case 'openKp': WS.ui.openKp(); break;
-      case 'kpSend': WS.ui.closeModal(); api.toast('КП отправлено клиенту на подпись (A2 · delivered)', 'ok'); break;
+      case 'kpSend': {
+        const deal = store.data.deals.find(d => d.id === store.dealId);
+        if (deal) {
+          const client = store.data.clients.find(c => c.id === deal.clientId);
+          if (client) {
+            const audit = WS.audience.calculateAudience([{id: client.id, clientId: client.id}]);
+            if (audit.excluded.length > 0) {
+              api.toast('Клиент без согласия — КП не отправляется', 'warn');
+              break;
+            }
+            if (audit.suitable.length === 0) {
+              api.toast('Нет подходящих адресатов — КП отправлено не будет', 'warn');
+              break;
+            }
+          }
+        }
+        WS.ui.closeModal();
+        api.toast('КП отправлено клиенту на подпись (A2 · delivered)', 'ok');
+        break;
+      }
       case 'openXls': WS.ui.openXls(); break;
-      case 'promoSend': WS.ui.closeModal(); api.toast('Рассылка отправлена профильным партнёрам · отклики появятся во «Входящих»', 'ok'); break;
+      case 'promoSend': {
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен — рассылку отправить невозможно', 'warn');
+          break;
+        }
+        const partners = WS.partners;
+        const audit = WS.audience.calculateAudience(partners);
+        WS.ui.closeModal();
+        if (audit.excluded.length > 0) {
+          api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+        }
+        if (audit.suitable.length === 0) {
+          api.toast('Нет подходящих адресатов — рассылка отправлена не будет', 'warn');
+          break;
+        }
+        api.toast('Рассылка отправлена профильным партнёрам · отклики появятся во «Входящих»', 'ok');
+        break;
+      }
       case 'clubPost': WS.ui.openClubPost(); break;
-      case 'clubPostSend': WS.ui.closeModal(); api.toast('Объект размещён в клубной витрине (демо)', 'ok'); break;
+      case 'clubPostSend': {
+        const clubMembers = store.data.clients.filter(c => c.ctype === 'investor');
+        const audit = WS.audience.calculateAudience(clubMembers);
+        WS.ui.closeModal();
+        if (audit.excluded.length > 0) {
+          api.toast('Некоторые инвесторы клуба без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+        }
+        if (audit.suitable.length === 0) {
+          api.toast('Нет подходящих адресатов — размещение отменяется', 'warn');
+          break;
+        }
+        api.toast('Объект размещён в клубной витрине (демо)', 'ok');
+        break;
+      }
       case 'clubReqSend': WS.ui.closeModal(); api.toast('Заявка отправлена владельцу листинга в клубе (демо)', 'ok'); break;
       case 'svcReqSend': WS.ui.closeModal(); api.toast('Заявка на услугу отправлена · появится во «Входящих» (демо)', 'ok'); break;
       case 'walletTopup': WS.ui.openWalletTopup(); break;
@@ -19566,6 +19745,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';
   }
 })(window.WS = window.WS || {});
+
 
 </script>
 </body>

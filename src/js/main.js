@@ -340,7 +340,24 @@
       case 'psychSave': WS.ui.savePsychForm(t.dataset.cid); break;
       case 'dealsView': store.dealsView = t.dataset.v; api.emit(); break;
       case 'netTab': store.netTab = t.dataset.nettab; api.emit(); break;
-      case 'netMsg': store.netSel = t.dataset.nettarget; store.netTab = 'contacts'; api.emit(); break;
+      case 'netMsg': {
+        store.netSel = t.dataset.nettarget;
+        store.netTab = 'contacts';
+        // Check partner consent before enabling message
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен', 'warn');
+          break;
+        }
+        const partners = WS.partners;
+        if (partners.length > 0) {
+          const audit = WS.audience.calculateAudience(partners);
+          if (audit.excluded.length > 0) {
+            api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+          }
+        }
+        api.emit();
+        break;
+      }
       case 'toggleMenuSet': store.setMenuOpen = !store.setMenuOpen; api.emit(); break;
       case 'newDeal': WS.ui.openDealForm(t.dataset.cid); break;
       case 'createDeal': WS.ui.createDeal(); break;
@@ -420,11 +437,60 @@
       case 'newThread': WS.ui.openNewThread(); break;
       case 'finReset': if (store.finModel) { const o = store.data.objects.find((x) => x.id === store.finModel.objectId); store.finModel = Object.assign(api.clone(store.data.refModel), { objectId: o ? o.id : 'o_creekline', price: o ? o.price : store.data.refModel.price, scenario: 'base' }); WS.ui.openFinance(store.finModel.objectId); } break;
       case 'openKp': WS.ui.openKp(); break;
-      case 'kpSend': WS.ui.closeModal(); api.toast('КП отправлено клиенту на подпись (A2 · delivered)', 'ok'); break;
+      case 'kpSend': {
+        const deal = store.data.deals.find(d => d.id === store.dealId);
+        if (deal) {
+          const client = store.data.clients.find(c => c.id === deal.clientId);
+          if (client) {
+            const audit = WS.audience.calculateAudience([{id: client.id, clientId: client.id}]);
+            if (audit.excluded.length > 0) {
+              api.toast('Клиент без согласия — КП не отправляется', 'warn');
+              break;
+            }
+            if (audit.suitable.length === 0) {
+              api.toast('Нет подходящих адресатов — КП отправлено не будет', 'warn');
+              break;
+            }
+          }
+        }
+        WS.ui.closeModal();
+        api.toast('КП отправлено клиенту на подпись (A2 · delivered)', 'ok');
+        break;
+      }
       case 'openXls': WS.ui.openXls(); break;
-      case 'promoSend': WS.ui.closeModal(); api.toast('Рассылка отправлена профильным партнёрам · отклики появятся во «Входящих»', 'ok'); break;
+      case 'promoSend': {
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен — рассылку отправить невозможно', 'warn');
+          break;
+        }
+        const partners = WS.partners;
+        const audit = WS.audience.calculateAudience(partners);
+        WS.ui.closeModal();
+        if (audit.excluded.length > 0) {
+          api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+        }
+        if (audit.suitable.length === 0) {
+          api.toast('Нет подходящих адресатов — рассылка отправлена не будет', 'warn');
+          break;
+        }
+        api.toast('Рассылка отправлена профильным партнёрам · отклики появятся во «Входящих»', 'ok');
+        break;
+      }
       case 'clubPost': WS.ui.openClubPost(); break;
-      case 'clubPostSend': WS.ui.closeModal(); api.toast('Объект размещён в клубной витрине (демо)', 'ok'); break;
+      case 'clubPostSend': {
+        const clubMembers = store.data.clients.filter(c => c.ctype === 'investor');
+        const audit = WS.audience.calculateAudience(clubMembers);
+        WS.ui.closeModal();
+        if (audit.excluded.length > 0) {
+          api.toast('Некоторые инвесторы клуба без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+        }
+        if (audit.suitable.length === 0) {
+          api.toast('Нет подходящих адресатов — размещение отменяется', 'warn');
+          break;
+        }
+        api.toast('Объект размещён в клубной витрине (демо)', 'ok');
+        break;
+      }
       case 'clubReqSend': WS.ui.closeModal(); api.toast('Заявка отправлена владельцу листинга в клубе (демо)', 'ok'); break;
       case 'svcReqSend': WS.ui.closeModal(); api.toast('Заявка на услугу отправлена · появится во «Входящих» (демо)', 'ok'); break;
       case 'walletTopup': WS.ui.openWalletTopup(); break;
@@ -641,3 +707,4 @@
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';
   }
 })(window.WS = window.WS || {});
+
