@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:30</title>
+  <title>WESPACE · сборка 21:56</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:30';
+    window.WS_BUILD='21:56';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2455,6 +2455,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (min-width: 1100px) { .dcard-pair { grid-template-columns: 1fr 1fr; align-items: stretch; } }
 .dcard-pair > * { min-width: 0; }
 .dcard-pair > .dx-sec { display: flex; flex-direction: column; }
+/* Карточки ряда — соседи, и общее правило «.dx-sec + .dx-sec» опускало вторую на 14 пикселей.
+   Ряд оставался кривым ровно на эту величину при верном grid-выравнивании. */
+.dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }
 .dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
 .dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
 .dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }
@@ -8002,7 +8005,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       card.style.transform = 'translateX(' + (moved < 0 ? -560 : 560) + 'px) rotate(' + (moved / 22) + 'deg)';
       card.style.opacity = '0';
       S().prospIdx = go;
-      setTimeout(() => WS.storeApi.touch(), 170);
+      // Не `touch()`: он поднимает ревизию данных, и подготовленное Консьержем предложение
+      // после простого перелистывания отклонялось бы как «данные изменились с момента предложения».
+      setTimeout(() => WS.storeApi.emit(), 170);
     };
     card.addEventListener('pointerup', release);
     card.addEventListener('pointercancel', release);
@@ -14272,12 +14277,16 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<button class="send" data-act="cardSend" aria-label="Отправить Консьержу">' + I('arrowRight') + '</button>' +
       '</div></div>';
   }
-  // Отправка из карточки: панель открывается привязанной к записи, экран под ней не перестраивается.
+  /* Отправка из карточки: панель открывается привязанной к записи, экран под ней не
+     перестраивается. Привязка делается ВСЕГДА, а не только при закрытой панели: панель,
+     открытая на прошлой сделке, оставалась привязанной к ней, и поручение, написанное из
+     карточки другой сделки, доставалось прошлой — вместе с задачей, которую оно создаёт. */
   function sendFromCard() {
     const el = document.getElementById('cardPrompt');
     const v = el ? String(el.value || '').trim() : '';
     if (el) el.value = '';
-    if (!S().cgDock) toggleCgDock();
+    bindDockToScreen();
+    if (!S().cgDock) { S().cgDock = true; renderCgDock(); }
     if (v) WS.router.routePrompt(v);
   }
   function dealComposer(d) {
@@ -14303,14 +14312,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function closeDealChat() { S().dealChat = null; S().cgDock = false; renderCgDock(); }
   // Док, открытый круглой кнопкой, привязывается к записи, на которой стоит агент. Раньше он
   // открывался в общем треде с любого экрана, и вопрос «а по этой сделке?» приходил без подлежащего.
+  /* Префикс треда — тот же, что читает разбор области поручения: контакт живёт под
+     `contact:`, и заведение его же под `client:` дало бы контакту две несвязанные истории,
+     а новый тред перестал бы опознаваться как контекст контакта. */
   const CTX_THREAD = { 'сделка': ['deal:', 'briefcase'], 'запрос': ['request:', 'mail'],
-    'контакт': ['client:', 'users'], 'компания': ['company:', 'building'], 'объект': ['object:', 'building'] };
+    'контакт': ['contact:', 'users'], 'компания': ['company:', 'building'], 'объект': ['object:', 'building'] };
+  function bindDockToScreen() {
+    const rec = screenContext().запись;
+    const map = rec && CTX_THREAD[rec.тип];
+    if (!map) return false;
+    WS.engine.bindThread(map[0] + rec.id, (rec.клиент ? rec.клиент + ' · ' : '') + rec.название, map[1]);
+    return true;
+  }
   function toggleCgDock() {
     const st = S();
     if (st.cgDock) { st.cgDock = false; renderCgDock(); return; }
-    const rec = screenContext().запись;
-    const map = rec && CTX_THREAD[rec.тип];
-    if (map) WS.engine.bindThread(map[0] + rec.id, (rec.клиент ? rec.клиент + ' · ' : '') + rec.название, map[1]);
+    bindDockToScreen();
     st.cgDock = true;
     renderCgDock();
   }
@@ -17335,7 +17352,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   /* `\b` в JS определён только по латинице: `\bэт` не совпадает НИКОГДА — и пробел, и «э» оба
      не словесные символы, границы между ними нет. Первая версия этого правила молча не
      срабатывала ни разу, поэтому граница слова выписана явно. */
-  const DEMONSTRATIVE = /(^|[^а-яёa-z])(эт(?:ой|у|ому|ом|от|а|о|и)|здесь|тут|текущ|по ней|по нему)/i;
+  const DEMONSTRATIVE = /(^|[^а-яёa-z])(эт(?:ой|у|ому|ом|от|а|о|и)|здесь|тут|текущ\w*|по ней|по нему)(?![а-яё])/i;
   function screenAnswer(t) {
     if (!DEMONSTRATIVE.test(t)) return null;
     const scr = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;

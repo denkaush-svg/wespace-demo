@@ -838,7 +838,9 @@
       card.style.transform = 'translateX(' + (moved < 0 ? -560 : 560) + 'px) rotate(' + (moved / 22) + 'deg)';
       card.style.opacity = '0';
       S().prospIdx = go;
-      setTimeout(() => WS.storeApi.touch(), 170);
+      // Не `touch()`: он поднимает ревизию данных, и подготовленное Консьержем предложение
+      // после простого перелистывания отклонялось бы как «данные изменились с момента предложения».
+      setTimeout(() => WS.storeApi.emit(), 170);
     };
     card.addEventListener('pointerup', release);
     card.addEventListener('pointercancel', release);
@@ -7108,12 +7110,16 @@
       '<button class="send" data-act="cardSend" aria-label="Отправить Консьержу">' + I('arrowRight') + '</button>' +
       '</div></div>';
   }
-  // Отправка из карточки: панель открывается привязанной к записи, экран под ней не перестраивается.
+  /* Отправка из карточки: панель открывается привязанной к записи, экран под ней не
+     перестраивается. Привязка делается ВСЕГДА, а не только при закрытой панели: панель,
+     открытая на прошлой сделке, оставалась привязанной к ней, и поручение, написанное из
+     карточки другой сделки, доставалось прошлой — вместе с задачей, которую оно создаёт. */
   function sendFromCard() {
     const el = document.getElementById('cardPrompt');
     const v = el ? String(el.value || '').trim() : '';
     if (el) el.value = '';
-    if (!S().cgDock) toggleCgDock();
+    bindDockToScreen();
+    if (!S().cgDock) { S().cgDock = true; renderCgDock(); }
     if (v) WS.router.routePrompt(v);
   }
   function dealComposer(d) {
@@ -7139,14 +7145,22 @@
   function closeDealChat() { S().dealChat = null; S().cgDock = false; renderCgDock(); }
   // Док, открытый круглой кнопкой, привязывается к записи, на которой стоит агент. Раньше он
   // открывался в общем треде с любого экрана, и вопрос «а по этой сделке?» приходил без подлежащего.
+  /* Префикс треда — тот же, что читает разбор области поручения: контакт живёт под
+     `contact:`, и заведение его же под `client:` дало бы контакту две несвязанные истории,
+     а новый тред перестал бы опознаваться как контекст контакта. */
   const CTX_THREAD = { 'сделка': ['deal:', 'briefcase'], 'запрос': ['request:', 'mail'],
-    'контакт': ['client:', 'users'], 'компания': ['company:', 'building'], 'объект': ['object:', 'building'] };
+    'контакт': ['contact:', 'users'], 'компания': ['company:', 'building'], 'объект': ['object:', 'building'] };
+  function bindDockToScreen() {
+    const rec = screenContext().запись;
+    const map = rec && CTX_THREAD[rec.тип];
+    if (!map) return false;
+    WS.engine.bindThread(map[0] + rec.id, (rec.клиент ? rec.клиент + ' · ' : '') + rec.название, map[1]);
+    return true;
+  }
   function toggleCgDock() {
     const st = S();
     if (st.cgDock) { st.cgDock = false; renderCgDock(); return; }
-    const rec = screenContext().запись;
-    const map = rec && CTX_THREAD[rec.тип];
-    if (map) WS.engine.bindThread(map[0] + rec.id, (rec.клиент ? rec.клиент + ' · ' : '') + rec.название, map[1]);
+    bindDockToScreen();
     st.cgDock = true;
     renderCgDock();
   }

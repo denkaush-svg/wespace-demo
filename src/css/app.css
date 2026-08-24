@@ -2305,6 +2305,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (min-width: 1100px) { .dcard-pair { grid-template-columns: 1fr 1fr; align-items: stretch; } }
 .dcard-pair > * { min-width: 0; }
 .dcard-pair > .dx-sec { display: flex; flex-direction: column; }
+/* Карточки ряда — соседи, и общее правило «.dx-sec + .dx-sec» опускало вторую на 14 пикселей.
+   Ряд оставался кривым ровно на эту величину при верном grid-выравнивании. */
+.dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }
 .dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
 .dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
 .dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }

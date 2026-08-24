@@ -4301,9 +4301,13 @@ setTimeout(async () => {
        В jsdom высоту не измерить, поэтому проверяется правило, которое её задаёт. */
     {
       const cssSrc = read('css/app.css');
+      /* Одного grid-выравнивания мало: обе карточки — соседние `.dx-sec`, и общее правило
+         «.dx-sec + .dx-sec» опускало вторую на 14 пикселей. Ряд оставался кривым ровно на эту
+         величину при формально верном выравнивании — измерено в браузере, 301×614 против 287×628. */
       check('карточка · и обе карточки ряда одной высоты',
         /\.dcard-pair \{ grid-template-columns: 1fr 1fr; align-items: stretch/.test(cssSrc) &&
-        cssSrc.indexOf('.dcard-pair > .dx-sec { display: flex; flex-direction: column;') > 0,
+        cssSrc.indexOf('.dcard-pair > .dx-sec { display: flex; flex-direction: column;') > 0 &&
+        cssSrc.indexOf('.dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }') > 0,
         'правила равной высоты в CSS нет');
     }
     // Отдельной кнопки «Работать через Консьержа» нет — она была дублем строки ввода внизу.
@@ -5316,6 +5320,12 @@ setTimeout(async () => {
       const ans = WS.agent.ask('что по этой сделке');
       check('консьерж · «что по этой сделке» отвечает про открытую сделку',
         ans.kind === 'answer' && ans.text.indexOf(dl.title) >= 0, (ans.text || '').slice(0, 140));
+      /* И не перехватывает слова, которые лишь НАЧИНАЮТСЯ как указание: «этаж» — не «эта».
+         Без правой границы вопрос про этаж возвращал сводку по сделке. */
+      const floor = WS.agent.ask('какой этаж у объекта');
+      check('консьерж · «какой этаж» не читается как «эта…» и не подменяется сводкой по сделке',
+        floor.kind !== 'answer' || floor.text.indexOf('Открыта сделка') < 0,
+        (floor.text || '').slice(0, 120));
       // Панель, открытая круглой кнопкой, привязывается к тому, что открыто. Тред сбрасывается
       // напрямую: openThread уводит на раздел Консьержа, и экран перестал бы быть сделкой.
       WS.store.cgDock = false;
@@ -5330,7 +5340,36 @@ setTimeout(async () => {
         !!dock && !!dock.querySelector('.cgdock-where') &&
         dock.querySelector('.cgdock-where').textContent.indexOf(dl.title) >= 0,
         dock && dock.querySelector('.cgdock-where') ? dock.querySelector('.cgdock-where').textContent : 'строки контекста нет');
+      /* Панель, открытая на прошлой сделке, оставалась привязанной к ней: перепривязка стояла
+         под условием «док закрыт». Поручение, написанное из карточки другой сделки, доставалось
+         прошлой — вместе с задачей, которую оно создаёт. */
+      const other = (dd().deals || []).find((x) => x.id !== 'd_anna' && !WS.ui.dealArchived(x));
+      if (other) {
+        WS.ui.dealCard('d_anna');
+        WS.store.cgDock = false;
+        WS.ui.toggleCgDock();                       // панель открыта на сделке Анны
+        WS.ui.dealCard(other.id);                   // агент ушёл в другую сделку
+        const inp = doc.getElementById('cardPrompt');
+        if (inp) inp.value = '';                    // пустая строка: проверяем привязку, не отправку
+        WS.ui.sendFromCard();
+        check('консьерж · ввод из карточки уходит в тред ТОЙ записи, которая открыта',
+          (WS.engine.activeThread() || {}).id === 'deal:' + other.id,
+          ((WS.engine.activeThread() || {}).id || 'нет треда') + ' вместо deal:' + other.id);
+      }
+      /* Тред контакта заводится под тем же префиксом, который читает разбор области поручения.
+         Под своим префиксом контакт получил бы две несвязанные истории, а новый тред перестал
+         бы опознаваться как контекст контакта. */
+      {
+        const c0 = (dd().clients || [])[0];
+        WS.store.cgDock = false;
+        WS.ui.clientCard(c0.id);
+        WS.ui.toggleCgDock();
+        check('консьерж · тред контакта заводится под тем же префиксом, что читает разбор поручения',
+          (WS.engine.activeThread() || {}).id === 'contact:' + c0.id,
+          ((WS.engine.activeThread() || {}).id || 'нет треда') + ' вместо contact:' + c0.id);
+      }
       WS.store.cgDock = false; WS.ui.renderCgDock();
+      WS.ui.dealCard('d_anna');
     }
 
     /* ---- Заведённая запись открывается из того сообщения, которое её завело -----------------
@@ -5929,6 +5968,18 @@ setTimeout(async () => {
       WS.ui.dealCard('d_anna');
       check('Пульс · а открытие другой записи переходом считается', WS._renderKey !== k1,
         k1 + ' → ' + WS._renderKey);
+      /* Перелистывание — состояние экрана, а не данных. `touch()` поднимает ревизию, и
+         подготовленное Консьержем предложение после простого пролистывания отклонялось бы
+         как «данные изменились с момента предложения». */
+      const revWas = WS.store.dataRevision;
+      const nx = doc.querySelector('#app [data-prosp="next"]');
+      if (nx) nx.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('Пульс · перелистывание не считается изменением данных',
+        WS.store.dataRevision === revWas, revWas + ' → ' + WS.store.dataRevision);
+      // Тот же путь при смахивании: жест в jsdom не воспроизвести, проверяется само место.
+      check('Пульс · и смахивание идёт тем же путём, а не через изменение данных',
+        /setTimeout\(\(\) => WS\.storeApi\.emit\(\), 170\)/.test(read('js/ui.js')),
+        'обработчик смахивания снова поднимает ревизию');
       WS.store.prospIdx = 0;
       WS.router.go('start');
     }
