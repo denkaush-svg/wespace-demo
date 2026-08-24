@@ -5929,6 +5929,107 @@ setTimeout(async () => {
     }
   }
 
+  // ---- находки кросс-модельной вычитки: то, что наши 1538 проверок пропустили ----
+  {
+    const src = read('js/ui.js');
+
+    // Маршрут, которого нет. `data-nav="deals"` рисуется, нажимается и не делает ничего:
+    // раздел сделок — это `clients` со вкладкой, а не собственный маршрут. Проверка держит
+    // весь класс, а не три конкретных плитки.
+    const vf = src.slice(src.indexOf('function viewFor'));
+    const routes = (vf.slice(0, vf.indexOf('\n  }')).match(/case '([a-z]+)'/g) || [])
+      .map((m) => m.slice(6, -1));
+    const used = Array.from(new Set((src.match(/data-nav="([a-z]+)"/g) || []).map((m) => m.slice(10, -1))));
+    const dead = used.filter((v) => routes.indexOf(v) < 0);
+    check('маршруты · каждая ссылка меню ведёт на существующий экран', dead.length === 0,
+      'нет таких экранов: ' + dead.join(', ') + ' | есть: ' + routes.join(', '));
+
+    // Подпись выборки называет КАЖДЫЙ включённый фильтр: неназванный превращает суженный
+    // список во «Всю книгу», и отправка уходит не тем, кого отобрал агент.
+    const wasF = WS.store.contactsFilters;
+    const wasQ = WS.store.contactsSearch;
+    const missed = [];
+    [['priority', 'A'], ['budget', 'hi'], ['area', 'Business Bay'], ['state', 'open'],
+     ['consent', 'no'], ['kind', 'owner'], ['channel', 'phone']].forEach((pair) => {
+      WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { [pair[0]]: pair[1] });
+      if (WS.ui.contactsSelectionLabel() === 'Вся книга') missed.push(pair[0]);
+    });
+    check('контакты · подпись выборки не называет её «всей книгой», когда фильтр включён',
+      missed.length === 0, 'не попали в подпись: ' + missed.join(', '));
+    WS.store.contactsFilters = wasF; WS.store.contactsSearch = wasQ;
+
+    // Сторона клиента хранится словом, а не ключом: сравнение с ключом не совпадало никогда,
+    // и собственник получал роль покупателя — то есть попадал в выборку «покупатели».
+    const ownerSide = (dd().deals || []).find((d) => /собственник/i.test(d.side || ''));
+    check('контакты · в данных есть сделка со стороны собственника', !!ownerSide,
+      'сторон: ' + Array.from(new Set((dd().deals || []).map((d) => d.side).filter(Boolean))).join(', '));
+    if (ownerSide) {
+      const oc = (dd().clients || []).find((c) => c.id === ownerSide.clientId);
+      const otherDeals = (dd().deals || []).filter((d) => d.clientId === oc.id && d !== ownerSide);
+      if (oc && !otherDeals.some((d) => /покупатель/i.test(d.side || ''))) {
+        const roles = WS.ui.contactRoles(oc);
+        check('контакты · собственник по сделке не записан покупателем',
+          roles.indexOf('owner') >= 0 && roles.indexOf('buyer') < 0, oc.name + ': ' + roles.join(', '));
+      }
+    }
+
+    // «Мессенджер» — способ связи, а не приложение: Telegram обязан попадать вместе с WhatsApp.
+    const tg = (dd().clients || []).filter((c) => c.channel === 'telegram');
+    check('контакты · в данных есть контакт на Telegram, иначе проверять нечего', tg.length > 0,
+      'каналы: ' + Array.from(new Set((dd().clients || []).map((c) => c.channel))).join(', '));
+    if (tg.length) {
+      WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { channel: 'whatsapp' });
+      const got = WS.ui.contactsSearchList().map((p) => p.id);
+      check('контакты · «мессенджер» не теряет Telegram',
+        tg.every((c) => got.indexOf(c.id) >= 0), 'потеряны: ' +
+        tg.filter((c) => got.indexOf(c.id) < 0).map((c) => c.name).join(', '));
+      WS.store.contactsFilters = WS.CONTACT_FILTERS_DEFAULT();
+    }
+
+    // Ни один способ связи в фильтре не должен быть мёртвым выбором: пункт меню, который
+    // всегда даёт пустой экран, читается как поломка. В данных телефонный канал записан
+    // словом «call» — prefChannel знал только «phone», и «звонок» не находил никого.
+    const emptyCh = ['whatsapp', 'phone', 'email'].filter((ch) => {
+      WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { channel: ch });
+      return WS.ui.contactsSearchList().length === 0;
+    });
+    WS.store.contactsFilters = WS.CONTACT_FILTERS_DEFAULT();
+    check('контакты · ни один способ связи не даёт пустой экран', emptyCh.length === 0,
+      'пусто по: ' + emptyCh.join(', '));
+
+    // «Заявок в работе» — по стадии заявки. Проигранная заявка в работе не находится.
+    WS.store.pulseTab = 'requests';
+    WS.store.clientsTab = 'deals';
+    WS.router.go('start');
+    const reqPanel = (doc.querySelector('#app .pulse-panel') || {}).textContent || '';
+    const tileVal = (label) => {
+      const t = [].slice.call(doc.querySelectorAll('#app .pulse-panel .tile'))
+        .find((x) => (x.querySelector('.th') || {}).textContent === label);
+      return t ? ((t.querySelector('.val') || {}).textContent || '').replace(/\D+.*$/, '') : null;
+    };
+    const liveReq = (dd().requests || []).filter((r) => ['closed', 'lost'].indexOf(WS.ui.reqStage(r)) < 0).length;
+    check('пульс · «заявок в работе» считается по стадии, а не по наличию выбранного объекта',
+      tileVal('Заявок в работе') === String(liveReq) && liveReq < (dd().requests || []).length,
+      'на плитке ' + tileVal('Заявок в работе') + ', живых по стадии ' + liveReq +
+      ' из ' + (dd().requests || []).length);
+
+    // Конверсия источника считает выигранные сделки: проигрыш не поднимает конверсию.
+    const lostSrc = (dd().deals || []).find((d) => d.stage === 'lost' && d.source);
+    check('аналитика · в данных есть проигранная сделка с источником', !!lostSrc,
+      lostSrc ? lostSrc.source : 'проигранных с источником нет');
+    if (lostSrc) {
+      const attr = (dd().attribution || []).find((a) => a.source === lostSrc.source);
+      if (attr) {
+        const wonN = (dd().deals || []).filter((x) => x.source === lostSrc.source && x.stage === 'won').length;
+        const allN = (dd().deals || []).filter((x) => x.source === lostSrc.source).length;
+        check('аналитика · конверсия источника считает выигранные сделки, а не все',
+          reqPanel.indexOf(wonN + '/' + attr.leads) >= 0 && wonN < allN,
+          'выиграно ' + wonN + ' из ' + allN + ' по источнику «' + lostSrc.source + '»');
+      }
+    }
+    WS.store.pulseTab = 'deals';
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

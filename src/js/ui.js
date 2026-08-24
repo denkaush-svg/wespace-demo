@@ -477,7 +477,9 @@
   // на Пульсе агента. Две копии этой таблицы разошлись бы при первой же правке формулы.
   function srcQualityList() {
     const rows = computeMetrics().attribution.map((a) => {
-      const won = (D().deals || []).filter((x) => x.source === a.source).length;
+      // Конверсия считает ВЫИГРАННЫЕ сделки. Раньше сюда шли все, включая проигранные, и
+      // проигрыш поднимал показатель, названный конверсией.
+      const won = (D().deals || []).filter((x) => x.source === a.source && dealWon(x)).length;
       const conv = a.leads ? Math.round((won / a.leads) * 100) : 0;
       return '<button class="src-row" data-analytics="src:' + a.source + '"><span class="sn">' + a.source + '</span><span class="sc">' + conv + '% · ' + won + '/' + a.leads + '</span><span class="scomm">' + WS.AED(a.commission) + '</span></button>';
     }).join('');
@@ -556,7 +558,7 @@
     const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d) && (!mine || d.agent === mine));
     const top = live.slice().sort((x, y) => dealCommission(y) - dealCommission(x)).slice(0, 4);
     const head = pulseHead('Перспективные сделки' + (live.length ? ' · ' + live.length : ''),
-      live.length > top.length ? '<button class="btn sm" data-nav="deals">' + I('arrowRight') + 'Все сделки</button>' : '');
+      live.length > top.length ? '<button class="btn sm" data-nav="clients" data-tab="deals">' + I('arrowRight') + 'Все сделки</button>' : '');
     if (!top.length) {
       return head + '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Активных сделок за вами сейчас нет. Как только появится первая, она встанет сюда — с ожидаемой комиссией и ближайшим шагом.</div>';
     }
@@ -606,7 +608,10 @@
   function pulseTabRequests() {
     const m = computeMetrics();
     const a = D().analytics;
-    const open = (D().requests || []).filter((r) => !(r.offered || []).some((o) => o.state === 'selected'));
+    // «В работе» — это стадия заявки, а не «в подборке нет выбранного объекта»: по второму
+    // признаку проигранные услуги без инвентаря считались живыми, а живая заявка с одним
+    // выбранным объектом и открытым остатком — закрытой.
+    const open = (D().requests || []).filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0);
     return '<div class="tiles dash">' +
       tile('mail', 'Заявок в работе', open.length, '', 'span 4', 'из ' + (D().requests || []).length + ' всего', '', 'accent', 'data-nav="requests"') +
       tile('target', 'Конверсия заявка → сделка', m.conv, '%', 'span 4', m.won + ' из ' + m.leads + ' лидов', '', '', 'data-analytics="conv"') +
@@ -623,11 +628,11 @@
     const byType = (t) => cl.filter((c) => c.ctype === t).length;
     const silent = cl.filter((c) => !lastTouchOf(c.id)).length;
     return '<div class="tiles dash">' +
-      tile('users', 'Клиентов в базе', cl.length, '', 'span 4', 'закреплены за вами', '', 'accent', 'data-nav="contacts"') +
-      tile('trend', 'Инвесторы', byType('investor'), '', 'span 4', 'покупают ради доходности', '', '', 'data-nav="contacts"') +
-      tile('home', 'Для себя', byType('enduser'), '', 'span 4', 'покупают для проживания', '', '', 'data-nav="contacts"') +
-      tile('building', 'Собственники', byType('owner'), '', 'span 6', 'сдают или продают свой объект', '', '', 'data-nav="contacts"') +
-      tile('clock', 'Без единого касания', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="contacts"') +
+      tile('users', 'Клиентов в базе', cl.length, '', 'span 4', 'закреплены за вами', '', 'accent', 'data-nav="clients" data-tab="contacts"') +
+      tile('trend', 'Инвесторы', byType('investor'), '', 'span 4', 'покупают ради доходности', '', '', 'data-nav="clients" data-tab="contacts"') +
+      tile('home', 'Для себя', byType('enduser'), '', 'span 4', 'покупают для проживания', '', '', 'data-nav="clients" data-tab="contacts"') +
+      tile('building', 'Собственники', byType('owner'), '', 'span 6', 'сдают или продают свой объект', '', '', 'data-nav="clients" data-tab="contacts"') +
+      tile('clock', 'Без единого касания', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="clients" data-tab="contacts"') +
       '</div>';
   }
   function pulseTabPartners() {
@@ -635,8 +640,8 @@
     const co = (D().deals || []).filter((d) => d.partnerAgent);
     const coComm = Math.round(co.reduce((s, d) => s + dealCommission(d), 0));
     return '<div class="tiles dash">' +
-      tile('handshake', 'Взаимные партнёры', mutual.length, '', 'span 4', 'из ' + NET_AGENTS.length + ' контрагентов в сети', '', 'accent', 'data-nav="network"') +
-      tile('briefcase', 'Сделки в со-брокеридже', co.length, '', 'span 4', co.length ? 'делим комиссию с партнёром' : 'пока ни одной', '', '', 'data-nav="deals"') +
+      tile('handshake', 'Взаимные партнёры', mutual.length, '', 'span 4', 'из ' + NET_AGENTS.length + ' контрагентов в сети', '', 'accent', 'data-nav="partners"') +
+      tile('briefcase', 'Сделки в со-брокеридже', co.length, '', 'span 4', co.length ? 'делим комиссию с партнёром' : 'пока ни одной', '', '', 'data-nav="clients" data-tab="deals"') +
       tile('money', 'Комиссия по клубным сделкам', WS.AED(coComm), '', 'span 4', 'до раздела с партнёром', '', '', 'data-analytics="pipeline"') +
       '</div>' +
       '<div class="card" style="padding:14px 16px;margin-top:14px;font-size:12.5px;color:var(--mut)">' +
@@ -1245,7 +1250,12 @@
       const won = hasWonDeal(c.id);
       if (st.success === 'yes' ? !won : won) return false;
     }
-    if (st.channel && st.channel !== 'all' && prefChannel(c) !== st.channel) return false;
+    // «Мессенджер» в списке — способ связи, а не приложение: WhatsApp и Telegram оба.
+    if (st.channel && st.channel !== 'all') {
+      const ch = prefChannel(c);
+      const okCh = st.channel === 'whatsapp' ? (ch === 'whatsapp' || ch === 'telegram') : ch === st.channel;
+      if (!okCh) return false;
+    }
     // Priority filter
     if (st.priority && st.priority !== 'all') {
       const sig = (D().clientSignals || {})[c.id];
@@ -1346,10 +1356,13 @@
   // Роли, в которых человек уже выступал: основной тип плюс то, чем он оказался в сделках.
   function contactRoles(c) {
     const out = [c.contactKind].filter(Boolean);
+    // Сторона клиента хранится словом («покупатель», «собственник», «арендатор»), а не ключом.
+    // Сравнение с ключом не совпадало никогда, и собственник получал роль покупателя.
+    const SIDE_ROLE = { 'покупатель': 'buyer', 'собственник': 'owner', 'арендатор': 'tenant' };
     (D().deals || []).forEach((d) => {
       if (d.clientId !== c.id) return;
-      const k = (d.funnel || '').indexOf('rent') >= 0 ? (d.side === 'owner' ? 'owner' : 'tenant')
-        : d.side === 'owner' ? 'owner' : 'buyer';
+      const k = SIDE_ROLE[String(d.side || '').toLowerCase()] ||
+        ((d.funnel || '').indexOf('rent') >= 0 ? 'tenant' : 'buyer');
       if (out.indexOf(k) < 0) out.push(k);
     });
     if (c.companyId && out.indexOf('company') < 0) out.push('company');
@@ -1447,18 +1460,31 @@
   // Одной строкой — то, по чему собрана выборка. Это и подпись свёрнутого списка, и то,
   // что уходит Консьержу контекстом: пересказывать выборку словами значит дать ему
   // возможность понять её иначе, чем понял агент.
+  // Каждый включённый фильтр обязан попасть в подпись. Подпись называет выборку и агенту,
+  // и модели: фильтр, который в неё не попал, превращает суженный список в «Всю книгу»,
+  // и отправка уходит не тем, кого агент отобрал.
+  const CONTACT_FILTER_WORD = {
+    kind: (v) => CONTACT_KIND_LABEL[v] || v,
+    interest: (v) => CONTACT_INTEREST_LABEL[v] || v,
+    objType: (v) => OBJ_INTEREST_LABEL[v] || v,
+    success: (v) => (v === 'yes' ? 'с успешной сделкой' : 'без успешных сделок'),
+    channel: (v) => CHANNEL_PICK_LABEL[v] || v,
+    consent: (v) => (v === 'yes' ? 'с согласием' : 'без согласия'),
+    priority: (v) => 'приоритет ' + v,
+    area: (v) => v,
+    budget: (v) => ({ lo: 'до 1,5 млн', mid: '1,5–3 млн', hi: 'от 3 млн' })[v] || v,
+    state: (v) => ({ open: 'есть открытый запрос', done: 'всё закрыто', none: 'заявок ещё не было' })[v] || v,
+    psych: (v) => (v === 'empty' ? 'портрет не заполнен' : String(v).split(':').pop()),
+    object: (v) => { const o = (D().objects || []).find((x) => x.id === v); return o ? 'смотрел ' + o.name.split(',')[0] : v; },
+  };
   function contactsSelectionLabel() {
     const f = S().contactsFilters || {};
-    const parts = [];
-    if (f.kind && f.kind !== 'all') parts.push(CONTACT_KIND_LABEL[f.kind]);
-    if (f.interest && f.interest !== 'all') parts.push(CONTACT_INTEREST_LABEL[f.interest]);
-    if (f.objType && f.objType !== 'all') parts.push(OBJ_INTEREST_LABEL[f.objType]);
-    if (f.success === 'yes') parts.push('с успешной сделкой');
-    if (f.success === 'no') parts.push('без успешных сделок');
-    if (f.channel && f.channel !== 'all') parts.push(CHANNEL_PICK_LABEL[f.channel] || f.channel);
-    if (f.consent === 'yes') parts.push('с согласием');
+    const parts = CONTACT_FILTER_KEYS
+      .filter((k) => f[k] && f[k] !== 'all')
+      .map((k) => (CONTACT_FILTER_WORD[k] ? CONTACT_FILTER_WORD[k](f[k]) : k + ': ' + f[k]));
     const q = (S().contactsSearch || '').trim();
     if (q) parts.push('«' + q + '»');
+    if (S().contactType === 'transferred') parts.unshift('переданные вам');
     return parts.length ? parts.join(' · ') : 'Вся книга';
   }
   // Массовая отправка по книге — ровно тот случай, где нарушение стоит денег (PDPL в ОАЭ,
@@ -2389,7 +2415,11 @@
     })[ch] || ['whatsapp', 'WhatsApp'];
   }
   function prefChannel(c) {
-    return c.channel === 'email' ? 'email' : c.channel === 'telegram' ? 'telegram' : c.channel === 'phone' ? 'phone' : 'whatsapp';
+    const ch = c.channel;
+    if (ch === 'email') return 'email';
+    if (ch === 'telegram') return 'telegram';
+    if (ch === 'phone' || ch === 'call') return 'phone';
+    return 'whatsapp';
   }
   const CONTACT_ORDER = ['phone', 'whatsapp', 'telegram', 'instagram', 'email'];
   // vCard-style rows: канал + реальное значение, основной подсвечен. Один рендер для клиента и пользователя.
@@ -9422,7 +9452,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
