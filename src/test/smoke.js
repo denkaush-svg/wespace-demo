@@ -6150,6 +6150,41 @@ setTimeout(async () => {
     check('меню · разворачивается обратно', WS.store.navRail === false, String(WS.store.navRail));
   }
 
+  // ---- заявка и сделка стоят на одном каркасе ----
+  // Соседние такты одной работы, между которыми агент ходит десятки раз в день. Разная
+  // раскладка заставляет каждый раз заново искать глазами, где условия, а где что дальше.
+  {
+    const FRAME = ['.dcard-cover', '.dcard-title', '.dcard-sub', '.dcard-pathrow',
+      '.dcard-cols', '.dcard-aside', '.dcard-main', '.dcard-composer', '.dx-tabs'];
+    WS.store.navStack = [];
+    const dOne = (dd().deals || []).find((d) => !d.archived);
+    WS.ui.dealCard(dOne.id);
+    const inDeal = FRAME.filter((sel) => !doc.querySelector('#app .view ' + sel));
+    check('каркас · карточка сделки собрана из всех частей каркаса', inDeal.length === 0,
+      'нет: ' + inDeal.join(', '));
+    WS.ui.requestCard((dd().requests || [])[0].id);
+    const inReq = FRAME.filter((sel) => !doc.querySelector('#app .view ' + sel));
+    check('каркас · карточка заявки собрана из тех же частей', inReq.length === 0,
+      'нет: ' + inReq.join(', '));
+    // Не только присутствие, но и порядок: обложка выше заголовка, колонки ниже пути.
+    const order = ['.dcard-cover', '.dcard-title', '.dcard-pathrow', '.dcard-cols'];
+    const pos = order.map((sel) => {
+      const e = doc.querySelector('#app .view ' + sel);
+      if (!e) return -1;
+      let n = 0, w = e;
+      while (w.previousElementSibling) { w = w.previousElementSibling; n++; }
+      return (e.parentElement ? e.parentElement.className : '') + '#' + n;
+    });
+    check('каркас · части заявки идут в том же порядке', pos.every((x) => x !== -1), pos.join(' | '));
+    // Запланированное и последнее — в ряд, как в сделке.
+    check('каркас · «что дальше» и «что было» в заявке тоже в ряд',
+      !!doc.querySelector('#app .view .dcard-pair'));
+    // Строка ввода внизу одна и ведёт в тот же док.
+    check('каркас · внизу заявки одна строка ввода',
+      doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1,
+      String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

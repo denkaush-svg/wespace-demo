@@ -5226,13 +5226,29 @@
       '<span>Стадия выводится из фактов запроса. Агент отмечает объекты, по которым согласованы условия, — остальное следует само.</span></div>';
     return '<div class="dx-sec dx-sec-bare">' + reqStepper(r) + why + '</div>';
   }
+  // Левая колонка заявки — то же, что у сделки: справка о клиенте и условия, которые не двигаются,
+  // пока прокручивается работа.
+  function reqAside(r) {
+    return reqClientCard(r) + reqKeyCard(r);
+  }
+  // Правая — работа: что дальше, запланированное и последнее в ряд, подбор, расхождения.
+  function reqWork(r) {
+    const planned = reqNextStepCard(r);
+    const recent = reqRecentCard(r);
+    const pair = (planned || recent) ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
+    return pair + cxStack([
+      // Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны
+      // не сошлись, сделки нет. Раньше карточка расхождения висела на сделке, где бюджета уже нет.
+      conflictBlock(r),
+      reqOffersStatusBlock(r),
+      reqSecondaryRow(r),
+    ]);
+  }
   function requestState(r) {
     return reqStepperSection(r) +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       cxStack([
         [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
-        // Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны
-        // не сошлись, сделки нет. Раньше карточка расхождения висела на сделке, где бюджета уже нет.
         conflictBlock(r),
         reqOffersStatusBlock(r),
         reqSecondaryRow(r),
@@ -5314,9 +5330,37 @@
   }
   function viewRequestDetail(id) {
     const spec = requestSpec(id);
-    if (!spec) return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
+    const r = requestById(id);
+    if (!spec || !r) return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
       '<div style="padding:20px;color:var(--mut)">Запрос не найден.</div>';
-    return entityPage(spec, 'requests', '', 'Назад ко входящим');
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    // Тот же каркас, что у сделки: обложка · заголовок · лента шагов · неподвижная левая колонка ·
+    // рабочая область · вкладки · строка ввода внизу.
+    const o0 = (r.offered || []).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean)[0];
+    const bg = (WS.photos && ((o0 && WS.photos[o0.id]) || WS.photos.o_creekline)) || '';
+    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
+      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
+    const sub = [escAttr(c.name || '—'), r.budget ? WS.AED(r.budget) : null, r.horizon]
+      .filter(Boolean).join(' · ');
+    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Клиент и условия запроса</summary>' +
+      '<div class="dcard-aside-m-b">' + reqAside(r) + '</div></details>';
+    return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
+      '<div class="dcard">' +
+      '<div class="dcard-top">' + cover +
+      '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
+      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-pathrow">' + reqStepperSection(r) + '</div></div>' +
+      '<div class="dcard-cols">' +
+      '<aside class="dcard-aside">' + reqAside(r) + '</aside>' + aside +
+      '<div class="dcard-main">' + entityActionBar(requestActions(r)) +
+      '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
+      reqWork(r) + dealTabsBlock(spec) + '</div>' +
+      '</div>' +
+      '<div class="dcard-composer"><div class="dx-cbar" data-thread="request:' + r.id + '" ' +
+      'data-tlabel="' + escAttr(r.title) + '" data-ticon="mail">' +
+      '<div class="w">W</div><div class="ph">Записать заметку или поручить Консьержу по запросу — «собрать КП», «подобрать объекты»…</div>' +
+      '<div class="send">' + I('arrowRight') + '</div></div></div>' +
+      '</div>';
   }
   // ---- Request funnel actions (A1): client-selection state, add object, form КП, create deal ----
   function reqObjState(reqId, objId, state) {
