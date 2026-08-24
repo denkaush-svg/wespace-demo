@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:06</title>
+  <title>WESPACE · сборка 11:42</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:06';
+    window.WS_BUILD='11:42';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -18310,10 +18310,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       case 'netMsg': {
         store.netSel = t.dataset.nettarget;
         store.netTab = 'contacts';
-        // Validate partner against audience rules
-        const partners = (typeof WS !== 'undefined' && WS.partners ? WS.partners : []);
+        // Check partner consent before enabling message
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен', 'warn');
+          break;
+        }
+        const partners = WS.partners;
         if (partners.length > 0) {
-          WS.audience.calculateAudience(partners);
+          const audit = WS.audience.calculateAudience(partners);
+          if (audit.excluded.length > 0) {
+            api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+          }
         }
         api.emit();
         break;
@@ -18412,7 +18419,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       }
       case 'openXls': WS.ui.openXls(); break;
       case 'promoSend': {
-        const partners = (typeof WS !== 'undefined' && WS.partners ? WS.partners : []);
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен — рассылку отправить невозможно', 'warn');
+          break;
+        }
+        const partners = WS.partners;
         const audit = WS.audience.calculateAudience(partners);
         WS.ui.closeModal();
         if (audit.excluded.length > 0) {

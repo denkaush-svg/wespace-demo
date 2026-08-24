@@ -331,10 +331,17 @@
       case 'netMsg': {
         store.netSel = t.dataset.nettarget;
         store.netTab = 'contacts';
-        // Validate partner against audience rules
-        const partners = (typeof WS !== 'undefined' && WS.partners ? WS.partners : []);
+        // Check partner consent before enabling message
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен', 'warn');
+          break;
+        }
+        const partners = WS.partners;
         if (partners.length > 0) {
-          WS.audience.calculateAudience(partners);
+          const audit = WS.audience.calculateAudience(partners);
+          if (audit.excluded.length > 0) {
+            api.toast('Некоторые партнёры без согласия (' + audit.excluded.length + ' из ' + audit.stats.total + ') — исключены', 'warn');
+          }
         }
         api.emit();
         break;
@@ -433,7 +440,11 @@
       }
       case 'openXls': WS.ui.openXls(); break;
       case 'promoSend': {
-        const partners = (typeof WS !== 'undefined' && WS.partners ? WS.partners : []);
+        if (!WS || !WS.partners) {
+          api.toast('Список партнёров недоступен — рассылку отправить невозможно', 'warn');
+          break;
+        }
+        const partners = WS.partners;
         const audit = WS.audience.calculateAudience(partners);
         WS.ui.closeModal();
         if (audit.excluded.length > 0) {
