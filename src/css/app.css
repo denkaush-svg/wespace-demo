@@ -78,6 +78,23 @@ button { font-family: inherit; cursor: pointer; }
 .nav-item .count { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--mut); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-pill); min-width: 20px; height: 19px; padding: 0 6px; display: grid; place-items: center; }
 .nav-item.on .count { background: var(--acc); color: #fff; border-color: var(--acc); }
 .nav-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--hair); }
+
+/* Меню сворачивается до значков: рабочей области прибавляется 168 пикселей, а ряд остаётся
+   узнаваемым — на широкой карточке сделки это целая колонка. Подпись уходит в подсказку,
+   счётчик — в точку над значком, иначе он вылезает за 64 пикселя ширины. */
+.nav-rail-t { flex: none; }
+.app.nav-railed { grid-template-columns: 64px minmax(0, 1fr); }
+.app.nav-railed .brand { padding: 0 10px; gap: 0; }
+.app.nav-railed .brand .wm, .app.nav-railed .brand .sub { display: none; }
+.app.nav-railed .nav { padding: 12px 8px; }
+.app.nav-railed .nav-item { justify-content: center; padding: 9px 0; gap: 0; }
+.app.nav-railed .nav-lbl { display: none; }
+.app.nav-railed .nav-group-label { text-align: center; padding: 3px 0; letter-spacing: .04em; }
+.app.nav-railed .nav-item .count { position: absolute; top: 2px; right: 6px; margin-left: 0;
+  min-width: 0; width: 7px; height: 7px; padding: 0; border-radius: 50%; font-size: 0;
+  background: var(--acc); border-color: var(--acc); }
+.app.nav-railed .nav-foot { display: none; }
+@media (max-width: 899.98px) { .nav-rail-t { display: none; } }
 .nav-foot .demo-mode { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--mut); padding: 6px 10px; }
 .nav-foot .demo-mode .pill { font-size: 10px; font-weight: 700; color: var(--beta); background: var(--beta-soft); border: 1px solid var(--beta-line); padding: 2px 8px; border-radius: var(--r-pill); }
 

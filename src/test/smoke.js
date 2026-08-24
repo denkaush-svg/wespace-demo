@@ -6092,6 +6092,31 @@ setTimeout(async () => {
     WS.store.pulseTab = 'deals';
   }
 
+  // ---- меню сворачивается до значков ----
+  {
+    WS.store.navRail = false; WS.storeApi.emit();
+    const wide = doc.querySelectorAll('#app .nav .nav-item').length;
+    const toggle = doc.querySelector('#app [data-act="navRail"]');
+    check('меню · есть чем свернуть', !!toggle);
+    if (toggle) toggle.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('меню · свёрнутое состояние включилось', WS.store.navRail === true, String(WS.store.navRail));
+    check('меню · разметка оболочки помечена свёрнутой', !!doc.querySelector('#app.nav-railed, .app.nav-railed'));
+    // Свернули — но ни один раздел не исчез: узкая полоса не должна отнимать доступ.
+    const railed = doc.querySelectorAll('#app .nav .nav-item').length;
+    check('меню · ни один раздел из меню не пропал', railed === wide, railed + ' против ' + wide);
+    // Подпись уходит в подсказку, иначе значок без имени — это ребус.
+    const noTitle = [].slice.call(doc.querySelectorAll('#app .nav .nav-item'))
+      .filter((a2) => !(a2.getAttribute('title') || '').trim());
+    check('меню · у каждого значка осталась подпись в подсказке', noTitle.length === 0,
+      'без подсказки: ' + noTitle.length);
+    // Ширина полосы задана в CSS, а не «на глаз» в разметке.
+    const cssSrc2 = read('css/app.css');
+    check('меню · свёрнутая ширина задана правилом', /\.app\.nav-railed \{ grid-template-columns: 64px/.test(cssSrc2));
+    const t2 = doc.querySelector('#app [data-act="navRail"]');
+    if (t2) t2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('меню · разворачивается обратно', WS.store.navRail === false, String(WS.store.navRail));
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

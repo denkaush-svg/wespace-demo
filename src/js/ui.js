@@ -92,7 +92,8 @@
       const on = navActive(n) ? ' on' : '';
       const cnt = n.count ? '<span class="count">' + n.count() + '</span>' : '';
       const tab = n.tab ? ' data-tab="' + n.tab + '"' : '';
-      return '<a class="nav-item' + on + '" data-nav="' + n.id + '"' + tab + ' tabindex="0">' + I(n.icon) + '<span>' + n.label + '</span>' + cnt + '</a>';
+      return '<a class="nav-item' + on + '" data-nav="' + n.id + '"' + tab + ' tabindex="0" title="' + escAttr(n.label) + '">' +
+        I(n.icon) + '<span class="nav-lbl">' + n.label + '</span>' + cnt + '</a>';
     };
     const _nav = st.role === 'manager' ? NAV_MGR : NAV;
     const _navMore = st.role === 'manager' ? NAV_MGR_MORE : NAV_MORE;
@@ -110,10 +111,14 @@
 
     const unsavedDot = st.unsaved ? '<span class="badge-dot"></span>' : '';
 
+    const railed = !!st.navRail;
     return '' +
-      '<div class="app">' +
+      '<div class="app' + (railed ? ' nav-railed' : '') + '">' +
         '<div class="brand"><div class="logo">W</div><div><div class="wm">WE<span>SPACE</span></div></div></div>' +
         '<div class="topbar">' +
+          '<button class="tb-icon nav-rail-t" data-act="navRail" title="' +
+          (railed ? 'Развернуть меню' : 'Свернуть меню до значков') + '" aria-label="Свернуть меню">' +
+          I(railed ? 'chevRight' : 'chevLeft') + '</button>' +
           '<div class="tb-tenant"><span class="dot"></span><span class="txt">Демо-тенант · Dubai</span></div>' +
           '<span class="tb-build" title="Версия сборки. Если цифра старая — обновите: Ctrl+Shift+R">v' + ((typeof window !== 'undefined' && window.WS_BUILD) || 'DEV') + '</span>' +
           '<div class="tb-spacer"></div>' +

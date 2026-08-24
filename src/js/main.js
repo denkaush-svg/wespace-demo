@@ -402,6 +402,7 @@
       }
       case 'startSend': routePrompt(promptValue('startPrompt')); break;
       case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
+      case 'navRail': store.navRail = !store.navRail; api.emit(); break;
       case 'cgDock': store.cgDock = !store.cgDock; WS.ui.renderCgDock(); break;
       case 'cgDockSend': routePrompt(promptValue('cgDockPrompt')); break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
