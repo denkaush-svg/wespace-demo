@@ -1325,10 +1325,13 @@ setTimeout(async () => {
       if (n !== want.length) off.push(d.id + ': ' + n + ' против ' + want.length);
       // Пресейл рисуется только у сделки, выросшей из запроса, и всегда неинтерактивен:
       // стадия запроса вычисляется из фактов, руками её не выставляют. Он представлен одной плашкой.
-      const preSum = doc.querySelectorAll('#app .view .dx-path .dx-pre-sum');
+      const preSum = doc.querySelectorAll('#app .view .dx-path .dx-pre');
       if (d.requestId && !preSum.length) nopre.push(d.id + ': пресейла нет');
       if (!d.requestId && preSum.length) nopre.push(d.id + ': пресейл без запроса');
-      [].slice.call(preSum).forEach((el) => { if (el.tagName === 'BUTTON' || el.hasAttribute('data-dealstage')) nopre.push(d.id + ': пресейл кликабелен'); });
+      [].slice.call(preSum).forEach((el) => {
+        if (el.tagName === 'BUTTON' || el.hasAttribute('data-dealstage')) nopre.push(d.id + ': пресейл кликабелен');
+        if (el.className.indexOf('done') < 0) nopre.push(d.id + ': пресейл не помечен пройденным');
+      });
       // Путь не должен содержать более: 1 чипа пресейла + 1 границы + N шагов договора
       const pathEl = doc.querySelector('#app .view .dx-path');
       if (pathEl && pathEl.children.length > n + 2) pathLen.push(d.id + ': ' + pathEl.children.length + ' > ' + (n + 2));
@@ -1343,11 +1346,11 @@ setTimeout(async () => {
        по самому CSS: показ должен стоять ВНЕ медиазапроса. */
     {
       const cssSrc = read('css/app.css');
-      const shown = cssSrc.indexOf('.dx-pre-sum { display: inline-flex');
+      const shown = cssSrc.indexOf('.dx-path .dx-pre { flex: 0 0 auto');
       const inMedia = shown > 0 && /@media[^{]*\{(?:[^{}]|\{[^{}]*\})*$/.test(cssSrc.slice(0, shown));
       check('сделка · плашка пресейла видна на любой ширине, а не только на телефоне',
         shown > 0 && !inMedia,
-        shown < 0 ? 'правила «.dx-pre-sum { display: inline-flex» в CSS нет — пресейл не показан нигде'
+        shown < 0 ? 'правила «.dx-path .dx-pre» в CSS нет — пресейл не показан нигде'
           : (inMedia ? 'правило спрятано в медиазапросе — на широком экране пресейла не видно' : ''));
     }
     WS.ui.dealCard('d_anna');
@@ -4276,10 +4279,13 @@ setTimeout(async () => {
       'входов: ' + doc.querySelectorAll('#app .view .dx-cbar').length);
     // Узкий экран: левая колонка сворачивается, ни один блок не пропадает.
     check('карточка · на узком экране левая колонка сворачивается в раскрываемую справку',
-      !!q('details.dcard-aside-m') && q('details.dcard-aside-m').textContent.indexOf('Участники') > 0);
+      !!q('details.dcard-aside-m') && q('details.dcard-aside-m').textContent.indexOf('Условия сделки') > 0,
+      q('details.dcard-aside-m') ? q('details.dcard-aside-m').textContent.slice(0, 60) : 'раскрывашки нет');
     check('карточка · и раскрывается без скриптов', q('details.dcard-aside-m').tagName === 'DETAILS');
-    check('карточка · свёрнутый пресейл подписан для узкого экрана',
-      !!q('.dx-pre-sum') && /пресейл пройден/.test(q('.dx-pre-sum').textContent));
+    check('карточка · пройденный пресейл подписан одним узлом, а не пятью шагами',
+      !!q('.dx-path .dx-pre') && /Пресейл/.test(q('.dx-path .dx-pre').textContent) &&
+      doc.querySelectorAll('#app .view .dx-path .dx-pre').length === 1,
+      q('.dx-path .dx-pre') ? q('.dx-path .dx-pre').textContent : 'узла пресейла нет');
     // Сделка без запроса пресейла не рисует — рисовать нечего. В фикстурах такой нет (все выросли
     // из запроса), поэтому случай ставится руками: перенесённая вручную сделка — реальный сценарий.
     const orphan = dd().deals.find((x) => x.id === 'd_anna');
@@ -5185,9 +5191,11 @@ setTimeout(async () => {
     check('консьерж · и это тот же тред, что и в разделе',
       (WS.engine.activeThread() || {}).id === 'deal:d_anna', ((WS.engine.activeThread() || {}).id) || 'нет треда');
     // Главное требование: остальное на экране осталось видимым, а не свернулось и не исчезло.
-    check('консьерж · левая колонка с фактами и участниками осталась',
+    check('консьерж · левая колонка с фактами и условиями осталась',
       !!doc.querySelector('#app .view .dcard-aside') &&
-      /Участники/.test((doc.querySelector('#app .view .dcard-aside') || { textContent: '' }).textContent));
+      /Условия сделки/.test((doc.querySelector('#app .view .dcard-aside') || { textContent: '' }).textContent));
+    check('консьерж · и участники сделки с экрана не ушли',
+      /Участники/.test((doc.querySelector('#app .view .dcard-main') || { textContent: '' }).textContent));
     // Не по заголовку, а по существу: объект сделки назван на экране поимённо.
     {
       const annaDeal = dd().deals.find((x) => x.id === 'd_anna');
@@ -5946,9 +5954,12 @@ setTimeout(async () => {
       const dupes = ['Тип объекта', 'Готовность', 'Источник (из запроса)']
         .filter((k) => aside && body && aside.textContent.indexOf(k) >= 0 && body.textContent.indexOf(k) >= 0);
       check('карточка · условия не напечатаны дважды на одном экране', dupes.length === 0, dupes.join(', '));
-      check('карточка · участники не напечатаны дважды на одном экране',
-        !!aside && aside.textContent.indexOf('Участники') >= 0 &&
-        (!body || body.textContent.indexOf('Участники сделки') < 0));
+      // Участники живут в правой колонке ровно один раз: ни второй копии слева, ни вкладки.
+      const mainEl = doc.querySelector('#app .dcard-main');
+      const peopleN = (((mainEl || {}).textContent || '').match(/Участники/g) || []).length;
+      check('карточка · участники напечатаны ровно один раз',
+        peopleN === 1 && !!aside && aside.textContent.indexOf('Участники') < 0,
+        'справа ' + peopleN + ', слева ' + (!!aside && aside.textContent.indexOf('Участники') >= 0));
 
       // Запомненная вкладка, которой на новой стадии нет, не оставляет пустое место.
       WS.store.cardTabs = WS.store.cardTabs || {};

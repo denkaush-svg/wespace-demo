@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:00</title>
+  <title>WESPACE · сборка 13:06</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:00';
+    window.WS_BUILD='13:06';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -997,9 +997,14 @@ button { font-family: inherit; cursor: pointer; }
 .dx-step.done::before, .dx-step.cur::before { background: var(--acc); }
 .dx-step-cap { font-size: 11.5px; font-weight: 700; color: var(--acc-ink); background: var(--acc-soft); border: 1px solid var(--acc-line); padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
 .deal-stepper-wrap { margin-top: 14px; }
-.dx-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
-.dx-tab { padding: 9px 15px; font-size: 13.5px; color: var(--mut); border: 0; border-bottom: 2px solid transparent; font-weight: 600; cursor: pointer; background: none; }
-.dx-tab.on { color: var(--ink); font-weight: 800; border-bottom-color: var(--acc); }
+/* Вкладки стояли голым рядом на сером фоне страницы — ни границы, ни подложки, поэтому
+   не читались как переключатель вовсе. Теперь это панель того же веса, что карточки вокруг. */
+.dx-tabs { display: flex; gap: 4px; flex-wrap: wrap; padding: 5px; margin-bottom: 16px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-pill); }
+.dx-tab { padding: 8px 15px; font-size: 13.5px; color: var(--mut); border: 0; border-radius: var(--r-pill);
+  font-weight: 600; cursor: pointer; background: none; transition: .14s var(--ease); }
+.dx-tab:hover { color: var(--ink); background: var(--surface); }
+.dx-tab.on { color: var(--ink); font-weight: 800; background: var(--surface); box-shadow: var(--shadow-sm); }
 .dx-statusbar { margin-bottom: 12px; }
 .dx-tabbody { min-height: 200px; max-height: 46vh; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
 .dx-concierge { margin-top: 14px; }
@@ -2207,6 +2212,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================================================ */
 .dcard { display: block; }
 .dcard-top { padding: 4px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+/* Маленькая обложка: сделку узнают по объекту раньше, чем прочитан заголовок. */
+.dcard-cover { height: 84px; border-radius: var(--r); margin-bottom: 12px;
+  background-size: cover; background-position: center; border: 1px solid var(--line); }
+@media (max-width: 899.98px) { .dcard-cover { height: 60px; } }
 .dcard-title .deal-title-text { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.25;
   display: inline-block; min-width: 40%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; outline: none; }
 .dcard-title .deal-title-text:hover { background: var(--acc-soft); }
@@ -2223,14 +2232,26 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    Она рисуется явно: невидимая читается как «всё это одно и то же». */
 /* Граница держит собственную колонку, а не висит поверх соседних подписей: подпись шириной
    в 60 пикселей на элементе шириной 26 налезала на «Переговоры» слева и на текущий шаг справа. */
-.dx-bound { flex: 0 0 auto; align-self: stretch; position: relative; width: 88px; }
-.dx-bound::before { content: ''; position: absolute; left: 43px; top: 2px; bottom: 18px; width: 2px;
-  background: repeating-linear-gradient(to bottom, var(--acc) 0 4px, transparent 4px 8px); }
-.dx-bound-l { position: absolute; top: 38px; left: 50%; transform: translateX(-50%);
-  font-size: 9.5px; line-height: 1.15; text-align: center; color: var(--acc-ink); font-weight: 700;
-  width: 84px; text-transform: lowercase; }
+/* Граница и пройденный пресейл — такие же узлы ленты, как шаги договора: круг сверху,
+   подпись под ним, одна линия сквозь всё. Раньше в одной строке жили три разных языка —
+   серая таблетка по центру кружков, красная пунктирная вертикаль во всю высоту со своей
+   подписью в 9,5 пикселя и мета-текст справа на третьем базовом уровне. */
+.dx-path .dx-pre { flex: 0 0 auto; min-width: 96px; cursor: default; }
+.dx-path .dx-pre .d { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc-ink); }
+.dx-path .dx-pre .d svg { width: 15px; height: 15px; }
+.dx-bound { flex: 0 0 auto; width: 78px; display: flex; flex-direction: column; align-items: center;
+  position: relative; }
+.dx-bound .d { width: 30px; height: 30px; display: grid; place-items: center; position: relative; z-index: 1; }
+.dx-bound .d::before { content: ''; width: 2px; height: 18px; border-radius: 2px;
+  background: repeating-linear-gradient(to bottom, var(--acc) 0 4px, transparent 4px 7px); }
+.dx-bound::after { content: ''; position: absolute; top: 14px; left: 0; right: 0; height: 3px;
+  background: var(--acc); }
+.dx-bound .l { font-size: 11.5px; margin-top: 8px; text-align: center; line-height: 1.25;
+  color: var(--acc-ink); font-weight: 700; }
+/* Когда сделка пришла из запроса, «стала сделкой» — часть той же ленты, а не текст, повисший
+   справа на собственном базовом уровне. */
 .dx-path-meta { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px;
-  font-size: 11.5px; color: var(--faint); padding-top: 4px; }
+  font-size: 11.5px; color: var(--faint); padding-top: 4px; align-self: center; }
 
 .dcard-cols { display: block; }
 .dcard-aside { display: none; }
@@ -2240,14 +2261,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcard-aside-m > summary svg { width: 15px; height: 15px; opacity: .7; }
 .dcard-aside-m[open] > summary { margin-bottom: 10px; }
 .dcard-aside-m-b { margin-bottom: 16px; }
-.dcard-params { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
-  padding: 12px 0; margin: 12px 0; display: grid; gap: 9px; }
+/* Условия сделки были набором строк на фоне страницы — без рамки, без заголовка, между двумя
+   карточками. Читалось как обрывок чужого блока. Теперь это карточка с именем, как соседние. */
+.dcard-terms { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-sm); padding: 4px 14px 10px; margin: 12px 0; }
+.dcard-terms-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800;
+  color: var(--mut); text-transform: uppercase; letter-spacing: .04em; padding: 12px 0 4px; }
+.dcard-terms-h svg { width: 14px; height: 14px; color: var(--acc); }
+.dcard-params { display: grid; gap: 2px; }
 /* Строка ввода — единственный вход в Консьержа с карточки. Отдельная кнопка была её же дублем. */
 .dcard-composer { position: sticky; bottom: 0; z-index: 3; padding: 10px 0 4px;
   background: linear-gradient(to top, var(--bg) 72%, transparent); margin-top: 18px; }
 
 @media (min-width: 900px) {
-  .dcard-cols { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 22px; align-items: start; }
+  /* Граница сдвинута вправо: в 340 пикселях справка, клиент и условия шли в три строки каждая
+     и левая колонка требовала собственной прокрутки при пустом месте справа. */
+  .dcard-cols { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 22px; align-items: start; }
   /* Неподвижная — это и есть обещание «не выходить из сделки»: справка, условия и участники
      остаются на месте, пока прокручивается работа. */
   .dcard-aside { display: block; position: sticky; top: 12px; max-height: calc(100vh - 32px);
@@ -2276,6 +2305,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .dcard-composer { padding: 8px 0 2px; }
   .dcard-composer .dx-cbar .ph { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+/* Запланированное и последнее стоят в ряд — так они оба видны без прокрутки. Ниже 1100
+   пикселей ряд распускается в стопку: две ленты в 260 пикселей нечитаемы. */
+.dcard-pair { display: grid; gap: 14px; }
+@media (min-width: 1100px) { .dcard-pair { grid-template-columns: 1fr 1fr; align-items: start; } }
+.dcard-pair > * { min-width: 0; }
+
 /* Последний блок карточки не должен навсегда оставаться под прилипшей строкой ввода. */
 .dcard { padding-bottom: 8px; }
 
@@ -10594,10 +10629,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // становилась одиннадцатью элементами в горизонтальной прокрутке: шаги договора, ради которых
     // карточку открывают, сжимались до 62 пикселей и подписи в 10.5. Суть сохранена — участок
     // виден пройденным, граница нарисована, стадии запроса перечислены в подсказке.
-    const preSum = pre.length ? '<span class="dx-pre-sum" title="' + escAttr(pre.join(' → ')) + '">' +
-      I('check') + 'пресейл пройден · ' + pre.length + '</span>' : '';
+    const preSum = pre.length ? '<span class="dx-step done dx-pre" title="' + escAttr('Пресейл: ' + pre.join(' → ')) + '">' +
+      '<span class="d">' + I('check') + '</span><span class="l">Пресейл · ' + pre.length + '</span></span>' : '';
     const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
-      '<span class="dx-bound-l">условия согласованы</span></span>' : '';
+      '<span class="d"></span><span class="l">условия<br>согласованы</span></span>' : '';
     const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
     return '<div class="dx-path' + (s.cols.length > 7 ? ' long' : '') + '">' + preSum + bound + own + '</div>' + lost;
   }
@@ -13422,7 +13457,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function dealTopBand(d) {
     const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.goal, d.amount ? WS.AED(d.amount) : null]
       .filter(Boolean).join(' · ');
-    return '<div class="dcard-top">' +
+    // Обложка карточки — та же, что у объекта сделки: сделка узнаётся по объекту раньше,
+    // чем прочитан её заголовок.
+    const lot = dealLots(d)[0];
+    const bg = (WS.photos && ((lot && WS.photos[lot.id]) || WS.photos.o_creekline)) || '';
+    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
+      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
+    return '<div class="dcard-top">' + cover +
       '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
@@ -13440,9 +13481,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       dealField('Готовность', d.readiness, 'confirmed', '', d.id, 'readiness') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal', d.id, 'goal') +
       dealField('Источник (из запроса)', d.source, p.source, d.id + ':source', d.id, 'source') + '</div>';
+    return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) +
+      '<div class="dcard-terms"><div class="dcard-terms-h">' + I('doc') + 'Условия сделки</div>' + params + '</div>';
+  }
+  function dealPeopleCard(d) {
     const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
-    return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) + params +
-      dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
+    return dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
   }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
@@ -13451,7 +13495,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
        о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
     const drafts = outcomesBlock('deal', d.id);
     const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
-    return dealNextStepCard(d) + dealPlannedEventsCard(d) + pend + dealLotsBlock(d) + dealRecentCard(d);
+    // Запланированное и последнее — две стороны одного вопроса «что происходит», и на макете
+    // партнёра они стоят в ряд. В столбик «последнее» уезжало под сгиб на каждой сделке.
+    const planned = dealPlannedEventsCard(d);
+    const recent = dealRecentCard(d);
+    const pair = (planned || recent)
+      ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
+    return dealNextStepCard(d) + pair + pend + dealLotsBlock(d) + dealPeopleCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -13508,7 +13558,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // Узкий экран: левая колонка сворачивается в раскрываемую справку под названием, правая
     // встаёт стопкой. Свернули в <details>, а не во вкладки: он раскрывается без скрипта,
     // и ни один блок не пропадает — меняется только способ до него добраться.
-    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка, условия и участники</summary>' +
+    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка и условия сделки</summary>' +
       '<div class="dcard-aside-m-b">' + dealAside(d) + '</div></details>';
     return crumb +
       '<div class="obj-page-head">' + backBtn('clients', 'deals', 'Назад к сделкам') + '</div>' +

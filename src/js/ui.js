@@ -3759,10 +3759,10 @@
     // становилась одиннадцатью элементами в горизонтальной прокрутке: шаги договора, ради которых
     // карточку открывают, сжимались до 62 пикселей и подписи в 10.5. Суть сохранена — участок
     // виден пройденным, граница нарисована, стадии запроса перечислены в подсказке.
-    const preSum = pre.length ? '<span class="dx-pre-sum" title="' + escAttr(pre.join(' → ')) + '">' +
-      I('check') + 'пресейл пройден · ' + pre.length + '</span>' : '';
+    const preSum = pre.length ? '<span class="dx-step done dx-pre" title="' + escAttr('Пресейл: ' + pre.join(' → ')) + '">' +
+      '<span class="d">' + I('check') + '</span><span class="l">Пресейл · ' + pre.length + '</span></span>' : '';
     const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
-      '<span class="dx-bound-l">условия согласованы</span></span>' : '';
+      '<span class="d"></span><span class="l">условия<br>согласованы</span></span>' : '';
     const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
     return '<div class="dx-path' + (s.cols.length > 7 ? ' long' : '') + '">' + preSum + bound + own + '</div>' + lost;
   }
@@ -6587,7 +6587,13 @@
   function dealTopBand(d) {
     const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.goal, d.amount ? WS.AED(d.amount) : null]
       .filter(Boolean).join(' · ');
-    return '<div class="dcard-top">' +
+    // Обложка карточки — та же, что у объекта сделки: сделка узнаётся по объекту раньше,
+    // чем прочитан её заголовок.
+    const lot = dealLots(d)[0];
+    const bg = (WS.photos && ((lot && WS.photos[lot.id]) || WS.photos.o_creekline)) || '';
+    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
+      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
+    return '<div class="dcard-top">' + cover +
       '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
@@ -6605,9 +6611,12 @@
       dealField('Готовность', d.readiness, 'confirmed', '', d.id, 'readiness') +
       dealField('Цель', d.goal, p.goal, d.id + ':goal', d.id, 'goal') +
       dealField('Источник (из запроса)', d.source, p.source, d.id + ':source', d.id, 'source') + '</div>';
+    return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) +
+      '<div class="dcard-terms"><div class="dcard-terms-h">' + I('doc') + 'Условия сделки</div>' + params + '</div>';
+  }
+  function dealPeopleCard(d) {
     const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
-    return dealStatusBrief(d) + dealClientCard(d, 'deal:' + d.id) + params +
-      dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
+    return dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
   }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
@@ -6616,7 +6625,13 @@
        о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
     const drafts = outcomesBlock('deal', d.id);
     const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
-    return dealNextStepCard(d) + dealPlannedEventsCard(d) + pend + dealLotsBlock(d) + dealRecentCard(d);
+    // Запланированное и последнее — две стороны одного вопроса «что происходит», и на макете
+    // партнёра они стоят в ряд. В столбик «последнее» уезжало под сгиб на каждой сделке.
+    const planned = dealPlannedEventsCard(d);
+    const recent = dealRecentCard(d);
+    const pair = (planned || recent)
+      ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
+    return dealNextStepCard(d) + pair + pend + dealLotsBlock(d) + dealPeopleCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -6673,7 +6688,7 @@
     // Узкий экран: левая колонка сворачивается в раскрываемую справку под названием, правая
     // встаёт стопкой. Свернули в <details>, а не во вкладки: он раскрывается без скрипта,
     // и ни один блок не пропадает — меняется только способ до него добраться.
-    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка, условия и участники</summary>' +
+    const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка и условия сделки</summary>' +
       '<div class="dcard-aside-m-b">' + dealAside(d) + '</div></details>';
     return crumb +
       '<div class="obj-page-head">' + backBtn('clients', 'deals', 'Назад к сделкам') + '</div>' +
