@@ -5314,9 +5314,41 @@ setTimeout(async () => {
     // Раздел открывают ради разбора; доска без «Разобрать» — витрина.
     const cards = [].slice.call(view.querySelectorAll('.kanban .kcol .deal'));
     check('входящие · на доске есть карточки обращений', cards.length > 0, 'карточек: ' + cards.length);
-    const noTriage = cards.filter((el) => el.textContent.indexOf('Разобрать') < 0);
-    check('входящие · на каждой карточке есть «Разобрать»', noTriage.length === 0,
-      'без разбора: ' + noTriage.length + ' из ' + cards.length);
+    // На доске два вида карточек, и действие у них разное: неразобранное обращение
+    // разбирают, заведённую заявку открывают. Мёртвой не должна быть ни одна.
+    const inCards = cards.filter((el) => !el.getAttribute('data-request'));
+    const reqCards = cards.filter((el) => el.getAttribute('data-request'));
+    const noTriage = inCards.filter((el) => el.textContent.indexOf('Разобрать') < 0);
+    check('входящие · на каждом обращении есть «Разобрать»', noTriage.length === 0,
+      'без разбора: ' + noTriage.length + ' из ' + inCards.length);
+    const deadReq = reqCards.filter((el) => el.textContent.indexOf('Открыть заявку') < 0);
+    check('входящие · с каждой заведённой заявки есть вход в неё', deadReq.length === 0,
+      'без входа: ' + deadReq.length + ' из ' + reqCards.length);
+
+    // Замечание партнёра дословно: раздел оставить ТОЛЬКО под разбор входящих, отображение —
+    // канбаном. Прежняя проверка смотрела, что доска существует, — а над ней стоял список
+    // из семнадцати разобранных заявок и абзац-пояснение, и раздел разбором не был.
+    const blocks = [].slice.call(view.children).map((el) => el.className);
+    check('входящие · доска — единственное содержимое раздела',
+      blocks.filter((c) => c !== 'wh').length === 1 && blocks.indexOf('kanban') >= 0,
+      'блоки экрана: ' + blocks.join(' | '));
+    check('входящие · пояснения над разделом нет',
+      ((view.querySelector('.wh__p') || {}).textContent || '').trim() === '',
+      (view.querySelector('.wh__p') || {}).textContent);
+    // Пустая колонка читается как поломка. «Квалифицирована» набиралась только из обращений,
+    // а разбор заводит ЗАЯВКУ — колонка была вечно нулевой при семнадцати заявках рядом.
+    const emptyCols = [].slice.call(view.querySelectorAll('.kanban .kcol'))
+      .filter((c) => c.querySelectorAll('.deal').length === 0)
+      .map((c) => (c.querySelector('.kh span') || {}).textContent);
+    check('входящие · ни одна стадия разбора не пуста', emptyCols.length === 0,
+      'пусто: ' + emptyCols.join(', '));
+    // Ничего не потеряно: каждая заявка либо на доске, либо видна через свою сделку.
+    const onBoard = [].slice.call(view.querySelectorAll('.kanban [data-request]'))
+      .map((el) => el.getAttribute('data-request'));
+    const lostReqs = (dd().requests || []).filter((r) =>
+      onBoard.indexOf(r.id) < 0 && (dd().deals || []).filter((d) => d.requestId === r.id).length === 0);
+    check('входящие · заявка без сделки не пропала с доски', lostReqs.length === 0,
+      lostReqs.map((r) => r.title).join(', '));
 
     // Стадию должно быть чем сдвинуть, и крайние положения не заворачиваются.
     check('входящие · стадию можно двигать с карточки', view.querySelectorAll('[data-instage]').length > 0);

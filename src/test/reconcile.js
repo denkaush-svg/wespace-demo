@@ -52,19 +52,30 @@ setTimeout(() => {
   // ---------------- ПУЛ 1 ----------------
   const inbox = go('requests');
   const stages = WS.INBOX_STAGES || [];
+  // «Только для разбора» — это про СОСТАВ экрана, а не про наличие словаря стадий. Прежняя
+  // проверка смотрела на словарь, а над доской стоял список из семнадцати разобранных заявок.
+  const inbBlocks = [].slice.call(inbox.children).map((el) => el.className);
   measured(1, 1, 'Заявки — только квалификация, отказ закрывается статусом',
-    stages.indexOf('rejected') >= 0 && stages.indexOf('qualified') >= 0,
-    'стадии разбора: ' + stages.join(', '));
+    stages.indexOf('rejected') >= 0 && stages.indexOf('qualified') >= 0 &&
+    inbBlocks.filter((c) => c !== 'wh').length === 1,
+    'стадии: ' + stages.join(', ') + ' · блоки экрана: ' + inbBlocks.join(' | '));
   const withStage = (DD().inbox || []).filter((x) => x.stage).length;
   measured(1, 2, 'Стадии обращения: новое · не вышли на связь · квалифицирована · отказ',
     stages.length === 4 && withStage === (DD().inbox || []).length,
     'стадий ' + stages.length + ', обращений со стадией ' + withStage + ' из ' + (DD().inbox || []).length);
   const kanCols = qa('.kanban > div').length;
   const triage = qa('.kanban [data-scn], .kanban [data-nav="concierge"]').length;
-  measured(1, 3, 'Канбан обращений', kanCols === 4 && triage > 0,
-    'колонок ' + kanCols + ', кнопок «Разобрать» ' + triage);
-  measured(1, 4, 'Убрать шапку-пояснение на «Входящих»',
-    txt(inbox).indexOf('Входящие') === 0, 'экран начинается с: ' + short(txt(inbox), 46));
+  const emptyCols = qa('.kanban .kcol').filter((c) => c.querySelectorAll('.deal').length === 0)
+    .map((c) => (c.querySelector('.kh span') || {}).textContent);
+  measured(1, 3, 'Канбан обращений',
+    kanCols === 4 && triage > 0 && inbBlocks.indexOf('kanban') >= 0 && emptyCols.length === 0,
+    'колонок ' + kanCols + ', кнопок «Разобрать» ' + triage +
+    ', пустых колонок ' + emptyCols.length + (emptyCols.length ? ' (' + emptyCols.join(', ') + ')' : ''));
+  // Пояснение — это абзац под заголовком, а не первое слово экрана: прежняя проверка читала
+  // заголовок и проходила при полностью сохранённом абзаце.
+  const inbP = ((inbox.querySelector('.wh__p') || {}).textContent || '').trim();
+  measured(1, 4, 'Убрать шапку-пояснение на «Входящих»', inbP === '',
+    inbP ? 'абзац на месте: ' + short(inbP, 60) : 'абзаца под заголовком нет');
 
   const deals = go('clients', 'deals');
   const dlist = (DD().deals || []).filter((d) => !d.archived);

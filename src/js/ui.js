@@ -8236,6 +8236,36 @@
     return scn ? '<button class="btn xs" data-scn="' + scn + '">' + I('play') + 'Разобрать</button>'
       : '<button class="btn xs" data-nav="concierge">' + I('sparkle') + 'Разобрать</button>';
   }
+  // Что лежит в колонке разбора. Обращение и заявка — две разные записи, но для агента это одна
+  // доска: обращение разобрали -> появилась заявка -> пошёл подбор -> заявка ушла в «Сделки».
+  // Пока «Квалифицирована» набиралась только из обращений, она была вечно пустой: разбор
+  // заводит ЗАЯВКУ, а не переставляет обращение, — и колонка читалась как поломка.
+  function inboxColumnItems(stage) {
+    const inbox = (D().inbox || []).filter((it) => (it.stage || 'new') === stage);
+    if (stage === 'qualified') {
+      // Заведена, работа по объектам ещё не началась. Как только появилась сделка — запись
+      // живёт в «Сделках», и на доске разбора ей делать нечего.
+      return { inbox: inbox, reqs: (D().requests || []).filter((r) =>
+        !dealsOfRequest(r.id).length && ['closed', 'lost'].indexOf(reqStage(r)) < 0) };
+    }
+    if (stage === 'rejected') {
+      // Отказ — и по обращению (спам, не наш запрос), и по заявке, из которой ничего не вышло.
+      return { inbox: inbox, reqs: (D().requests || []).filter((r) =>
+        !dealsOfRequest(r.id).length && reqStage(r) === 'lost') };
+    }
+    return { inbox: inbox, reqs: [] };
+  }
+  function inboxReqCard(r) {
+    const rc = D().clients.find((x) => x.id === r.clientId) || {};
+    return '<div class="deal" data-request="' + r.id + '" style="cursor:pointer">' +
+      '<div class="deal-body"><div class="dt">' + escAttr(rc.name || '—') + '</div>' +
+      '<div class="dm" style="font-size:11px">' + I('mail') + ' заявка · ' + escAttr(r.createdAt || '') + '</div>' +
+      '<div class="dm in-txt" title="' + escAttr(r.title) + '">' + escAttr(r.title) + '</div>' +
+      '<div class="dfoot"><div class="dtag"><span class="badge">' +
+      (r.budget ? WS.AED(r.budget) : 'бюджет не назван') + '</span>' +
+      '<span class="badge">' + ((r.offered || []).length) + ' объектов</span></div></div>' +
+      '<div class="in-act"><button class="btn xs" data-request="' + r.id + '">' + I('arrowRight') + 'Открыть заявку</button></div></div></div>';
+  }
   function inboxKanban() {
     const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
     const stages = WS.INBOX_STAGES || [];
@@ -8257,10 +8287,11 @@
         '<div class="in-act">' + inboxTriageBtn(it) + '</div></div></div>';
     };
     const cols = (WS.INBOX_STAGES || []).map((stage) => {
-      const items = (D().inbox || []).filter((it) => (it.stage || 'new') === stage);
-      let cards = items.map(inboxCard).join('');
+      const g = inboxColumnItems(stage);
+      const n = g.inbox.length + g.reqs.length;
+      let cards = g.inbox.map(inboxCard).join('') + g.reqs.map(inboxReqCard).join('');
       if (!cards) cards = '<div style="font-size:12px;color:var(--faint);padding:8px 6px">пусто</div>';
-      return '<div class="kcol"><div class="kh"><span>' + inboxStageLabel(stage) + '</span><span class="c">' + items.length + '</span></div>' +
+      return '<div class="kcol"><div class="kh"><span>' + inboxStageLabel(stage) + '</span><span class="c">' + n + '</span></div>' +
         cards + '</div>';
     }).join('');
     return '<div class="kanban">' + cols + '</div>';
@@ -8282,34 +8313,33 @@
   // Заявки — incoming requests from all channels (night leads, voice, exceptions).
   function viewRequests() {
     const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
-    const exLabel = { qualify: ['Квалифицировать', 'warn'], duplicate: ['Возможный дубль', 'warn'], unknown_object: ['Объект вне инвентаря', 'warn'], delivery_fail: ['Ошибка доставки', 'stop'] };
-    const rows = (D().inbox || []).map((it) => {
-      const c = (D().clients || []).find((x) => x.id === it.clientId);
-      const who = c ? c.name : 'Новый контакт';
-      const ex = exLabel[it.ex] || ['Входящее', ''];
-      const scn = it.scenario || (it.ex === 'qualify' ? 'S15' : null);
-      const act = scn ? '<button class="btn sm" data-scn="' + scn + '">' + I('play') + 'Разобрать</button>'
-        : '<button class="btn sm" data-nav="concierge">' + I('sparkle') + 'Разобрать</button>';
-      return '<div class="feed-row"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
-        '<div class="ft"><div class="t">' + who + ' · <span style="color:var(--mut);font-weight:500">' + it.at + '</span></div>' +
-        '<div class="m">' + it.text + '</div></div>' +
-        '<div style="display:flex;gap:6px;align-items:center"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span>' + act + '</div></div>';
+    // Раздел — ТОЛЬКО разбор входящего, как и просил партнёр. Отдельного списка «разобрано,
+    // ждут подбора» здесь больше нет: заведённые заявки стоят в своей колонке той же доски,
+    // а как только по заявке пошла сделка, работа идёт в «Сделках» одним сквозным путём.
+    // Пояснение над разделом снято: доска объясняет себя названиями колонок.
+    const narrow = (WS.INBOX_STAGES || []).map((stage) => {
+      const g = inboxColumnItems(stage);
+      const n = g.inbox.length + g.reqs.length;
+      const body = (g.inbox.map((it) => {
+        const c = (D().clients || []).find((x) => x.id === it.clientId);
+        const ex = INBOX_EX_LABEL[it.ex] || ['Входящее', ''];
+        return '<div class="feed-row"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
+          '<div class="ft"><div class="t">' + (c ? c.name : 'Новый контакт') + ' · <span style="color:var(--mut);font-weight:500">' + it.at + '</span></div>' +
+          '<div class="m">' + it.text + '</div></div>' +
+          '<div style="display:flex;gap:6px;align-items:center"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span>' +
+          inboxTriageBtn(it) + '</div></div>';
+      }).join('') + g.reqs.map((r) => {
+        const rc = D().clients.find((x) => x.id === r.clientId) || {};
+        return '<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('mail') + '</div>' +
+          '<div class="ft"><div class="t">' + escAttr(rc.name || '—') + ' · ' + escAttr(r.title) + '</div>' +
+          '<div class="m">' + (r.budget ? WS.AED(r.budget) : 'бюджет не назван') + ' · предложено объектов: ' + ((r.offered || []).length) + '</div></div>' + I('arrowRight') + '</div>';
+      }).join('')) || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">пусто</div>';
+      return '<div class="card" style="margin-top:12px"><div class="section-label" style="padding:12px 16px 4px">' +
+        inboxStageLabel(stage) + ' · ' + n + '</div><div class="feed" style="padding:0 16px 8px">' + body + '</div></div>';
     }).join('');
-    const reqRows = (D().requests || []).map((r) => {
-      const rc = D().clients.find((x) => x.id === r.clientId) || {};
-      const dn = dealsOfRequest(r.id).length;
-      return '<div class="feed-row" data-request="' + r.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('mail') + '</div>' +
-        '<div class="ft"><div class="t">' + (rc.name || '—') + ' · ' + r.title + '</div>' +
-        '<div class="m">' + (r.budget ? WS.AED(r.budget) : '—') + ' · сделок: ' + dn + ' · предложено объектов: ' + ((r.offered || []).length) + '</div></div>' + I('arrowRight') + '</div>';
-    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">запросов в разборе нет</div>';
-    // Раздел сжат до разбора входящего: подбор, показы и переговоры переехали в «Сделки» одним
-    // сквозным путём. Оставаться здесь запросу незачем — как только критерии сняты, работа идёт там.
-    const inboxSection = boardFits() ? inboxKanban() :
-      ('<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Новые · нужно разобрать · ' + (D().inbox || []).length + '</div><div class="feed" style="padding:0 16px 8px">' + (rows || '<div style="font-size:12px;color:var(--faint);padding:6px 16px">входящих обращений нет — всё разобрано</div>') + '</div></div>');
-    return head('Входящие', 'Что пришло и ещё не разобрано, и что разобрано, но работа по объектам ещё не началась. «Разобрать» запускает Консьержа. Как только критерии сняты и подбор пошёл — запрос виден в «Сделках», одним путём до подписания.',
+    return head('Входящие', '',
       '<button class="btn sm" data-scn="G1">' + I('mic') + 'Запрос голосом (G1)</button>') +
-      '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Разобрано, ждут подбора · ' + ((D().requests || []).length) + '</div><div class="feed" style="padding:0 16px 8px">' + reqRows + '</div></div>' +
-      inboxSection;
+      (boardFits() ? inboxKanban() : narrow);
   }
   // Компании — legal entities (developers, funds, corporates, agencies).
   // Компании — legal entities (developers, funds, corporates, agencies). The list, its search and
