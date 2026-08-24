@@ -226,6 +226,9 @@
   }
   function renderCgDock() {
     const el = document.getElementById('cgdock'); if (!el) return;
+    // Закладка на краю едет вместе с кромкой панели — она же ручка, которой панель задвигают.
+    // Класс на body, потому что закладка живёт вне #app и переживает перерисовку.
+    if (document.body) document.body.classList.toggle('cg-open', !!S().cgDock);
     if (!S().cgDock) { el.className = 'cgdock'; el.innerHTML = ''; return; }
     const t = WS.engine.activeThread();
     const label = t ? t.label : 'Новый диалог';
@@ -4498,11 +4501,20 @@
       '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>';
   }
   // "Последние события" card: the few most-recent events that fit, then a jump to the full history.
+  /* «Вся история» раскрывается ЗДЕСЬ ЖЕ, в правой части карточки, а не переключает вкладку в
+     самом низу: у вкладки внизу и у карточки сверху разные глаза, и, нажав «вся история», агент
+     терял из виду то, ради чего её открыл. Правая часть — единственное место карточки, которое
+     меняется: в неё же выезжает разговор с Консьержем. */
   function recentEventsCard(tl, moreEtab, limit) {
     const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, limit || 4).map(nowEvLine).join('') ||
       '<div class="dnb-ev-empty">событий пока нет</div>';
-    const more = '<button class="btn xs" data-etab="' + moreEtab + '">' + I('arrowRight') + 'вся история</button>';
+    const more = '<button class="btn xs" data-rightpane="history">' + I('arrowRight') + 'вся история</button>';
     return dxSec('clock', 'Последние события', more, '<div class="dnb-hist">' + evs + '</div>');
+  }
+  // Правая часть в режиме истории: заголовок с возвратом и лента со своей прокруткой.
+  function rightHistoryPane(inner, backLabel) {
+    const back = '<button class="btn sm" data-rightpane="off">' + I('chevLeft') + backLabel + '</button>';
+    return dxSec('clock', 'Вся история', back, '<div class="rp-scroll">' + inner + '</div>');
   }
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   // What an agent opens a deal to do. Ordered by how often it is the reason for opening it.
@@ -5046,7 +5058,7 @@
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
   }
-  function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
+  function dealCard(id) { S().dealId = id; S().rightPane = null; WS.router.go('dealDetail'); }
   // Call affordance on the deal card — the client is reachable without opening the contact card.
   function callClient(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return;
@@ -5068,7 +5080,7 @@
       '<div style="font-size:12px;color:var(--mut);margin-top:2px">Показано объектов: ' + shown + ' · сделок по запросу: ' + sibs.length + '</div>' +
       (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки по этому запросу</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
   }
-  function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  function requestCard(id) { S().requestId = id; S().rightPane = null; WS.router.go('requestDetail'); }
   // Lead-ops strip (Codex IA review): who owns the lead, its status/temperature, the next contact —
   // the operational facts a broker needs before the brief attributes. Shared by request + client.
   function opsTempChip(t) {
@@ -5421,13 +5433,17 @@
   }
   // Правая — работа: что дальше, запланированное и последнее в ряд, подбор, расхождения.
   function reqWork(r) {
+    if (S().rightPane === 'history') {
+      return rightHistoryPane(requestTimelineInner(r), 'Назад к работе по запросу');
+    }
     const planned = reqPlannedCard(r);
     const recent = reqRecentCard(r);
     const pair = (planned || recent) ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
-    return pair + cxStack([
-      // Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны
-      // не сошлись, сделки нет. Раньше карточка расхождения висела на сделке, где бюджета уже нет.
-      conflictBlock(r),
+    /* Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны не
+       сошлись, сделки нет. И это ровно то решение, которого ждут от агента, — поэтому оно
+       стоит в той же первой карточке, что и черновики итогов, а не отдельной плашкой ниже. */
+    const pend = needsYouCard('request', r.id, conflictBlock(r));
+    return pend + pair + cxStack([
       reqOffersStatusBlock(r),
       reqSecondaryRow(r),
     ]);
@@ -5526,17 +5542,15 @@
     // рабочая область · вкладки · строка ввода внизу.
     const o0 = (r.offered || []).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean)[0];
     const bg = (WS.photos && ((o0 && WS.photos[o0.id]) || WS.photos.o_creekline)) || '';
-    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
-      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
     const sub = [escAttr(c.name || '—'), r.budget ? WS.AED(r.budget) : null, r.horizon]
       .filter(Boolean).join(' · ');
     const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Клиент и условия запроса</summary>' +
       '<div class="dcard-aside-m-b">' + reqAside(r) + '</div></details>';
+    const title = '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
+      '<div class="dcard-sub">' + sub + '</div>';
     return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
       '<div class="dcard">' +
-      '<div class="dcard-top">' + cover +
-      '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
-      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-top">' + coverBand(bg, title) +
       '<div class="dcard-pathrow">' + reqStepperSection(r) + '</div></div>' +
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + reqAside(r) + '</aside>' + aside +
@@ -7048,14 +7062,24 @@
     // чем прочитан её заголовок.
     const lot = dealLots(d)[0];
     const bg = (WS.photos && ((lot && WS.photos[lot.id]) || WS.photos.o_creekline)) || '';
-    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
-      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
-    return '<div class="dcard-top">' + cover +
-      '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
+    // Название и суть живут ВНУТРИ обложки. Пустая полоса картинки занимала высоту заголовка и
+    // не несла ни слова — на карточке, которую открывают ради работы, это чистая потеря экрана.
+    const title = '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
-      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-sub">' + sub + '</div>';
+    return '<div class="dcard-top">' + coverBand(bg, title) +
       '<div class="dcard-pathrow">' + dealPathSection(d) + '</div></div>';
+  }
+  /* Обложка карточки — она же первый экран: картинка объекта и поверх неё название и суть.
+     Одна на сделку и на заявку, чтобы они не разъезжались снова. Без картинки полоса остаётся
+     той же по составу — меняется только фон, а не раскладка. */
+  function coverBand(bg, inner) {
+    const style = bg
+      ? ' style="background-image:linear-gradient(90deg,var(--surface) 10%,var(--wh-fade1) 58%,var(--wh-fade2) 100%),url(' + bg + ')"'
+      : '';
+    return '<div class="dcard-cover' + (bg ? '' : ' no-img') + '"' + style + '>' +
+      '<div class="dcard-hero-b">' + inner + '</div></div>';
   }
   // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
   // у объектов, потому что ставка принадлежит объекту, а не сделке.
@@ -7075,20 +7099,51 @@
     const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
     return dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
   }
+  /* ---- «Требует вашего решения» -----------------------------------------------------------
+     Раньше это называлось «Итоги на подтверждение» и стояло третьим блоком: имя описывало один
+     частный случай — черновик итога звонка, — а на деле это единственное место на карточке, где
+     от агента что-то ТРЕБУЕТСЯ лично: подтвердить, поправить, выбрать. Поэтому и имя общее, и
+     место первое: это руководство к действию, а не запись о прошлом.
+
+     Черновик стоит здесь, а не в истории: он не часть истории, пока его не подтвердили. В ленту
+     он попадает ровно в тот момент, когда становится правдой. */
+  function needsYouCard(scope, id, extraHtml) {
+    const drafts = outcomesBlock(scope, id);
+    const rows = [];
+    if (drafts) rows.push('<div class="timeline">' + drafts + '</div>');
+    if (extraHtml) rows.push(extraHtml);
+    if (!rows.length) return '';
+    const n = outcomesFor(scope, id).length + (extraHtml ? 1 : 0);
+    return dxSec('sparkle', 'Требует вашего решения · ' + n,
+      '<span class="ny-hint">' + I('lock') + 'до подтверждения не идёт в выводы</span>',
+      '<div class="ny-body">' + rows.join('') + '</div>');
+  }
+  // Значения, предложенные моделью и ещё не подтверждённые: сами поля правятся слева, здесь —
+  // только счёт и путь к ним, чтобы карточка не держала одно значение в двух местах.
+  function aiFieldsPending(d) {
+    const p = d.prov || {};
+    const n = Object.keys(p).filter((k) => p[k] === 'ai').length;
+    if (!n) return '';
+    return '<div class="ny-row"><span class="ny-ic">' + I('sparkle') + '</span>' +
+      '<div><div class="ny-t">' + n + ' ' + plural(n, 'значение предложено', 'значения предложены', 'значений предложено') +
+      ' моделью</div>' +
+      '<div class="ny-m">Условия сделки слева — подтвердите галочкой или впишите своё.</div></div></div>';
+  }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
-    /* Черновик итога стоит в РАБОЧЕЙ области, а не в истории: он не часть истории, пока его
-       не подтвердили, и это дело на сегодня — «подтвердите или отклоните», — а не запись
-       о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
-    const drafts = outcomesBlock('deal', d.id);
-    const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
+    if (S().rightPane === 'history') {
+      return rightHistoryPane(commsFeedRows(dealLineageEntries(d)), 'Назад к работе по сделке');
+    }
+    // То, что требует агента лично, стоит ПЕРВЫМ: это руководство к действию, и держать его
+    // третьим блоком означало, что до него доходят последним.
+    const pend = needsYouCard('deal', d.id, aiFieldsPending(d));
     // Запланированное и последнее — две стороны одного вопроса «что происходит», и на макете
     // партнёра они стоят в ряд. В столбик «последнее» уезжало под сгиб на каждой сделке.
     const planned = dealPlannedEventsCard(d);
     const recent = dealRecentCard(d);
     const pair = (planned || recent)
       ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
-    return pair + pend + dealLotsBlock(d) + dealPeopleCard(d);
+    return pend + pair + dealLotsBlock(d) + dealPeopleCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -9972,7 +10027,8 @@
     bindListSearch();
     if (st.view === 'finance') renderFinance();
     // Hide the floating Concierge launcher (W) on the Concierge screen itself — it's redundant there.
-    const _fab = document.querySelector('.fab-w'); if (_fab) _fab.style.display = (st.view === 'concierge') ? 'none' : '';
+    // На самом экране Консьержа закладка не нужна — она вела бы туда, где уже стоишь.
+    const _tab = document.querySelector('.cg-tab'); if (_tab) _tab.style.display = (st.view === 'concierge') ? 'none' : '';
     renderToasts();
 
     if (st.navOpen) { document.getElementById('drawer').classList.add('show'); document.getElementById('scrim').classList.add('show'); }

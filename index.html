@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:56</title>
+  <title>WESPACE · сборка 23:34</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:56';
+    window.WS_BUILD='23:34';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2368,15 +2368,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================================================ */
 .dcard { display: block; }
 .dcard-top { padding: 4px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
-/* Маленькая обложка: сделку узнают по объекту раньше, чем прочитан заголовок. */
-.dcard-cover { height: 84px; border-radius: var(--r); margin-bottom: 12px;
-  background-size: cover; background-position: center; border: 1px solid var(--line); }
-@media (max-width: 899.98px) { .dcard-cover { height: 60px; } }
+/* Обложка — она же первый экран: картинка объекта и поверх неё название и суть. Полоса
+   картинки без единого слова занимала высоту заголовка и не несла ничего — на карточке,
+   которую открывают ради работы, это чистая потеря экрана. */
+.dcard-cover { min-height: 96px; border-radius: var(--r); margin-bottom: 12px;
+  background-size: cover; background-position: center; border: 1px solid var(--line);
+  display: flex; align-items: flex-end; padding: 14px 18px; }
+.dcard-cover.no-img { background: var(--surface-2); }
+.dcard-hero-b { min-width: 0; max-width: 72%; }
+@media (max-width: 899.98px) { .dcard-cover { min-height: 76px; padding: 12px 14px; } .dcard-hero-b { max-width: 100%; } }
 .dcard-title .deal-title-text { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.25;
   display: inline-block; min-width: 40%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; outline: none; }
 .dcard-title .deal-title-text:hover { background: var(--acc-soft); }
 .dcard-title .deal-title-text:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--acc); }
-.dcard-sub { font-size: 12.5px; color: var(--mut); margin: 4px 0 14px; }
+.dcard-sub { font-size: 12.5px; color: var(--mut); margin: 3px 0 0; }
 .dcard-pathrow { display: block; }
 /* Лента сделки — та же лента, что у заявки, до последнего правила: карточка, кружки в ряд,
    подпись под кружком, одна поясняющая строка внизу. Раньше здесь в одной строке жили три
@@ -2458,6 +2463,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Карточки ряда — соседи, и общее правило «.dx-sec + .dx-sec» опускало вторую на 14 пикселей.
    Ряд оставался кривым ровно на эту величину при верном grid-выравнивании. */
 .dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }
+
+/* ---- «Требует вашего решения» -------------------------------------------------------------
+   Единственное место на карточке, где от агента что-то требуется лично: подтвердить, поправить,
+   выбрать. Стоит первым и подписано так, чтобы имя не описывало один частный случай. */
+.ny-body { display: flex; flex-direction: column; gap: 10px; }
+.ny-hint { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mut); font-weight: 500; }
+.ny-hint svg { width: 12px; height: 12px; }
+.ny-row { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--acc-line);
+  background: var(--acc-soft); border-radius: 10px; padding: 10px 12px; }
+.ny-ic { flex: none; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 7px; background: var(--surface); color: var(--acc); }
+.ny-ic svg { width: 13px; height: 13px; }
+.ny-t { font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.ny-m { font-size: 11.5px; color: var(--mut); margin-top: 2px; line-height: 1.4; }
+
+/* История в правой части карточки: своя прокрутка, чтобы лента не выталкивала работу за экран. */
+.rp-scroll { max-height: 62vh; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
 .dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
 .dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
 .dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }
@@ -2779,12 +2801,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    Была окошком 390×560 в углу: в неё не помещался ни разбор, ни таблица, и разговор о сделке
    читался в щель. Теперь это правая панель во всю высоту рабочей области и не уже четверти
    экрана — clamp держит её читаемой и на 1280, и на 2560. */
-.cgdock{ position:fixed; right:18px; top:74px; bottom:18px;
-  width:clamp(400px, 33vw, 620px); max-width:calc(100vw - 36px);
-  background:var(--surface); border:1px solid var(--line-2); border-radius:16px;
-  box-shadow:0 30px 70px -20px rgba(17,17,17,.4), 0 10px 24px rgba(17,17,17,.16); z-index:94;
-  display:none; flex-direction:column; overflow:hidden; opacity:0; transform:translateY(12px) scale(.98);
-  transition:.2s cubic-bezier(.16,1,.3,1); }
+/* Панель выезжает из правого края, из-под закладки, и занимает значительную часть экрана:
+   в окошко 390x560 не помещался ни разбор, ни таблица, и разговор о сделке читался в щель.
+   На карточке сделки эта ширина накрывает ровно правую, рабочую колонку — левая со справкой
+   и условиями остаётся на виду. */
+:root{ --cg-w: clamp(440px, 44vw, 780px); }
+.cgdock{ position:fixed; right:0; top:64px; bottom:0;
+  width:var(--cg-w); max-width:100vw;
+  background:var(--surface); border:1px solid var(--line-2); border-right:0; border-radius:16px 0 0 0;
+  box-shadow:-24px 0 60px -24px rgba(17,17,17,.4), -8px 0 20px rgba(17,17,17,.12); z-index:94;
+  display:none; flex-direction:column; overflow:hidden; opacity:0; transform:translateX(28px);
+  transition:.24s cubic-bezier(.16,1,.3,1); }
 .cgdock.show{ display:flex; opacity:1; transform:none; }
 .cgdock-head{ display:flex; align-items:center; gap:9px; padding:12px 14px; border-bottom:1px solid var(--line);
   background:linear-gradient(180deg,var(--acc-soft),var(--surface)); }
@@ -2808,7 +2835,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cgdock-welcome > svg{ width:34px; height:34px; color:var(--acc); opacity:.75; margin-bottom:10px; }
 .cgdock-w-t{ font-weight:700; color:var(--ink); font-size:15px; }
 .cgdock-w-m{ font-size:12.5px; margin-top:5px; }
-@media (max-width:520px){ .cgdock{ right:10px; left:10px; width:auto; top:auto; bottom:82px; height:min(70dvh, 520px); } }
+@media (max-width:520px){ .cgdock{ right:0; left:0; width:auto; top:auto; bottom:0; height:min(78dvh, 620px); border-radius:16px 16px 0 0; } }
 
 /* Пульс — personal "next best action" feed (formal, action-first) */
 .nba-feed{ display:flex; flex-direction:column; gap:8px; }
@@ -2826,16 +2853,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* keep the reused funnel "hot" marker as a sized SVG (no emoji) */
 .wl .n svg{ width:12px; height:12px; vertical-align:-1px; color:var(--stop); }
 
-/* ---- floating round Concierge button — black W on orange circle ---- */
-.fab-w{ position:fixed; right:10px; bottom:18px; width:52px; height:52px; border-radius:50%;
-  background:radial-gradient(130% 130% at 32% 24%, #FF9E5F 0%, var(--acc) 52%, var(--acc-2) 100%);
-  color:#141414; border:0; font-family:'Bebas Neue',sans-serif; font-size:27px; line-height:1;
-  display:grid; place-items:center; cursor:pointer; z-index:95; transition:.16s cubic-bezier(.2,.7,.2,1);
-  box-shadow: inset 0 2px 3px rgba(255,255,255,.55), inset 0 -4px 7px rgba(150,55,15,.35),
-    0 10px 22px -6px rgba(241,126,61,.6), 0 4px 9px rgba(17,17,17,.2); }
-.fab-w:hover{ transform:translateY(-2px); box-shadow: inset 0 2px 3px rgba(255,255,255,.55), inset 0 -4px 7px rgba(150,55,15,.35),
-    0 14px 28px -6px rgba(241,126,61,.68), 0 5px 11px rgba(17,17,17,.22); }
-.fab-w:active{ transform:translateY(0); }
+/* ---- Закладка Консьержа на правом краю --------------------------------------------------
+   Была круглая кнопка в углу: она читалась как ещё одно плавающее действие и ничего не
+   говорила о том, откуда возьмётся панель. Закладка приклеена к краю, и панель выезжает
+   ровно из-под неё; когда панель открыта, закладка едет вместе с её кромкой. */
+.cg-tab{ position:fixed; right:0; top:50%; transform:translateY(-50%);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:16px 9px; border:1px solid var(--acc-2); border-right:0; border-radius:14px 0 0 14px;
+  background:linear-gradient(180deg, var(--acc) 0%, var(--acc-2) 100%); color:#fff;
+  cursor:pointer; z-index:96; transition:right .22s cubic-bezier(.16,1,.3,1), filter .15s var(--ease);
+  box-shadow:-6px 0 18px -8px rgba(17,17,17,.4); }
+.cg-tab:hover{ filter:brightness(1.06); }
+.cg-tab-w{ font-family:'Bebas Neue',sans-serif; font-size:22px; line-height:1; }
+.cg-tab-t{ writing-mode:vertical-rl; font-size:11px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; }
+/* Панель открыта — закладка стоит на её кромке и служит ручкой, которой панель задвигают. */
+body.cg-open .cg-tab{ right:var(--cg-w); }
+@media (max-width:520px){ body.cg-open .cg-tab{ right:0; } .cg-tab-t{ display:none; } }
 
 /* top-bar: profile avatar + wallet chip */
 .tb-avatar{ width:34px; height:34px; flex-shrink:0; border-radius:50%; background:#111; color:#fff; border:0;
@@ -2889,7 +2923,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   <div id="app"><div id="bootmsg" style="padding:24px;font:16px 'Manrope',-apple-system,sans-serif;color:#737373">WeSpace загружается…</div></div>
   <div class="modal-wrap" id="modal"></div>
   <div class="toasts" id="toasts"></div>
-  <button class="fab-w" title="Консьерж — чат" data-act="cgDock">W</button>
+  <!-- Закладка на правом краю: из неё и выезжает панель Консьержа. Круглая кнопка в углу
+       читалась как «ещё одно плавающее действие» и никак не объясняла, откуда берётся панель. -->
+  <button class="cg-tab" title="Консьерж — открыть панель" data-act="cgDock">
+    <span class="cg-tab-w">W</span><span class="cg-tab-t">Консьерж</span>
+  </button>
 
   <script>
 /* Inline icon set (Phosphor-style, stroke 1.6). Offline, no CDN. */
@@ -4680,7 +4718,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', pulseTab: 'deals', pulseDay: 'today', prospIdx: 0, prospList: false, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', prospIdx: 0, prospList: false, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -7393,6 +7431,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   function renderCgDock() {
     const el = document.getElementById('cgdock'); if (!el) return;
+    // Закладка на краю едет вместе с кромкой панели — она же ручка, которой панель задвигают.
+    // Класс на body, потому что закладка живёт вне #app и переживает перерисовку.
+    if (document.body) document.body.classList.toggle('cg-open', !!S().cgDock);
     if (!S().cgDock) { el.className = 'cgdock'; el.innerHTML = ''; return; }
     const t = WS.engine.activeThread();
     const label = t ? t.label : 'Новый диалог';
@@ -11665,11 +11706,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div class="dnb-ev-m">' + p.e.at + ' · ' + p.e.by + '</div></div></div>';
   }
   // "Последние события" card: the few most-recent events that fit, then a jump to the full history.
+  /* «Вся история» раскрывается ЗДЕСЬ ЖЕ, в правой части карточки, а не переключает вкладку в
+     самом низу: у вкладки внизу и у карточки сверху разные глаза, и, нажав «вся история», агент
+     терял из виду то, ради чего её открыл. Правая часть — единственное место карточки, которое
+     меняется: в неё же выезжает разговор с Консьержем. */
   function recentEventsCard(tl, moreEtab, limit) {
     const evs = feedSortDesc((tl || []).map((e, i) => ({ e: e, i: i }))).slice(0, limit || 4).map(nowEvLine).join('') ||
       '<div class="dnb-ev-empty">событий пока нет</div>';
-    const more = '<button class="btn xs" data-etab="' + moreEtab + '">' + I('arrowRight') + 'вся история</button>';
+    const more = '<button class="btn xs" data-rightpane="history">' + I('arrowRight') + 'вся история</button>';
     return dxSec('clock', 'Последние события', more, '<div class="dnb-hist">' + evs + '</div>');
+  }
+  // Правая часть в режиме истории: заголовок с возвратом и лента со своей прокруткой.
+  function rightHistoryPane(inner, backLabel) {
+    const back = '<button class="btn sm" data-rightpane="off">' + I('chevLeft') + backLabel + '</button>';
+    return dxSec('clock', 'Вся история', back, '<div class="rp-scroll">' + inner + '</div>');
   }
   // Status/context chips lifted out of the old grey block to sit right under the «Сейчас» line.
   // What an agent opens a deal to do. Ordered by how often it is the reason for opening it.
@@ -12213,7 +12263,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
   }
-  function dealCard(id) { S().dealId = id; WS.router.go('dealDetail'); }
+  function dealCard(id) { S().dealId = id; S().rightPane = null; WS.router.go('dealDetail'); }
   // Call affordance on the deal card — the client is reachable without opening the contact card.
   function callClient(id) {
     const c = D().clients.find((x) => x.id === id); if (!c) return;
@@ -12235,7 +12285,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       '<div style="font-size:12px;color:var(--mut);margin-top:2px">Показано объектов: ' + shown + ' · сделок по запросу: ' + sibs.length + '</div>' +
       (sibs.length > 1 ? '<div class="section-label" style="margin-top:8px">Сделки по этому запросу</div><div class="qa-row" style="margin-top:4px">' + sibChips + '</div>' : ''));
   }
-  function requestCard(id) { S().requestId = id; WS.router.go('requestDetail'); }
+  function requestCard(id) { S().requestId = id; S().rightPane = null; WS.router.go('requestDetail'); }
   // Lead-ops strip (Codex IA review): who owns the lead, its status/temperature, the next contact —
   // the operational facts a broker needs before the brief attributes. Shared by request + client.
   function opsTempChip(t) {
@@ -12588,13 +12638,17 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   }
   // Правая — работа: что дальше, запланированное и последнее в ряд, подбор, расхождения.
   function reqWork(r) {
+    if (S().rightPane === 'history') {
+      return rightHistoryPane(requestTimelineInner(r), 'Назад к работе по запросу');
+    }
     const planned = reqPlannedCard(r);
     const recent = reqRecentCard(r);
     const pair = (planned || recent) ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
-    return pair + cxStack([
-      // Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны
-      // не сошлись, сделки нет. Раньше карточка расхождения висела на сделке, где бюджета уже нет.
-      conflictBlock(r),
+    /* Расхождение по бюджету — свойство заявки: бюджет называет клиент, и пока стороны не
+       сошлись, сделки нет. И это ровно то решение, которого ждут от агента, — поэтому оно
+       стоит в той же первой карточке, что и черновики итогов, а не отдельной плашкой ниже. */
+    const pend = needsYouCard('request', r.id, conflictBlock(r));
+    return pend + pair + cxStack([
       reqOffersStatusBlock(r),
       reqSecondaryRow(r),
     ]);
@@ -12693,17 +12747,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // рабочая область · вкладки · строка ввода внизу.
     const o0 = (r.offered || []).map((o) => D().objects.find((x) => x.id === o.id)).filter(Boolean)[0];
     const bg = (WS.photos && ((o0 && WS.photos[o0.id]) || WS.photos.o_creekline)) || '';
-    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
-      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
     const sub = [escAttr(c.name || '—'), r.budget ? WS.AED(r.budget) : null, r.horizon]
       .filter(Boolean).join(' · ');
     const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Клиент и условия запроса</summary>' +
       '<div class="dcard-aside-m-b">' + reqAside(r) + '</div></details>';
+    const title = '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
+      '<div class="dcard-sub">' + sub + '</div>';
     return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
       '<div class="dcard">' +
-      '<div class="dcard-top">' + cover +
-      '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
-      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-top">' + coverBand(bg, title) +
       '<div class="dcard-pathrow">' + reqStepperSection(r) + '</div></div>' +
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + reqAside(r) + '</aside>' + aside +
@@ -14215,14 +14267,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     // чем прочитан её заголовок.
     const lot = dealLots(d)[0];
     const bg = (WS.photos && ((lot && WS.photos[lot.id]) || WS.photos.o_creekline)) || '';
-    const cover = bg ? '<div class="dcard-cover" style="background-image:linear-gradient(90deg,' +
-      'var(--surface) 8%,var(--wh-fade1) 52%,var(--wh-fade2) 100%),url(' + bg + ')"></div>' : '';
-    return '<div class="dcard-top">' + cover +
-      '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
+    // Название и суть живут ВНУТРИ обложки. Пустая полоса картинки занимала высоту заголовка и
+    // не несла ни слова — на карточке, которую открывают ради работы, это чистая потеря экрана.
+    const title = '<div class="dcard-title deal-title-edit" data-titledeal="' + d.id + '">' +
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
-      '<div class="dcard-sub">' + sub + '</div>' +
+      '<div class="dcard-sub">' + sub + '</div>';
+    return '<div class="dcard-top">' + coverBand(bg, title) +
       '<div class="dcard-pathrow">' + dealPathSection(d) + '</div></div>';
+  }
+  /* Обложка карточки — она же первый экран: картинка объекта и поверх неё название и суть.
+     Одна на сделку и на заявку, чтобы они не разъезжались снова. Без картинки полоса остаётся
+     той же по составу — меняется только фон, а не раскладка. */
+  function coverBand(bg, inner) {
+    const style = bg
+      ? ' style="background-image:linear-gradient(90deg,var(--surface) 10%,var(--wh-fade1) 58%,var(--wh-fade2) 100%),url(' + bg + ')"'
+      : '';
+    return '<div class="dcard-cover' + (bg ? '' : ' no-img') + '"' + style + '>' +
+      '<div class="dcard-hero-b">' + inner + '</div></div>';
   }
   // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
   // у объектов, потому что ставка принадлежит объекту, а не сделке.
@@ -14242,20 +14304,51 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
     return dxSec('users', 'Участники · ' + dealContacts(d).length, addBtn, dealContactsInner(d));
   }
+  /* ---- «Требует вашего решения» -----------------------------------------------------------
+     Раньше это называлось «Итоги на подтверждение» и стояло третьим блоком: имя описывало один
+     частный случай — черновик итога звонка, — а на деле это единственное место на карточке, где
+     от агента что-то ТРЕБУЕТСЯ лично: подтвердить, поправить, выбрать. Поэтому и имя общее, и
+     место первое: это руководство к действию, а не запись о прошлом.
+
+     Черновик стоит здесь, а не в истории: он не часть истории, пока его не подтвердили. В ленту
+     он попадает ровно в тот момент, когда становится правдой. */
+  function needsYouCard(scope, id, extraHtml) {
+    const drafts = outcomesBlock(scope, id);
+    const rows = [];
+    if (drafts) rows.push('<div class="timeline">' + drafts + '</div>');
+    if (extraHtml) rows.push(extraHtml);
+    if (!rows.length) return '';
+    const n = outcomesFor(scope, id).length + (extraHtml ? 1 : 0);
+    return dxSec('sparkle', 'Требует вашего решения · ' + n,
+      '<span class="ny-hint">' + I('lock') + 'до подтверждения не идёт в выводы</span>',
+      '<div class="ny-body">' + rows.join('') + '</div>');
+  }
+  // Значения, предложенные моделью и ещё не подтверждённые: сами поля правятся слева, здесь —
+  // только счёт и путь к ним, чтобы карточка не держала одно значение в двух местах.
+  function aiFieldsPending(d) {
+    const p = d.prov || {};
+    const n = Object.keys(p).filter((k) => p[k] === 'ai').length;
+    if (!n) return '';
+    return '<div class="ny-row"><span class="ny-ic">' + I('sparkle') + '</span>' +
+      '<div><div class="ny-t">' + n + ' ' + plural(n, 'значение предложено', 'значения предложены', 'значений предложено') +
+      ' моделью</div>' +
+      '<div class="ny-m">Условия сделки слева — подтвердите галочкой или впишите своё.</div></div></div>';
+  }
   // Правая колонка — рабочая область: что дальше, объекты, что было.
   function dealWork(d) {
-    /* Черновик итога стоит в РАБОЧЕЙ области, а не в истории: он не часть истории, пока его
-       не подтвердили, и это дело на сегодня — «подтвердите или отклоните», — а не запись
-       о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
-    const drafts = outcomesBlock('deal', d.id);
-    const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
+    if (S().rightPane === 'history') {
+      return rightHistoryPane(commsFeedRows(dealLineageEntries(d)), 'Назад к работе по сделке');
+    }
+    // То, что требует агента лично, стоит ПЕРВЫМ: это руководство к действию, и держать его
+    // третьим блоком означало, что до него доходят последним.
+    const pend = needsYouCard('deal', d.id, aiFieldsPending(d));
     // Запланированное и последнее — две стороны одного вопроса «что происходит», и на макете
     // партнёра они стоят в ряд. В столбик «последнее» уезжало под сгиб на каждой сделке.
     const planned = dealPlannedEventsCard(d);
     const recent = dealRecentCard(d);
     const pair = (planned || recent)
       ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
-    return pair + pend + dealLotsBlock(d) + dealPeopleCard(d);
+    return pend + pair + dealLotsBlock(d) + dealPeopleCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -17139,7 +17232,8 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     bindListSearch();
     if (st.view === 'finance') renderFinance();
     // Hide the floating Concierge launcher (W) on the Concierge screen itself — it's redundant there.
-    const _fab = document.querySelector('.fab-w'); if (_fab) _fab.style.display = (st.view === 'concierge') ? 'none' : '';
+    // На самом экране Консьержа закладка не нужна — она вела бы туда, где уже стоишь.
+    const _tab = document.querySelector('.cg-tab'); if (_tab) _tab.style.display = (st.view === 'concierge') ? 'none' : '';
     renderToasts();
 
     if (st.navOpen) { document.getElementById('drawer').classList.add('show'); document.getElementById('scrim').classList.add('show'); }
@@ -17353,10 +17447,33 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
      не словесные символы, границы между ними нет. Первая версия этого правила молча не
      срабатывала ни разу, поэтому граница слова выписана явно. */
   const DEMONSTRATIVE = /(^|[^а-яёa-z])(эт(?:ой|у|ому|ом|от|а|о|и)|здесь|тут|текущ\w*|по ней|по нему)(?![а-яё])/i;
-  function screenAnswer(t) {
-    if (!DEMONSTRATIVE.test(t)) return null;
+  // Слово, которым называют саму открытую запись. «Сделай саммари СДЕЛКИ», стоя на сделке, —
+  // это вопрос про неё, даже когда указательного слова нет вовсе.
+  const KIND_WORD = { 'сделка': /сделк/i, 'запрос': /заявк|запрос/i, 'контакт': /контакт|клиент/i,
+    'компания': /компан/i, 'объект': /объект|лот/i };
+  /* Вопрос, заданный из-под карточки, — вопрос про эту карточку.
+     Раньше «сделай саммари сделки» уходило в общую аналитику и возвращалось сводкой по всему
+     рабочему месту: «8 сделок в работе, 20 228 000 AED». Формально это ответ, по сути — левая
+     информация вместо ответа на заданный вопрос. Правило: если на экране открыта запись и
+     брокер не назвал ДРУГОГО человека, вопрос считается заданным про неё. */
+  function screenScoped(text) {
     const scr = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
     const rec = scr && scr.запись;
+    if (!rec) return null;
+    const t = lc(text || '');
+    const named = findEntity(text);
+    // Назвали другого человека — значит, спрашивают не про открытую запись.
+    if (named && named.name && rec.клиент && lc(named.name) !== lc(rec.клиент)) return null;
+    // «Сколько сделок в работе», «покажи все сделки» — вопрос про множество, а не про открытую
+    // запись. Указательное слово перевешивает: «сколько задач по этой сделке» — снова про неё.
+    const GLOBAL = /сколько|скольк|всего|все\s|всех|список|в работе|по всем|у меня|воронк|конверси/i;
+    if (GLOBAL.test(t) && !DEMONSTRATIVE.test(t)) return null;
+    const kw = KIND_WORD[rec.тип];
+    if (!DEMONSTRATIVE.test(t) && !(kw && kw.test(t))) return null;
+    return rec;
+  }
+  function screenAnswer(text) {
+    const rec = screenScoped(text);
     if (!rec) return null;
     const money = (v) => (WS.AED ? WS.AED(v) : String(v));
     const bits = [];
@@ -17590,11 +17707,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
       .map((m) => m.район || m.area || m.name).filter(Boolean);
     const askedArea = areas.length &&
       /район|аналитик|рынок|цен|доходн|аренд|jumeirah|palm|downtown|marina|jlt|jbr|arjan|hills/i.test(t);
+    /* Когда открыта карточка, «не понял» не должно превращаться в инвентарь рабочего места:
+       брокер стоит на конкретной сделке, и общий список коллекций к его вопросу отношения не
+       имеет. Уточняем — про ЭТУ запись, называя её по имени. */
+    const scrRec = (WS.ui && WS.ui.screenContext) ? (WS.ui.screenContext().запись || null) : null;
     const lines = askedArea
       ? ['Этого района в нашем срезе рынка нет. Есть: ' + areas.join(', ') + '.',
          'Могу разобрать любой — цену за метр, доходность, срок экспозиции.']
-      : ['Такого у нас в данных нет. Что есть: ' + know.join(', ') + '.',
-         'Скажите, что из этого посмотреть.'];
+      : scrRec
+        ? ['Не понял вопрос. Вы стоите на записи «' + scrRec.название + '» — уточните, что по ней нужно:',
+           'бриф к звонку, что мешает закрыть, что просрочено, история переписки, следующий шаг.']
+        : ['Такого у нас в данных нет. Что есть: ' + know.join(', ') + '.',
+           'Скажите, что из этого посмотреть.'];
     return {
       kind: 'answer',
       text: lines.join(' '),
@@ -17703,10 +17827,11 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
         { subject: deal.id, title: 'Смена стадии', lines: ['Сделка ' + (deal.title || deal.id) + ': ' + deal.stage + ' → ' + st] });
     }
 
-    // Вопрос об открытой записи — раньше общей аналитики: «что по этой сделке» не должно
-    // превращаться в инвентарь рабочего места.
-    if (RE.ask.test(t)) {
-      const scr = screenAnswer(t);
+    /* Вопрос об открытой записи разбирается ДО общей аналитики — и до неё же уходит любой
+        вопрос, заданный из-под карточки. Иначе «сделай саммари сделки» матчится словом «сделк»
+        и возвращается счётчиком всех сделок рабочего места. */
+    {
+      const scr = screenAnswer(text);
       if (scr) return scr;
     }
 
@@ -17724,7 +17849,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
           next: suggestions(),
         };
       }
-      const hit = METRIC_HINTS.find((h) => h[0].test(t));
+      /* Счётчик — ответ на вопрос «сколько». Когда открыта карточка, ответить счётчиком на
+         вопрос о свойстве («какой этаж у объекта» → «12 объектов») значит выдать левую
+         информацию вместо ответа; лучше уточнить. Вне карточки поведение прежнее. */
+      const QUANTITY = /сколько|скольк|количеств|сумм|итог|всего|объ[её]м|покажи|дай|список|выведи|статус|состояни/i;
+      const onCard = !!((WS.ui && WS.ui.screenContext) ? WS.ui.screenContext().запись : null);
+      const hit = (onCard && !QUANTITY.test(t)) ? null : METRIC_HINTS.find((h) => h[0].test(t));
       if (hit) {
         const ans = answerReadings(hit[1]);
         if (ans) return ans;
@@ -18387,7 +18517,18 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   function scope() {
     const th = (WS.engine && WS.engine.activeThread) ? WS.engine.activeThread() : null;
     if (!th) return null;
-    return { id: th.id, о_чём: th.label || th.id, реплик: (th.items || []).length };
+    /* Что открыто на экране — ВНУТРИ описания разговора, а не только отдельным полем.
+       Развёрнутый сервер собирает из области разговора ровно две вещи — «о_чём» и «id», —
+       поэтому контекст экрана, уехавший отдельным полем, до модели просто не доходил: она
+       по-прежнему отвечала общей сводкой на вопрос, заданный из-под конкретной сделки. */
+    const sc = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
+    const rec = sc && sc.запись;
+    const about = rec
+      ? [sc.экран + ' «' + rec.название + '»', rec.клиент ? 'клиент ' + rec.клиент : null,
+         rec.шаг ? 'шаг ' + rec.шаг : (rec.стадия ? 'стадия ' + rec.стадия : null)]
+        .filter(Boolean).join(', ')
+      : (th.label || th.id);
+    return { id: th.id, о_чём: about, экран: sc ? sc.экран : null, реплик: (th.items || []).length };
   }
 
   // ---------- what comes back ----------
@@ -19553,7 +19694,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-instage],[data-cgask],[data-pulsetab],[data-dayfilter],[data-prosp],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-instage],[data-cgask],[data-pulsetab],[data-dayfilter],[data-prosp],[data-rightpane],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -19588,6 +19729,9 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
     if (d.role) { store.view = 'start'; store.navOpen = false; store.navStack = []; return api.setRole(d.role); }
     if (d.pulsetab) { store.pulseTab = d.pulsetab; return api.emit(); }
     if (d.dayfilter) { store.pulseDay = d.dayfilter; return api.emit(); }
+    // Правая часть карточки — единственное, что меняется: история и разговор с Консьержем
+    // раскрываются в ней, а левая колонка с условиями остаётся на месте.
+    if (d.rightpane) { store.rightPane = d.rightpane === 'off' ? null : d.rightpane; return api.emit(); }
     if (d.prosp) {
       const n = WS.ui.pulseProspectList().length;
       const i = store.prospIdx || 0;

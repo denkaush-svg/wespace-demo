@@ -2218,15 +2218,20 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    ============================================================================================ */
 .dcard { display: block; }
 .dcard-top { padding: 4px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
-/* Маленькая обложка: сделку узнают по объекту раньше, чем прочитан заголовок. */
-.dcard-cover { height: 84px; border-radius: var(--r); margin-bottom: 12px;
-  background-size: cover; background-position: center; border: 1px solid var(--line); }
-@media (max-width: 899.98px) { .dcard-cover { height: 60px; } }
+/* Обложка — она же первый экран: картинка объекта и поверх неё название и суть. Полоса
+   картинки без единого слова занимала высоту заголовка и не несла ничего — на карточке,
+   которую открывают ради работы, это чистая потеря экрана. */
+.dcard-cover { min-height: 96px; border-radius: var(--r); margin-bottom: 12px;
+  background-size: cover; background-position: center; border: 1px solid var(--line);
+  display: flex; align-items: flex-end; padding: 14px 18px; }
+.dcard-cover.no-img { background: var(--surface-2); }
+.dcard-hero-b { min-width: 0; max-width: 72%; }
+@media (max-width: 899.98px) { .dcard-cover { min-height: 76px; padding: 12px 14px; } .dcard-hero-b { max-width: 100%; } }
 .dcard-title .deal-title-text { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.25;
   display: inline-block; min-width: 40%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; outline: none; }
 .dcard-title .deal-title-text:hover { background: var(--acc-soft); }
 .dcard-title .deal-title-text:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--acc); }
-.dcard-sub { font-size: 12.5px; color: var(--mut); margin: 4px 0 14px; }
+.dcard-sub { font-size: 12.5px; color: var(--mut); margin: 3px 0 0; }
 .dcard-pathrow { display: block; }
 /* Лента сделки — та же лента, что у заявки, до последнего правила: карточка, кружки в ряд,
    подпись под кружком, одна поясняющая строка внизу. Раньше здесь в одной строке жили три
@@ -2308,6 +2313,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Карточки ряда — соседи, и общее правило «.dx-sec + .dx-sec» опускало вторую на 14 пикселей.
    Ряд оставался кривым ровно на эту величину при верном grid-выравнивании. */
 .dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }
+
+/* ---- «Требует вашего решения» -------------------------------------------------------------
+   Единственное место на карточке, где от агента что-то требуется лично: подтвердить, поправить,
+   выбрать. Стоит первым и подписано так, чтобы имя не описывало один частный случай. */
+.ny-body { display: flex; flex-direction: column; gap: 10px; }
+.ny-hint { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mut); font-weight: 500; }
+.ny-hint svg { width: 12px; height: 12px; }
+.ny-row { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--acc-line);
+  background: var(--acc-soft); border-radius: 10px; padding: 10px 12px; }
+.ny-ic { flex: none; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 7px; background: var(--surface); color: var(--acc); }
+.ny-ic svg { width: 13px; height: 13px; }
+.ny-t { font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.ny-m { font-size: 11.5px; color: var(--mut); margin-top: 2px; line-height: 1.4; }
+
+/* История в правой части карточки: своя прокрутка, чтобы лента не выталкивала работу за экран. */
+.rp-scroll { max-height: 62vh; overflow-y: auto; margin-right: -4px; padding-right: 4px; }
 .dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
 .dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
 .dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }

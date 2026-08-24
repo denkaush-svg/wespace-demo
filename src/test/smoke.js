@@ -4268,6 +4268,11 @@ setTimeout(async () => {
     const q = (s) => doc.querySelector('#app .view ' + s);
     check('карточка · полоса сверху несёт название, суть и путь',
       !!q('.dcard-top .deal-title-text') && !!q('.dcard-sub') && !!q('.dcard-pathrow .dx-path'));
+    /* Название и суть стоят ВНУТРИ обложки. Пустая полоса картинки занимала высоту заголовка и
+       не несла ни слова — на карточке, которую открывают ради работы, это потерянный экран. */
+    check('карточка · название и суть стоят внутри обложки, а не под ней',
+      !!q('.dcard-cover .dcard-title .deal-title-text') && !!q('.dcard-cover .dcard-sub'),
+      q('.dcard-cover') ? q('.dcard-cover').className : 'обложки нет');
     check('карточка · название по-прежнему правится по клику',
       !!q('.dcard-title.deal-title-edit[data-titledeal="d_anna"]'));
     // Дата перехода и срок на шаге — в строке ПОД лентой, вместе с границей пресейла. Отдельного
@@ -4283,6 +4288,27 @@ setTimeout(async () => {
     check('карточка · комиссии в левой колонке нет',
       q('.dcard-aside') && q('.dcard-aside').textContent.indexOf('Комиссия') < 0);
     check('карточка · связь с клиентом осталась на месте', !!q('.dcard-aside .dcli-chans'));
+    /* «Итоги на подтверждение» называли один частный случай, а это единственное место карточки,
+       где от агента что-то требуется лично. Имя общее, место первое: это руководство к действию,
+       а не запись о прошлом. */
+    {
+      const heads = [].slice.call(doc.querySelectorAll('#app .view .dcard-main .dx-sec-h'))
+        .map((h) => h.textContent.trim());
+      const iNeed = heads.findIndex((h) => /^Требует вашего решения/.test(h));
+      const iPlan = heads.findIndex((h) => /^Запланировано/.test(h));
+      check('карточка · «Требует вашего решения» названо по сути и стоит первым',
+        iNeed === 0 && iPlan > iNeed, heads.slice(0, 4).join(' | '));
+      check('карточка · и «Итогов на подтверждение» на экране больше нет',
+        heads.every((h) => !/Итоги на подтверждение/.test(h)), heads.join(' | '));
+      // Значения, предложенные моделью, названы счётом и путём к ним — а не продублированы.
+      const dl = (dd().deals || []).find((x) => x.id === 'd_anna') || {};
+      const aiN = Object.keys(dl.prov || {}).filter((k) => dl.prov[k] === 'ai').length;
+      if (aiN) {
+        check('карточка · и предложенные моделью значения названы счётом, а не повторены',
+          !!q('.ny-row') && q('.ny-row').textContent.indexOf(String(aiN)) >= 0,
+          q('.ny-row') ? q('.ny-row').textContent.replace(/\s+/g, ' ').slice(0, 120) : 'строки нет');
+      }
+    }
     check('карточка · справа «что дальше», объекты и «что было»',
       !!q('.plev-next .pn-act') && v().indexOf('Последние события') > 0 &&
       (v().indexOf('Объект сделки') > 0 || v().indexOf('Объекты сделки') > 0));
@@ -4309,6 +4335,37 @@ setTimeout(async () => {
         cssSrc.indexOf('.dcard-pair > .dx-sec { display: flex; flex-direction: column;') > 0 &&
         cssSrc.indexOf('.dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }') > 0,
         'правила равной высоты в CSS нет');
+    }
+    /* «Вся история» раскрывается в ПРАВОЙ части карточки, а не переключает вкладку в самом
+       низу: у вкладки внизу и у карточки сверху разные глаза, и, нажав «вся история», агент
+       терял из виду то, ради чего её открыл. Левая колонка при этом не двигается. */
+    {
+      const more = doc.querySelector('#app .view [data-rightpane="history"]');
+      check('карточка · «вся история» не переключает вкладку внизу', !!more &&
+        !more.hasAttribute('data-etab'), more ? more.outerHTML.slice(0, 80) : 'кнопки нет');
+      if (more) {
+        more.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('карточка · история раскрылась в правой части',
+          !!doc.querySelector('#app .view .dcard-main .rp-scroll'),
+          'правая часть: ' + ((doc.querySelector('#app .view .dcard-main .dx-sec-h') || {}).textContent || '—'));
+        check('карточка · и левая колонка с условиями осталась на месте',
+          !!doc.querySelector('#app .view .dcard-aside .dcard-params'));
+        const back = doc.querySelector('#app .view [data-rightpane="off"]');
+        check('карточка · и есть чем вернуться к работе', !!back);
+        if (back) back.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        check('карточка · возврат вернул рабочую область',
+          !doc.querySelector('#app .view .rp-scroll') && !!doc.querySelector('#app .view .dcard-pair'));
+      }
+      // Открытие другой записи не тащит за собой историю прошлой.
+      WS.store.rightPane = 'history';
+      const another = (dd().deals || []).find((x) => x.id !== 'd_anna' && !WS.ui.dealArchived(x));
+      if (another) {
+        WS.ui.dealCard(another.id);
+        check('карточка · история прошлой записи не открывается на новой',
+          WS.store.rightPane === null && !doc.querySelector('#app .view .rp-scroll'),
+          String(WS.store.rightPane));
+      }
+      WS.ui.dealCard('d_anna');
     }
     // Отдельной кнопки «Работать через Консьержа» нет — она была дублем строки ввода внизу.
     check('карточка · внизу одна строка ввода', doc.querySelectorAll('#app .view .dcard-composer').length === 1);
@@ -5326,6 +5383,24 @@ setTimeout(async () => {
       check('консьерж · «какой этаж» не читается как «эта…» и не подменяется сводкой по сделке',
         floor.kind !== 'answer' || floor.text.indexOf('Открыта сделка') < 0,
         (floor.text || '').slice(0, 120));
+      /* Вопрос, заданный из-под карточки, — вопрос про неё, даже без указательного слова.
+         «Сделай саммари сделки» уходило в общую аналитику и возвращалось сводкой по всему
+         рабочему месту: формально ответ, по сути — левая информация вместо ответа. */
+      const summ = WS.agent.ask('сделай саммари сделки');
+      check('консьерж · вопрос из-под карточки отвечается про эту карточку',
+        summ.kind === 'answer' && summ.text.indexOf(dl.title) >= 0, (summ.text || '').slice(0, 140));
+      // Вопрос про множество остаётся вопросом про множество, даже стоя на карточке.
+      const many = WS.agent.ask('сколько сделок в работе');
+      check('консьерж · вопрос про множество не сужается до открытой записи',
+        many.text.indexOf(dl.title) < 0 && /\d/.test(many.text), (many.text || '').slice(0, 120));
+      // И «не понял» на карточке — это уточнение про НЕЁ, а не инвентарь рабочего места.
+      check('консьерж · «не понял» на карточке уточняет по этой записи, а не перечисляет коллекции',
+        floor.text.indexOf(dl.title) >= 0 && floor.text.indexOf('уточните') >= 0,
+        (floor.text || '').slice(0, 160));
+      /* Экран уезжает к модели ВНУТРИ описания разговора: развёрнутый сервер собирает из области
+         ровно «о_чём» и «id», и контекст, уехавший отдельным полем, до модели не доходил. */
+      check('консьерж · описание разговора называет открытую запись',
+        /о_чём:\s*about/.test(liveSrc) && /WS\.ui\.screenContext/.test(liveSrc));
       // Панель, открытая круглой кнопкой, привязывается к тому, что открыто. Тред сбрасывается
       // напрямую: openThread уводит на раздел Консьержа, и экран перестал бы быть сделкой.
       WS.store.cgDock = false;

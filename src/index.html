@@ -23,7 +23,11 @@
   <div id="app"><div id="bootmsg" style="padding:24px;font:16px 'Manrope',-apple-system,sans-serif;color:#737373">WeSpace загружается…</div></div>
   <div class="modal-wrap" id="modal"></div>
   <div class="toasts" id="toasts"></div>
-  <button class="fab-w" title="Консьерж — чат" data-act="cgDock">W</button>
+  <!-- Закладка на правом краю: из неё и выезжает панель Консьержа. Круглая кнопка в углу
+       читалась как «ещё одно плавающее действие» и никак не объясняла, откуда берётся панель. -->
+  <button class="cg-tab" title="Консьерж — открыть панель" data-act="cgDock">
+    <span class="cg-tab-w">W</span><span class="cg-tab-t">Консьерж</span>
+  </button>
 
   <script src="js/icons.js"></script>
   <script src="js/photos.js"></script>

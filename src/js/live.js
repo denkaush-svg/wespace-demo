@@ -264,7 +264,18 @@
   function scope() {
     const th = (WS.engine && WS.engine.activeThread) ? WS.engine.activeThread() : null;
     if (!th) return null;
-    return { id: th.id, о_чём: th.label || th.id, реплик: (th.items || []).length };
+    /* Что открыто на экране — ВНУТРИ описания разговора, а не только отдельным полем.
+       Развёрнутый сервер собирает из области разговора ровно две вещи — «о_чём» и «id», —
+       поэтому контекст экрана, уехавший отдельным полем, до модели просто не доходил: она
+       по-прежнему отвечала общей сводкой на вопрос, заданный из-под конкретной сделки. */
+    const sc = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
+    const rec = sc && sc.запись;
+    const about = rec
+      ? [sc.экран + ' «' + rec.название + '»', rec.клиент ? 'клиент ' + rec.клиент : null,
+         rec.шаг ? 'шаг ' + rec.шаг : (rec.стадия ? 'стадия ' + rec.стадия : null)]
+        .filter(Boolean).join(', ')
+      : (th.label || th.id);
+    return { id: th.id, о_чём: about, экран: sc ? sc.экран : null, реплик: (th.items || []).length };
   }
 
   // ---------- what comes back ----------
