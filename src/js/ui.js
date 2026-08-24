@@ -229,6 +229,17 @@
     // Закладка на краю едет вместе с кромкой панели — она же ручка, которой панель задвигают.
     // Класс на body, потому что закладка живёт вне #app и переживает перерисовку.
     if (document.body) document.body.classList.toggle('cg-open', !!S().cgDock);
+    /* На карточке сделки или заявки панель ложится РОВНО на правую, рабочую колонку: партнёр
+       просил, чтобы правая часть превращалась в диалог, а левая со справкой и условиями
+       оставалась на виду. Ширина берётся замером самой колонки, а не подобранной константой —
+       константа разъехалась бы с раскладкой при первой же её правке. */
+    const col = document.querySelector('#app .dcard-main');
+    const box = col ? col.getBoundingClientRect() : null;
+    if (box && box.left > 0 && window.innerWidth > 900) {
+      document.documentElement.style.setProperty('--cg-w', Math.round(window.innerWidth - box.left) + 'px');
+    } else {
+      document.documentElement.style.removeProperty('--cg-w');
+    }
     if (!S().cgDock) { el.className = 'cgdock'; el.innerHTML = ''; return; }
     const t = WS.engine.activeThread();
     const label = t ? t.label : 'Новый диалог';
