@@ -1034,13 +1034,39 @@
     return answerCard(r, mid);
   }
 
+  /* Как открыть то, что было заведено. Ключ — коллекция, значение — атрибут, который уже
+     умеет открывать карточку в общем обработчике кликов. Коллекция без карточки (задачи,
+     события) ведёт на свой экран, а не в никуда: молчащая кнопка хуже отсутствующей. */
+  const OPEN_CREATED = {
+    deals: (id) => 'data-deal="' + id + '"', requests: (id) => 'data-request="' + id + '"',
+    clients: (id) => 'data-client="' + id + '"', companies: (id) => 'data-company="' + id + '"',
+    objects: (id) => 'data-obj="' + id + '"', tasks: () => 'data-nav="tasks"',
+  };
+  const CREATED_RU = { deals: 'сделку', requests: 'запрос', clients: 'контакт',
+    companies: 'компанию', objects: 'объект', tasks: 'задачи' };
+  function openCreatedBtn(created) {
+    const first = (created || []).filter((c) => c && OPEN_CREATED[c.coll])[0];
+    if (!first) return '';
+    return '<button class="btn sm primary" ' + OPEN_CREATED[first.coll](first.id) + '>' +
+      I('arrowRight') + 'Открыть ' + (CREATED_RU[first.coll] || 'запись') + '</button>';
+  }
   function agentConfirm(id) {
     const p = WS.agent.pendingProposal(id);
     const res = WS.agent.confirm(id);
     if (res.ok) {
+      /* Что осталось дозаполнить — на карточке, которая это сделала, и КНОПКОЙ. Раньше это была
+         строка текста: агент читал «не заполнены: бюджет, район», нажимал на неё и ничего не
+         происходило — открывать было нечего, потому что ссылки не было вовсе. */
+      const open = openCreatedBtn(res.created);
+      const gaps = (p && p.missing || []).length
+        ? '<div style="margin-top:9px;font-size:12px;color:var(--mut)">' + I('warn') +
+          ' ' + ((p && p.missing) || []).map(esc).join('<br>') + '</div>'
+        : '';
+      const acts = open ? '<div class="qa-row" style="margin-top:10px">' + open + '</div>' : '';
       pushMsg('<div class="msg ai fadeup" style="max-width:100%"><div class="who">' + I('checkCircle') + ' Применено</div>' +
         '<div class="card pad" style="border-color:var(--ok-line)"><span class="badge ok">' + I('check') + esc((p && p.title) || 'Изменение') + '</span>' +
-        '<div style="margin-top:7px;font-size:12px;color:var(--mut)">' + ((p && p.lines) || []).map(esc).join('<br>') + '</div></div></div>');
+        '<div style="margin-top:7px;font-size:12px;color:var(--mut)">' + ((p && p.lines) || []).map(esc).join('<br>') + '</div>' +
+        gaps + acts + '</div></div>');
       WS.storeApi.toast('Применено', 'ok');
       WS.storeApi.logEvent({ scenario: 'agent', action: (p && p.title) || 'изменение', result: 'EXECUTED', level: p && p.tier === 'guarded' ? 'A3' : 'A1' });
     } else {

@@ -157,6 +157,60 @@
     }
   }
 
+  // ---------------- ЧТО СЕЙЧАС ОТКРЫТО НА ЭКРАНЕ ----------------
+  const VIEW_NAMES = {
+    start: 'Пульс', concierge: 'Консьерж', clients: 'Сделки', companies: 'Контакты · компании',
+    objects: 'Объекты', requests: 'Входящие', contracts: 'Сопровождение', tasks: 'Задачи',
+    calc: 'Расчёт', finance: 'Финансы', shows: 'Показы', docs: 'Документы', analytics: 'Аналитика',
+    valuation: 'Оценка объекта', partners: 'Сеть', services: 'Услуги', club: 'Клуб',
+    promotion: 'Продвижение', profile: 'Профиль', settings: 'Настройки', team: 'Команда',
+    leads: 'Распределение лидов', approvals: 'Согласования',
+    dealDetail: 'Карточка сделки', requestDetail: 'Карточка запроса',
+    clientDetail: 'Карточка контакта', companyDetail: 'Карточка компании',
+    objectDetail: 'Карточка объекта', contractDetail: 'Карточка договора',
+  };
+  // Ключевые факты записи, а не вся запись: Консьерж и так читает рабочее место целиком, здесь
+  // важно ровно одно — на что смотрит агент, когда говорит «эта сделка».
+  function screenContext() {
+    const st = S();
+    const out = { вид: st.view, экран: VIEW_NAMES[st.view] || st.view };
+    if (st.view === 'dealDetail') {
+      const d = (D().deals || []).find((x) => x.id === st.dealId);
+      if (d) {
+        const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+        const f = funnelSteps(d);
+        out.запись = { тип: 'сделка', id: d.id, название: d.title || 'сделка', клиент: c.name || null,
+          шаг: f.cols[f.idx] || null, сумма: d.amount || null, срок_следующего_шага: d.nextDue || null,
+          объекты: dealLots(d).map((o) => o.name) };
+      }
+    } else if (st.view === 'requestDetail') {
+      const r = requestById(st.requestId);
+      if (r) {
+        const c = (D().clients || []).find((x) => x.id === r.clientId) || {};
+        out.запись = { тип: 'запрос', id: r.id, название: r.title || 'запрос', клиент: c.name || null,
+          стадия: reqStageLabel(reqStage(r), r), бюджет: r.budget || null, срок: r.horizon || null };
+      }
+    } else if (st.view === 'clientDetail') {
+      const c = (D().clients || []).find((x) => x.id === st.clientId);
+      if (c) out.запись = { тип: 'контакт', id: c.id, название: c.name, канал: c.channel || null };
+    } else if (st.view === 'companyDetail') {
+      const co = (D().companies || []).find((x) => x.id === st.companyId);
+      if (co) out.запись = { тип: 'компания', id: co.id, название: co.name };
+    } else if (st.view === 'objectDetail') {
+      const o = (D().objects || []).find((x) => x.id === st.objectId);
+      if (o) out.запись = { тип: 'объект', id: o.id, название: o.name, район: o.area || null, цена: o.price || null };
+    } else if (st.view === 'clients') {
+      out.вкладка = st.clientsTab === 'contacts' ? 'Контакты' : 'Сделки';
+    }
+    return out;
+  }
+  // Одной строкой — для шапки дока: агент должен ВИДЕТЬ, что Консьерж смотрит туда же.
+  function screenContextLabel() {
+    const c = screenContext();
+    const r = c.запись;
+    return r ? (c.экран + ' · ' + r.название) : (c.экран + (c.вкладка ? ' · ' + c.вкладка : ''));
+  }
+
   // ---------------- DOCKED CONCIERGE CHAT (float over any page) ----------------
   function cgDockWelcome() {
     return '<div class="cgdock-welcome">' + I('sparkle') +
@@ -181,6 +235,9 @@
         '<span class="cgdock-sub">' + label + '</span>' +
         '<button class="cgdock-x" data-act="cgDockOpenFull" title="Открыть на весь экран">' + I('layers') + '</button>' +
         '<button class="cgdock-x" data-act="cgDock" title="Свернуть">' + I('x') + '</button></div>' +
+      // Видно, что Консьерж смотрит на тот же экран: без этой строки «а по этой сделке что?»
+      // выглядит как вопрос в пустоту, даже когда контекст на самом деле передан.
+      '<div class="cgdock-where">' + I('layers') + '<span>Контекст: ' + escAttr(screenContextLabel()) + '</span></div>' +
       '<div class="cgdock-msgs" id="cgdockmsgs"></div>' +
       '<div class="cgdock-foot">' + cgComposer('cgDockPrompt', 'Спросите Консьержа…', 'cgDockSend') + '</div>';
     WS.engine.mount(document.getElementById('cgdockmsgs'), function () { renderDockMsgs(); });
@@ -3968,9 +4025,11 @@
   // кратность: до перехода запись связана с N объектами подборки, после — с одним договором.
   //
   // Оба правы, и это решается не спором, а рисунком: на экране одна линия, в данных две таблицы.
-  // Пресейл идёт ПРОЙДЕННЫМ участком — он неинтерактивен, потому что стадия запроса вычисляется
-  // из фактов, а не выставляется рукой; шаги договора кликабельны, как и были. Между ними —
-  // видимая граница «условия согласованы»: невидимая читалась бы как «всё это одно и то же».
+  // Пресейл идёт ПРОЙДЕННЫМ узлом ленты — он неинтерактивен, потому что стадия запроса
+  // вычисляется из фактов, а не выставляется рукой; шаги договора кликабельны, как и были.
+  // Граница «условия согласованы» больше не отдельный элемент со своим шрифтом и своей
+  // пунктирной вертикалью: она названа словами в строке под лентой, вместе с датой перехода
+  // и сроком на текущем шаге. Один язык на всю ленту — тот же, что у заявки.
   // ============================================================================================
   function dealThroughPath(d) {
     const r = d.requestId ? requestById(d.requestId) : null;
@@ -3988,21 +4047,34 @@
     // виден пройденным, граница нарисована, стадии запроса перечислены в подсказке.
     const preSum = pre.length ? '<span class="dx-step done dx-pre" title="' + escAttr('Пресейл: ' + pre.join(' → ')) + '">' +
       '<span class="d">' + I('check') + '</span><span class="l">Пресейл · ' + pre.length + '</span></span>' : '';
-    const bound = pre.length ? '<span class="dx-bound" title="Условия согласованы — здесь запрос стал сделкой">' +
-      '<span class="d"></span><span class="l">условия<br>согласованы</span></span>' : '';
     const lost = s.lost ? '<div class="dx-lost">' + I('x') + 'Сделка проиграна</div>' : '';
-    return '<div class="dx-path' + (s.cols.length > 7 ? ' long' : '') + '">' + preSum + bound + own + '</div>' + lost;
+    return '<div class="dx-path' + (s.cols.length > 7 ? ' long' : '') + '">' + preSum + own + '</div>' + lost;
   }
-  // Справа от пути: когда запрос стал сделкой и сколько она стоит на текущем шаге.
-  function dealPathMeta(d) {
-    const ago = createdAgoLabel(d);
+  // Строка под лентой — то, что раньше висело справа своим шрифтом и своей вертикалью: где
+  // проходит граница пресейла, когда запрос стал сделкой и сколько сделка стоит на текущем шаге.
+  function dealPathWhy(d) {
+    const out = [];
     // Дата конверсии, когда она записана, главнее даты создания: «стала сделкой» — это
     // момент согласования условий, а не момент заведения карточки.
     const when = d.convertedAt || d.createdAt;
-    const conv = when ? ('стала сделкой ' + when + (ago ? ' · ' + ago : '')) : '';
-    const days = d.stageDays != null ? ('на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней')) : '';
-    const both = [conv, days].filter(Boolean);
-    return both.length ? '<div class="dx-path-meta">' + both.map((t) => '<span>' + t + '</span>').join('') + '</div>' : '';
+    const ago = createdAgoLabel(d);
+    if (d.requestId) {
+      out.push('Пресейл прошёл в запросе; здесь условия согласованы' +
+        (when ? ' — запрос стал сделкой ' + when + (ago ? ' (' + ago + ')' : '') : '') + '.');
+    } else if (when) {
+      out.push('Сделка заведена ' + when + (ago ? ' (' + ago + ')' : '') + '.');
+    }
+    if (d.stageDays != null) {
+      out.push('На текущем шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней') + '.');
+    }
+    out.push('Шаги договора нажимаются — отметьте, куда сделка перешла.');
+    return out.join(' ');
+  }
+  // Та же секция, что у заявки: лента в карточке, под ней одна поясняющая строка. Ради этого
+  // и переделывалось — партнёр читает две карточки одной работы и видит два разных экрана.
+  function dealPathSection(d) {
+    return '<div class="dx-sec dx-sec-bare">' + dealThroughPath(d) +
+      '<div class="req-stage-why">' + I('sparkle') + '<span>' + dealPathWhy(d) + '</span></div></div>';
   }
   function dealConcierge(d) {
     return '<div class="dx-cbar-lbl">' + I('sparkle') + 'Консьерж знает контекст этой сделки</div>' +
@@ -4304,11 +4376,19 @@
   // diverge). The old flat grey "Что сейчас" block is split into distinct titled surface cards with
   // an emphasized action — so it reads as hierarchy, not one grey area of same-size text. ----
   // "Следующий шаг" callout: owner + due sit in the header, the action itself is emphasized.
-  function nextStepCard(owner, due, over, actionHtml, whyHtml) {
-    const meta = (owner ? '<span class="nstep-owner">' + I('users') + owner + '</span>' : '') +
-      (due ? '<span class="nstep-due' + (over ? ' over' : '') + '">' + I('clock') + due + '</span>' : '');
-    return dxSec('target', 'Следующий шаг', meta ? '<span class="nstep-meta">' + meta + '</span>' : '',
-      '<div class="nstep-body"><div class="nstep-act">' + actionHtml + '</div>' + (whyHtml ? '<div class="nstep-why">' + whyHtml + '</div>' : '') + '</div>');
+  // Карточка «Запланировано» с выделенным первым делом. Ближайший шаг — не отдельная секция,
+  // а верхняя строка того же списка: две карточки об одном и том же и были тем дублем, из-за
+  // которого на сделке подряд стояли «Следующий шаг» и «Запланировано».
+  function plannedCard(next, rowsHtml) {
+    const n = next || {};
+    const head = n.action ? '<div class="plev-next' + (n.over ? ' over' : '') + '">' +
+      '<div class="pn-h"><span class="pn-tag">' + I('target') + 'следующий шаг</span>' +
+      (n.due ? '<span class="pn-due' + (n.over ? ' over' : '') + '">' + I('clock') + n.due + '</span>' : '') +
+      (n.owner ? '<span class="pn-owner">' + I('users') + n.owner + '</span>' : '') + '</div>' +
+      '<div class="pn-act">' + n.action + '</div>' +
+      (n.why ? '<div class="pn-why">' + n.why + '</div>' : '') + '</div>' : '';
+    if (!head && !rowsHtml) return '';
+    return dxSec('clock', 'Запланировано', '', '<div class="plev-list">' + head + (rowsHtml || '') + '</div>');
   }
   function nowEvLine(p) {
     return '<div class="dnb-ev"><span class="dnb-ev-dot">' + I('dot') + '</span>' +
@@ -4478,10 +4558,10 @@
       (c.consent === false ? '<span class="chip stop">' + I('lock') + 'нет согласия</span>' : '') +
       (d.createdAt && createdDaysAgo ? '<span class="chip">' + I('calendar') + 'создана ' + d.createdAt + ' · ' + createdDaysAgo + '</span>' : '') + '</div>';
   }
-  function dealNextStepCard(d) {
+  function dealNextStep(d) {
     const a = nbaActions(d);
-    const over = /просроч/i.test(d.nextDue || '');
-    return nextStepCard(agentName(d.agent), d.nextDue || '', over, a.doIt[0], a.why || '');
+    return { owner: agentName(d.agent), due: d.nextDue || '', over: /просроч/i.test(d.nextDue || ''),
+      action: a.doIt[0], why: a.why || '' };
   }
   // Planned events block: open tasks and calendar events with dates. Overdue first, marked visibly.
   // Past events live in dealRecentCard, not duplicated here.
@@ -4506,7 +4586,6 @@
         overdue: /просроч/i.test(String(when)),
         ord: (WHEN_ORD[when] == null ? 5 : WHEN_ORD[when]) });
     });
-    if (!items.length) return '';
     items.sort((a, b) => a.ord - b.ord);
     const html = items.map((it) => {
       const icon = it.type === 'task' ? 'checkCircle' : 'calendar';
@@ -4516,7 +4595,7 @@
         '<div class="plev-info"><div>' + escAttr(it.label) + '</div>' +
         '<div class="plev-date">' + (it.due || '—') + (it.overdue ? ' · просрочено' : '') + '</div></div></div>';
     }).join('');
-    return html.length ? dxSec('clock', 'Запланировано', '', '<div class="plev-list">' + html + '</div>') : '';
+    return plannedCard(dealNextStep(d), html);
   }
   // Entries the client authored, across the deal, its заявка and the contact — the client's own
   // moves, separated from ours. `by` is the author of a timeline entry; inbound raw channel capture
@@ -4821,7 +4900,7 @@
     return '<div class="deal-stepper-compact">' + dealStepperSection(d) + '</div>' +
       dealChipRow(d) +
       cxStack([
-        [cxCol([dealStatusBrief(d), dealKeyCard(d), dealNextStepCard(d)]),
+        [cxCol([dealStatusBrief(d), dealKeyCard(d), dealPlannedEventsCard(d)]),
          cxCol([dealClientCard(d), dealRecentCard(d)])],
         dealLotsBlock(d),
       ]);
@@ -5119,10 +5198,17 @@
       'Отметьте выбранные объекты — КП собирается с доходностью, стоимостью и условиями, из него создаётся сделка.</div>' +
       '<div class="reqo-kp-acts">' + btns.join('') + '</div></div>';
   }
-  function reqNextStepCard(r) {
+  // Заявка собирает ту же карточку из своих фактов: ближайший шаг плюс её задачи со сроком.
+  function reqPlannedCard(r) {
     const me = (D().users && D().users.agent) ? D().users.agent.name : '—';
     const owner = r.assignee ? agentName(r.assignee) : me;
-    return nextStepCard(owner, r.nextContact || '', false, reqNextAction(r), '');
+    const rows = tasksOfRequest(r).filter((t) => t.status !== 'done' && t.due).map((t) =>
+      '<div class="plev-row' + (t.when === 'overdue' ? ' over' : '') + '">' +
+      '<span class="plev-icon">' + I('checkCircle') + '</span>' +
+      '<div class="plev-info"><div>' + escAttr(t.title || t.text || 'Задача') + '</div>' +
+      '<div class="plev-date">' + (t.due || '—') + (t.when === 'overdue' ? ' · просрочено' : '') + '</div></div></div>').join('');
+    return plannedCard({ owner: owner, due: r.nextContact || '', over: false,
+      action: reqNextAction(r), why: '' }, rows);
   }
   function reqRecentCard(r) {
     // 3 (not 4) events on the request so the right column bottom lands level with «Следующий шаг».
@@ -5233,7 +5319,7 @@
   }
   // Правая — работа: что дальше, запланированное и последнее в ряд, подбор, расхождения.
   function reqWork(r) {
-    const planned = reqNextStepCard(r);
+    const planned = reqPlannedCard(r);
     const recent = reqRecentCard(r);
     const pair = (planned || recent) ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
     return pair + cxStack([
@@ -5248,7 +5334,7 @@
     return reqStepperSection(r) +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       cxStack([
-        [cxCol([reqKeyCard(r), reqNextStepCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
+        [cxCol([reqKeyCard(r), reqPlannedCard(r)]), cxCol([reqClientCard(r), reqRecentCard(r)])],
         conflictBlock(r),
         reqOffersStatusBlock(r),
         reqSecondaryRow(r),
@@ -5356,10 +5442,8 @@
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       reqWork(r) + dealTabsBlock(spec) + '</div>' +
       '</div>' +
-      '<div class="dcard-composer"><div class="dx-cbar" data-thread="request:' + r.id + '" ' +
-      'data-tlabel="' + escAttr(r.title) + '" data-ticon="mail">' +
-      '<div class="w">W</div><div class="ph">Записать заметку или поручить Консьержу по запросу — «собрать КП», «подобрать объекты»…</div>' +
-      '<div class="send">' + I('arrowRight') + '</div></div></div>' +
+      cardComposer('Записать заметку или поручить Консьержу по запросу «' + (r.title || 'запрос') +
+        '» — «собрать КП», «подобрать объекты»…') +
       '</div>';
   }
   // ---- Request funnel actions (A1): client-selection state, add object, form КП, create deal ----
@@ -6869,7 +6953,7 @@
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
       '<div class="dcard-sub">' + sub + '</div>' +
-      '<div class="dcard-pathrow">' + dealThroughPath(d) + dealPathMeta(d) + '</div></div>';
+      '<div class="dcard-pathrow">' + dealPathSection(d) + '</div></div>';
   }
   // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
   // у объектов, потому что ставка принадлежит объекту, а не сделке.
@@ -6902,7 +6986,7 @@
     const recent = dealRecentCard(d);
     const pair = (planned || recent)
       ? '<div class="dcard-pair">' + (planned || '') + (recent || '') + '</div>' : '';
-    return dealNextStepCard(d) + pair + pend + dealLotsBlock(d) + dealPeopleCard(d);
+    return pair + pend + dealLotsBlock(d) + dealPeopleCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -6911,15 +6995,30 @@
   // на другой экран, так что от сделки не оставалось ничего. Диалог открывается здесь же, над
   // рабочей областью, и рабочая область остаётся на месте: объекты, запланированное, история
   // видны под ним, левая колонка с фактами и участниками не двигается вовсе.
-  function dealComposer(d) {
-    // Пока диалог свёрнут — это приглашение; как только он открыт, та же строка становится
-    // настоящим полем ввода. Второй строки не появляется: два поля ввода на одном экране и были
-    // тем дублем, из-за которого «Работать через Консьержа» убрали.
-    return '<div class="dcard-composer">' +
-      '<div class="dx-cbar" data-dealchat="' + d.id + '">' +
+  /* Строка внизу карточки — НАСТОЯЩЕЕ поле ввода. Раньше это была картинка поля: она выглядела
+     как строка, в которую можно писать, а по клику открывала панель Консьержа — ровно то, на что
+     партнёр и жаловался («как будто можно писать, а на самом деле нельзя»). Убрать её было бы
+     проще, но она есть на каждом листе его макета и она же — единственный вход в диалог,
+     не уводящий с карточки. Поэтому строка осталась, а врать перестала: текст уходит в панель
+     поверх экрана, и панель открывается привязанной к этой записи. */
+  function cardComposer(placeholder) {
+    return '<div class="dcard-composer"><div class="dx-cbar live">' +
       '<div class="w">W</div>' +
-      '<div class="ph">Записать заметку или поручить Консьержу — «собрать КП», «что просрочено», «бриф к звонку»…</div>' +
-      '<div class="send">' + I('arrowRight') + '</div></div></div>';
+      '<input class="ph-in" id="cardPrompt" type="text" autocomplete="off" placeholder="' + escAttr(placeholder) + '">' +
+      '<button class="send" data-act="cardSend" aria-label="Отправить Консьержу">' + I('arrowRight') + '</button>' +
+      '</div></div>';
+  }
+  // Отправка из карточки: панель открывается привязанной к записи, экран под ней не перестраивается.
+  function sendFromCard() {
+    const el = document.getElementById('cardPrompt');
+    const v = el ? String(el.value || '').trim() : '';
+    if (el) el.value = '';
+    if (!S().cgDock) toggleCgDock();
+    if (v) WS.router.routePrompt(v);
+  }
+  function dealComposer(d) {
+    return cardComposer('Записать заметку или поручить Консьержу по сделке «' + (d.title || 'сделка') +
+      '» — «собрать КП», «что просрочено», «бриф к звонку»…');
   }
   // Диалог внутри карточки. Занимает собственную высоту и прокручивается внутри себя, а не
   // выталкивает работу за экран: макет партнёра отдавал Консьержу всю правую колонку, и объекты
@@ -6938,6 +7037,19 @@
     renderCgDock();
   }
   function closeDealChat() { S().dealChat = null; S().cgDock = false; renderCgDock(); }
+  // Док, открытый круглой кнопкой, привязывается к записи, на которой стоит агент. Раньше он
+  // открывался в общем треде с любого экрана, и вопрос «а по этой сделке?» приходил без подлежащего.
+  const CTX_THREAD = { 'сделка': ['deal:', 'briefcase'], 'запрос': ['request:', 'mail'],
+    'контакт': ['client:', 'users'], 'компания': ['company:', 'building'], 'объект': ['object:', 'building'] };
+  function toggleCgDock() {
+    const st = S();
+    if (st.cgDock) { st.cgDock = false; renderCgDock(); return; }
+    const rec = screenContext().запись;
+    const map = rec && CTX_THREAD[rec.тип];
+    if (map) WS.engine.bindThread(map[0] + rec.id, (rec.клиент ? rec.клиент + ' · ' : '') + rec.название, map[1]);
+    st.cgDock = true;
+    renderCgDock();
+  }
   function viewDealDetail(id) {
     const spec = dealSpec(id);
     if (!spec) return viewClients();
@@ -9713,6 +9825,11 @@
 
   function wrap(inner) { return '<div class="view fadeup">' + inner + '</div>'; }
 
+  // Один и тот же экран с той же открытой записью — не переход, а обновление: прокрутка
+  // сохраняется. Другая запись или другой раздел — начинаем сверху, как и раньше.
+  function renderKey(st) {
+    return [st.view, st.dealId, st.requestId, st.clientId, st.companyId, st.objectId, st.contractId].join('|');
+  }
   function render() {
     const app = document.getElementById('app');
     const st = S();
@@ -9720,6 +9837,13 @@
     const active = document.activeElement;
     const focusId = active && active.id ? active.id : null;
     const caret = active && active.selectionStart;
+    const key = renderKey(st);
+    const sameScreen = WS._renderKey === key;
+    const doc0 = document.scrollingElement || document.documentElement;
+    const mainEl0 = document.getElementById('main');
+    const keepY = sameScreen ? (doc0 ? doc0.scrollTop : 0) : 0;
+    const keepMainY = sameScreen && mainEl0 ? mainEl0.scrollTop : 0;
+    WS._renderKey = key;
 
     app.innerHTML = shell();
     ensureOverlays(); // modal/toasts live outside #app — never wiped by this render (P0-1)
@@ -9740,6 +9864,12 @@
     if (st.incompatible) { showIncompatible(); st.incompatible = false; }
 
     if (focusId) { const elx = document.getElementById(focusId); if (elx) { elx.focus(); try { elx.setSelectionRange(caret, caret); } catch (e) {} } }
+    if (keepY || keepMainY) {
+      const sc = document.scrollingElement || document.documentElement;
+      if (sc && keepY) sc.scrollTop = keepY;
+      const mainEl = document.getElementById('main');
+      if (mainEl && keepMainY) mainEl.scrollTop = keepMainY;
+    }
     // docked chat lives outside #app (survives re-render); keep the engine pointed at it while open
     if (st.cgDock) { const m = document.getElementById('cgdockmsgs'); if (m) WS.engine.mount(m, renderDockMsgs); }
     if (WS.router && WS.router.mark) WS.router.mark();
@@ -9757,7 +9887,8 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
+    screenContext, screenContextLabel, toggleCgDock, sendFromCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

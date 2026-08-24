@@ -1339,24 +1339,34 @@ setTimeout(async () => {
     check('сделка · путь рисует ровно шаги своего договора', off.length === 0, off.join(' | '));
     check('сделка · и пресейл впереди — пройденным неинтерактивным участком', nopre.length === 0, nopre.slice(0, 4).join(' | '));
     check('сделка · путь не переполнен (≤ свои шаги + 2)', pathLen.length === 0, pathLen.join(' | '));
-    /* Плашка пресейла — единственное, что говорит «этот участок пройден», после того как пять
-       отдельных шагов из ленты убрали. Она жила в медиазапросе для узкого экрана: убрав шаги и
-       оставив её там, пресейл стёрли бы с десктопа целиком. В jsdom это невидимо — стили не
-       применяются, элемент находится селектором в любом случае, — поэтому правило проверяется
-       по самому CSS: показ должен стоять ВНЕ медиазапроса. */
+    /* Узел пресейла говорит «этот участок пройден», после того как пять отдельных шагов из
+       ленты убрали. Он виден на любой ширине: правило, которое его касается, должно стоять ВНЕ
+       медиазапроса — иначе на десктопе пресейла не было бы вовсе. В jsdom это невидимо (стили
+       не применяются, элемент находится селектором в любом случае), поэтому проверяется CSS. */
     {
       const cssSrc = read('css/app.css');
-      const shown = cssSrc.indexOf('.dx-path .dx-pre { flex: 0 0 auto');
+      const shown = cssSrc.indexOf('.dx-path .dx-pre { cursor: default');
       const inMedia = shown > 0 && /@media[^{]*\{(?:[^{}]|\{[^{}]*\})*$/.test(cssSrc.slice(0, shown));
-      check('сделка · плашка пресейла видна на любой ширине, а не только на телефоне',
+      check('сделка · узел пресейла виден на любой ширине, а не только на телефоне',
         shown > 0 && !inMedia,
         shown < 0 ? 'правила «.dx-path .dx-pre» в CSS нет — пресейл не показан нигде'
           : (inMedia ? 'правило спрятано в медиазапросе — на широком экране пресейла не видно' : ''));
     }
+    /* Граница «условия согласованы» больше НЕ рисуется отдельным элементом со своей пунктирной
+       вертикалью и подписью в 9,5 пикселя: три разных языка в одной строке и читались как
+       сломанная лента. Она НАЗВАНА словами в строке под лентой — вместе с датой перехода. Здесь
+       проверяется, что факт никуда не делся: пропала картинка, а не смысл. */
     WS.ui.dealCard('d_anna');
-    check('сделка · граница «условия согласованы» нарисована между пресейлом и договором',
-      doc.querySelectorAll('#app .view .dx-path .dx-bound').length === 1,
-      'границ: ' + doc.querySelectorAll('#app .view .dx-path .dx-bound').length);
+    {
+      const why = doc.querySelector('#app .view .dcard-pathrow .req-stage-why');
+      const t = why ? why.textContent : '';
+      const dl = dd().deals.find((x) => x.id === 'd_anna') || {};
+      check('сделка · переход «условия согласованы» назван под лентой, а не нарисован вторым языком',
+        /услови[яй] согласован/i.test(t) && !doc.querySelector('#app .view .dx-path .dx-bound'), t.slice(0, 160));
+      check('сделка · и там же — когда запрос стал сделкой',
+        !!(dl.convertedAt || dl.createdAt) && t.indexOf(dl.convertedAt || dl.createdAt) >= 0,
+        (dl.convertedAt || dl.createdAt || '—') + ' | ' + t.slice(0, 160));
+    }
 
     // Оффплан регистрируется в Oqood, вторичка — Title Deed, аренда — Ejari: шаг один, реестр разный.
     WS.ui.dealCard('d_anna');
@@ -4260,9 +4270,13 @@ setTimeout(async () => {
       !!q('.dcard-top .deal-title-text') && !!q('.dcard-sub') && !!q('.dcard-pathrow .dx-path'));
     check('карточка · название по-прежнему правится по клику',
       !!q('.dcard-title.deal-title-edit[data-titledeal="d_anna"]'));
-    check('карточка · справа от пути — когда стала сделкой и сколько стоит на шаге',
-      !!q('.dx-path-meta') && /стала сделкой/.test(q('.dx-path-meta').textContent) &&
-      /на шаге/.test(q('.dx-path-meta').textContent), q('.dx-path-meta') ? q('.dx-path-meta').textContent : 'нет');
+    // Дата перехода и срок на шаге — в строке ПОД лентой, вместе с границей пресейла. Отдельного
+    // блока справа на собственном базовом уровне больше нет: он и делал ленту кривой.
+    check('карточка · под лентой сказано, когда стала сделкой и сколько стоит на шаге',
+      !!q('.dcard-pathrow .req-stage-why') && /стал[а]? сделкой/.test(q('.dcard-pathrow .req-stage-why').textContent) &&
+      /на текущем шаге/i.test(q('.dcard-pathrow .req-stage-why').textContent),
+      q('.dcard-pathrow .req-stage-why') ? q('.dcard-pathrow .req-stage-why').textContent : 'строки под лентой нет');
+    check('карточка · и третьего текста справа от ленты не осталось', !q('.dx-path-meta'));
     check('карточка · слева справка, условия и участники', !!q('.dcard-aside .dcard-params') &&
       v().indexOf('Справка по сделке') > 0 && v().indexOf('Участники · ') > 0);
     // Комиссия у объектов, а не в условиях слева: ставка принадлежит объекту, а не сделке.
@@ -4270,8 +4284,28 @@ setTimeout(async () => {
       q('.dcard-aside') && q('.dcard-aside').textContent.indexOf('Комиссия') < 0);
     check('карточка · связь с клиентом осталась на месте', !!q('.dcard-aside .dcli-chans'));
     check('карточка · справа «что дальше», объекты и «что было»',
-      v().indexOf('Следующий шаг') > 0 && v().indexOf('Последние события') > 0 &&
+      !!q('.plev-next .pn-act') && v().indexOf('Последние события') > 0 &&
       (v().indexOf('Объект сделки') > 0 || v().indexOf('Объекты сделки') > 0));
+    /* Одна карточка на один список. Рядом стояли «Следующий шаг» и «Запланировано» — две
+       карточки одного и того же: ближайшее дело и всё остальное. Теперь ближайшее выделено
+       ВНУТРИ списка, и второй карточки в правой колонке нет. */
+    check('карточка · отдельной карточки «Следующий шаг» рядом с «Запланировано» нет',
+      [].slice.call(doc.querySelectorAll('#app .view .dcard-main .dx-sec-h'))
+        .filter((h) => /^Следующий шаг/.test(h.textContent.trim())).length === 0,
+      [].slice.call(doc.querySelectorAll('#app .view .dcard-main .dx-sec-h')).map((h) => h.textContent.trim()).join(' | '));
+    check('карточка · ближайший шаг — первая строка «Запланировано», со сроком и сутью действия',
+      !!q('.plev-list > .plev-next:first-child') && !!q('.plev-next .pn-due') && !!q('.plev-next .pn-act') &&
+      q('.plev-next .pn-act').textContent.trim().length > 3,
+      q('.plev-next') ? q('.plev-next').textContent.replace(/\s+/g, ' ').slice(0, 120) : 'выделенной строки нет');
+    /* Ряд «Запланировано» + «Последние события» — одинаковые по высоте, а не «как получилось».
+       В jsdom высоту не измерить, поэтому проверяется правило, которое её задаёт. */
+    {
+      const cssSrc = read('css/app.css');
+      check('карточка · и обе карточки ряда одной высоты',
+        /\.dcard-pair \{ grid-template-columns: 1fr 1fr; align-items: stretch/.test(cssSrc) &&
+        cssSrc.indexOf('.dcard-pair > .dx-sec { display: flex; flex-direction: column;') > 0,
+        'правила равной высоты в CSS нет');
+    }
     // Отдельной кнопки «Работать через Консьержа» нет — она была дублем строки ввода внизу.
     check('карточка · внизу одна строка ввода', doc.querySelectorAll('#app .view .dcard-composer').length === 1);
     check('карточка · и второго входа в Консьержа рядом с ней нет',
@@ -5149,8 +5183,9 @@ setTimeout(async () => {
       const rows = doc.querySelectorAll('#app .view .plev-row');
       check('карточка · запланированное показано списком', rows.length > 0, 'строк: ' + rows.length);
       check('карточка · и одна выделенная строка следующего шага осталась над ним',
-        !!doc.querySelector('#app .view .nxt, #app .view .dnb-next, #app .view .next-step') ||
-        /Следующий шаг|Сейчас/.test(doc.querySelector('#app .view').textContent));
+        doc.querySelectorAll('#app .view .plev-list > .plev-next').length === 1 &&
+        doc.querySelector('#app .view .plev-list').firstElementChild.className.indexOf('plev-next') === 0,
+        'выделенных строк: ' + doc.querySelectorAll('#app .view .plev-next').length);
       // Просроченное идёт первым — оно и есть повод открыть карточку.
       const html = WS.ui.dealPlannedEventsCard(withTask);
       const firstOver = html.indexOf('plev-row over');
@@ -5168,15 +5203,21 @@ setTimeout(async () => {
     const viewWas = WS.store.view;
     const stackWas = (WS.store.navStack || []).length;
     const before = doc.querySelector('#app .view').textContent;
-    // Строка ввода внизу больше не помечена как переход в раздел: именно это и уводило.
+    /* Строка внизу — НАСТОЯЩЕЕ поле ввода, а не картинка поля. Она выглядела как строка, в
+       которую можно писать, а писать было нельзя: клик просто открывал панель. Теперь в ней
+       живёт input, и она по-прежнему не помечена как переход в раздел — именно это уводило. */
     const cbar = doc.querySelector('#app .view .dcard-composer .dx-cbar');
+    const cin = cbar && cbar.querySelector('input.ph-in');
     check('консьерж · строка ввода в карточке не ведёт в раздел',
-      !!cbar && !cbar.hasAttribute('data-thread') && cbar.hasAttribute('data-dealchat'),
+      !!cbar && !cbar.hasAttribute('data-thread') && !cbar.hasAttribute('data-dealchat'),
       cbar ? cbar.outerHTML.slice(0, 90) : 'строки нет');
+    check('консьерж · и в неё действительно можно писать',
+      !!cin && cin.tagName === 'INPUT' && !cin.disabled && !cin.readOnly,
+      cin ? cin.outerHTML.slice(0, 90) : 'поля ввода нет');
 
     // Настоящий клик — не вызов функции: именно на клике старое поведение и уходило с экрана.
     const errsWas = errors.length;
-    cbar.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    cbar.querySelector('[data-act="cardSend"]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     check('консьерж · клик по строке ничего не сломал', errors.length === errsWas, errors.slice(errsWas).join('; '));
     check('консьерж · экран не сменился', WS.store.view === viewWas, 'было ' + viewWas + ', стало ' + WS.store.view);
     check('консьерж · перехода в историю навигации не записано',

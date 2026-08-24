@@ -137,7 +137,50 @@
     if (req) return { requestId: req.id, clientId: req.clientId };
     const c = at('contact:', 'clients');
     if (c) return { clientId: c.id };
+    // Тред молчит — смотрим на экран. Поручение, отданное со сделки, принадлежит ей, даже если
+    // разговор начали круглой кнопкой, а не из карточки.
+    const scr = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
+    const rec = scr && scr.запись;
+    if (rec && rec.тип === 'сделка') {
+      const dl = (d.deals || []).find((x) => x.id === rec.id);
+      if (dl) return { dealId: dl.id, clientId: dl.clientId };
+    }
+    if (rec && rec.тип === 'запрос') {
+      const rq = (d.requests || []).find((x) => x.id === rec.id);
+      if (rq) return { requestId: rq.id, clientId: rq.clientId };
+    }
+    if (rec && rec.тип === 'контакт') return { clientId: rec.id };
     return null;
+  }
+  /* «А по этой сделке что?» — вопрос без подлежащего, и раньше он им и оставался: планировщик
+     искал имя в тексте, не находил и отвечал общей сводкой по рабочему месту. Подлежащее стоит
+     на экране. Ответ собирается ИЗ ПОЛЕЙ ЗАПИСИ — ни одного числа сверх того, что в ней есть. */
+  const DEMONSTRATIVE = /\bэт(?:ой|у|а|ому|ом|от|о|и)\b|\bздесь\b|\bпо\s+ней\b|\bпо\s+нему\b|\bтекущ/i;
+  function screenAnswer(t) {
+    if (!DEMONSTRATIVE.test(t)) return null;
+    const scr = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
+    const rec = scr && scr.запись;
+    if (!rec) return null;
+    const money = (v) => (WS.AED ? WS.AED(v) : String(v));
+    const bits = [];
+    if (rec.тип === 'сделка') {
+      bits.push('Открыта сделка «' + rec.название + '»');
+      if (rec.клиент) bits.push('клиент — ' + rec.клиент);
+      if (rec.шаг) bits.push('шаг «' + rec.шаг + '»');
+      if (rec.сумма) bits.push('сумма ' + money(rec.сумма));
+      if (rec.срок_следующего_шага) bits.push('следующее касание ' + rec.срок_следующего_шага);
+      if ((rec.объекты || []).length) bits.push('объект: ' + rec.объекты.join(', '));
+    } else if (rec.тип === 'запрос') {
+      bits.push('Открыт запрос «' + rec.название + '»');
+      if (rec.клиент) bits.push('клиент — ' + rec.клиент);
+      if (rec.стадия) bits.push('стадия «' + rec.стадия + '»');
+      if (rec.бюджет) bits.push('бюджет ' + money(rec.бюджет));
+      if (rec.срок) bits.push('срок ' + rec.срок);
+    } else {
+      bits.push('Открыт ' + rec.тип + ' «' + rec.название + '»');
+    }
+    return { kind: 'answer', text: bits.join(', ') + '. Спросите конкретнее — что собрать, что просрочено, что дальше.',
+      evidence: [], next: suggestions() };
   }
   function dealsOf(clientId) {
     return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
@@ -461,6 +504,13 @@
       }
       return propose([{ op: 'dealStage', id: deal.id, stage: st }],
         { subject: deal.id, title: 'Смена стадии', lines: ['Сделка ' + (deal.title || deal.id) + ': ' + deal.stage + ' → ' + st] });
+    }
+
+    // Вопрос об открытой записи — раньше общей аналитики: «что по этой сделке» не должно
+    // превращаться в инвентарь рабочего места.
+    if (RE.ask.test(t)) {
+      const scr = screenAnswer(t);
+      if (scr) return scr;
     }
 
     // analytics

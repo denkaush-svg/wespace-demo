@@ -2057,15 +2057,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .pref-row { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 12.5px; color: var(--ink); }
 .pref-row > span:last-child { min-width: 0; }
 
-/* --- Shared "now" cards: emphasized next-step + structured recent events (не серая каша) --- */
-.nstep-meta { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-end; }
-.nstep-body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-start; }
-.nstep-act { font-size: 14px; font-weight: 650; color: var(--ink); line-height: 1.4; }
-.nstep-why { font-size: 12px; color: var(--mut); margin-top: 5px; line-height: 1.4; }
-.nstep-owner, .nstep-due { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--mut); }
-.nstep-owner svg, .nstep-due svg { width: 12px; height: 12px; color: var(--acc); }
-.nstep-due { color: var(--acc-ink); }
-.nstep-due.over, .nstep-due.over svg { color: var(--stop); }
+/* --- Ближайшее дело выделено ВНУТРИ «Запланировано» ---------------------------------------
+   Отдельной карточки «Следующий шаг» больше нет: рядом стояли две карточки одного списка.
+   Первая строка списка — то же дело, но с рамкой, сроком и сутью действия. */
+.plev-next { border: 1px solid var(--acc-line); background: var(--acc-soft); border-radius: 10px;
+  padding: 11px 12px; margin-bottom: 4px; }
+.plev-next.over { border-color: var(--stop-line); background: rgba(255, 152, 0, .1); }
+.pn-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.pn-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--acc-ink); }
+.pn-tag svg { width: 13px; height: 13px; }
+.pn-due { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
+  color: var(--acc-ink); background: var(--surface); border: 1px solid var(--acc-line);
+  border-radius: 999px; padding: 2px 8px; }
+.pn-due svg { width: 12px; height: 12px; }
+.pn-due.over, .pn-due.over svg { color: var(--stop); border-color: var(--stop-line); }
+.pn-owner { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--mut); margin-left: auto; }
+.pn-owner svg { width: 12px; height: 12px; color: var(--acc); }
+.pn-act { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; }
+.pn-why { font-size: 12px; color: var(--mut); margin-top: 4px; line-height: 1.4; }
 /* Inline decision control on a подбор tile — Выбран / В работе / Отклонён без ухода со страницы */
 .obj-mini-b-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .obj-mini-info { flex: 1 1 180px; min-width: 0; }
@@ -2143,37 +2153,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcard-title .deal-title-text:hover { background: var(--acc-soft); }
 .dcard-title .deal-title-text:focus { background: var(--surface); box-shadow: 0 0 0 2px var(--acc); }
 .dcard-sub { font-size: 12.5px; color: var(--mut); margin: 4px 0 14px; }
-.dcard-pathrow { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
-.dx-path { display: flex; align-items: flex-start; flex: 1 1 460px; min-width: 0; padding-bottom: 4px; }
+.dcard-pathrow { display: block; }
+/* Лента сделки — та же лента, что у заявки, до последнего правила: карточка, кружки в ряд,
+   подпись под кружком, одна поясняющая строка внизу. Раньше здесь в одной строке жили три
+   разных языка — серая таблетка пресейла по центру кружков, красная пунктирная вертикаль во
+   всю высоту со своей подписью в 9,5 пикселя и мета-текст справа на третьем базовом уровне.
+   Граница «условия согласованы» никуда не делась: она названа словами в строке под лентой. */
+.dx-path { display: flex; margin: 12px 0 4px; }
 .dx-path .dx-step { flex: 1; min-width: 0; }
 .dx-path.long .dx-step { min-width: 62px; }
 .dx-path.long .dx-step .l { font-size: 10.5px; max-width: 84px; margin-top: 6px; }
 .dx-path.long .dx-step .d { width: 26px; height: 26px; font-size: 11.5px; }
 .dx-path.long .dx-step::before { top: 12px; }
-/* Граница «условия согласованы» — тот самый переход, из-за которого шёл весь спор.
-   Она рисуется явно: невидимая читается как «всё это одно и то же». */
-/* Граница держит собственную колонку, а не висит поверх соседних подписей: подпись шириной
-   в 60 пикселей на элементе шириной 26 налезала на «Переговоры» слева и на текущий шаг справа. */
-/* Граница и пройденный пресейл — такие же узлы ленты, как шаги договора: круг сверху,
-   подпись под ним, одна линия сквозь всё. Раньше в одной строке жили три разных языка —
-   серая таблетка по центру кружков, красная пунктирная вертикаль во всю высоту со своей
-   подписью в 9,5 пикселя и мета-текст справа на третьем базовом уровне. */
-.dx-path .dx-pre { flex: 0 0 auto; min-width: 96px; cursor: default; }
-.dx-path .dx-pre .d { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc-ink); }
+/* Пройденный пресейл — такой же узел ленты, как шаг договора, только не нажимается: стадия
+   запроса вычисляется из фактов, и «переставить» её нельзя. */
+.dx-path .dx-pre { cursor: default; }
 .dx-path .dx-pre .d svg { width: 15px; height: 15px; }
-.dx-bound { flex: 0 0 auto; width: 78px; display: flex; flex-direction: column; align-items: center;
-  position: relative; }
-.dx-bound .d { width: 30px; height: 30px; display: grid; place-items: center; position: relative; z-index: 1; }
-.dx-bound .d::before { content: ''; width: 2px; height: 18px; border-radius: 2px;
-  background: repeating-linear-gradient(to bottom, var(--acc) 0 4px, transparent 4px 7px); }
-.dx-bound::after { content: ''; position: absolute; top: 14px; left: 0; right: 0; height: 3px;
-  background: var(--acc); }
-.dx-bound .l { font-size: 11.5px; margin-top: 8px; text-align: center; line-height: 1.25;
-  color: var(--acc-ink); font-weight: 700; }
-/* Когда сделка пришла из запроса, «стала сделкой» — часть той же ленты, а не текст, повисший
-   справа на собственном базовом уровне. */
-.dx-path-meta { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px;
-  font-size: 11.5px; color: var(--faint); padding-top: 4px; align-self: center; }
 
 .dcard-cols { display: block; }
 .dcard-aside { display: none; }
@@ -2230,8 +2225,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Запланированное и последнее стоят в ряд — так они оба видны без прокрутки. Ниже 1100
    пикселей ряд распускается в стопку: две ленты в 260 пикселей нечитаемы. */
 .dcard-pair { display: grid; gap: 14px; }
-@media (min-width: 1100px) { .dcard-pair { grid-template-columns: 1fr 1fr; align-items: start; } }
+/* Ровно одинаковые: одна высота на обе карточки и один уровень заголовков. Раньше это был
+   grid с align-items:start — карточки садились по своему содержимому, заголовок «Последние
+   события» переносился на две строки из-за кнопки справа, и ряд читался кривым. */
+@media (min-width: 1100px) { .dcard-pair { grid-template-columns: 1fr 1fr; align-items: stretch; } }
 .dcard-pair > * { min-width: 0; }
+.dcard-pair > .dx-sec { display: flex; flex-direction: column; }
+.dcard-pair > .dx-sec > .dx-sec-h { flex: none; min-height: 27px; white-space: nowrap; }
+.dcard-pair > .dx-sec > .dx-sec-h .r { flex: none; }
+.dcard-pair > .dx-sec > *:last-child { flex: 1 1 auto; }
 
 /* Последний блок карточки не должен навсегда оставаться под прилипшей строкой ввода. */
 .dcard { padding-bottom: 8px; }

@@ -252,6 +252,13 @@
     return { операция: p.ops, ждём: p.need };
   }
 
+  // Which SCREEN this was asked from. A thread says what the conversation is
+  // about; the screen says what the broker is looking at while typing, and
+  // «а по этой сделке?» has no subject without it.
+  function screen() {
+    return (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
+  }
+
   // Which conversation this is. Threads are per deal, per object, per lead, and
   // the model was answering every one of them as if it were the general chat.
   function scope() {
@@ -840,7 +847,9 @@
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
-        pending: pendingAction(), lang: langs(text) }, composer())),
+        // На что смотрит агент прямо сейчас. Без этого «а по этой сделке что?» приходило без
+        // подлежащего: тред у модели был, экрана — нет, и она честно отвечала, что не поняла.
+        screen: screen(), pending: pendingAction(), lang: langs(text) }, composer())),
     });
   }
 

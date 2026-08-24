@@ -89,7 +89,7 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
-    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-dealchat],[data-instage],[data-cgask],[data-pulsetab],[data-dayfilter],[data-prosp],[data-act]');
+    const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-instage],[data-cgask],[data-pulsetab],[data-dayfilter],[data-prosp],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
     // however many navigable ancestors it happens to sit under.
@@ -116,7 +116,6 @@
     if (d.nav) { if (d.tab) store.clientsTab = d.tab; return WS.router.go(d.nav); }
     // Диалог по сделке открывается ВНУТРИ карточки: это состояние экрана, не маршрут.
     if (d.instage) { const p2 = d.instage.split('~'); return WS.ui.moveInboxStage(p2[0], p2[1]); }
-    if (d.dealchat) { store.navOpen = false; WS.ui.closeModal(); return WS.ui.openDealChat(d.dealchat); }
     if (d.thread) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.openThread(d.thread, d.tlabel, d.ticon); }
     if (d.chain) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.startChain(d.chain); }
     if (d.scn) { store.navOpen = false; WS.ui.closeModal(); return WS.engine.startScenario(d.scn); }
@@ -429,8 +428,12 @@
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
       case 'prospList': store.prospList = true; api.emit(); break;
       case 'prospCards': store.prospList = false; api.emit(); break;
-      case 'cgDock': store.cgDock = !store.cgDock; WS.ui.renderCgDock(); break;
+      // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
+      // какой экран сейчас на экране.
+      case 'cgDock': WS.ui.toggleCgDock(); break;
       case 'cgDockSend': routePrompt(promptValue('cgDockPrompt')); break;
+      // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
+      case 'cardSend': WS.ui.sendFromCard(); break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
       case 'cgWorkshop': store.cgWorkshopOpen = !store.cgWorkshopOpen; api.emit(); break;
       case 'cgRailToggle': store.cgRailOpen = !store.cgRailOpen; api.emit(); break;
@@ -525,6 +528,7 @@
     if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
     if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); routePrompt(promptValue('cgDockPrompt')); }
+    if (e.key === 'Enter' && e.target.id === 'cardPrompt') { e.preventDefault(); WS.ui.sendFromCard(); }
     if (e.key === 'Enter' && e.target.id === 'dealChatPrompt') { e.preventDefault(); routePrompt(promptValue('dealChatPrompt')); }
     // Deal title inline edit: save on Enter, restore on Escape
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('deal-title-text')) {

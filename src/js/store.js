@@ -673,7 +673,10 @@
     store.dataRevision++;
     save();
     if (opts.silent !== true) emit();
-    return { ok: true, tier: tier, revision: store.dataRevision, applied: plan.map((p) => p.summary) };
+    // Что именно было заведено — чтобы карточка «Применено» могла открыть запись. Без этого
+    // Консьерж заводил сделку и оставлял агента искать её руками в списке.
+    return { ok: true, tier: tier, revision: store.dataRevision, applied: plan.map((p) => p.summary),
+      created: plan.map((p) => p.creates).filter(Boolean) };
   }
 
   // Dry run: what would happen, without happening. Used to render the diff a
