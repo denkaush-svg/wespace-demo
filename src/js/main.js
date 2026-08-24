@@ -431,7 +431,6 @@
       case 'unarchiveDeal': WS.ui.unarchiveDeal(t.dataset.deal); break;
       case 'duplicateDeal': WS.ui.duplicateDeal(t.dataset.deal); break;
       case 'dealsArchive': store.dealArchivedOnly = !store.dealArchivedOnly; api.emit(); break;
-      case 'dealChatSend': routePrompt(promptValue('dealChatPrompt')); break;
       case 'toggleQaMore': {
         const menu = t.closest('.qa-more').querySelector('.qa-more-menu');
         if (menu) menu.classList.toggle('open');

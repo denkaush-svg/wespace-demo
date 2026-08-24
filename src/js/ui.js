@@ -1497,24 +1497,20 @@
     return { total: list.length, companies: list.length - people.length, people: people.length,
       noConsent: noConsent, reachable: people.length - noConsent };
   }
+  // Строка выборки остаётся НАД списком: она говорит, по чему собрана выдача, и повторяет
+  // то же, что ушло Консьержу контекстом. Список под ней больше не сворачивается — диалог
+  // открывается доком поверх экрана, и выдача видна во время разговора.
   function contactsChatPanel() {
     if (!S().contactsChat) return '';
     const r = contactsReach();
-    const sel = contactsSelectionLabel();
     const consent = r.noConsent
       ? '<span class="badge stop">' + I('lock') + r.noConsent + ' без согласия — исключены</span>'
       : '<span class="badge ok">' + I('check') + 'у всех есть согласие</span>';
-    return '<button class="contacts-sel" data-act="contactsChatClose" title="Вернуться к списку">' +
-      I('chevLeft') + '<span class="cs-t">' + escAttr(sel) + '</span>' +
+    return '<div class="contacts-sel"><span class="cs-t">' + I('sparkle') + escAttr(contactsSelectionLabel()) + '</span>' +
       '<span class="badge">' + I('users') + r.reachable + ' из ' + r.people + '</span>' + consent +
       (r.companies ? '<span class="badge">' + I('building') + r.companies + ' компаний</span>' : '') +
-      '<span class="cs-back">развернуть список</span></button>' +
-      '<div class="dcard-chat" style="margin-top:12px">' +
-      '<div class="dcard-chat-h">' + I('sparkle') +
-      '<span class="dcard-chat-t">Консьерж · выборка контактов</span>' +
-      '<span class="dcard-chat-n">видит эту выборку, а не пересказ</span></div>' +
-      '<div class="chat" id="chat"></div></div>' +
-      '<div class="ws-flag" style="margin-top:12px">' + I('phone') +
+      '<button class="btn xs ghost" data-act="contactsChatClose">' + I('x') + 'Снять выборку</button></div>' +
+      '<div class="ws-flag" style="margin:10px 0 4px">' + I('phone') +
       ' Обзвон Консьерж готовит скриптом для агента: холодный автообзвон запрещён (первое дубайское интервью — «звонить нельзя, писать можно»), и мы его не делаем.</div>';
   }
   // Открытие диалога — состояние экрана, а не переход: маршрут не меняется, «назад» по-прежнему
@@ -1524,9 +1520,11 @@
     S().contactsChat = true;
     S().cgCtx = [{ icon: 'users', label: contactsSelectionLabel() + ' · ' + r.reachable + ' контактов' }];
     WS.engine.bindThread('contacts:selection', 'Выборка · ' + contactsSelectionLabel(), 'users');
+    S().cgDock = true;
     WS.storeApi.emit();
+    renderCgDock();
   }
-  function closeContactsChat() { S().contactsChat = false; S().cgCtx = []; WS.storeApi.emit(); }
+  function closeContactsChat() { S().contactsChat = false; S().cgCtx = []; S().cgDock = false; WS.storeApi.emit(); renderCgDock(); }
   function contactsFilterCount() {
     const f = S().contactsFilters || {};
     return CONTACT_FILTER_KEYS.filter((k) => f[k] && f[k] !== 'all').length;
@@ -1570,7 +1568,7 @@
     const cgBtn = '<button class="chip" data-act="contactsChatOpen">' + I('sparkle') + 'Поручить Консьержу выборку</button>';
     // Диалог занимает экран целиком: список и фильтры сворачиваются в одну строку над ним,
     // и она же — путь назад. Это тот же механизм, что в карточке сделки.
-    if (S().contactsChat) return contactsChatPanel();
+    const selBar = contactsChatPanel();
 
     let panel = '';
     if (open) {
@@ -1613,7 +1611,7 @@
     const note = cur === 'transferred'
       ? '<div class="ws-flag" style="margin:0 0 12px">' + I('users') + ' Клиенты, переданные вам от коллеги на время его отсутствия. Режим замещения включается в Настройках.</div>' : '';
 
-    return '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
+    return selBar + '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
       searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
       '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + cgBtn + '</div>' + panel +
       '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
@@ -6644,13 +6642,6 @@
     // Пока диалог свёрнут — это приглашение; как только он открыт, та же строка становится
     // настоящим полем ввода. Второй строки не появляется: два поля ввода на одном экране и были
     // тем дублем, из-за которого «Работать через Консьержа» убрали.
-    if (S().dealChat === d.id) {
-      return '<div class="dcard-composer">' +
-        '<div class="dx-cbar live"><div class="w">W</div>' +
-        '<input id="dealChatPrompt" class="ph-in" autocomplete="off" ' +
-        'placeholder="Поручите Консьержу по этой сделке — Enter отправит…">' +
-        '<button class="send" data-act="dealChatSend" aria-label="Отправить">' + I('arrowRight') + '</button></div></div>';
-    }
     return '<div class="dcard-composer">' +
       '<div class="dx-cbar" data-dealchat="' + d.id + '">' +
       '<div class="w">W</div>' +
@@ -6660,26 +6651,20 @@
   // Диалог внутри карточки. Занимает собственную высоту и прокручивается внутри себя, а не
   // выталкивает работу за экран: макет партнёра отдавал Консьержу всю правую колонку, и объекты
   // с событиями исчезали — он просил «не выходить из сделки», а нарисовал экран без сделки.
-  function dealChatPanel(d) {
-    if (S().dealChat !== d.id) return '';
-    const t = WS.engine.activeThread() || { label: d.title || 'Сделка', icon: 'briefcase' };
-    return '<div class="dcard-chat">' +
-      '<div class="dcard-chat-h">' + I('sparkle') +
-      '<span class="dcard-chat-t">Консьерж · ' + escAttr(t.label || d.title || 'сделка') + '</span>' +
-      '<span class="dcard-chat-n">знает контекст этой сделки</span>' +
-      '<button class="btn xs ghost" data-act="dealChatClose" title="Свернуть диалог">' + I('x') + 'Свернуть</button></div>' +
-      '<div class="chat" id="chat"></div></div>';
-  }
+  // Диалог по сделке живёт в общем доке над страницей. Отдельной панели внутри карточки нет:
+  // она раздвигала работу и была третьей реализацией одного и того же чата.
+  function dealChatPanel() { return ''; }
   // Открыть/закрыть диалог — это состояние экрана, а не переход. Маршрут не меняется, история
   // навигации не растёт, кнопка «назад» по-прежнему ведёт к списку сделок, а не к чату.
   function openDealChat(dealId) {
     const d = D().deals.find((x) => x.id === dealId); if (!d) return;
     const c = D().clients.find((x) => x.id === d.clientId) || {};
-    S().dealChat = dealId;
     WS.engine.bindThread('deal:' + dealId, (c.name ? c.name + ' · ' : '') + (d.title || 'сделка'), 'briefcase');
-    WS.storeApi.emit();
+    S().dealChat = null;
+    S().cgDock = true;
+    renderCgDock();
   }
-  function closeDealChat() { S().dealChat = null; WS.storeApi.emit(); }
+  function closeDealChat() { S().dealChat = null; S().cgDock = false; renderCgDock(); }
   function viewDealDetail(id) {
     const spec = dealSpec(id);
     if (!spec) return viewClients();
@@ -9464,11 +9449,9 @@
     document.getElementById('main').innerHTML = viewFor(st.view);
     document.getElementById('drawer').innerHTML = drawer();
 
+    // Полноэкранный Консьерж — единственное место, где лента живёт ВНУТРИ страницы.
+    // С любого другого экрана разговор идёт в доке поверх него, и экран не перестраивается.
     if (st.view === 'concierge') mountConcierge();
-    // Лента внутри карточки — тот же движок и тот же тред, что и в разделе: второго чата нет.
-    if (st.view === 'dealDetail' && st.dealChat) mountConcierge();
-    // Диалог по выборке контактов — тот же движок и тот же тред: второго чата в системе нет.
-    if (st.view === 'clients' && (st.clientsTab || 'deals') === 'contacts' && st.contactsChat) mountConcierge();
     if (st.view === 'objects') bindObjects();
     bindListSearch();
     if (st.view === 'finance') renderFinance();

@@ -5181,13 +5181,22 @@ setTimeout(async () => {
     check('консьерж · экран не сменился', WS.store.view === viewWas, 'было ' + viewWas + ', стало ' + WS.store.view);
     check('консьерж · перехода в историю навигации не записано',
       (WS.store.navStack || []).length === stackWas, (WS.store.navStack || []).length + ' против ' + stackWas);
-    check('консьерж · диалог открылся именно по этой сделке', WS.store.dealChat === 'd_anna', String(WS.store.dealChat));
+    // Разговор идёт в панели ПОВЕРХ экрана — той же самой на всех разделах. Отдельной ленты
+    // внутри карточки больше нет: она раздвигала работу, и это была третья реализация чата.
+    check('консьерж · диалог открылся именно по этой сделке',
+      (WS.engine.activeThread() || {}).id === 'deal:d_anna' && WS.store.cgDock === true,
+      ((WS.engine.activeThread() || {}).id || 'нет треда') + ' · док ' + WS.store.cgDock);
 
     // Читаем защищённо: если экран всё-таки сменился, `.view` может не существовать —
     // проверка должна показать провал, а не уронить весь прогон на null.
     const afterEl = doc.querySelector('#app .view');
     const after = afterEl ? afterEl.textContent : '';
-    check('консьерж · лента диалога появилась в карточке', !!doc.querySelector('#app .view .dcard-chat .chat'));
+    check('консьерж · лента диалога появилась панелью поверх экрана',
+      !!doc.querySelector('#cgdock.show #cgdockmsgs'),
+      (doc.getElementById('cgdock') || {}).className || 'дока нет');
+    check('консьерж · и работа под панелью не перестроилась',
+      !doc.querySelector('#app .view .dcard-chat .chat'),
+      'внутри карточки снова появилась своя лента');
     check('консьерж · и это тот же тред, что и в разделе',
       (WS.engine.activeThread() || {}).id === 'deal:d_anna', ((WS.engine.activeThread() || {}).id) || 'нет треда');
     // Главное требование: остальное на экране осталось видимым, а не свернулось и не исчезло.
@@ -5211,9 +5220,11 @@ setTimeout(async () => {
       .filter((w) => before.indexOf(w) >= 0 && after.indexOf(w) < 0);
     check('консьерж · открытие диалога ничего с экрана не унесло', lost.length === 0, lost.join(', '));
     // Второй строки ввода не появилось — два поля и были тем дублем, который убирали.
-    check('консьерж · поле ввода на экране одно',
+    check('консьерж · поле ввода одно, и оно в панели',
       doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1 &&
-      !!doc.getElementById('dealChatPrompt'));
+      !doc.getElementById('dealChatPrompt') && !!doc.getElementById('cgDockPrompt'),
+      'в карточке ' + doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length +
+      ', ввод в доке: ' + !!doc.getElementById('cgDockPrompt'));
     // Лента обязана иметь собственный предел высоты, иначе она вытолкнет работу за экран.
     // В jsdom стили не применяются — правило проверяется по самому CSS.
     {
@@ -5223,11 +5234,14 @@ setTimeout(async () => {
         (cssSrc.match(/\.dcard-chat \.chat \{[^}]*\}/) || ['правила нет'])[0].slice(0, 110));
     }
     // Свернуть — вернуться к прежнему виду, снова без перехода.
-    const closeBtn = doc.querySelector('#app .view [data-act="dealChatClose"]');
+    const closeBtn = doc.querySelector('#cgdock [data-act="cgDock"]');
     check('консьерж · есть чем свернуть', !!closeBtn);
     if (closeBtn) closeBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     check('консьерж · свёрнут без смены экрана',
-      WS.store.dealChat === null && WS.store.view === viewWas, WS.store.view + ' / ' + WS.store.dealChat);
+      !WS.store.cgDock && WS.store.view === viewWas, WS.store.view + ' / док ' + WS.store.cgDock);
+    check('консьерж · и экран под ним вернулся таким, каким был',
+      !doc.querySelector('#cgdock.show') &&
+      !!doc.querySelector('#app .view .dcard-main') && !!doc.querySelector('#app .view .dcard-aside'));
     check('консьерж · и карточка вернулась к прежнему виду',
       !doc.querySelector('#app .view .dcard-chat') && !!doc.querySelector('#app .view .dcard-composer .dx-cbar'));
     // Раздел Консьержа при этом продолжает открываться отдельно — второй вход не сломан.
@@ -5855,11 +5869,16 @@ setTimeout(async () => {
     WS.store.contactsFilters = Object.assign(WS.CONTACT_FILTERS_DEFAULT(), { kind: 'buyer' });
     WS.ui.openContactsChat();
     const chatView = doc.querySelector('#app .view') || doc.getElementById('app');
-    check('контакты · Консьерж сворачивает выдачу в одну строку',
-      !!chatView.querySelector('.contacts-sel') && !chatView.querySelector('.contacts-list'),
+    // Выборка названа строкой над списком, а сам список остаётся на экране: разговор идёт
+    // в панели поверх него. Так решил принципал — видеть выдачу во время разговора.
+    check('контакты · выборка названа строкой над выдачей',
+      !!chatView.querySelector('.contacts-sel'),
       'строка выборки: ' + !!chatView.querySelector('.contacts-sel'));
-    check('контакты · диалог открывается на этом же экране, без перехода',
-      WS.store.view === 'clients' && !!doc.getElementById('chat'), WS.store.view);
+    check('контакты · и сама выдача с экрана не ушла',
+      !!chatView.querySelector('.contacts-list'));
+    check('контакты · диалог открывается панелью поверх, без перехода',
+      WS.store.view === 'clients' && WS.store.cgDock === true && !!doc.querySelector('#cgdock.show'),
+      WS.store.view + ' · док ' + WS.store.cgDock);
     const reach = WS.ui.contactsReach();
     const noConsentReal = WS.ui.contactsSearchList().filter((p) => !p.co && !p.c.consent).length;
     check('контакты · без согласия посчитаны по данным, а не написаны словом',
