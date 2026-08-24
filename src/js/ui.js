@@ -3199,15 +3199,26 @@
   }
   // Params tab shows only what the header «Ключевое» doesn't (no Бюджет/Форма оплаты/Цель/Тип —
   // those are up top). Источник is inherited from the заявка, labelled as such.
+  // Граница «условия согласованы»: до неё работа идёт про подбор — объекты, предложения,
+  // сравнение; после — про оформление: гейты, документы, договор. Один и тот же набор вкладок
+  // на обоих участках означает, что половина из них всегда пустая, и это единственная сильная
+  // мысль макета партнёра. Считается по шагам ЭТОГО вида договора, а не по общему списку:
+  // у оффплана есть бронь, у перепродажи её нет.
+  function dealTermsAgreed(d) {
+    if (!d) return false;
+    if (dealClosed(d)) return true;
+    const steps = (WS.DEAL_STEPS || {})[WS.contractKindFor(d.funnel, d.readiness)] || ['prep'];
+    const i = steps.indexOf(d.stage);
+    return i > 0;                       // 0 — «Подготовка к сделке», это ещё подбор
+  }
   function dealParamsExtra(d) {
     const co = (D().companies || []).find((x) => x.id === d.companyId);
     const p = d.prov || {};
-    return dealField('Тип объекта', d.objectType, p.objectType, d.id + ':objectType') +
-      dealField('Готовность', d.readiness, p.readiness, d.id + ':readiness') +
-      (d.saleKind ? dealField('Вид сделки', d.saleKind, p.saleKind, d.id + ':saleKind') : '') +
+    // Тип объекта, готовность и источник стоят в левой колонке и правятся там; здесь их нет,
+    // иначе одно значение живёт на экране в двух местах и правится в одном.
+    return (d.saleKind ? dealField('Вид сделки', d.saleKind, p.saleKind, d.id + ':saleKind') : '') +
       dealField('Сторона клиента', d.side, p.side, d.id + ':side') +
       dealField('VAT 5%', d.vat ? 'применяется' : 'не применяется', p.vat) +
-      dealField('Источник (из запроса)', d.source, p.source, d.id + ':source') +
       dealField('Компания', co ? '<span data-company="' + co.id + '" style="cursor:pointer;border-bottom:1px solid var(--acc-line)">' + co.name + '</span> · ' + co.kind : '—', 'confirmed') +
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
@@ -3808,7 +3819,10 @@
     WS.store.cardOpen = WS.store.cardOpen || {};
     const key = type + ':' + id;
     if (WS.store.cardOpen[type] !== key) { WS.store.cardOpen[type] = key; WS.store.cardTabs[type] = def; }
-    return WS.store.cardTabs[type] || def;
+    const cur = WS.store.cardTabs[type] || def;
+    // Состав вкладок у сделки зависит от стадии: запомненная вкладка может исчезнуть, пока
+    // карточка открыта, и тогда экран остался бы пустым, а не вернулся к первой.
+    return tabs.some((t) => t[0] === cur) ? cur : def;
   }
   function statusChip(items) {
     return '<div class="prov dx-statusbar">' + items.map((it) =>
@@ -3882,6 +3896,13 @@
   function dfPair(k, v) { return '<div class="dfield"><div class="dk">' + k + '</div><div class="dv">' + (v || '—') + '</div></div>'; }
   // Tab content — every tab wrapped in the same dx-sec card treatment for consistent hierarchy.
   function dealTabContent(d, tab) {
+    // Подбор — предложения по объектам и их сравнение. Сами объекты сделки остались над
+    // вкладками: это предмет сделки, а не подробность о ней.
+    if (tab === 'offers') {
+      const off = dealOffersBlock(d);
+      return off || dxSec('layers', 'Подбор', '',
+        '<div style="font-size:12.5px;color:var(--mut)">Предложений по этой сделке ещё нет. Объекты сделки — выше, над вкладками.</div>');
+    }
     if (tab === 'contacts') {
       const addBtn = '<button class="btn xs" data-act="addDealContact" data-deal="' + d.id + '">' + I('plus') + 'Добавить</button>';
       const hint = '<div style="font-size:11px;color:var(--faint);margin-top:8px">Рейтинг A/B/C — влияние контакта на решение. Основной помечен звездой.</div>';
@@ -4559,6 +4580,21 @@
   function dealStepperSection(d) {
     return '<div class="dx-sec dx-sec-bare">' + dealStepper(d) + '</div>';
   }
+  // «Участники» и условия сделки стоят в левой колонке — вкладки, повторявшей их, больше нет:
+  // один и тот же список дважды на одном экране читался как две разные записи.
+  function dealTabsFor(d) {
+    const pick = ['offers', 'Подбор'];
+    const forms = ['docs', 'Оформление'];
+    // Меняется не состав, а что стоит первым и открыто по умолчанию: до согласования условий
+    // работа идёт про подбор, после — про оформление, и открывать карточку каждый раз на том,
+    // чем сегодня не занимаются, — это лишний клик на каждом открытии.
+    const lead = dealTermsAgreed(d) ? [forms, pick] : [pick, forms];
+    return lead.concat([
+      ['params', 'Сделка'],
+      ['tasks', 'Задачи · ' + tasksOfDeal(d).length],
+      ['history', 'История'],
+    ]);
+  }
   function dealSpec(id) {
     const d = D().deals.find((x) => x.id === id); if (!d) return null;
     const c = D().clients.find((x) => x.id === d.clientId) || {};
@@ -4567,7 +4603,7 @@
       hero: dealHero2(d),
       acts: entityActionBar(dealActions(d)),
       state: dealState(d),
-      tabs: [['params', 'Параметры'], ['contacts', 'Участники · ' + dealContacts(d).length], ['tasks', 'Задачи · ' + tasksOfDeal(d).length], ['docs', 'Документы'], ['history', 'История']],
+      tabs: dealTabsFor(d),
       render: function (tab) { return dealTabContent(d, tab); },
       concierge: entityConcierge('Поручите Консьержу по сделке — «собрать КП», «что просрочено», «бриф к звонку»…', 'deal:' + d.id, escAttr(d.title), 'briefcase'),
     };
@@ -6550,7 +6586,7 @@
        о прошлом. В ленту он попадает ровно в тот момент, когда становится правдой. */
     const drafts = outcomesBlock('deal', d.id);
     const pend = drafts ? dxSec('sparkle', 'Итоги на подтверждение', '', '<div class="timeline">' + drafts + '</div>') : '';
-    return dealNextStepCard(d) + dealPlannedEventsCard(d) + pend + dealLotsBlock(d) + dealOffersBlock(d) + dealRecentCard(d);
+    return dealNextStepCard(d) + dealPlannedEventsCard(d) + pend + dealLotsBlock(d) + dealRecentCard(d);
   }
   // Одна строка ввода внизу — она же вход в Консьержа. Отдельной кнопки «Работать через Консьержа»
   // нет: она была дублем этой же строки, и именно её партнёр критикует, не заметив, что нарисовал сам.
@@ -9386,7 +9422,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, pulseProspects, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

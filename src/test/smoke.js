@@ -5844,8 +5844,89 @@ setTimeout(async () => {
     WS.store.contactsFiltersOpen = false;
 
     // 7. Вкладка внутри сделки больше не спорит с разделом за одно слово.
-    check('контакты · вкладка внутри сделки называется «Участники»',
-      uiSrc2.indexOf("['contacts', 'Участники · '") >= 0);
+    // Участники и условия стоят в левой колонке карточки сделки — вкладки, повторявшей их,
+    // больше нет: один список дважды на одном экране читается как две разные записи.
+    check('контакты · участники сделки не задвоены вкладкой',
+      uiSrc2.indexOf("['contacts', 'Участники") < 0 && uiSrc2.indexOf("'Участники · ' + dealContacts(d).length, addBtn") >= 0);
+  }
+
+  // ---- Карточка сделки: состав вкладок меняется на границе «условия согласованы» ----
+  {
+    const deals = dd().deals || [];
+    const before = deals.find((d) => !WS.ui.dealTermsAgreed(d) && !d.archived);
+    const after = deals.find((d) => WS.ui.dealTermsAgreed(d) && !WS.ui.dealClosed(d) && !d.archived);
+    check('карточка · в данных есть сделка до согласования условий и сделка после',
+      !!before && !!after, (before ? before.id : 'нет до') + ' / ' + (after ? after.id : 'нет после'));
+
+    if (before && after) {
+      WS.store.navStack = [];
+      WS.ui.dealCard(before.id);
+      const tabsBefore = [].slice.call(doc.querySelectorAll('#app .dcard-main .dx-tab')).map((b) => b.textContent.trim());
+      check('карточка · до согласования условий первой стоит вкладка подбора',
+        tabsBefore[0] === 'Подбор', tabsBefore.join(' | '));
+      check('карточка · и она же открыта — не приходится кликать в неё каждый раз',
+        (doc.querySelector('#app .dcard-main .dx-tab.on') || {}).textContent === 'Подбор',
+        (doc.querySelector('#app .dcard-main .dx-tab.on') || {}).textContent);
+
+      WS.ui.dealCard(after.id);
+      const tabsAfter = [].slice.call(doc.querySelectorAll('#app .dcard-main .dx-tab')).map((b) => b.textContent.trim());
+      check('карточка · после согласования первой стоит вкладка оформления',
+        tabsAfter[0] === 'Оформление', tabsAfter.join(' | '));
+      check('карточка · и открыта именно она',
+        (doc.querySelector('#app .dcard-main .dx-tab.on') || {}).textContent === 'Оформление',
+        (doc.querySelector('#app .dcard-main .dx-tab.on') || {}).textContent);
+      // Порядок меняется, состав — нет: ничего из работы не пропадает после перехода границы.
+      check('карточка · за границей ничего из вкладок не пропало',
+        tabsBefore.length === tabsAfter.length &&
+        tabsBefore.every((t) => tabsAfter.indexOf(t) >= 0),
+        tabsBefore.join(' | ') + '  ПРОТИВ  ' + tabsAfter.join(' | '));
+
+      // Объект — предмет сделки: он виден сразу, без клика по вкладке.
+      const lots = WS.ui.dealLots(after);
+      if (lots.length) {
+        const main = doc.querySelector('#app .dcard-main');
+        const inBody = main.querySelector('.dx-tabbody');
+        const shownOutsideTabs = main.textContent.indexOf(lots[0].name) >= 0 &&
+          (!inBody || inBody.textContent.indexOf(lots[0].name) < 0);
+        check('карточка · объект сделки виден без клика по вкладке', shownOutsideTabs,
+          'объект: ' + lots[0].name);
+      }
+
+      // Граница считается по шагам ЭТОГО договора: у оффплана есть бронь, у перепродажи нет.
+      const offplan = deals.find((d) => WS.contractKindFor(d.funnel, d.readiness) === 'offplan_spa');
+      if (offplan) {
+        const steps = (WS.DEAL_STEPS || {})[WS.contractKindFor(offplan.funnel, offplan.readiness)];
+        const was = offplan.stage;
+        offplan.stage = steps[0];
+        check('карточка · на первом шаге договора условия ещё не согласованы',
+          !WS.ui.dealTermsAgreed(offplan), steps[0]);
+        offplan.stage = steps[1];
+        check('карточка · на втором шаге — уже согласованы',
+          WS.ui.dealTermsAgreed(offplan), steps[1]);
+        offplan.stage = was;
+      }
+
+      // Условия и участники живут в левой колонке; вкладка «Сделка» их не повторяет.
+      WS.ui.dealCard(after.id);
+      WS.ui.setEntityTab('deal', after.id, 'params');
+      const body = doc.querySelector('#app .dcard-main .dx-tabbody');
+      const aside = doc.querySelector('#app .dcard-aside');
+      const dupes = ['Тип объекта', 'Готовность', 'Источник (из запроса)']
+        .filter((k) => aside && body && aside.textContent.indexOf(k) >= 0 && body.textContent.indexOf(k) >= 0);
+      check('карточка · условия не напечатаны дважды на одном экране', dupes.length === 0, dupes.join(', '));
+      check('карточка · участники не напечатаны дважды на одном экране',
+        !!aside && aside.textContent.indexOf('Участники') >= 0 &&
+        (!body || body.textContent.indexOf('Участники сделки') < 0));
+
+      // Запомненная вкладка, которой на новой стадии нет, не оставляет пустое место.
+      WS.store.cardTabs = WS.store.cardTabs || {};
+      WS.store.cardTabs.deal = 'вкладка-которой-нет';
+      WS.ui.dealCard(after.id);
+      check('карточка · исчезнувшая вкладка возвращает к первой, а не к пустому экрану',
+        !!doc.querySelector('#app .dcard-main .dx-tab.on') &&
+        (doc.querySelector('#app .dcard-main .dx-tabbody') || {}).textContent.trim().length > 0,
+        (doc.querySelector('#app .dcard-main .dx-tabbody') || {}).textContent.slice(0, 60));
+    }
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));
