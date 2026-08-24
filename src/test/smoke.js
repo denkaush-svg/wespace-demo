@@ -5228,6 +5228,7 @@ setTimeout(async () => {
       (WS.engine.activeThread() || {}).id === 'deal:d_anna' && WS.store.cgDock === true,
       ((WS.engine.activeThread() || {}).id || 'нет треда') + ' · док ' + WS.store.cgDock);
 
+
     // Читаем защищённо: если экран всё-таки сменился, `.view` может не существовать —
     // проверка должна показать провал, а не уронить весь прогон на null.
     const afterEl = doc.querySelector('#app .view');
@@ -5289,6 +5290,92 @@ setTimeout(async () => {
     WS.engine.openThread('deal:d_anna', 'Проверка', 'briefcase');
     check('консьерж · раздел Консьержа по-прежнему открывается сам по себе', WS.store.view === 'concierge', WS.store.view);
     WS.ui.dealCard('d_anna');
+
+    /* ---- Консьерж знает, на каком экране стоит агент ----------------------------------------
+       «А по этой сделке что?» приходило к модели без подлежащего: тред она знала, экран — нет,
+       и честно отвечала, что не поняла. Экран — такой же вход, как текст поручения. */
+    {
+      WS.ui.dealCard('d_anna');
+      const sc = WS.ui.screenContext();
+      const dl = (dd().deals || []).find((x) => x.id === 'd_anna') || {};
+      check('консьерж · знает, какая запись открыта',
+        !!sc.запись && sc.запись.тип === 'сделка' && sc.запись.id === 'd_anna',
+        JSON.stringify(sc).slice(0, 160));
+      // Читаем защищённо: если контекста нет вовсе, проверка обязана показать провал, а не
+      // уронить весь прогон на undefined.
+      const rec = sc.запись || {};
+      check('консьерж · и держит её ключевые факты, а не одно название',
+        !!rec.клиент && !!rec.шаг && rec.сумма === dl.amount,
+        JSON.stringify(sc.запись || null).slice(0, 200));
+      // Экран уезжает к модели вместе с вопросом. Транспорт в jsdom не поднять, поэтому
+      // проверяется само место склейки запроса — как и правила CSS выше.
+      const liveSrc = read('js/live.js');
+      check('консьерж · экран уходит к модели вместе с вопросом',
+        /screen:\s*screen\(\)/.test(liveSrc) && /WS\.ui\.screenContext/.test(liveSrc));
+      // И офлайновый планировщик отвечает про открытую сделку, а не сводкой по рабочему месту.
+      const ans = WS.agent.ask('что по этой сделке');
+      check('консьерж · «что по этой сделке» отвечает про открытую сделку',
+        ans.kind === 'answer' && ans.text.indexOf(dl.title) >= 0, (ans.text || '').slice(0, 140));
+      // Панель, открытая круглой кнопкой, привязывается к тому, что открыто. Тред сбрасывается
+      // напрямую: openThread уводит на раздел Консьержа, и экран перестал бы быть сделкой.
+      WS.store.cgDock = false;
+      WS.engine.closeThread();
+      WS.ui.dealCard('d_anna');
+      WS.ui.toggleCgDock();
+      check('консьерж · панель открылась привязанной к открытой сделке',
+        (WS.engine.activeThread() || {}).id === 'deal:d_anna' && WS.store.cgDock === true,
+        ((WS.engine.activeThread() || {}).id || 'нет треда'));
+      const dock = doc.getElementById('cgdock');
+      check('консьерж · и вслух называет экран, на котором стоит агент',
+        !!dock && !!dock.querySelector('.cgdock-where') &&
+        dock.querySelector('.cgdock-where').textContent.indexOf(dl.title) >= 0,
+        dock && dock.querySelector('.cgdock-where') ? dock.querySelector('.cgdock-where').textContent : 'строки контекста нет');
+      WS.store.cgDock = false; WS.ui.renderCgDock();
+    }
+
+    /* ---- Заведённая запись открывается из того сообщения, которое её завело -----------------
+       Раньше карточка «Применено» показывала название текстом, а строка «не заполнены: телефон,
+       канал» была именно строкой: агент нажимал на неё, и не происходило ничего. */
+    {
+      const res = WS.storeApi.apply([{ op: 'addClient',
+        record: { name: 'Тестовый Контакт' } }], { confirmed: true });
+      check('консьерж · запись возвращает свой идентификатор наружу',
+        res.ok && (res.created || []).length === 1 && res.created[0].coll === 'clients' && !!res.created[0].id,
+        JSON.stringify(res.created || res.error || null));
+      const madeId = res.ok && (res.created || [])[0] && res.created[0].id;
+      /* Тем самым путём, каким дефект и возникает: модель предлагает завести контакт, человек
+         подтверждает, и карточка «Применено» обязана вести в саму запись. Предложение
+         собирается через тот же вход, которым пользуется живая голова, — иначе офлайновый
+         планировщик, который заводить контакты не умеет, тихо пропустил бы всю проверку. */
+      const prop = WS.agent.tools.propose(
+        [{ op: 'addClient', record: { name: 'Пробный Клиент' } }],
+        { title: 'Новый контакт', lines: ['Контакт: Пробный Клиент'] });
+      check('консьерж · предложение завести контакт собирается', prop && prop.kind === 'proposal',
+        prop ? (prop.kind + ' ' + (prop.error || '')) : 'нет предложения');
+      check('консьерж · и оно называет, чего записи не хватает',
+        (prop.missing || []).length > 0 && /не заполнены/.test((prop.missing || []).join(' ')),
+        JSON.stringify(prop.missing || []));
+      if (prop && prop.kind === 'proposal') {
+        const before = ((WS.engine.activeThread() || {}).items || []).length;
+        WS.engine.agentConfirm(prop.id);
+        const items = (WS.engine.activeThread() || {}).items || [];
+        const last = (items[items.length - 1] || {}).html || '';
+        check('консьерж · из карточки «Применено» запись открывается кнопкой',
+          /data-client="/.test(last) && /Открыть контакт/.test(last),
+          last.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 160));
+        check('консьерж · и рядом сказано, что осталось дозаполнить',
+          /не заполнены/.test(last),
+          last.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 200));
+        check('консьерж · и сообщение действительно добавилось', items.length > before, before + ' → ' + items.length);
+      }
+      // Пробные записи из рабочего места убираются: они были нужны на один вопрос.
+      const arr = dd().clients;
+      [madeId, 'Пробный Клиент'].forEach((k) => {
+        const at = arr.findIndex((x) => x && (x.id === k || x.name === k));
+        if (at >= 0) arr.splice(at, 1);
+      });
+      WS.ui.dealCard('d_anna');
+    }
   }
 
   // ---- Gap A: board mini-card must show next task + call button ----
@@ -5762,7 +5849,89 @@ setTimeout(async () => {
     check('Пульс · разделы блоками, а не левым списком', blocks.length >= 3, 'блоков: ' + blocks.length);
     check('Пульс · и каждый сворачивается без скриптов',
       blocks.every((b) => b.tagName === 'DETAILS' && !!b.querySelector('summary')));
+    // Предложения идут раньше аналитики: их читают каждый день, аналитику — раз в неделю.
+    const iIns = labels.findIndex((l) => l.indexOf('Инсайты') === 0);
+    const iAn = labels.findIndex((l) => l.indexOf('Аналитика') === 0);
+    check('Пульс · предложения и инсайты стоят раньше аналитики', iIns >= 0 && iAn > iIns,
+      'инсайты ' + iIns + ', аналитика ' + iAn);
 
+    /* ---- Цель полосой над рабочей областью -------------------------------------------------
+       На каждом листе макета партнёра сверху стоит одна и та же полоса: срок · что заработать ·
+       выполнено · осталось · прогресс. Проверяется не «полоса есть», а что все четыре текста
+       на месте и что длина закраски совпадает с посчитанным процентом. */
+    const band = pulse.querySelector('.pgoal');
+    check('Пульс · цель стоит полосой над рабочей областью', !!band);
+    if (band) {
+      const row = band.querySelector('.pgoal-row');
+      const t = row.textContent;
+      check('Пульс · полоса называет срок, цель, выполненное и остаток',
+        /Цель до \s*\d/.test(t) && /Выполнено/.test(t) && /Осталось/.test(t) &&
+        row.querySelectorAll('.pgoal-cell').length === 2, t.replace(/\s+/g, ' ').slice(0, 160));
+      const pct = parseInt((row.querySelector('.pgoal-pct') || {}).textContent || '', 10);
+      const w = parseFloat(((row.querySelector('.pgoal-bar > i') || {}).getAttribute
+        ? row.querySelector('.pgoal-bar > i').getAttribute('style') : '').replace(/[^\d.]/g, ''));
+      check('Пульс · закраска полосы совпадает с процентом, а не нарисована на глаз',
+        Math.abs(w - Math.max(0, Math.min(100, pct))) < 0.51, 'процент ' + pct + ', ширина ' + w);
+    }
+
+    /* ---- Ежедневник: срочность видна строкой, тип — своим цветом ---------------------------
+       Состав колонок задан партнёром и проверяется выше. Здесь — то, из-за чего он сказал, что
+       ему не нравится, как это выглядит: плоский список, в котором просроченное ничем не
+       отличается от завтрашнего, пока не вчитаешься в дату. */
+    {
+      const bAll = doc.querySelector('#app [data-dayfilter="all"]');
+      if (bAll) bAll.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      const rows = [].slice.call(doc.querySelectorAll('#app .pd-table tbody tr'));
+      const items = WS.ui.pulseDayItems();
+      const over = items.filter((x) => x.when === 'overdue').length;
+      const today = items.filter((x) => x.when === 'today').length;
+      check('Пульс · просроченное и сегодняшнее помечены в самой строке, а не только датой',
+        rows.filter((r) => r.className.indexOf('pd-over') >= 0).length === over &&
+        rows.filter((r) => r.className.indexOf('pd-today') >= 0).length === today,
+        'просрочено ' + over + ', сегодня ' + today + ' против строк ' +
+        rows.filter((r) => r.className.indexOf('pd-over') >= 0).length + '/' +
+        rows.filter((r) => r.className.indexOf('pd-today') >= 0).length);
+      check('Пульс · тип дела назван и окрашен, а не выведен одним серым словом',
+        rows.length > 0 && rows.every((r) => {
+          const k = r.querySelector('.pd-kind');
+          return k && /k-(call|meet|task|msg)/.test(k.className) && k.textContent.trim().length > 3;
+        }), rows.length + ' строк');
+    }
+
+    /* ---- Предложение говорит, что сделать и что это даст ------------------------------------
+       «Перспективная сделка» без глагола — это ещё одна карточка сделки. Здесь проверяется, что
+       предложение названо тем же правилом, что рисует следующий шаг в карточке, и что ценность
+       называет посчитанную комиссию, а не общие слова. */
+    {
+      const pcard = pulse.querySelector('.pcard[data-prospcard]');
+      check('Пульс · перспективная сделка подана карточкой-предложением', !!pcard);
+      if (pcard) {
+        const d = (dd().deals || []).find((x) => x.id === pcard.getAttribute('data-prospcard'));
+        const doTxt = (pcard.querySelector('.pc-do') || {}).textContent || '';
+        const gain = (pcard.querySelector('.pc-gain-t') || {}).textContent || '';
+        check('Пульс · «Предлагаю» — то же действие, что и следующий шаг по этой сделке',
+          !!d && doTxt.trim() === WS.ui.prospectOffer(d).trim(), doTxt);
+        check('Пульс · «Что это даёт» называет посчитанную комиссию',
+          gain.indexOf(WS.AED(Math.round(WS.ui.dealCommission(d)))) >= 0, gain);
+      }
+    }
+
+    /* Пролистывание карточки возвращало экран наверх: перерисовка заменяет разметку целиком, и
+       прокрутка обнулялась. Восстанавливать её можно только на ТОМ ЖЕ экране — переход на другую
+       запись обязан начинаться сверху. Проверяется решение, которое это различает. */
+    {
+      WS.router.go('start');
+      const k1 = WS._renderKey;
+      WS.store.prospIdx = (WS.store.prospIdx || 0) + 1;
+      WS.storeApi.touch();
+      check('Пульс · перелистывание не считается переходом — экран не отматывается наверх',
+        !!k1 && WS._renderKey === k1, k1 + ' → ' + WS._renderKey);
+      WS.ui.dealCard('d_anna');
+      check('Пульс · а открытие другой записи переходом считается', WS._renderKey !== k1,
+        k1 + ' → ' + WS._renderKey);
+      WS.store.prospIdx = 0;
+      WS.router.go('start');
+    }
     // То, что уже было выверено, перестройка сносить не имеет права.
     check('Пульс · строка Консьержа осталась первой', !!doc.getElementById('startPrompt'));
     check('Пульс · вход в «Сюжет дня» не потерян', !!pulse.querySelector('[data-act="presenter"]'));

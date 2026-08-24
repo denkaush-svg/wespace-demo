@@ -392,24 +392,42 @@
     else pace = 'при текущем темпе — ' + share + '% к концу ' + (goal.period === 'quarter' ? 'квартала' : 'месяца');
     return { fact: fact, target: target, pct: pct, remaining: Math.max(0, target - fact), pace: pace, behind: share < 100 && fact < target };
   }
-  // One row, used by the agent's «Мои цели» and by the manager's «План отдела».
-  function goalRow(goal, scope) {
+  function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
+  /* ---- Цель полосой над рабочей областью --------------------------------------------------
+     На каждом из семи листов партнёра сверху стоит одна и та же полоса: «Цель до <дата>» ·
+     «Заработать <сумма>» · выполнено · осталось · двухцветный прогресс. Она не украшение —
+     это единственный элемент, который виден из любого раздела Пульса, и мерило всему
+     остальному. У нас на её месте стояли две плитки в общем потоке, и цель читалась как
+     ещё один блок среди прочих. Числа считаются по сделкам стенда, как и раньше. */
+  const MONTH_RU = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const MONTH_LAST = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function goalDeadline(goal) {
+    const now = WS.fixtures.DEMO_NOW;
+    // Квартал заканчивается своим последним месяцем, месяц — собой. Даты рисуются, а не берутся
+    // из макета: «до 31.12.2026» в стенде, где сегодня 14 мая, было бы чужим числом.
+    const mo = goal.period === 'quarter' ? Math.ceil(now.mo / 3) * 3 : now.mo;
+    return MONTH_LAST[mo - 1] + ' ' + MONTH_RU[mo - 1] + ' ' + now.y;
+  }
+  function goalBandRow(goal, scope) {
     const p = computeGoalProgress(goal, scope);
-    const bar = Math.max(2, Math.min(100, p.pct));
-    return '<div class="goal-tile' + (p.behind ? ' is-behind' : '') + '">' +
-      '<div class="goal-label">' + escAttr(goal.label) + '</div>' +
-      '<div class="goal-num">' + goalValue(goal.metric, p.fact) + '<i> из ' + goalValue(goal.metric, p.target) + '</i></div>' +
-      '<div class="meter goal-meter' + (p.behind ? ' is-behind' : '') + '"><i style="width:' + bar + '%"></i></div>' +
-      '<div class="goal-foot"><span class="goal-pct">' + p.pct + '%</span>' +
-      '<span>' + (p.remaining ? 'осталось ' + goalValue(goal.metric, p.remaining) : 'выполнено') + '</span></div>' +
-      '<div class="goal-pace' + (p.behind ? ' is-behind' : '') + '">' + I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
+    const pct = Math.max(0, Math.min(100, p.pct));
+    return '<div class="pgoal-row' + (p.behind ? ' is-behind' : '') + '" data-goal="' + goal.id + '">' +
+      '<div class="pgoal-cells">' +
+        '<div class="pgoal-cell"><div class="pgoal-k">Цель до ' + goalDeadline(goal) + '</div>' +
+          '<div class="pgoal-v">Выполнено ' + goalValue(goal.metric, p.fact) + '</div></div>' +
+        '<div class="pgoal-cell"><div class="pgoal-k">' + escAttr(goal.label) + '</div>' +
+          '<div class="pgoal-v">Осталось ' + goalValue(goal.metric, p.remaining) + '</div></div>' +
+      '</div>' +
+      '<div class="pgoal-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="pgoal-foot"><span class="pgoal-pct">' + p.pct + '%</span>' +
+        I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
       '</div>';
   }
-  function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
   function pulseMyGoals() {
     const goals = goalsOf(S().role);
     const pinned = goals.filter((g) => g.pinned);
-    const head = '<div class="wq-head" style="margin-top:24px"><div class="section-label" style="margin:0">' +
+    const head = '<div class="wq-head" style="margin:24px 0 0"><div class="section-label" style="margin:0">' +
       (S().role === 'manager' ? 'План отдела' : 'Мои цели') + '</div>' +
       '<button class="btn sm" data-nav="profile">' + I('target') + 'Настроить цели</button></div>';
     if (!pinned.length) {
@@ -420,7 +438,7 @@
         '<button class="btn sm primary" data-act="addGoal" style="margin-top:10px">' + I('plus') + 'Поставить цель</button></div>';
     }
     const scope = S().role === 'manager' ? 'team' : 'me';
-    return head + '<div class="goal-grid">' + pinned.map((g) => goalRow(g, scope)).join('') + '</div>';
+    return head + '<div class="pgoal">' + pinned.map((g) => goalBandRow(g, scope)).join('') + '</div>';
   }
   // ---- Named metrics over the real demo state ----
   // The Concierge must answer with numbers that match what is on screen, so it reads THESE and
@@ -628,10 +646,12 @@
   // ---- «Мои дела» — ежедневник ------------------------------------------------------------------
   // Партнёр описал состав строки дословно: дата · кликабельное название сделки или заявки ·
   // контакт · описание события · тип. Всё сюда стекается из карточек — задачи и записи календаря.
+  // Тип дела — не просто подпись, а свой цвет: агент читает столбец боковым зрением и должен
+  // отличать звонок от встречи, не вчитываясь. Третий элемент — класс окраски.
   const DAY_KIND = {
-    touch: ['Коммуникация', 'chat'], call: ['Звонок', 'phone'], kp: ['Задача', 'doc'],
-    doc: ['Задача', 'doc'], task: ['Задача', 'check'], show: ['Встреча', 'calendar'],
-    meet: ['Встреча', 'calendar'], visit: ['Встреча', 'calendar'], mail: ['Коммуникация', 'mail'],
+    touch: ['Коммуникация', 'chat', 'k-msg'], call: ['Звонок', 'phone', 'k-call'], kp: ['Задача', 'doc', 'k-task'],
+    doc: ['Задача', 'doc', 'k-task'], task: ['Задача', 'check', 'k-task'], show: ['Встреча', 'calendar', 'k-meet'],
+    meet: ['Встреча', 'calendar', 'k-meet'], visit: ['Встреча', 'calendar', 'k-meet'], mail: ['Коммуникация', 'mail', 'k-msg'],
   };
   const DAY_WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
   function pulseDayItems() {
@@ -671,20 +691,27 @@
       const c = it.clientId ? (D().clients || []).find((x) => x.id === it.clientId) : null;
       const who = c ? '<button class="lnk" data-client="' + c.id + '">' + escAttr(c.name) + '</button>' +
         (c.phone ? '<div class="pd-ph">' + escAttr(c.phone) + '</div>' : '') : '—';
-      const k = DAY_KIND[it.kind] || ['Задача', 'check'];
-      return '<tr' + (it.when === 'overdue' ? ' class="pd-over"' : '') + '>' +
-        '<td class="pd-due">' + escAttr(it.due) + '</td><td>' + what + '</td><td>' + who + '</td>' +
-        '<td>' + escAttr(it.title) + '</td>' +
-        '<td><span class="badge' + (it.when === 'overdue' ? ' stop' : ' acc') + '">' + I(k[1]) + k[0] + '</span></td></tr>';
+      const k = DAY_KIND[it.kind] || ['Задача', 'check', 'k-task'];
+      // Срочность — полосой слева на всю строку, а не только цветом даты: список читается
+      // сверху вниз одним движением, «что горит» видно раньше, чем прочитано хоть одно слово.
+      const urg = it.when === 'overdue' ? ' pd-over' : (it.when === 'today' ? ' pd-today' : '');
+      return '<tr class="pd-r' + urg + '">' +
+        '<td class="pd-due"><span class="pd-dot"></span>' + escAttr(it.due) +
+        (it.when === 'overdue' ? '<div class="pd-late">просрочено</div>' : '') + '</td>' +
+        '<td>' + what + '</td><td>' + who + '</td>' +
+        '<td class="pd-what">' + escAttr(it.title) + '</td>' +
+        '<td class="pd-type"><span class="pd-kind ' + k[2] + '">' + I(k[1]) + k[0] + '</span></td></tr>';
     }).join('');
     const body = rows
-      ? '<div class="pd-wrap"><table class="deals-table pd-table"><thead><tr>' +
+      ? '<div class="pd-wrap"><table class="pd-table"><thead><tr>' +
         '<th>Дата</th><th>Сделка или заявка</th><th>Контакт</th><th>Событие</th><th>Тип</th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty" style="padding:22px">' + I('checkCircle') +
         '<div style="font-weight:700;color:var(--ink)">На этот срок дел нет</div></div>';
-    return '<div class="qa-row" style="margin-bottom:12px">' + chips +
-      '<span class="df-sep"></span><button class="btn sm" data-nav="tasks">' + I('arrowRight') + 'Все задачи</button></div>' +
+    return '<div class="qa-row pd-bar">' + chips +
+      '<span class="df-sep"></span><span class="pd-n">' + list.length + ' ' +
+      plural(list.length, 'дело', 'дела', 'дел') + '</span>' +
+      '<button class="btn sm" data-nav="tasks" style="margin-left:auto">' + I('arrowRight') + 'Все задачи</button></div>' +
       body;
   }
 
@@ -697,6 +724,23 @@
     return (D().deals || [])
       .filter((d) => !dealClosed(d) && !dealArchived(d) && (!mine || d.agent === mine))
       .sort((x, y) => dealCommission(y) - dealCommission(x));
+  }
+  /* Предложение, а не витрина. «Перспективная сделка» без глагола — это просто ещё одна
+     карточка сделки: партнёр так и сказал — суть предложения должна быть в явном виде, что
+     конкретно сделать и в чём ценность. Действие берётся из того же правила, что рисует
+     «следующий шаг» в карточке, ценность — из комиссии и того факта, который делает шаг
+     срочным. Ни одного сочинённого слова: всё либо посчитано, либо прочитано из записи. */
+  function prospectOffer(d) {
+    return nbaActions(d).doIt[0];
+  }
+  function prospectValue(d) {
+    const bits = ['ожидаемая комиссия ' + WS.AED(Math.round(dealCommission(d)))];
+    const r = d.requestId ? requestById(d.requestId) : null;
+    if (r && (r.offered || []).some((o) => o.state === 'selected')) bits.push('объект уже выбран — до брони один шаг');
+    if (d.hot) bits.push('клиент горячий: ответ в течение двух часов');
+    if (d.stageDays >= 5) bits.push('сделка стоит на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней'));
+    if (!dealHasNextStep(d)) bits.push('следующий шаг не назначен — сделка не двинется сама');
+    return bits.join(' · ');
   }
   function prospectWhy(d) {
     const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
@@ -734,20 +778,70 @@
     const d = list[i];
     const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
     const why = prospectWhy(d).map((t) => '<span class="badge">' + escAttr(t) + '</span>').join('');
-    return '<div class="qa-row" style="margin-bottom:10px"><button class="chip" data-act="prospList">' +
+    // Колода: под верхней карточкой видно, что за ней есть ещё. Пустые высокие кнопки по бокам
+    // ушли — стрелки стоят в подвале карточки, рядом со счётчиком, и карточку можно смахнуть.
+    const deck = list.length > 1 ? ' has-deck' : '';
+    return '<div class="qa-row" style="margin-bottom:12px"><button class="chip" data-act="prospList">' +
       I('menu') + 'Вывести списком</button><span class="df-sep"></span>' +
-      '<span class="pc-count">' + (i + 1) + ' из ' + list.length + '</span></div>' +
+      '<span class="pc-count">' + (i + 1) + ' из ' + list.length + '</span>' +
+      '<span class="pc-hint">' + I('sparkle') + 'смахните карточку или листайте стрелками</span></div>' +
       '<div class="pcard-row">' +
-      '<button class="pcard-nav" data-prosp="prev"' + (i > 0 ? '' : ' disabled') + ' aria-label="Предыдущая">' + I('chevLeft') + '</button>' +
-      '<div class="pcard pulse-prospects" data-deal="' + d.id + '">' +
-      '<div class="pc-name">' + escAttr(c.name || d.title) + '</div>' +
+      '<div class="pcard pulse-prospects' + deck + '" data-prospcard="' + d.id + '">' +
+      '<div class="pc-head"><div class="pc-name">' + escAttr(c.name || d.title) + '</div>' +
+      '<span class="pc-comm">' + WS.AED(Math.round(dealCommission(d))) + '</span></div>' +
       '<div class="pc-deal">' + escAttr(d.title) + ' · ' + stageLabel(d.stage) + '</div>' +
+      '<div class="pc-offer"><div class="pc-lbl">' + I('target') + 'Предлагаю</div>' +
+      '<div class="pc-do">' + escAttr(prospectOffer(d)) + '</div></div>' +
+      '<div class="pc-gain"><div class="pc-lbl">' + I('sparkle') + 'Что это даёт</div>' +
+      '<div class="pc-gain-t">' + escAttr(prospectValue(d)) + '</div></div>' +
       '<div class="pc-why">' + why + '</div>' +
-      '<div class="pc-comm">Ожидаемая комиссия · ' + WS.AED(Math.round(dealCommission(d))) + '</div>' +
+      '<div class="pc-foot">' +
+      '<button class="pcard-nav" data-prosp="prev"' + (i > 0 ? '' : ' disabled') + ' aria-label="Предыдущая">' + I('chevLeft') + '</button>' +
       '<button class="btn sm primary" data-deal="' + d.id + '">' + I('arrowRight') + 'Открыть сделку</button>' +
-      '</div>' +
       '<button class="pcard-nav" data-prosp="next"' + (i < list.length - 1 ? '' : ' disabled') + ' aria-label="Следующая">' + I('chevRight') + '</button>' +
-      '</div>';
+      '</div></div></div>';
+  }
+
+  /* Смахнуть карточку — как в колоде. Сделано на pointer-событиях, а не на touch: стенд
+     показывают с ноутбука, и жест мышью обязан работать ровно так же, как пальцем. Порог в
+     64 пикселя отделяет намеренный жест от дрожи руки; ниже порога карточка возвращается. */
+  const SWIPE_MIN = 64;
+  function bindProspSwipe() {
+    const card = document.querySelector('.pcard[data-prospcard]');
+    if (!card || !card.setPointerCapture) return;
+    const total = pulseProspectList().length;
+    let x0 = null, dx = 0;
+    card.addEventListener('pointerdown', (e) => {
+      // Кнопки внутри карточки остаются кнопками: перетаскивание начинается с полотна.
+      if (e.target.closest && e.target.closest('button, a, input')) return;
+      x0 = e.clientX; dx = 0;
+      try { card.setPointerCapture(e.pointerId); } catch (err) { /* курсор мог уйти с окна */ }
+      card.classList.remove('swipe-out');
+      card.classList.add('dragging');
+    });
+    card.addEventListener('pointermove', (e) => {
+      if (x0 == null) return;
+      dx = e.clientX - x0;
+      card.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 30) + 'deg)';
+      card.style.opacity = String(Math.max(0.45, 1 - Math.abs(dx) / 520));
+    });
+    const release = () => {
+      if (x0 == null) return;
+      const moved = dx;
+      x0 = null;
+      card.classList.remove('dragging');
+      card.classList.add('swipe-out');
+      const i = S().prospIdx || 0;
+      const go = moved <= -SWIPE_MIN ? Math.min(i + 1, total - 1)
+        : (moved >= SWIPE_MIN ? Math.max(i - 1, 0) : i);
+      if (go === i) { card.style.transform = ''; card.style.opacity = ''; return; }
+      card.style.transform = 'translateX(' + (moved < 0 ? -560 : 560) + 'px) rotate(' + (moved / 22) + 'deg)';
+      card.style.opacity = '0';
+      S().prospIdx = go;
+      setTimeout(() => WS.storeApi.touch(), 170);
+    };
+    card.addEventListener('pointerup', release);
+    card.addEventListener('pointercancel', release);
   }
 
   // ---- Саммари ------------------------------------------------------------------------------------
@@ -820,9 +914,15 @@
     // признаку проигранные услуги без инвентаря считались живыми, а живая заявка с одним
     // выбранным объектом и открытым остатком — закрытой.
     const open = (D().requests || []).filter((r) => ['closed', 'lost'].indexOf(reqStage(r)) < 0);
+    // «Брак» стоит на листе партнёра отдельной строкой: это доля входящих, с которыми работать
+    // нельзя — спам и непрофильное. Считается по разбору входящих, а не оценивается.
+    const scrapped = (D().inbox || []).filter((it) => (it.stage || 'new') === 'rejected').length;
+    const inboxN = (D().inbox || []).length;
     return '<div class="tiles dash">' +
       tile('mail', 'Заявок в работе', open.length, '', 'span 4', 'из ' + (D().requests || []).length + ' всего', '', 'accent', 'data-nav="requests"') +
       tile('target', 'Конверсия заявка → сделка', m.conv, '%', 'span 4', m.won + ' из ' + m.leads + ' лидов', '', '', 'data-analytics="conv"') +
+      tile('x', 'Брак во входящих', scrapped, '', 'span 4',
+        inboxN ? 'из ' + inboxN + ' обращений в разборе' : 'разбирать пока нечего', '', '', 'data-nav="requests"') +
       tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'ждут вашего шага сегодня', '', '', 'data-analytics="hot"') +
       '<button class="tile wide" data-nav="leads"><div class="th">' + I('target') + 'Отработка лидов</div>' +
         '<div class="val">' + Math.round(a.coverage * 100) + '<span class="u">%</span></div>' +
@@ -1014,8 +1114,8 @@
         'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
         pulseDay() + pulseNoNextStep(), true) +
       pulseBlock('prospects', 'Перспективные сделки', prospN ? String(prospN) : '', pulseProspects(), true) +
-      pulseBlock('analytics', 'Аналитика', '', pulseAnalytics(), false) +
       pulseBlock('insights', 'Инсайты и сюжет дня', '', dayHint + insightCards(), false) +
+      pulseBlock('analytics', 'Аналитика', '', pulseAnalytics(), false) +
       '</div>' +
     '</div>';
   }
@@ -9854,6 +9954,7 @@
     // С любого другого экрана разговор идёт в доке поверх него, и экран не перестраивается.
     if (st.view === 'concierge') mountConcierge();
     if (st.view === 'objects') bindObjects();
+    if (st.view === 'start') bindProspSwipe();
     bindListSearch();
     if (st.view === 'finance') renderFinance();
     // Hide the floating Concierge launcher (W) on the Concierge screen itself — it's redundant there.
@@ -9888,7 +9989,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    screenContext, screenContextLabel, toggleCgDock, sendFromCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    screenContext, screenContextLabel, toggleCgDock, sendFromCard, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
