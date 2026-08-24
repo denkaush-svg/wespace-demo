@@ -556,32 +556,151 @@
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0">' + title + '</div>' +
       (right || '') + '</div>';
   }
-  // «Перспективная» — не просто дорогая: сортируем по ожидаемой комиссии, то есть по тому, чем
-  // сделка отличается лично для агента, и в строке объясняем, почему она здесь.
-  function pulseProspects() {
-    const mine = (D().users[S().role] || {}).id;
-    const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d) && (!mine || d.agent === mine));
-    const top = live.slice().sort((x, y) => dealCommission(y) - dealCommission(x)).slice(0, 4);
-    const head = pulseHead('Перспективные сделки' + (live.length ? ' · ' + live.length : ''),
-      live.length > top.length ? '<button class="btn sm" data-nav="clients" data-tab="deals">' + I('arrowRight') + 'Все сделки</button>' : '');
-    if (!top.length) {
-      return head + '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Активных сделок за вами сейчас нет. Как только появится первая, она встанет сюда — с ожидаемой комиссией и ближайшим шагом.</div>';
-    }
-    const rows = top.map((d) => {
-      const c = D().clients.find((x) => x.id === d.clientId) || {};
-      const r = (D().requests || []).find((x) => x.id === d.requestId);
-      const why = [];
-      if (d.hot) why.push('горячая');
-      if (r && (r.offered || []).some((o) => o.state === 'selected')) why.push('объект выбран');
-      if (!dealHasNextStep(d)) why.push('нет следующего шага');
-      const marks = why.map((w) => '<span class="badge' + (w === 'нет следующего шага' ? ' warn' : ' acc') + '">' + w + '</span>').join('');
-      return '<div class="rel-row" data-deal="' + d.id + '" style="cursor:pointer">' +
-        '<div class="fi i-acc">' + I('briefcase') + '</div>' +
-        '<div class="ft"><div class="t">' + escAttr(d.title) + ' ' + marks + '</div>' +
-        '<div class="m">' + escAttr(c.name || '—') + ' · ' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) +
-        ' · комиссия ' + WS.AED(Math.round(dealCommission(d))) + '</div></div>' + I('arrowRight') + '</div>';
+  // ---- Пульс: разделы блоками, каждый сворачивается --------------------------------------------
+  // Схема партнёра держит разделы левым списком. Список забирает четверть ширины и оставляет
+  // рабочую область в одном экране на семь тем. Взято его РАЗБИЕНИЕ, а не рисунок: те же разделы
+  // стоят блоками сверху вниз, каждый сворачивается, и свёрнутый занимает одну строку.
+  // Свёрнуто через <details> — раскрывается без скрипта, как и левая колонка карточки сделки.
+  function pulseBlock(key, title, sub, body, openByDefault) {
+    return '<details class="pblock"' + (openByDefault ? ' open' : '') + ' data-pblock="' + key + '">' +
+      '<summary><span class="pb-t">' + title + '</span>' +
+      (sub ? '<span class="pb-m">' + sub + '</span>' : '') + I('chevDown') + '</summary>' +
+      '<div class="pb-body">' + body + '</div></details>';
+  }
+
+  // ---- «Мои дела» — ежедневник ------------------------------------------------------------------
+  // Партнёр описал состав строки дословно: дата · кликабельное название сделки или заявки ·
+  // контакт · описание события · тип. Всё сюда стекается из карточек — задачи и записи календаря.
+  const DAY_KIND = {
+    touch: ['Коммуникация', 'chat'], call: ['Звонок', 'phone'], kp: ['Задача', 'doc'],
+    doc: ['Задача', 'doc'], task: ['Задача', 'check'], show: ['Встреча', 'calendar'],
+    meet: ['Встреча', 'calendar'], visit: ['Встреча', 'calendar'], mail: ['Коммуникация', 'mail'],
+  };
+  const DAY_WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+  function pulseDayItems() {
+    const out = [];
+    (D().tasks || []).forEach((t) => {
+      if (t.status === 'done') return;
+      out.push({ when: t.when || 'later', due: t.due || '—', title: t.title || 'Задача',
+        kind: t.kind || 'task', clientId: t.clientId, dealId: t.dealId, requestId: t.requestId });
+    });
+    (D().events || []).forEach((e) => {
+      if (e.status === 'canceled') return;
+      const w = e.when || e.at;
+      if (!w) return;
+      out.push({ when: DAY_WHEN_ORD[w] != null ? w : 'later', due: w, title: e.title || e.text || 'Событие',
+        kind: e.kind || 'meet', clientId: e.clientId, dealId: e.dealId, requestId: e.requestId });
+    });
+    return out.sort((a, b) => (DAY_WHEN_ORD[a.when] == null ? 9 : DAY_WHEN_ORD[a.when]) -
+      (DAY_WHEN_ORD[b.when] == null ? 9 : DAY_WHEN_ORD[b.when]));
+  }
+  const DAY_FILTERS = [['today', 'На сегодня'], ['tomorrow', 'На завтра'], ['overdue', 'Просроченные'], ['all', 'Все']];
+  function pulseDay() {
+    const f = S().pulseDay || 'today';
+    const all = pulseDayItems();
+    const list = f === 'all' ? all : all.filter((x) => x.when === f);
+    const chips = DAY_FILTERS.map((c) => {
+      const n = c[0] === 'all' ? all.length : all.filter((x) => x.when === c[0]).length;
+      return '<button class="chip' + (f === c[0] ? '' : ' mut') + '" data-dayfilter="' + c[0] + '">' +
+        c[1] + '<span class="ch-n">' + n + '</span></button>';
     }).join('');
-    return head + '<div class="card pulse-prospects" style="padding:4px 16px"><div class="rel-list">' + rows + '</div></div>';
+    const rows = list.map((it) => {
+      // Название сделки или заявки — кликабельное: из ежедневника попадают в работу одним касанием.
+      const d = it.dealId ? (D().deals || []).find((x) => x.id === it.dealId) : null;
+      const r = !d && it.requestId ? requestById(it.requestId) : null;
+      const what = d ? '<button class="lnk" data-deal="' + d.id + '">' + escAttr(d.title) + '</button>'
+        : r ? '<button class="lnk" data-request="' + r.id + '">' + escAttr(r.title) + '</button>'
+        : '<span style="color:var(--faint)">без сделки</span>';
+      const c = it.clientId ? (D().clients || []).find((x) => x.id === it.clientId) : null;
+      const who = c ? '<button class="lnk" data-client="' + c.id + '">' + escAttr(c.name) + '</button>' +
+        (c.phone ? '<div class="pd-ph">' + escAttr(c.phone) + '</div>' : '') : '—';
+      const k = DAY_KIND[it.kind] || ['Задача', 'check'];
+      return '<tr' + (it.when === 'overdue' ? ' class="pd-over"' : '') + '>' +
+        '<td class="pd-due">' + escAttr(it.due) + '</td><td>' + what + '</td><td>' + who + '</td>' +
+        '<td>' + escAttr(it.title) + '</td>' +
+        '<td><span class="badge' + (it.when === 'overdue' ? ' stop' : ' acc') + '">' + I(k[1]) + k[0] + '</span></td></tr>';
+    }).join('');
+    const body = rows
+      ? '<div class="pd-wrap"><table class="deals-table pd-table"><thead><tr>' +
+        '<th>Дата</th><th>Сделка или заявка</th><th>Контакт</th><th>Событие</th><th>Тип</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      : '<div class="empty" style="padding:22px">' + I('checkCircle') +
+        '<div style="font-weight:700;color:var(--ink)">На этот срок дел нет</div></div>';
+    return '<div class="qa-row" style="margin-bottom:12px">' + chips +
+      '<span class="df-sep"></span><button class="btn sm" data-nav="tasks">' + I('arrowRight') + 'Все задачи</button></div>' +
+      body;
+  }
+
+  // ---- «Перспективные сделки» — карточками с перелистыванием -------------------------------------
+  // На макете это одна карточка с обоснованием и стрелкой вперёд. Обоснование СОБИРАЕТСЯ ИЗ
+  // ЗАПИСЕЙ — тип клиента, бюджет, состояние подбора, ожидаемая комиссия, последнее касание;
+  // сочинять про клиента текст здесь нельзя, его читают перед звонком.
+  function pulseProspectList() {
+    const mine = (D().users[S().role] || {}).id;
+    return (D().deals || [])
+      .filter((d) => !dealClosed(d) && !dealArchived(d) && (!mine || d.agent === mine))
+      .sort((x, y) => dealCommission(y) - dealCommission(x));
+  }
+  function prospectWhy(d) {
+    const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+    const bits = [];
+    if (c.contactKind) bits.push(CONTACT_KIND_LABEL[c.contactKind]);
+    if (c.interest) bits.push(CONTACT_INTEREST_LABEL[c.interest]);
+    if (d.amount) bits.push('бюджет ' + WS.AED(d.amount));
+    const r = d.requestId ? requestById(d.requestId) : null;
+    if (r && (r.offered || []).some((o) => o.state === 'selected')) bits.push('объект выбран');
+    else if (r && (r.offered || []).length) bits.push('показано объектов: ' + r.offered.length);
+    if (!dealHasNextStep(d)) bits.push('следующий шаг не назначен');
+    const last = lastTouchOf(d.clientId);
+    if (last) bits.push('последнее касание ' + last);
+    return bits;
+  }
+  function pulseProspects() {
+    const list = pulseProspectList();
+    if (!list.length) {
+      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Активных сделок за вами сейчас нет. Как только появится первая, она встанет сюда — с ожидаемой комиссией и ближайшим шагом.</div>';
+    }
+    if (S().prospList) {
+      const rows = list.map((d) => {
+        const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+        return '<div class="rel-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+          '<div class="fi i-acc">' + I('briefcase') + '</div>' +
+          '<div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
+          '<div class="m">' + escAttr(c.name || '—') + ' · ' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) +
+          ' · комиссия ' + WS.AED(Math.round(dealCommission(d))) + '</div></div>' + I('arrowRight') + '</div>';
+      }).join('');
+      return '<div class="qa-row" style="margin-bottom:10px"><button class="chip" data-act="prospCards">' +
+        I('layers') + 'Карточками</button></div>' +
+        '<div class="card pulse-prospects" style="padding:4px 16px"><div class="rel-list">' + rows + '</div></div>';
+    }
+    const i = Math.min(Math.max(S().prospIdx || 0, 0), list.length - 1);
+    const d = list[i];
+    const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+    const why = prospectWhy(d).map((t) => '<span class="badge">' + escAttr(t) + '</span>').join('');
+    return '<div class="qa-row" style="margin-bottom:10px"><button class="chip" data-act="prospList">' +
+      I('menu') + 'Вывести списком</button><span class="df-sep"></span>' +
+      '<span class="pc-count">' + (i + 1) + ' из ' + list.length + '</span></div>' +
+      '<div class="pcard-row">' +
+      '<button class="pcard-nav" data-prosp="prev"' + (i > 0 ? '' : ' disabled') + ' aria-label="Предыдущая">' + I('chevLeft') + '</button>' +
+      '<div class="pcard pulse-prospects" data-deal="' + d.id + '">' +
+      '<div class="pc-name">' + escAttr(c.name || d.title) + '</div>' +
+      '<div class="pc-deal">' + escAttr(d.title) + ' · ' + stageLabel(d.stage) + '</div>' +
+      '<div class="pc-why">' + why + '</div>' +
+      '<div class="pc-comm">Ожидаемая комиссия · ' + WS.AED(Math.round(dealCommission(d))) + '</div>' +
+      '<button class="btn sm primary" data-deal="' + d.id + '">' + I('arrowRight') + 'Открыть сделку</button>' +
+      '</div>' +
+      '<button class="pcard-nav" data-prosp="next"' + (i < list.length - 1 ? '' : ' disabled') + ' aria-label="Следующая">' + I('chevRight') + '</button>' +
+      '</div>';
+  }
+
+  // ---- Саммари ------------------------------------------------------------------------------------
+  // Блок «Саммари AI» стоит на четырёх листах из семи и там самый ценный элемент. Он собирается
+  // ИЗ ПОСЧИТАННЫХ ЧИСЕЛ и называет своё основание: правдоподобный абзац без опоры на данные —
+  // это то, ради чего систему потом перестанут открывать.
+  function pulseSummary(lines) {
+    if (!lines.length) return '';
+    return '<div class="pai"><div class="pai-h">' + I('sparkle') + 'Саммари · <span class="badge ai-b">собрано моделью</span></div>' +
+      lines.map((t) => '<div class="pai-l">' + t + '</div>').join('') + '</div>';
   }
   const PULSE_TABS = [
     ['deals', 'Сделки', 'briefcase'],
@@ -608,7 +727,34 @@
         '<div class="val">' + pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
         '<div class="sub">Тренд новых сделок · 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
-      '</div>';
+      '</div>' + pulseSummary(dealsSummaryLines(live, won, lost, a));
+  }
+  // Строки саммари собираются из тех же чисел, что стоят на плитках. Ни одного утверждения,
+  // которого нельзя проверить по записям на этом же экране.
+  function dealsSummaryLines(live, won, lost, a) {
+    const out = [];
+    const sum = live.reduce((x, d) => x + (d.amount || 0), 0);
+    if (live.length) {
+      out.push('В работе ' + live.length + ' ' + plural(live.length, 'сделка', 'сделки', 'сделок') +
+        ' на ' + WS.AED(sum) + '. Ожидаемая комиссия по ним — ' + WS.AED(computeMetrics().expectedComm) + '.');
+    }
+    // Оценка «что закроется» строится по шагу договора, а не по вере: считаем те, что уже прошли
+    // согласование условий. Основание названо прямо — иначе это гадание с видом отчёта.
+    const near = live.filter((d) => dealTermsAgreed(d));
+    if (near.length) {
+      out.push('Ближе всего к закрытию ' + near.length + ' — они уже прошли согласование условий. ' +
+        'При среднем цикле ' + (a.avgCycleDays || 0) + ' ' + plural(a.avgCycleDays || 0, 'день', 'дня', 'дней') +
+        ' это ориентир на месяц, а не обещание.');
+    } else if (live.length) {
+      out.push('Согласование условий не прошла ни одна из активных сделок — до закрытия в этом месяце дойти неоткуда.');
+    }
+    if (lost.length) {
+      const why = LOSS_REASONS[0];
+      out.push('Проиграно ' + lost.length + '. Самая частая причина по отделу — «' + why.r + '» (' + why.n + ').');
+    }
+    const noNext = live.filter((d) => !dealHasNextStep(d));
+    if (noNext.length) out.push('Без назначенного следующего шага ' + noNext.length + ' — это то, что теряется само.');
+    return out;
   }
   function pulseTabRequests() {
     const m = computeMetrics();
@@ -626,7 +772,24 @@
         '<div class="meter"><i style="width:' + (a.coverage * 100) + '%"></i></div>' +
         '<div class="sub">Связались за неделю: ' + a.weekTouches.done + ' из ' + a.weekTouches.total + ' лидов</div></button>' +
       '</div>' +
-      '<div class="section-label" style="margin-top:16px">Качество источника</div>' + srcQualityList();
+      '<div class="section-label" style="margin-top:16px">Качество источника</div>' + srcQualityList() +
+      pulseSummary(requestsSummaryLines(m, a, open));
+  }
+  function requestsSummaryLines(m, a, open) {
+    const out = [];
+    const all = (D().requests || []);
+    out.push('Заявок всего ' + all.length + ', в работе ' + open.length + '. Конверсия в сделку ' + m.conv +
+      '% — ' + m.won + ' из ' + m.leads + ' лидов по атрибуции.');
+    const best = (m.attribution || []).slice().sort((x, y) => (y.deals / (y.leads || 1)) - (x.deals / (x.leads || 1)))[0];
+    if (best && best.leads) {
+      out.push('Лучший источник — ' + best.source + ': ' + Math.round((best.deals / best.leads) * 100) +
+        '% доходят до сделки при ' + best.leads + ' лидах.');
+    }
+    const lostReq = all.filter((r) => reqStage(r) === 'lost').length;
+    if (lostReq) out.push('Закрыто отказом ' + lostReq + ' ' + plural(lostReq, 'заявка', 'заявки', 'заявок') + '.');
+    out.push('Отработка лидов за неделю — ' + a.weekTouches.done + ' из ' + a.weekTouches.total +
+      '. Непрокоснувшиеся остаются в «Входящих» на стадии «Не вышли на связь».');
+    return out;
   }
   function pulseTabClients() {
     const cl = D().clients || [];
@@ -638,7 +801,19 @@
       tile('home', 'Для себя', byType('enduser'), '', 'span 4', 'покупают для проживания', '', '', 'data-nav="clients" data-tab="contacts"') +
       tile('building', 'Собственники', byType('owner'), '', 'span 6', 'сдают или продают свой объект', '', '', 'data-nav="clients" data-tab="contacts"') +
       tile('clock', 'Без единого касания', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="clients" data-tab="contacts"') +
-      '</div>';
+      '</div>' + pulseSummary(clientsSummaryLines(cl, silent));
+  }
+  function clientsSummaryLines(cl, silent) {
+    const out = [];
+    const repeat = cl.filter((c) => (D().deals || []).filter((d) => d.clientId === c.id).length > 1).length;
+    out.push('В книге ' + cl.length + ' ' + plural(cl.length, 'контакт', 'контакта', 'контактов') +
+      '. Повторных — ' + repeat + ': у них больше одной сделки.');
+    const won = cl.filter((c) => hasWonDeal(c.id)).length;
+    out.push('С закрытой успехом сделкой ' + won + '. Это та часть базы, к которой возвращаются, а не ищут заново.');
+    if (silent) out.push('Без единого касания ' + silent + ' — с них не начиналась работа вовсе; они первыми выпадают из выборок на рассылку.');
+    const noConsent = cl.filter((c) => !c.consent).length;
+    if (noConsent) out.push('Без согласия на связь ' + noConsent + ' — они исключаются из любой адресной отправки автоматически.');
+    return out;
   }
   function pulseTabPartners() {
     const mutual = NET_AGENTS.filter((x) => x.mutual);
@@ -651,24 +826,66 @@
       '</div>' +
       '<div class="card" style="padding:14px 16px;margin-top:14px;font-size:12.5px;color:var(--mut)">' +
       'Раздел комиссии с партнёром в демо не считается: сплит согласуется в переписке по каждой сделке отдельно, единого поля под него ещё нет.' +
-      '</div>';
+      '</div>' + pulseSummary(partnersSummaryLines(mutual, co, coComm));
+  }
+  function partnersSummaryLines(mutual, co, coComm) {
+    const out = [];
+    const agencies = [];
+    NET_AGENTS.forEach((x) => { if (agencies.indexOf(x.agency) < 0) agencies.push(x.agency); });
+    out.push('В сети ' + NET_AGENTS.length + ' ' + plural(NET_AGENTS.length, 'контрагент', 'контрагента', 'контрагентов') +
+      ' из ' + agencies.length + ' ' + plural(agencies.length, 'агентства', 'агентств', 'агентств') +
+      '; взаимных — ' + mutual.length + '.');
+    if (co.length) {
+      out.push('Сделок в со-брокеридже ' + co.length + ' на ' + WS.AED(coComm) +
+        ' комиссии до раздела. Все они пришли по каналу «Клуб».');
+    } else {
+      out.push('Ни одной сделки в со-брокеридже пока нет — партнёрская сеть используется как справочник, а не как канал.');
+    }
+    const strong = NET_AGENTS.slice().sort((x, y) => y.deals - x.deals)[0];
+    if (strong) out.push('Самый нагруженный партнёр — ' + strong.name + ' (' + strong.agency + '), ' + strong.deals + ' сделок в профиле.');
+    return out;
+  }
+  // Формула партнёра дословно: стоимость лида = маркетинговый бюджет / число лидов; стоимость
+  // сделки = расходы / число новых сделок. Расходы в стенде ЕСТЬ — операционная смета месяца.
+  // Считаем по ней и говорим, что в неё входит: цифра без состава — этоцифра, которой не верят.
+  function marketingSpend() {
+    // Из сметы берутся ТОЛЬКО строки привлечения. Тариф CRM и клубный взнос — не маркетинг,
+    // и складывать их в стоимость лида значит завышать её на ровном месте.
+    const mk = EXPENSES.filter((e) => /листинг|продвижен|реклам/i.test(e[0]));
+    return { items: mk, total: mk.reduce((x, e) => x + e[2], 0), all: EXPENSES.reduce((x, e) => x + e[2], 0) };
   }
   function pulseTabCost() {
     const m = computeMetrics();
-    const commPerLead = m.leads ? Math.round((D().attribution || []).reduce((s, x) => s + (x.commission || 0), 0) / m.leads) : 0;
-    // Стоимость лида и стоимость привлечения посчитать НЕ ИЗ ЧЕГО: расходы на каналы в систему
-    // не приходят. Правдоподобная цифра здесь была бы выдумкой, поэтому её нет — вместо неё
-    // сказано, какого входа не хватает.
+    const sp = marketingSpend();
+    const commPerLead = m.leads ? Math.round((D().attribution || []).reduce((s2, x) => s2 + (x.commission || 0), 0) / m.leads) : 0;
+    const cpl = m.leads ? Math.round(sp.total / m.leads) : 0;
+    const newDeals = (D().deals || []).length;
+    const cpd = newDeals ? Math.round(sp.all / newDeals) : 0;
+    const rows = sp.items.map((e) => '<div class="feed-row"><div class="fi i-mut">' + I(e[3]) + '</div>' +
+      '<div class="ft"><div class="t">' + e[0] + '</div><div class="m">' + e[1] + '</div></div>' +
+      '<div class="td-amt">' + WS.AED(e[2]) + '</div></div>').join('');
     return '<div class="tiles dash">' +
-      tile('money', 'Комиссия на лид', WS.AED(commPerLead), '', 'span 6', 'из ' + m.leads + ' лидов по всем источникам', '', 'accent', 'data-analytics="conv"') +
-      tile('trend', 'Ожидаемая комиссия', WS.AED(m.expectedComm), '', 'span 6', 'из активного пайплайна', '', '', 'data-analytics="pipeline"') +
+      tile('money', 'Стоимость лида', WS.AED(cpl), '', 'span 4', 'бюджет привлечения ' + WS.AED(sp.total) + ' / ' + m.leads + ' лидов', '', 'accent', 'data-analytics="conv"') +
+      tile('briefcase', 'Стоимость сделки', WS.AED(cpd), '', 'span 4', 'вся смета ' + WS.AED(sp.all) + ' / ' + newDeals + ' сделок', '', '', 'data-analytics="pipeline"') +
+      tile('trend', 'Комиссия на лид', WS.AED(commPerLead), '', 'span 4', 'выручка на тот же лид', '', '', 'data-analytics="conv"') +
       '</div>' +
-      '<div class="card" style="padding:16px;margin-top:14px">' +
-      '<div style="font-weight:700;font-size:13px;margin-bottom:6px">Стоимость лида и стоимость сделки не посчитаны</div>' +
-      '<div style="font-size:12.5px;color:var(--mut);max-width:64ch;line-height:1.55">Система видит, что лид пришёл из Property Finder или из клуба, но не видит, сколько за этот канал заплачено. ' +
-      'Чтобы появились CPL и стоимость привлечения, нужен один вход — расходы по каждому источнику за период. ' +
-      'Пока его нет, здесь показана только выручка на лид: подставлять правдоподобную цифру расходов было бы обманом.</div>' +
-      '</div>';
+      '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Из чего собран бюджет привлечения</div>' +
+      '<div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' +
+      pulseSummary(costSummaryLines(sp, m, cpl, cpd, commPerLead));
+  }
+  function costSummaryLines(sp, m, cpl, cpd, commPerLead) {
+    const out = [];
+    out.push('Лид обходится в ' + WS.AED(cpl) + ', приносит ' + WS.AED(commPerLead) + ' комиссии — ' +
+      (commPerLead > cpl ? 'привлечение окупается ' + Math.round(commPerLead / Math.max(cpl, 1)) + 'x.'
+        : 'привлечение пока не окупается.'));
+    out.push('В стоимость сделки взята вся операционная смета месяца — ' + WS.AED(sp.all) +
+      '. ФОТ и офис в стенде не заведены, поэтому реальная цифра будет выше этой.');
+    const worst = (m.attribution || []).slice().sort((x, y) => (x.deals / (x.leads || 1)) - (y.deals / (y.leads || 1)))[0];
+    if (worst && worst.leads) {
+      out.push('Дешевле всего сократить расход на «' + worst.source + '»: ' + worst.leads +
+        ' лидов дали ' + worst.deals + ' сделок — худшая отдача из источников.');
+    }
+    return out;
   }
   function pulseAnalytics() {
     const tab = S().pulseTab || 'deals';
@@ -680,8 +897,7 @@
     else if (tab === 'partners') body = pulseTabPartners();
     else if (tab === 'cost') body = pulseTabCost();
     else body = pulseTabDeals();
-    return pulseHead('Аналитика') +
-      '<div class="pulse-tabs"><div class="seg">' + btns + '</div></div>' +
+    return '<div class="pulse-tabs"><div class="seg">' + btns + '</div></div>' +
       '<div class="pulse-panel">' + body + '</div>';
   }
 
@@ -726,16 +942,24 @@
       '<div class="m">' + (eventsPlayed ? 'Сыграно событий: ' + eventsPlayed + ' из 5 · продолжить' : 'Ночной лид · входящий звонок · ответ на КП · проверка · развилка') + '</div></div>' +
       I('arrowRight') + '</button>';
 
+    // Разделы партнёра — блоками, а не левым списком: список забирает четверть ширины и
+    // оставляет одну рабочую область на семь тем. Свёрнутый блок занимает одну строку.
+    const day = pulseDayItems();
+    const overdueN = day.filter((x) => x.when === 'overdue').length;
+    const todayN = day.filter((x) => x.when === 'today').length;
+    const prospN = pulseProspectList().length;
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       pulseMyGoals() +
-      // Мои дела: задачи на сегодня и просроченные + сделки, у которых не назначен следующий шаг.
-      pulseMyDay() + pulseNoNextStep() +
-      pulseProspects() +
-      pulseAnalytics() +
-      dayHint +
-      insightsBlock() +
+      '<div class="pblocks">' +
+      pulseBlock('day', 'Мои дела',
+        'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
+        pulseDay() + pulseNoNextStep(), true) +
+      pulseBlock('prospects', 'Перспективные сделки', prospN ? String(prospN) : '', pulseProspects(), true) +
+      pulseBlock('analytics', 'Аналитика', '', pulseAnalytics(), false) +
+      pulseBlock('insights', 'Инсайты и сюжет дня', '', dayHint + insightCards(), false) +
+      '</div>' +
     '</div>';
   }
 
@@ -9485,7 +9709,7 @@
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
-    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

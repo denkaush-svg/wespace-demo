@@ -138,6 +138,61 @@ button { font-family: inherit; cursor: pointer; }
 .pulse-tabs .seg { flex: none; }
 .pulse-tabs .seg-b { white-space: nowrap; }
 .pulse-panel { margin-top: 14px; }
+
+/* Пульс: разделы блоками. Свёрнутый занимает одну строку и говорит, сколько внутри, —
+   на семь тем левым списком уходила бы четверть ширины экрана. */
+.pblocks { display: grid; gap: 12px; margin-top: 20px; }
+.pblock { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-sm); overflow: hidden; }
+.pblock > summary { cursor: pointer; display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; list-style: none; user-select: none; }
+.pblock > summary::-webkit-details-marker { display: none; }
+.pblock > summary:hover { background: var(--surface-2); }
+.pblock > summary > svg { margin-left: auto; width: 16px; height: 16px; color: var(--mut);
+  transition: transform .16s var(--ease); flex: none; }
+.pblock[open] > summary > svg { transform: rotate(180deg); }
+.pblock[open] > summary { border-bottom: 1px solid var(--line); }
+.pb-t { font-size: 14.5px; font-weight: 800; color: var(--ink); }
+.pb-m { font-size: 12px; color: var(--mut); }
+.pb-body { padding: 14px 16px 16px; }
+
+/* Ежедневник: дата · сделка · контакт · событие · тип — состав строки задан партнёром. */
+.pd-wrap { overflow-x: auto; }
+.pd-table { width: 100%; }
+.pd-table td { vertical-align: top; }
+.pd-due { white-space: nowrap; color: var(--mut); }
+.pd-over .pd-due { color: var(--stop); font-weight: 700; }
+.pd-ph { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.lnk { border: 0; background: none; padding: 0; font: inherit; color: var(--acc-ink);
+  text-align: left; border-bottom: 1px solid var(--acc-line); cursor: pointer; }
+.lnk:hover { color: var(--acc); border-bottom-color: var(--acc); }
+.chip .ch-n { margin-left: 6px; font-weight: 800; opacity: .75; }
+
+/* Перспективные сделки — карточками с перелистыванием, как на макете. */
+.pcard-row { display: flex; align-items: stretch; gap: 12px; }
+.pcard { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.pc-name { font-family: var(--font-disp); font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.15; }
+.pc-deal { font-size: 12.5px; color: var(--mut); }
+.pc-why { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.pc-comm { font-size: 13px; font-weight: 700; color: var(--acc-ink); margin-top: 2px; }
+.pcard .btn { align-self: flex-start; margin-top: 6px; }
+.pcard-nav { flex: none; width: 42px; border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface); color: var(--mut); display: grid; place-items: center; cursor: pointer;
+  transition: .14s var(--ease); }
+.pcard-nav:hover:not(:disabled) { background: var(--acc-soft); border-color: var(--acc-line); color: var(--acc); }
+.pcard-nav:disabled { opacity: .35; cursor: default; }
+.pcard-nav svg { width: 20px; height: 20px; }
+.pc-count { font-size: 12px; color: var(--mut); }
+@media (max-width: 599.98px) { .pcard-nav { width: 34px; } .pc-name { font-size: 18px; } }
+
+/* Саммари: собрано моделью из тех же чисел, что на плитках рядом. */
+.pai { margin-top: 16px; background: var(--acc-soft); border: 1px solid var(--acc-line);
+  border-radius: var(--r); padding: 14px 16px; }
+.pai-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 800;
+  color: var(--acc-ink); margin-bottom: 8px; }
+.pai-h svg { width: 15px; height: 15px; }
+.pai-l { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; margin-top: 5px; }
 /* Свёрнутая выборка контактов: одна строка над диалогом, она же — путь назад. */
 .contacts-sel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; text-align: left;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px;

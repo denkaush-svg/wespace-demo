@@ -5470,7 +5470,8 @@ setTimeout(async () => {
     const uiSrc = read('js/ui.js'), mainSrc = read('js/main.js');
     // Все data-атрибуты, которые ui.js рисует, кроме заведомо оформительских.
     const DECOR = ['data-act', 'data-mid', 'data-v', 'data-dir', 'data-scope', 'data-deal', 'data-req',
-      'data-obj', 'data-cid', 'data-tlabel', 'data-ticon', 'data-feat', 'data-stage', 'data-field', 'data-task'];
+      'data-obj', 'data-cid', 'data-tlabel', 'data-ticon', 'data-feat', 'data-stage', 'data-field', 'data-task',
+      'data-pblock'];
     const rendered = Array.from(new Set((uiSrc.match(/data-[a-z]+(?:-[a-z]+)*=/g) || [])
       .map((x) => x.slice(0, -1)))).filter((a) => DECOR.indexOf(a) < 0);
     // Обработчик обязан хотя бы упоминать атрибут: либо в списке делегирования, либо как d.<имя>.
@@ -5708,26 +5709,46 @@ setTimeout(async () => {
     WS.store.pulseTab = 'deals';
     WS.router.go('start');
     const pulse = doc.querySelector('#app .start') || doc.getElementById('app');
-    const labels = [].slice.call(pulse.querySelectorAll('.section-label')).map((e) => e.textContent.trim());
+    const labels = [].slice.call(pulse.querySelectorAll('.section-label, .pb-t')).map((e) => e.textContent.trim());
     const order = ['Мои цели', 'Мои дела', 'Перспективные сделки', 'Аналитика'];
     const idx = order.map((t) => labels.findIndex((l) => l.indexOf(t) === 0));
     check('Пульс · все четыре раздела на экране', idx.every((i) => i >= 0),
       order.filter((t, i) => idx[i] < 0).join(', ') + ' | есть: ' + labels.join(' / '));
     check('Пульс · разделы идут в порядке схемы партнёра',
       idx.every((v, i) => i === 0 || (v > idx[i - 1])), idx.join(','));
+    // Каждый раздел сворачивается, и сворачивается без скрипта — как левая колонка карточки.
+    const blocks = [].slice.call(pulse.querySelectorAll('.pblock'));
+    check('Пульс · разделы блоками, а не левым списком', blocks.length >= 3, 'блоков: ' + blocks.length);
+    check('Пульс · и каждый сворачивается без скриптов',
+      blocks.every((b) => b.tagName === 'DETAILS' && !!b.querySelector('summary')));
 
     // То, что уже было выверено, перестройка сносить не имеет права.
     check('Пульс · строка Консьержа осталась первой', !!doc.getElementById('startPrompt'));
     check('Пульс · вход в «Сюжет дня» не потерян', !!pulse.querySelector('[data-act="presenter"]'));
     check('Пульс · «Инсайты» на месте', /Инсайты/.test(pulse.textContent));
-    check('Пульс · очередь дня показывает задачи или говорит, что их нет',
-      /Мои дела · сегодня/.test(pulse.textContent));
+    // Ежедневник: состав строки задан партнёром дословно — дата, сделка или заявка, контакт,
+    // событие, тип. Проверяется по шапке таблицы, а не по наличию слова «дела» на экране.
+    const heads = [].slice.call(pulse.querySelectorAll('.pd-table thead th')).map((e) => e.textContent.trim());
+    check('Пульс · «Мои дела» — ежедневник с колонками партнёра',
+      ['Дата', 'Сделка или заявка', 'Контакт', 'Событие', 'Тип'].every((h, i) => heads[i] === h),
+      heads.join(' | '));
+    check('Пульс · и срок дел переключается',
+      pulse.querySelectorAll('[data-dayfilter]').length >= 3,
+      String(pulse.querySelectorAll('[data-dayfilter]').length));
     // Разбор просроченных был отдельной плиткой; она уехала во вкладки, и путь к записям
     // обязан остаться — иначе список просроченных с Пульса больше не открыть.
     const odN = (dd().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
     if (odN) {
-      check('Пульс · просроченные открываются с Пульса, а не только считаются',
-        !!pulse.querySelector('[data-analytics="overdue"]'), 'просрочено: ' + odN);
+      // Просроченное открывается прямо из ежедневника: строка называет сделку и она кликается.
+      const b = doc.querySelector('#app [data-dayfilter="overdue"]');
+      if (b) b.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      const overRows = doc.querySelectorAll('#app .pd-table tbody tr');
+      check('Пульс · просроченные показываются списком, а не только счётчиком',
+        overRows.length >= odN, overRows.length + ' строк при ' + odN + ' просроченных');
+      check('Пульс · и из строки можно уйти в саму сделку или заявку',
+        !!doc.querySelector('#app .pd-table [data-deal], #app .pd-table [data-request]'));
+      const b2 = doc.querySelector('#app [data-dayfilter="today"]');
+      if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     }
     // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
     check('Пульс · ввод Консьержа один, а не задвоен',
@@ -5767,14 +5788,26 @@ setTimeout(async () => {
       clientsPanel.indexOf(String(investors)) >= 0, 'инвесторов в данных: ' + investors);
 
     // Стоимость лида посчитать НЕ ИЗ ЧЕГО. Экран обязан сказать это словами и не показать числа.
+    // Пересмотр раньше принятого: раньше стоимость лида объявлялась непосчитанной. Партнёр
+    // дал формулу — бюджет привлечения делить на число лидов, — а смета расходов в стенде есть.
+    // Теперь она СЧИТАЕТСЯ, и проверка требует, чтобы цифра сходилась с этой формулой.
     const costPanel = clickTab('cost');
-    check('Пульс · стоимость лида названа непосчитанной, а не выдумана',
-      /не посчитан/.test(costPanel), costPanel.slice(0, 120));
-    check('Пульс · сказано, какого входа для этого не хватает',
-      /расход/.test(costPanel), costPanel.slice(0, 160));
-    check('Пульс · и никакой цифры CPL рядом не стоит',
-      !/CPL\s*[:—-]?\s*\d/.test(costPanel) && !/стоимость лида[^.]{0,20}\d/i.test(costPanel),
-      costPanel.slice(0, 160));
+    const mk = WS.ui.marketingSpend();
+    const leads = (dd().attribution || []).reduce((x, a) => x + a.leads, 0);
+    const cpl = leads ? Math.round(mk.total / leads) : 0;
+    check('Пульс · стоимость лида посчитана по формуле партнёра',
+      costPanel.indexOf(WS.AED(cpl)) >= 0 && cpl > 0,
+      'ожидалось ' + WS.AED(cpl) + ' (' + mk.total + '/' + leads + ')');
+    check('Пульс · и названо, из чего собран бюджет привлечения',
+      mk.items.length > 0 && mk.items.every((e) => costPanel.indexOf(e[0]) >= 0),
+      mk.items.map((e) => e[0]).join(' | '));
+    // В бюджет привлечения не должен попадать тариф CRM и клубный взнос — это не маркетинг.
+    check('Пульс · в бюджет привлечения не свалены все расходы подряд',
+      mk.total < mk.all && !mk.items.some((e) => /CRM|клубный/i.test(e[0])),
+      mk.total + ' из ' + mk.all);
+    // Чего в стенде действительно нет — ФОТ и офис, — экран называет прямо.
+    check('Пульс · сказано, чего в расчёте не хватает',
+      /ФОТ/.test(costPanel), costPanel.slice(-200));
 
     // Перспективные сделки: только живые, порядок — по ожидаемой комиссии.
     clickTab('deals');
