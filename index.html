@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:55</title>
+  <title>WESPACE · сборка 00:36</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:55';
+    window.WS_BUILD='00:36';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5692,22 +5692,34 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function getEffectiveConsent(recipient, options, allClients) {
     // Recipient has direct consent field: use it immediately
     if (recipient.consent !== undefined) {
-      return recipient.consent;
+      return { consent: recipient.consent };
     }
 
     // Recipient has own clientId: look up consent in allClients
     if (recipient.clientId) {
       const client = allClients.find(c => c.id === recipient.clientId);
-      return client ? client.consent : undefined;
+      return { consent: client ? client.consent : undefined };
     }
 
     // Recipient is participant without own clientId: inherit from deal client
     if (options && options.dealClients && options.dealClients.length > 0) {
+      // Only participants from "client" side can inherit consent from deal client
+      // Check role group using WS.ui.roleGroupOf if available
+      if (typeof WS !== 'undefined' && WS.ui && WS.ui.roleGroupOf) {
+        const roleGroup = WS.ui.roleGroupOf(recipient);
+        if (roleGroup !== 'client') {
+          // Participant from other side or broker cannot inherit client's consent
+          return {
+            consent: undefined,
+            reason: 'согласие принадлежит другому лицу'
+          };
+        }
+      }
       const dealClient = options.dealClients[0];
-      return dealClient.consent;
+      return { consent: dealClient.consent };
     }
 
-    return undefined;
+    return { consent: undefined };
   }
 
   function calculateAudience(recipients, options) {
@@ -5725,7 +5737,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const excluded = [];
 
     recipients.forEach(recipient => {
-      const consent = getEffectiveConsent(recipient, options, allClients);
+      const result = getEffectiveConsent(recipient, options, allClients);
+      const consent = result.consent;
+      const inheritedReason = result.reason;
 
       // Check for channel before consent: if there is no channel to contact, exclude immediately
       if (!recipient.channel && consent !== false) {
@@ -5747,6 +5761,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
           id: recipient.id,
           consent: false,
           reason: 'нет согласия'
+        });
+      } else if (inheritedReason) {
+        // Explicit reason from getEffectiveConsent (e.g., from non-client role group)
+        excluded.push({
+          id: recipient.id,
+          consent: undefined,
+          reason: inheritedReason
         });
       } else if (consent === undefined && options && options.dealClients) {
         // Inherited consent is undefined: means deal client had no consent field
