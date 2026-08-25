@@ -6242,22 +6242,96 @@ setTimeout(async () => {
         }), rows.length + ' строк');
     }
 
-    /* ---- Предложение говорит, что сделать и что это даст ------------------------------------
-       «Перспективная сделка» без глагола — это ещё одна карточка сделки. Здесь проверяется, что
-       предложение названо тем же правилом, что рисует следующий шаг в карточке, и что ценность
-       называет посчитанную комиссию, а не общие слова. */
+    /* ---- Возможности, а не дела внутри открытых сделок --------------------------------------
+       Здесь стояла карточка УЖЕ ОТКРЫТОЙ сделки с ближайшим действием по ней — то есть «Мои
+       дела», сказанные другими словами. Принципал: в этом разделе должны быть возможности.
+       Проверяется контракт возможности целиком: кому · почему · на чём основано · что
+       предложить · первый шаг, — и что она НЕ является открытой сделкой. */
     {
-      const pcard = pulse.querySelector('.pcard[data-prospcard]');
-      check('Пульс · перспективная сделка подана карточкой-предложением', !!pcard);
-      if (pcard) {
-        const d = (dd().deals || []).find((x) => x.id === pcard.getAttribute('data-prospcard'));
-        const doTxt = (pcard.querySelector('.pc-do') || {}).textContent || '';
-        const gain = (pcard.querySelector('.pc-gain-t') || {}).textContent || '';
-        check('Пульс · «Предлагаю» — то же действие, что и следующий шаг по этой сделке',
-          !!d && doTxt.trim() === WS.ui.prospectOffer(d).trim(), doTxt);
-        check('Пульс · «Что это даёт» называет посчитанную комиссию',
-          gain.indexOf(WS.AED(Math.round(WS.ui.dealCommission(d)))) >= 0, gain);
+      const opps = WS.ui.pulseProspectList();
+      check('Пульс · возможностей в разделе много, а не три сделки из воронки',
+        opps.length >= 6, String(opps.length));
+      const dealIds = (dd().deals || []).map((d) => d.id);
+      check('Пульс · ни одна возможность не является открытой сделкой',
+        opps.every((p) => dealIds.indexOf(p.id) < 0 && !p.stage && !p.objectId),
+        opps.filter((p) => p.stage || p.objectId).map((p) => p.id).join(', '));
+      /* Разные основания — смысл раздела: восемь одинаковых карточек означали бы одно правило,
+         переписанное восемь раз. */
+      const rules = opps.map((p) => p.rule).filter((v, i, a) => a.indexOf(v) === i);
+      check('Пульс · возможности выведены разными разборами, а не одним',
+        rules.length >= 6, rules.join(', '));
+      // Пять вопросов, на которые обязана отвечать каждая карточка.
+      const thin = opps.filter((p) => !p.clientId || !p.client ||
+        !(p.why || '').trim() || (p.basis || []).length < 2 ||
+        !(p.offer || '').trim() || !(p.act || '').trim());
+      check('Пульс · каждая возможность говорит кому, почему, на чём основано, что предложить и что сделать',
+        thin.length === 0, thin.map((p) => p.rule).join(', '));
+      /* Один объект — одному клиенту. Иначе один и тот же юнит уходит в предложение двум
+         клиентам сразу, и брокер узнаёт об этом от них.
+
+         На готовых данных правила и так не сталкиваются, поэтому проверка НАГРУЖАЕТ защиту:
+         второму клиенту временно расширяется тип и подводится бюджет так, чтобы его правило
+         потянулось за тем же объектом, что уже занят чужой возможностью. Без закрепления
+         объект уходит обоим — проверка без этой подводки молчала бы всегда. */
+      const objs = opps.map((p) => p.objId).filter(Boolean);
+      check('Пульс · один объект не предложен двум клиентам сразу',
+        objs.length === objs.filter((v, i, a) => a.indexOf(v) === i).length, objs.join(', '));
+      {
+        const rival = (dd().clients || []).find((c) => c.id === 'c_ambig');
+        if (rival) {
+          const wasTypes = rival.objTypes, wasBudget = rival.budget;
+          rival.objTypes = ['apart', 'office'];
+          rival.budget = 2000000;
+          const clash = WS.ui.pulseProspectList().map((p) => p.objId).filter(Boolean);
+          rival.objTypes = wasTypes; rival.budget = wasBudget;
+          check('Пульс · и не уходит двоим, когда два разбора тянутся за одним юнитом',
+            clash.length === clash.filter((v, i, a) => a.indexOf(v) === i).length, clash.join(', '));
+        }
       }
+      /* Названный объект обязан быть свободен и подходить клиенту по типу: инвестору в
+         квартиры офис не предлагают, а занятый живой сделкой юнит не предлагают вовсе. */
+      const bad = opps.filter((p) => {
+        if (!p.objId) return false;
+        const o = (dd().objects || []).find((x) => x.id === p.objId);
+        if (!o || o.availability !== 'available') return true;
+        if ((dd().deals || []).some((d) => d.objectId === o.id && !WS.ui.dealClosed(d) && !d.archived)) return true;
+        const c = (dd().clients || []).find((x) => x.id === p.clientId);
+        const want = (c && c.objTypes) || [];
+        if (!want.length) return false;
+        const isOffice = /офис|office|block|блок/i.test((o.name || '') + ' ' + (o.br || ''));
+        return isOffice ? (want.indexOf('office') < 0 && want.indexOf('gab') < 0) : want.indexOf('apart') < 0;
+      });
+      check('Пульс · предложенный объект свободен и подходит клиенту по типу',
+        bad.length === 0, bad.map((p) => p.rule + '/' + p.objId).join(', '));
+      /* Вознаграждение посчитано из цены объекта и его же ставки, а не названо. */
+      const wrong = opps.filter((p) => {
+        if (!p.objId || !p.value) return false;
+        const o = (dd().objects || []).find((x) => x.id === p.objId);
+        const pct = o && o.commissionPct != null ? o.commissionPct : 2;
+        return p.value !== Math.round((o.price || 0) * pct / 100);
+      });
+      check('Пульс · вознаграждение посчитано из цены объекта и его ставки',
+        wrong.length === 0, wrong.map((p) => p.rule + ': ' + p.value).join(', '));
+      check('Пульс · возможности отсортированы по ожидаемому вознаграждению',
+        opps.every((p, i) => i === 0 || (p.value || 0) <= (opps[i - 1].value || 0)),
+        opps.map((p) => p.value || 0).join(' > '));
+      // И то же самое — на экране: по умолчанию сетка, потому что возможностей много.
+      const cards = pulse.querySelectorAll('.opps .opp');
+      check('Пульс · возможности показаны сеткой карточек, а их много',
+        cards.length === opps.length, cards.length + ' из ' + opps.length);
+      const first = cards[0];
+      check('Пульс · карточка несёт все пять частей', !!first &&
+        !!first.querySelector('.opp-rule') && !!first.querySelector('.opp-who') &&
+        !!first.querySelector('.opp-why') && first.querySelectorAll('.opp-basis .opp-b').length >= 2 &&
+        first.querySelectorAll('.opp-plan .opp-line').length === 2 &&
+        !!first.querySelector('.opp-f [data-client]'),
+        first ? first.className : 'карточек нет');
+      /* Колода со смахиванием — требование партнёра, и она осталась режимом, а не исчезла. */
+      WS.store.prospDeck = true; WS.ui.render();
+      check('Пульс · колода со смахиванием осталась отдельным режимом',
+        !!doc.querySelector('#app .pcard[data-prospcard] .opp') &&
+        !!doc.querySelector('#app [data-prosp="next"]'));
+      WS.store.prospDeck = false; WS.ui.render();
     }
 
     /* Пролистывание карточки возвращало экран наверх: перерисовка заменяет разметку целиком, и
@@ -6375,22 +6449,16 @@ setTimeout(async () => {
     check('Пульс · сказано, чего в расчёте не хватает',
       /ФОТ/.test(costPanel), costPanel.slice(-200));
 
-    // Перспективные сделки: только живые, порядок — по ожидаемой комиссии.
+    /* Возможность ведёт к КОНТАКТУ, а не к сделке: сделки по ней ещё нет — в этом и смысл
+       раздела. И каждый названный клиент существует: карточку читают перед звонком. */
     clickTab('deals');
-    const prosp = [].slice.call(doc.querySelectorAll('#app .pulse-prospects .rel-row[data-deal]'));
-    const prospIds = prosp.map((r) => r.getAttribute('data-deal'));
-    const closedIn = prospIds.filter((id) => {
-      const d = (dd().deals || []).find((x) => x.id === id);
-      return d && (WS.ui.dealClosed(d) || d.archived);
-    });
-    check('Пульс · в перспективных нет закрытых и архивных сделок',
-      closedIn.length === 0, closedIn.join(', '));
-    const live = (dd().deals || []).filter((d) => !WS.ui.dealClosed(d) && !d.archived);
-    if (live.length > 1) {
-      const inSec = prospIds.map((id) => (dd().deals || []).find((x) => x.id === id)).filter(Boolean);
-      const comms = inSec.map((d) => WS.ui.dealCommission(d));
-      check('Пульс · перспективные отсортированы по ожидаемой комиссии',
-        comms.every((v, i) => i === 0 || v <= comms[i - 1] + 0.5), comms.join(' > '));
+    {
+      const opps = WS.ui.pulseProspectList();
+      const ghosts = opps.filter((p) => !(dd().clients || []).some((c) => c.id === p.clientId));
+      check('Пульс · каждая возможность названа на существующем контакте', ghosts.length === 0,
+        ghosts.map((p) => p.rule + '/' + p.clientId).join(', '));
+      check('Пульс · карточка ведёт к контакту, а не к несуществующей сделке',
+        [].slice.call(doc.querySelectorAll('#app .opps .opp .opp-f [data-client]')).length === opps.length);
     }
     WS.store.pulseTab = 'deals';
   }

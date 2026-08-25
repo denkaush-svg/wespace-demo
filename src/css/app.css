@@ -724,6 +724,59 @@ button { font-family: inherit; cursor: pointer; }
 .qa-bar.qa-icons .qa-act svg { width: 15px; height: 15px; }
 .qa-bar.qa-icons .qa-act > span { position: absolute; width: 1px; height: 1px; padding: 0;
   margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* ==== Возможности в Пульсе ====================================================================
+   Пять вопросов в одном порядке на каждой карточке: кому · почему · на чём основано · что
+   предложить · что сделать. Раскладка держит этот порядок зрительно, чтобы взгляд находил
+   нужное на том же месте и не перечитывал карточку целиком.
+
+   «На чём основано» — таблица «признак → значение», а не строка серых чипов. Чипы читаются
+   как украшение; это единственная часть карточки, которую агент проверяет глазами, прежде
+   чем повторить клиенту, и она обязана читаться как выписка, а не как теги. */
+.opps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.opp { display: flex; flex-direction: column; gap: 11px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
+.opp-h { display: flex; align-items: flex-start; gap: 10px; }
+.opp-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--acc-soft); color: var(--acc); }
+.opp-ic svg { width: 15px; height: 15px; }
+.opp-kind { min-width: 0; flex: 1 1 auto; }
+.opp-rule { font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.opp-who { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.opp-val { flex: none; text-align: right; }
+.opp-val b { display: block; font-size: 15px; font-weight: 800; color: var(--acc-ink); white-space: nowrap; }
+.opp-val span { display: block; font-size: 10.5px; color: var(--faint); margin-top: 1px; max-width: 130px; }
+/* Возможность без числа не притворяется нулевой: прочерк и условие, при котором число появится. */
+.opp-val.none b { color: var(--faint); }
+.opp-why { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.opp-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.opp-lbl svg { width: 12px; height: 12px; }
+.opp-basis { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--surface-2); }
+.opp-basis .opp-lbl { margin-bottom: 7px; }
+.opp-b { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); }
+.opp-b:first-of-type { border-top: 0; padding-top: 0; }
+.opp-b .k { flex: 0 0 40%; font-size: 11px; color: var(--mut); }
+.opp-b .v { flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--ink); font-weight: 600; }
+.opp-plan { display: flex; flex-direction: column; gap: 8px; }
+.opp-line { display: flex; flex-direction: column; gap: 3px; }
+.opp-t { font-size: 12px; line-height: 1.45; color: var(--ink); }
+.opp-f { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px; }
+.opp-nav { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+/* Возможность, запертая согласием, — единственная, где первое действие не предложение, а
+   получение права предлагать. Она и подписана иначе. */
+.opp.t-stop .opp-ic { background: var(--stop-soft, var(--acc-soft)); color: var(--stop); }
+.opp.t-stop { border-color: var(--stop); }
+.opp-bar { margin-bottom: 12px; }
+.opp-bar .pc-count { font-size: 11.5px; color: var(--mut); }
+/* В колоде карточка одна и во всю ширину: её читают, а не сравнивают. */
+.pcard .opp { border: 0; padding: 0; background: none; }
+@media (max-width: 620px) {
+  .opps { grid-template-columns: 1fr; }
+  .opp-b { flex-direction: column; gap: 1px; }
+  .opp-b .k { flex: none; }
+  .opp-val span { max-width: 110px; }
+}
+
 /* Secondary actions dropdown. */
 .qa-more { position: relative; }
 .qa-more-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 1000; background: var(--surface);

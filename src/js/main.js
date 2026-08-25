@@ -433,8 +433,10 @@
       case 'startSend': routePrompt(promptValue('startPrompt')); break;
       case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
-      case 'prospList': store.prospList = true; api.emit(); break;
-      case 'prospCards': store.prospList = false; api.emit(); break;
+      // Раздел показывает возможности сеткой (их много, и их сравнивают) либо колодой
+      // (их разбирают по одной, со смахиванием). Флаг называется тем, что означает.
+      case 'prospDeck': store.prospDeck = true; api.emit(); break;
+      case 'prospGrid': store.prospDeck = false; store.prospIdx = 0; api.emit(); break;
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;

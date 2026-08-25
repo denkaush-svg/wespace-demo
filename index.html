@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:39</title>
+  <title>WESPACE · сборка 23:55</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:39';
+    window.WS_BUILD='23:55';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -874,6 +874,59 @@ button { font-family: inherit; cursor: pointer; }
 .qa-bar.qa-icons .qa-act svg { width: 15px; height: 15px; }
 .qa-bar.qa-icons .qa-act > span { position: absolute; width: 1px; height: 1px; padding: 0;
   margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* ==== Возможности в Пульсе ====================================================================
+   Пять вопросов в одном порядке на каждой карточке: кому · почему · на чём основано · что
+   предложить · что сделать. Раскладка держит этот порядок зрительно, чтобы взгляд находил
+   нужное на том же месте и не перечитывал карточку целиком.
+
+   «На чём основано» — таблица «признак → значение», а не строка серых чипов. Чипы читаются
+   как украшение; это единственная часть карточки, которую агент проверяет глазами, прежде
+   чем повторить клиенту, и она обязана читаться как выписка, а не как теги. */
+.opps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.opp { display: flex; flex-direction: column; gap: 11px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
+.opp-h { display: flex; align-items: flex-start; gap: 10px; }
+.opp-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--acc-soft); color: var(--acc); }
+.opp-ic svg { width: 15px; height: 15px; }
+.opp-kind { min-width: 0; flex: 1 1 auto; }
+.opp-rule { font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.opp-who { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.opp-val { flex: none; text-align: right; }
+.opp-val b { display: block; font-size: 15px; font-weight: 800; color: var(--acc-ink); white-space: nowrap; }
+.opp-val span { display: block; font-size: 10.5px; color: var(--faint); margin-top: 1px; max-width: 130px; }
+/* Возможность без числа не притворяется нулевой: прочерк и условие, при котором число появится. */
+.opp-val.none b { color: var(--faint); }
+.opp-why { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.opp-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.opp-lbl svg { width: 12px; height: 12px; }
+.opp-basis { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--surface-2); }
+.opp-basis .opp-lbl { margin-bottom: 7px; }
+.opp-b { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); }
+.opp-b:first-of-type { border-top: 0; padding-top: 0; }
+.opp-b .k { flex: 0 0 40%; font-size: 11px; color: var(--mut); }
+.opp-b .v { flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--ink); font-weight: 600; }
+.opp-plan { display: flex; flex-direction: column; gap: 8px; }
+.opp-line { display: flex; flex-direction: column; gap: 3px; }
+.opp-t { font-size: 12px; line-height: 1.45; color: var(--ink); }
+.opp-f { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px; }
+.opp-nav { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+/* Возможность, запертая согласием, — единственная, где первое действие не предложение, а
+   получение права предлагать. Она и подписана иначе. */
+.opp.t-stop .opp-ic { background: var(--stop-soft, var(--acc-soft)); color: var(--stop); }
+.opp.t-stop { border-color: var(--stop); }
+.opp-bar { margin-bottom: 12px; }
+.opp-bar .pc-count { font-size: 11.5px; color: var(--mut); }
+/* В колоде карточка одна и во всю ширину: её читают, а не сравнивают. */
+.pcard .opp { border: 0; padding: 0; background: none; }
+@media (max-width: 620px) {
+  .opps { grid-template-columns: 1fr; }
+  .opp-b { flex-direction: column; gap: 1px; }
+  .opp-b .k { flex: none; }
+  .opp-val span { max-width: 110px; }
+}
+
 /* Secondary actions dropdown. */
 .qa-more { position: relative; }
 .qa-more-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 1000; background: var(--surface);
@@ -4753,7 +4806,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', prospIdx: 0, prospList: false, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', prospIdx: 0, prospDeck: false, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -4907,7 +4960,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.cgGroupCollapse = {};
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
-    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.prospIdx = 0; store.prospList = false; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
+    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.prospIdx = 0; store.prospDeck = false; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.cgLang = 'ru'; store.cgDocLang = 'auto';
     store.dealArchivedOnly = false; store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
@@ -7969,91 +8022,456 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       body;
   }
 
-  // ---- «Перспективные сделки» — карточками с перелистыванием -------------------------------------
-  // На макете это одна карточка с обоснованием и стрелкой вперёд. Обоснование СОБИРАЕТСЯ ИЗ
-  // ЗАПИСЕЙ — тип клиента, бюджет, состояние подбора, ожидаемая комиссия, последнее касание;
-  // сочинять про клиента текст здесь нельзя, его читают перед звонком.
+  /* ==== «Перспективные сделки» — ВОЗМОЖНОСТИ, а не дела внутри сделок ========================
+
+     Здесь стояла карточка УЖЕ ОТКРЫТОЙ сделки с ближайшим действием по ней: «Согласовать
+     следующий шаг с клиентом» по сделке, которая и так в работе. То есть «Мои дела», сказанные
+     другими словами, — и принципал сказал об этом прямо: в этом разделе должны быть
+     ВОЗМОЖНОСТИ. Кому. Почему возможность вообще есть. На основании каких данных мы так
+     решили. Что предложить. Что сделать первым.
+
+     Возможность рождается ПРАВИЛОМ. Правил восемь, и каждое смотрит на свой срез: договоры
+     аренды, договоры off-plan, срез рынка, инвентарь, сроки сдачи, комплаенс, совпадение
+     бюджета, отчётность по управлению. Разные основания дают разные поводы — в этом и смысл
+     раздела: восемь одинаковых карточек означали бы одно правило, переписанное восемь раз.
+
+     Всё, что правило кладёт в карточку, либо посчитано, либо прочитано из записи: карточку
+     читают перед звонком, и сочинённый факт здесь дороже, чем отсутствующий. Где числа взять
+     не из чего — в карточке стоит не число, а условие, при котором оно появится.
+
+     Объект «занимается» первой же возможностью, которая его назвала: иначе один и тот же юнит
+     уходит в предложение двум клиентам сразу, и брокер узнаёт об этом от них. Порядок правил
+     в списке и есть приоритет. */
+
+  // Ставка агентства по аренде — процент от годовой. Называется в самой карточке: она не
+  // выводится из записи, и выдавать её за посчитанную нельзя.
+  const LEASE_FEE_PCT = 5;
+  function oppMarket() { const r = WS.query.run({ from: 'market' }); return (r && r.rows) || []; }
+  function oppMarketOf(area) { return oppMarket().find((m) => m.район === area) || null; }
+  function oppClient(id) { return (D().clients || []).find((x) => x.id === id) || null; }
+  function oppObject(id) { return (D().objects || []).find((x) => x.id === id) || null; }
+  function oppComm(o) {
+    if (!o) return 0;
+    const pct = o.commissionPct != null ? o.commissionPct : DEFAULT_COMM_PCT;
+    return Math.round((o.price || 0) * pct / 100);
+  }
+  function oppCommNote(o) {
+    const pct = o && o.commissionPct != null ? o.commissionPct : DEFAULT_COMM_PCT;
+    return pct + '% от ' + WS.AED(o ? o.price : 0);
+  }
+  // Занят ли объект живой сделкой — предлагать его второму клиенту нельзя.
+  function oppObjectBusy(id) {
+    return (D().deals || []).some((d) => d.objectId === id && !dealClosed(d) && !dealArchived(d));
+  }
+  function oppHasLiveDeal(clientId) {
+    return (D().deals || []).some((d) => d.clientId === clientId && !dealClosed(d) && !dealArchived(d));
+  }
+  function oppFreeObjects(claimed) {
+    return (D().objects || []).filter((o) => o.availability === 'available' &&
+      !oppObjectBusy(o.id) && claimed.indexOf(o.id) < 0);
+  }
+  function oppDays(n) { return n + ' ' + plural(n, 'день', 'дня', 'дней'); }
+  /* Инвестору в квартиры нельзя предлагать офис. Отдельного поля типа у объекта нет, поэтому
+     тип читается из названия и спальности — там он и написан («Office 1204», «Офис»,
+     «Block 3»). Клиент, который тип не назвал, принимает любой: пустой список означает
+     «не сказано», а не «ничего не подходит». */
+  function oppTypeOf(o) {
+    return /офис|office|block|блок/i.test((o.name || '') + ' ' + (o.br || '')) ? 'office' : 'apart';
+  }
+  function oppTypeFit(c, o) {
+    const want = c.objTypes || [];
+    if (!want.length) return true;
+    const t = oppTypeOf(o);
+    return want.indexOf(t) >= 0 || (t === 'office' && want.indexOf('gab') >= 0);
+  }
+  /* Правило предпочитает клиента, которому в этом обходе ещё ничего не предложено: день
+     брокера шире, когда восемь поводов лежат на шести клиентах, а не на двух. */
+  function oppPrefer(list, used) {
+    const fresh = list.filter((c) => used.indexOf(c.id) < 0);
+    return (fresh.length ? fresh : list)[0] || null;
+  }
+  function oppRoleWord(c) {
+    return [CONTACT_KIND_LABEL[c.contactKind], CONTACT_INTEREST_LABEL[c.interest]].filter(Boolean).join(' · ');
+  }
+
+  const PROSPECT_RULES = [
+    /* 1. Договор аренды у окна уведомления. Решение о продлении принимает арендатор, и
+          принимает его ДО даты уведомления — после неё выбор сужается до остатков рынка. */
+    { key: 'lease_window', label: 'Договор аренды у окна продления', icon: 'doc',
+      find(claimed, used) {
+        return (D().contracts || []).filter((k) => k.kind === 'lease' && k.status === 'active')
+          .map((k) => {
+            const c = oppClient(k.clientId); if (!c) return null;
+            const m = oppMarketOf((c.areas || [])[0]);
+            return {
+              clientId: c.id, client: c.name, role: oppRoleWord(c),
+              why: 'Договор подходит к окну уведомления о продлении. До этой даты решение принимает ' +
+                'арендатор и решает его спокойно; после неё выбор сужается до того, что осталось на рынке.',
+              basis: [['Договор', k.number + ' · ' + WS.AED(k.amount) + ' в год · подписан ' + k.signedAt],
+                ['Ближайший срок', k.nextDue || '—'],
+                m ? ['Рынок · ' + m.район, 'аренда ' + WS.AED(m.арендаЗаМетрВГод) + ' за м² в год, ' +
+                  '+' + m.изменениеЗаГодПроцент + '% за год, ' + oppDays(m.дней_на_рынке) + ' экспозиции'] : null,
+              ].filter(Boolean),
+              offer: 'Продление на новый срок — либо переезд в тот же бюджет, но с меньшей ценой метра',
+              act: 'Позвонить до окна уведомления и спросить о планах на следующий срок',
+              value: Math.round((k.amount || 0) * LEASE_FEE_PCT / 100),
+              valueNote: LEASE_FEE_PCT + '% годовой аренды · ставка агентства',
+              ask: 'сравни продление и переезд для ' + c.name + ' по бюджету текущей аренды',
+            };
+          }).filter(Boolean);
+      } },
+
+    /* 2. Клиент, прошедший полный цикл off-plan и платящий по графику. Второй юнит у того же
+          застройщика идёт по знакомой рассрочке и без нового KYC — самая короткая сделка,
+          какая бывает. */
+    { key: 'repeat_offplan', label: 'Второй юнит после закрытой сделки', icon: 'handshake',
+      find(claimed, used) {
+        const out = [];
+        (D().contracts || []).filter((k) => k.kind === 'offplan_spa' && k.status === 'active').forEach((k) => {
+          const c = oppClient(k.clientId); if (!c) return;
+          const won = (D().deals || []).filter((d) => d.clientId === c.id && dealWon(d))[0];
+          if (!won) return;
+          const bought = oppObject(k.objectId);
+          const dev = bought && bought.developer;
+          const co = (D().companies || []).find((x) => x.name === dev);
+          /* Купленный объект из выбора исключён явно: без этого правило предлагало клиенту
+             ровно тот юнит, который он у нас же и купил. Дальше — по близости: сначала тот же
+             застройщик, потом тот же район, потом любой свободный в бюджете. Знакомый
+             застройщик короче всего, но «нет второго юнита у Nakheel» не повод молчать. */
+          const fit = oppFreeObjects(claimed).filter((o) => o.id !== k.objectId && oppTypeFit(c, o) &&
+            (!c.budget || Math.abs((o.price || 0) - c.budget) <= c.budget * 0.35));
+          const pick = fit.filter((o) => o.developer === dev)[0] ||
+            fit.filter((o) => bought && o.area === bought.area)[0] ||
+            fit.slice().sort((a, b) => oppComm(b) - oppComm(a))[0];
+          if (!pick) return;
+          claimed.push(pick.id);
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            /* Про «того же застройщика» говорим, только если он действительно тот же: у
+               клиента справка перед звонком, и обещание знакомой рассрочки, которой нет,
+               вскроется в первую минуту разговора. */
+            why: 'Клиент уже прошёл с нами полный цикл off-plan и платит по графику. Второй объект ' +
+              (pick.developer === dev
+                ? 'у того же застройщика идёт по знакомой рассрочке и без нового KYC'
+                : 'идёт быстрее: клиент знает наш порядок, документы и людей — объяснять с нуля нечего') +
+              ' — и в тот же разговор укладывается просьба о рекомендации.',
+            basis: [['Закрытая сделка', won.title + ' · ' + WS.AED(won.amount)],
+              ['Договор', k.number + ' активен · ' + (k.nextDue || '—')],
+              co ? ['Застройщик', co.name + ' · ' + co.commission]
+                : ['Застройщик юнита', (pick.developer || '—') +
+                  (pick.developer === dev ? ' — тот же, что и в закрытой сделке' : '')],
+              ['Свободный юнит', pick.name + ' · ' + WS.AED(pick.price) + ' · ' + (pick.occupancy || pick.segment || '')],
+            ],
+            offer: pick.name + ' — ' + pick.size + ' м², ' + pick.br + ', ' + pick.area,
+            act: 'Позвонить сразу после ближайшего платежа и предложить смотреть второй юнит',
+            value: oppComm(pick), valueNote: oppCommNote(pick),
+            ask: 'подготовь сравнение второго юнита ' + pick.name + ' для ' + c.name,
+            objId: pick.id,
+          });
+        });
+        return out;
+      } },
+
+    /* 3. Разрыв доходности между районами. Инвестор ищет там, где доходность ниже, чем в
+          другом районе того же сегмента, — и разница на его бюджете считается в деньгах. */
+    { key: 'yield_gap', label: 'Разрыв доходности между районами', icon: 'trend',
+      find(claimed, used) {
+        const rows = oppMarket().filter((m) => m.сегмент === 'квартиры');
+        const best = rows.slice().sort((a, b) => b.доходностьПроцент - a.доходностьПроцент)[0];
+        if (!best) return [];
+        return (D().clients || []).filter((c) => c.interest === 'invest' && c.consent !== false && !oppHasLiveDeal(c.id))
+          .map((c) => {
+            const mine = (c.areas || []).map(oppMarketOf).filter(Boolean);
+            if (!mine.length) return null;
+            const cur = mine.slice().sort((a, b) => b.доходностьПроцент - a.доходностьПроцент)[0];
+            const gap = Math.round((best.доходностьПроцент - cur.доходностьПроцент) * 10) / 10;
+            if (gap < 0.5) return null;
+            const stock = (D().objects || []).filter((o) => o.area === best.район && o.availability === 'available');
+            const perYear = c.budget ? Math.round(c.budget * gap / 100) : 0;
+            return {
+              clientId: c.id, client: c.name, role: oppRoleWord(c),
+              why: 'Клиент ищет там, где доходность ' + cur.доходностьПроцент + '%. В ' + best.район +
+                ' — ' + best.доходностьПроцент + '% при росте +' + best.изменениеЗаГодПроцент +
+                '% за год' + (perYear ? '. На его бюджете разница — ' + WS.AED(perYear) + ' в год' : '') + '.',
+              basis: [['Срез рынка · ' + best.asOf, cur.район + ' — ' + cur.доходностьПроцент + '% · ' +
+                  best.район + ' — ' + best.доходностьПроцент + '%'],
+                ['Экспозиция', best.район + ' — ' + oppDays(best.дней_на_рынке) + ', ' +
+                  cur.район + ' — ' + oppDays(cur.дней_на_рынке)],
+                ['Бюджет клиента', c.budget ? WS.AED(c.budget) : 'не назван'],
+                ['В нашем инвентаре', stock.length
+                  ? stock.length + ' ' + plural(stock.length, 'объект', 'объекта', 'объектов') + ' в ' + best.район
+                  : 'объектов в ' + best.район + ' нет — запрашивать у партнёров'],
+              ],
+              offer: stock.length
+                ? 'Подборка в ' + best.район + ' в том же бюджете — ' + stock.map((o) => o.name).join(', ')
+                : 'Подборка в ' + best.район + ' в том же бюджете — собрать через партнёров и застройщиков',
+              act: stock.length
+                ? 'Собрать подборку и отправить сравнение доходности двух районов'
+                : 'Запросить у партнёров подборку в ' + best.район + ' и приложить сравнение доходности',
+              value: c.budget ? Math.round(c.budget * DEFAULT_COMM_PCT / 100) : 0,
+              valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + (c.budget ? WS.AED(c.budget) : ''),
+              ask: 'сравни доходность ' + cur.район + ' и ' + best.район + ' для ' + c.name,
+            };
+          }).filter(Boolean);
+      } },
+
+    /* 4. Окно до сдачи. Пока корпус строится, объект продаётся по плану застройщика с
+          рассрочкой; после сдачи он уходит на вторичный рынок и рассрочка исчезает вместе с
+          ним. Окно закрывается вместе со стройкой, и это единственный срок, который нельзя
+          передоговорить. */
+    { key: 'handover_window', label: 'Окно до сдачи корпуса', icon: 'clock',
+      find(claimed, used) {
+        const out = [];
+        oppFreeObjects(claimed).filter((o) => o.segment === 'off-plan' && o.handover).forEach((o) => {
+          const m = oppMarketOf(o.area);
+          const c = oppPrefer((D().clients || []).filter((x) => x.consent !== false &&
+            (x.areas || []).indexOf(o.area) >= 0 && x.budget >= (o.price || 0) && oppTypeFit(x, o) &&
+            (x.interest === 'invest' || x.interest === 'live'))
+            .sort((a, b) => a.budget - b.budget), used);
+          if (!c) return;
+          claimed.push(o.id);
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'До сдачи (' + o.handover + ') объект продаётся по плану застройщика с рассрочкой. ' +
+              'После сдачи он уходит на вторичный рынок, и рассрочка исчезает вместе с ним — ' +
+              'это тот срок, который нельзя передоговорить.',
+            basis: [['Объект', o.name + ' · ' + WS.AED(o.price) + ' · ' + o.size + ' м², ' + o.br],
+              ['Сдача', o.handover + ' · застройщик ' + (o.developer || '—')],
+              o.paymentPlan ? ['План оплаты', o.paymentPlan] : null,
+              m ? ['Рынок · ' + m.район, WS.AED(m.ценаЗаМетр) + ' за м², доля off-plan ' +
+                m.доля_офф_плана + '%, +' + m.изменениеЗаГодПроцент + '% за год'] : null,
+              ['Бюджет клиента', c.budget ? WS.AED(c.budget) : 'не назван'],
+            ].filter(Boolean),
+            offer: o.name + ' — рассрочка застройщика до сдачи ' + o.handover,
+            act: 'Показать план оплаты и назначить просмотр макета корпуса',
+            value: oppComm(o), valueNote: oppCommNote(o),
+            ask: 'собери расчёт рассрочки по ' + o.name + ' для ' + c.name,
+            objId: o.id,
+          });
+        });
+        return out;
+      } },
+
+    /* 5. Возможность, запертая комплаенсом. Бюджет есть, интерес есть, а писать нельзя:
+          согласия на связь нет. Это единственный вид возможности, где первое действие —
+          не предложение, а получение права предлагать. */
+    { key: 'consent_block', label: 'Возможность заперта согласием', icon: 'lock',
+      find(claimed, used) {
+        return (D().clients || []).filter((c) => c.consent === false && c.budget)
+          .map((c) => {
+            const area = (c.areas || [])[0] || '';
+            const m = oppMarketOf(area);
+            /* Допуск 10%: объект на четыре процента дороже бюджета — это предмет разговора,
+               а не «в бюджете ничего нет». Допуск назван в самой строке, а не спрятан. */
+            const fit = (D().objects || []).filter((o) => o.area === area &&
+              o.availability === 'available' && (o.price || 0) <= c.budget * 1.1);
+            return {
+              clientId: c.id, client: c.name, role: oppRoleWord(c),
+              tone: 'stop',
+              why: 'Бюджет назван, район назван, а адресно писать нельзя: согласия на связь нет. ' +
+                'Пока оно не получено, любая отправка — нарушение, и лид стоит на месте не потому, ' +
+                'что клиент остыл.',
+              basis: [['Согласие на связь', 'не получено — адресные отправки заблокированы'],
+                ['Бюджет и район', WS.AED(c.budget) + ' · ' + (area || 'район не назван') +
+                  (c.horizon ? ' · горизонт ' + c.horizon : '')],
+                ['Подходит в инвентаре', fit.length
+                  ? fit.length + ' ' + plural(fit.length, 'объект', 'объекта', 'объектов') + ' в бюджете с допуском 10%'
+                  : 'в бюджете с допуском 10% сейчас ничего нет'],
+                m ? ['Рынок · ' + m.район, WS.AED(m.ценаЗаМетр) + ' за м², доходность ' +
+                  m.доходностьПроцент + '%, +' + m.изменениеЗаГодПроцент + '% за год'] : null,
+              ].filter(Boolean),
+              offer: 'Сначала — согласие на связь; подборка идёт следом и уже законно',
+              act: 'Взять согласие лично или формой на сайте — до него канал закрыт',
+              value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
+              valueNote: DEFAULT_COMM_PCT + '% от бюджета · считается после согласия',
+              ask: 'что законно можно сделать по ' + c.name + ' без согласия на связь',
+            };
+          });
+      } },
+
+    /* 6. Бюджет совпал с целым объектом. Крупный собственник и свободный блок: цена метра ниже
+          районной, объект занят арендаторами — доход идёт с первого дня. Совпадение видно
+          только если сопоставлять бюджеты с инвентарём, а не ждать заявки. */
+    { key: 'block_match', label: 'Бюджет совпал с целым объектом', icon: 'layers',
+      find(claimed, used) {
+        const out = [];
+        (D().clients || []).filter((c) => c.budget >= 5000000).forEach((c) => {
+          const pick = oppFreeObjects(claimed).filter((o) => (o.price || 0) <= c.budget &&
+            (o.price || 0) >= c.budget * 0.6 && (c.areas || []).indexOf(o.area) >= 0 && oppTypeFit(c, o))
+            .sort((a, b) => oppComm(b) - oppComm(a))[0];
+          if (!pick) return;
+          claimed.push(pick.id);
+          const m = oppMarketOf(pick.area);
+          const perM = pick.size ? Math.round(pick.price / pick.size) : 0;
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Бюджет клиента и цена свободного объекта сходятся, район совпадает — а ни заявки, ' +
+              'ни сделки по этой паре нет. Объект просто не показывали.',
+            basis: [['Бюджет клиента', WS.AED(c.budget) + ' · ' + pick.area +
+                (c.horizon ? ' · горизонт ' + c.horizon : '')],
+              ['Объект', pick.name + ' · ' + WS.AED(pick.price) + ' · ' + pick.size + ' м²'],
+              (m && perM) ? ['Цена метра', WS.AED(perM) + ' против ' + WS.AED(m.ценаЗаМетр) +
+                ' по срезу ' + m.район + ' (' + (perM < m.ценаЗаМетр ? '−' : '+') +
+                Math.abs(Math.round((perM / m.ценаЗаМетр - 1) * 100)) + '%)'] : null,
+              pick.occupancy ? ['Заполненность', pick.occupancy] : null,
+              pick.usp ? ['Чем интересен', pick.usp] : null,
+            ].filter(Boolean),
+            offer: pick.name + ' целиком — ' + pick.size + ' м², ' + (pick.segment || ''),
+            act: 'Назначить осмотр и запросить рент-ролл по действующим арендаторам',
+            value: oppComm(pick), valueNote: oppCommNote(pick),
+            ask: 'собери расчёт доходности по ' + pick.name + ' для ' + c.name,
+            objId: pick.id,
+          });
+        });
+        return out;
+      } },
+
+    /* 7. Объект проигранной сделки снова свободен. Причина ухода могла быть в чём угодно, но
+          если объект вернулся в рынок, разговор возобновляется с фактом, а не с извинением. */
+    { key: 'lost_return', label: 'Объект проигранной сделки снова свободен', icon: 'replay',
+      find(claimed, used) {
+        const out = [];
+        (D().deals || []).filter((d) => d.stage === 'lost' && d.objectId).forEach((d) => {
+          const o = oppObject(d.objectId);
+          if (!o || o.availability !== 'available' || oppObjectBusy(o.id) || claimed.indexOf(o.id) >= 0) return;
+          const c = oppClient(d.clientId); if (!c) return;
+          claimed.push(o.id);
+          const m = oppMarketOf(o.area);
+          const buy = (c.budget || 0) >= (o.price || 0);
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Сделка была проиграна, а объект, вокруг которого она шла, снова свободен и в рынке. ' +
+              'Возвращаться есть с чем: разговор начинается с факта, а не с извинения.' +
+              (buy ? ' Бюджет клиента покрывает покупку — не только аренду.' : ''),
+            basis: [['Проигранная сделка', d.title + ' · ' + WS.AED(d.amount)],
+              ['Объект сейчас', o.name + ' · ' + (o.occupancy || 'свободен') + ' · ' + WS.AED(o.price)],
+              m ? ['Рынок · ' + m.район, '+' + m.изменениеЗаГодПроцент + '% за год, ' +
+                oppDays(m.дней_на_рынке) + ' экспозиции, доходность ' + m.доходностьПроцент + '%'] : null,
+              ['Бюджет клиента', c.budget ? WS.AED(c.budget) + (buy ? ' — покрывает цену объекта' : '') : 'не назван'],
+            ].filter(Boolean),
+            offer: buy ? o.name + ' — на покупку, а не в аренду: бюджет закрывает цену' : o.name + ' — снова доступен',
+            act: 'Позвонить и сказать, что объект вернулся в рынок; предложить пересмотр',
+            value: buy ? oppComm(o) : Math.round((d.amount || 0) * LEASE_FEE_PCT / 100),
+            valueNote: buy ? oppCommNote(o) : LEASE_FEE_PCT + '% годовой аренды · ставка агентства',
+            ask: 'сравни аренду и покупку ' + o.name + ' для ' + c.name,
+            objId: o.id,
+          });
+        });
+        return out;
+      } },
+
+    /* 8. Отчёт собственнику как готовый повод. Разговор всё равно состоится в назначенный срок
+          — второй объект ложится в него без отдельного звонка. */
+    { key: 'management_upsell', label: 'Второй объект в разговор об отчёте', icon: 'briefcase',
+      find(claimed, used) {
+        const out = [];
+        (D().contracts || []).filter((k) => k.kind === 'management' && k.status === 'active').forEach((k) => {
+          const c = oppClient(k.clientId); if (!c || !c.budget) return;
+          const pick = oppFreeObjects(claimed).filter((o) => (c.areas || []).indexOf(o.area) >= 0 &&
+            (o.price || 0) <= c.budget && oppTypeFit(c, o)).sort((a, b) => oppComm(b) - oppComm(a))[0];
+          if (!pick) return;
+          claimed.push(pick.id);
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Разговор с собственником всё равно состоится в назначенный срок — отчёт по ' +
+              'управлению готовим мы. Второй объект ложится в него без отдельного звонка и без ' +
+              'повода, который надо придумывать.',
+            basis: [['Договор управления', k.number + ' · ' + WS.AED(k.amount) + ' в год'],
+              ['Ближайший срок', k.nextDue || '—'],
+              ['Свободный объект', pick.name + ' · ' + WS.AED(pick.price) + ' · ' + (pick.occupancy || pick.segment || '')],
+              ['Бюджет клиента', WS.AED(c.budget) + ' — цена объекта укладывается'],
+            ],
+            offer: pick.name + ' — и сразу под то же управление, что и первый объект',
+            act: 'Приложить к отчёту одностраничный расчёт по второму объекту',
+            value: oppComm(pick), valueNote: oppCommNote(pick),
+            ask: 'посчитай доходность ' + pick.name + ' под управлением для ' + c.name,
+            objId: pick.id,
+          });
+        });
+        return out;
+      } },
+  ];
+
+  /* Список возможностей. Правила идут по порядку, объект достаётся первому назвавшему.
+     Сортировка — по ожидаемому вознаграждению; возможности без числа (их значение считается
+     только после оценки) уходят в конец, а не притворяются нулевыми. */
   function pulseProspectList() {
-    const mine = (D().users[S().role] || {}).id;
-    return (D().deals || [])
-      .filter((d) => !dealClosed(d) && !dealArchived(d) && (!mine || d.agent === mine))
-      .sort((x, y) => dealCommission(y) - dealCommission(x));
+    const claimed = [];   // объекты, уже названные возможностью: один юнит — одному клиенту
+    const used = [];      // клиенты, которым в этом обходе уже есть что предложить
+    const out = [];
+    PROSPECT_RULES.forEach((r) => {
+      let found = [];
+      try { found = r.find(claimed, used) || []; } catch (e) { found = []; }
+      found.forEach((p, i) => {
+        if (used.indexOf(p.clientId) < 0) used.push(p.clientId);
+        out.push(Object.assign({
+          id: 'p_' + r.key + '_' + i, rule: r.key, ruleLabel: r.label, icon: r.icon,
+        }, p));
+      });
+    });
+    return out.sort((a, b) => (b.value || 0) - (a.value || 0));
   }
-  /* Предложение, а не витрина. «Перспективная сделка» без глагола — это просто ещё одна
-     карточка сделки: партнёр так и сказал — суть предложения должна быть в явном виде, что
-     конкретно сделать и в чём ценность. Действие берётся из того же правила, что рисует
-     «следующий шаг» в карточке, ценность — из комиссии и того факта, который делает шаг
-     срочным. Ни одного сочинённого слова: всё либо посчитано, либо прочитано из записи. */
-  function prospectOffer(d) {
-    return nbaActions(d).doIt[0];
+  /* Карточка возможности. Пять вопросов в одном и том же порядке на всех карточках: кому ·
+     почему это возможность · на чём основано · что предложить · что сделать первым. Порядок
+     не украшение: брокер читает карточку перед звонком и должен находить нужное на том же
+     месте, не перечитывая целиком.
+
+     «На чём основано» — не серые чипы через точку, а таблица «признак → значение». Чипы
+     читаются как украшение, а это единственная часть карточки, которую агент будет
+     проверять глазами, прежде чем повторить клиенту. */
+  function prospectCard(p, foot) {
+    const val = p.value
+      ? '<div class="opp-val"><b>' + WS.AED(p.value) + '</b><span>' + escAttr(p.valueNote || '') + '</span></div>'
+      : '<div class="opp-val none"><b>—</b><span>' + escAttr(p.valueNote || 'считается после оценки') + '</span></div>';
+    const basis = (p.basis || []).map((b) =>
+      '<div class="opp-b"><span class="k">' + escAttr(b[0]) + '</span><span class="v">' + escAttr(b[1]) + '</span></div>').join('');
+    return '<article class="opp' + (p.tone ? ' t-' + p.tone : '') + '">' +
+      '<header class="opp-h"><span class="opp-ic">' + I(p.icon) + '</span>' +
+      '<div class="opp-kind"><div class="opp-rule">' + escAttr(p.ruleLabel) + '</div>' +
+      '<div class="opp-who">' + escAttr(p.client) + (p.role ? ' · ' + escAttr(p.role) : '') + '</div></div>' +
+      val + '</header>' +
+      '<p class="opp-why">' + escAttr(p.why) + '</p>' +
+      '<div class="opp-basis"><div class="opp-lbl">' + I('radar') + 'На чём основано</div>' + basis + '</div>' +
+      '<div class="opp-plan">' +
+      '<div class="opp-line"><span class="opp-lbl">' + I('target') + 'Что предложить</span>' +
+      '<span class="opp-t">' + escAttr(p.offer) + '</span></div>' +
+      '<div class="opp-line"><span class="opp-lbl">' + I('arrowRight') + 'Первый шаг</span>' +
+      '<span class="opp-t">' + escAttr(p.act) + '</span></div></div>' +
+      '<footer class="opp-f"><button class="btn sm primary" data-client="' + p.clientId + '">' +
+      I('users') + 'Открыть контакт</button>' +
+      '<button class="btn sm" data-cgask="' + escAttr(p.ask || p.act) + '">' + I('sparkle') + 'Поручить Консьержу</button>' +
+      (foot || '') + '</footer></article>';
   }
-  function prospectValue(d) {
-    const bits = ['ожидаемая комиссия ' + WS.AED(Math.round(dealCommission(d)))];
-    const r = d.requestId ? requestById(d.requestId) : null;
-    if (r && (r.offered || []).some((o) => o.state === 'selected')) bits.push('объект уже выбран — до брони один шаг');
-    if (d.hot) bits.push('клиент горячий: ответ в течение двух часов');
-    if (d.stageDays >= 5) bits.push('сделка стоит на шаге ' + d.stageDays + ' ' + plural(d.stageDays, 'день', 'дня', 'дней'));
-    if (!dealHasNextStep(d)) bits.push('следующий шаг не назначен — сделка не двинется сама');
-    return bits.join(' · ');
-  }
-  function prospectWhy(d) {
-    const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
-    const bits = [];
-    if (c.contactKind) bits.push(CONTACT_KIND_LABEL[c.contactKind]);
-    if (c.interest) bits.push(CONTACT_INTEREST_LABEL[c.interest]);
-    if (d.amount) bits.push('бюджет ' + WS.AED(d.amount));
-    const r = d.requestId ? requestById(d.requestId) : null;
-    if (r && (r.offered || []).some((o) => o.state === 'selected')) bits.push('объект выбран');
-    else if (r && (r.offered || []).length) bits.push('показано объектов: ' + r.offered.length);
-    if (!dealHasNextStep(d)) bits.push('следующий шаг не назначен');
-    const last = lastTouchOf(d.clientId);
-    if (last) bits.push('последнее касание ' + last);
-    return bits;
-  }
+  /* Два вида одного и того же. Сетка — потому что возможностей много и их сравнивают между
+     собой: сколько их и какая крупнее, видно только когда они рядом. Колода — потому что их
+     разбирают по одной, и смахивание партнёр просил отдельно; оно осталось целиком. */
   function pulseProspects() {
     const list = pulseProspectList();
     if (!list.length) {
-      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Активных сделок за вами сейчас нет. Как только появится первая, она встанет сюда — с ожидаемой комиссией и ближайшим шагом.</div>';
+      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Возможностей сейчас нет: ни один из восьми разборов не нашёл повода. Как только появится — договор подойдёт к сроку, объект освободится, срез рынка разойдётся с районом клиента, — она встанет сюда.</div>';
     }
-    if (S().prospList) {
-      const rows = list.map((d) => {
-        const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
-        return '<div class="rel-row" data-deal="' + d.id + '" style="cursor:pointer">' +
-          '<div class="fi i-acc">' + I('briefcase') + '</div>' +
-          '<div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
-          '<div class="m">' + escAttr(c.name || '—') + ' · ' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) +
-          ' · комиссия ' + WS.AED(Math.round(dealCommission(d))) + '</div></div>' + I('arrowRight') + '</div>';
-      }).join('');
-      return '<div class="qa-row" style="margin-bottom:10px"><button class="chip" data-act="prospCards">' +
-        I('layers') + 'Карточками</button></div>' +
-        '<div class="card pulse-prospects" style="padding:4px 16px"><div class="rel-list">' + rows + '</div></div>';
+    /* Счёт и сумма стоят в подписи раздела и повторять их в сорока пикселях ниже незачем:
+       один и тот же факт, набранный дважды, читается как два разных. */
+    const head = '<div class="qa-row opp-bar">' +
+      '<button class="chip' + (S().prospDeck ? '' : ' on') + '" data-act="prospGrid">' + I('grid') + 'Сеткой</button>' +
+      '<button class="chip' + (S().prospDeck ? ' on' : '') + '" data-act="prospDeck">' + I('layers') + 'Колодой</button>' +
+      '</div>';
+    if (!S().prospDeck) {
+      return head + '<div class="opps pulse-prospects">' + list.map((p) => prospectCard(p)).join('') + '</div>';
     }
     const i = Math.min(Math.max(S().prospIdx || 0, 0), list.length - 1);
-    const d = list[i];
-    const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
-    const why = prospectWhy(d).map((t) => '<span class="badge">' + escAttr(t) + '</span>').join('');
-    // Колода: под верхней карточкой видно, что за ней есть ещё. Пустые высокие кнопки по бокам
-    // ушли — стрелки стоят в подвале карточки, рядом со счётчиком, и карточку можно смахнуть.
+    const p = list[i];
+    // Колода: под верхней карточкой видно, что за ней есть ещё.
     const deck = list.length > 1 ? ' has-deck' : '';
-    return '<div class="qa-row" style="margin-bottom:12px"><button class="chip" data-act="prospList">' +
-      I('menu') + 'Вывести списком</button><span class="df-sep"></span>' +
-      '<span class="pc-count">' + (i + 1) + ' из ' + list.length + '</span>' +
-      '<span class="pc-hint">' + I('sparkle') + 'смахните карточку или листайте стрелками</span></div>' +
-      '<div class="pcard-row">' +
-      '<div class="pcard pulse-prospects' + deck + '" data-prospcard="' + d.id + '">' +
-      '<div class="pc-head"><div class="pc-name">' + escAttr(c.name || d.title) + '</div>' +
-      '<span class="pc-comm">' + WS.AED(Math.round(dealCommission(d))) + '</span></div>' +
-      '<div class="pc-deal">' + escAttr(d.title) + ' · ' + stageLabel(d.stage) + '</div>' +
-      '<div class="pc-offer"><div class="pc-lbl">' + I('target') + 'Предлагаю</div>' +
-      '<div class="pc-do">' + escAttr(prospectOffer(d)) + '</div></div>' +
-      '<div class="pc-gain"><div class="pc-lbl">' + I('sparkle') + 'Что это даёт</div>' +
-      '<div class="pc-gain-t">' + escAttr(prospectValue(d)) + '</div></div>' +
-      '<div class="pc-why">' + why + '</div>' +
-      '<div class="pc-foot">' +
+    const nav = '<span class="opp-nav">' +
       '<button class="pcard-nav" data-prosp="prev"' + (i > 0 ? '' : ' disabled') + ' aria-label="Предыдущая">' + I('chevLeft') + '</button>' +
-      '<button class="btn sm primary" data-deal="' + d.id + '">' + I('arrowRight') + 'Открыть сделку</button>' +
-      '<button class="pcard-nav" data-prosp="next"' + (i < list.length - 1 ? '' : ' disabled') + ' aria-label="Следующая">' + I('chevRight') + '</button>' +
-      '</div></div></div>';
+      '<span class="pc-count">' + (i + 1) + ' из ' + list.length + '</span>' +
+      '<button class="pcard-nav" data-prosp="next"' + (i < list.length - 1 ? '' : ' disabled') + ' aria-label="Следующая">' + I('chevRight') + '</button></span>';
+    return head +
+      '<div class="qa-row" style="margin-bottom:10px"><span class="pc-hint">' + I('sparkle') +
+      'смахните карточку или листайте стрелками</span></div>' +
+      '<div class="pcard-row"><div class="pcard pulse-prospects' + deck + '" data-prospcard="' + p.id + '">' +
+      prospectCard(p, nav) + '</div></div>';
   }
 
   /* Смахнуть карточку — как в колоде. Сделано на pointer-событиях, а не на touch: стенд
@@ -8360,7 +8778,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const day = pulseDayItems();
     const overdueN = day.filter((x) => x.when === 'overdue').length;
     const todayN = day.filter((x) => x.when === 'today').length;
-    const prospN = pulseProspectList().length;
+    const prosp = pulseProspectList();
+    const prospSum = prosp.reduce((a, p) => a + (p.value || 0), 0);
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
@@ -8369,9 +8788,17 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       pulseBlock('day', 'Мои дела',
         'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
         pulseDay() + pulseNoNextStep(), true) +
-      pulseBlock('prospects', 'Перспективные сделки', prospN ? String(prospN) : '', pulseProspects(), true) +
-      pulseBlock('insights', 'Инсайты и сюжет дня', '', dayHint + insightCards(), false) +
-      pulseBlock('analytics', 'Аналитика', '', pulseAnalytics(), false) +
+      pulseBlock('prospects', 'Перспективные сделки',
+        prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
+          ' · ' + WS.AED(prospSum) : '',
+        pulseProspects(), true) +
+      pulseBlock('insights', 'Инсайты и сюжет дня',
+        INSIGHTS.length + ' ' + plural(INSIGHTS.length, 'наблюдение', 'наблюдения', 'наблюдений') +
+        ' · сюжет дня ' + (eventsPlayed ? eventsPlayed + ' из 5' : 'не запускался'),
+        dayHint + insightCards(), false) +
+      pulseBlock('analytics', 'Аналитика',
+        'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
+        pulseAnalytics(), false) +
       '</div>' +
     '</div>';
   }
@@ -17390,7 +17817,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -20302,8 +20729,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'startSend': routePrompt(promptValue('startPrompt')); break;
       case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
-      case 'prospList': store.prospList = true; api.emit(); break;
-      case 'prospCards': store.prospList = false; api.emit(); break;
+      // Раздел показывает возможности сеткой (их много, и их сравнивают) либо колодой
+      // (их разбирают по одной, со смахиванием). Флаг называется тем, что означает.
+      case 'prospDeck': store.prospDeck = true; api.emit(); break;
+      case 'prospGrid': store.prospDeck = false; store.prospIdx = 0; api.emit(); break;
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
