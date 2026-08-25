@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 00:19</title>
+  <title>WESPACE · сборка 15:45</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='00:19';
+    window.WS_BUILD='15:45';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -866,6 +866,14 @@ button { font-family: inherit; cursor: pointer; }
 .qa-act.primary:hover { color: #fff; filter: brightness(1.05); }
 .qa-act.danger:hover { border-color: var(--stop); color: var(--stop); }
 @media (prefers-reduced-motion: reduce) { .qa-act { transition: none; } }
+/* Значками — там, где ряд стоит в обложке и ширины на слова нет. Слово при этом никуда не
+   девается: оно в подсказке при наведении, в aria-label и в самой разметке — спрятано
+   зрительно, а не выброшено. Кнопка без доступного имени — кнопка без назначения. */
+.qa-bar.qa-icons { padding: 0; margin: 0; gap: 6px; justify-content: flex-end; }
+.qa-bar.qa-icons .qa-act { padding: 0; width: 34px; justify-content: center; }
+.qa-bar.qa-icons .qa-act svg { width: 15px; height: 15px; }
+.qa-bar.qa-icons .qa-act > span { position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* Secondary actions dropdown. */
 .qa-more { position: relative; }
 .qa-more-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 1000; background: var(--surface);
@@ -2373,10 +2381,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    которую открывают ради работы, это чистая потеря экрана. */
 .dcard-cover { min-height: 96px; border-radius: var(--r); margin-bottom: 12px;
   background-size: cover; background-position: center; border: 1px solid var(--line);
-  display: flex; align-items: flex-end; padding: 14px 18px; }
+  display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 14px; padding: 14px 18px; }
 .dcard-cover.no-img { background: var(--surface-2); }
-.dcard-hero-b { min-width: 0; max-width: 72%; }
+.dcard-hero-b { min-width: 0; max-width: 72%; flex: 1 1 260px; }
 @media (max-width: 899.98px) { .dcard-cover { min-height: 76px; padding: 12px 14px; } .dcard-hero-b { max-width: 100%; } }
+/* ---- Служебная обвязка карточки живёт в обложке ---------------------------------------------
+   Над карточкой стояли три полосы во всю ширину: путь к родительской заявке, кнопка «Назад ·
+   Сделки» и ряд действий. Замерено: от 128-го до 501-го пикселя — 373 точки высоты уходило на
+   обвязку прежде, чем начиналась работа, при том что правая половина обложки пустовала.
+   Возврат и путь — мелкой строкой над названием, действия — значками справа в той же обложке. */
+.dcard-navrow { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; margin: 0 0 5px -6px; }
+.dcard-navsep { color: var(--faint); font-size: 11px; }
+.dcard-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none;
+  padding: 2px 6px; border-radius: 7px; font: inherit; font-size: 11.5px; font-weight: 600;
+  color: var(--mut); cursor: pointer; white-space: nowrap; }
+.dcard-back svg { width: 13px; height: 13px; flex: none; }
+.dcard-back:hover { background: var(--surface); color: var(--acc); }
+.dcard-back:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.dcard-acts { margin-left: auto; align-self: flex-end; }
+@media (max-width: 899.98px) { .dcard-acts { margin-left: 0; } }
 .dcard-title .deal-title-text { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.25;
   display: inline-block; min-width: 40%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; outline: none; }
 .dcard-title .deal-title-text:hover { background: var(--acc-soft); }
@@ -2463,6 +2486,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Карточки ряда — соседи, и общее правило «.dx-sec + .dx-sec» опускало вторую на 14 пикселей.
    Ряд оставался кривым ровно на эту величину при верном grid-выравнивании. */
 .dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }
+/* Сам ряд — такой же блок рабочей области, как секция, и стоять он обязан на том же
+   расстоянии от соседей. Правило «.dx-sec + .dx-sec» его не видело: между двумя секциями
+   стоит не секция, а ряд, — и обе границы сходились вплотную. Замерено на живом экране:
+   777→777 сверху и 1092→1092 снизу при 14 пикселях между всеми остальными блоками. */
+.dcard-main > .dcard-pair { margin: var(--card-gap) 0; }
+.dcard-main > .dcard-pair:first-child { margin-top: 0; }
 
 /* ---- «Требует вашего решения» -------------------------------------------------------------
    Единственное место на карточке, где от агента что-то требуется лично: подтвердить, поправить,
@@ -11436,26 +11465,32 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     }).join('');
     return '<div class="cx-stack">' + html + '</div>';
   }
-  function entityActionBar(items) {
+  /* `mode === 'icons'` — тот же ряд, но значками: он встаёт в свободную правую половину
+     обложки и не занимает собственной полосы во всю ширину. Слово при этом остаётся в
+     разметке — и в подсказке при наведении, и для экранного диктора; прячет его CSS, а не
+     эта функция. Кнопка, у которой слова нет вовсе, не опознаётся ни человеком, ни проверкой. */
+  function entityActionBar(items, mode) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
+    const icons = mode === 'icons';
+    const lbl = (a) => icons ? ' title="' + escAttr(a[1]) + '" aria-label="' + escAttr(a[1]) + '"' : '';
+    const act = (a, cls) => '<button class="qa-act' + cls + '" ' + a[2] + lbl(a) + '>' +
+      I(a[0]) + '<span>' + a[1] + '</span></button>';
+    const open = '<div class="qa-bar' + (icons ? ' qa-icons' : '') + '" role="group" aria-label="Действия">';
     const primary = list.filter((a) => a[3] === 'primary');
     const secondary = list.filter((a) => a[3] === 'secondary');
     const other = list.filter((a) => a[3] !== 'primary' && a[3] !== 'secondary');
     // If no primary/secondary specified, show all flat (backward compat for contract, etc.).
     if (primary.length === 0 && secondary.length === 0) {
-      return '<div class="qa-bar" role="group" aria-label="Действия">' +
-        list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
-          I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
+      return open + list.map((a) => act(a, a[3] ? ' ' + a[3] : '')).join('') + '</div>';
     }
     // Primary/secondary specified: show primary + non-classified in bar, secondary in dropdown
-    let html = '<div class="qa-bar" role="group" aria-label="Действия">' +
-      primary.map((a) => '<button class="qa-act primary" ' + a[2] + '>' +
-        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
-      other.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
-        I(a[0]) + '<span>' + a[1] + '</span></button>').join('');
+    let html = open +
+      primary.map((a) => act(a, ' primary')).join('') +
+      other.map((a) => act(a, a[3] ? ' ' + a[3] : '')).join('');
     if (secondary.length) {
-      html += '<div class="qa-more"><button class="qa-act secondary" data-act="toggleQaMore">' +
+      html += '<div class="qa-more"><button class="qa-act secondary" data-act="toggleQaMore"' +
+        (icons ? ' title="Ещё действия" aria-label="Ещё действия"' : '') + '>' +
         I('menu') + '<span>Ещё</span></button><div class="qa-more-menu">' +
         secondary.map((a) => '<button class="qa-more-item" ' + a[2] + '>' +
           I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
@@ -11531,6 +11566,30 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
     if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
     return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
+  /* Возврат и путь одной мелкой строкой — внутри обложки, а не двумя полосами над карточкой.
+     Полоса «Назад · Сделки» и полоса «К запросу · Анна Петрова» занимали по 46 пикселей высоты
+     каждая и несли по одному слову. Строка несёт те же слова и стоит над названием сделки,
+     в обложке, где до этого пустовало место. Кнопка та же и по разметке: `data-act="navBack"`
+     и `data-nav` читаются теми же обработчиками — путь назад не изменился, изменился его вид. */
+  function backLink(fallbackNav, fallbackTab, fallbackLabel) {
+    const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
+    if (!prev) return '<button class="dcard-back" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' +
+      I('chevLeft') + escAttr(fallbackLabel) + '</button>';
+    return '<button class="dcard-back" data-act="navBack" title="Назад (Alt+←)">' +
+      I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
+  // Путь к родительской заявке — звено той же строки, а не отдельная полоса над карточкой.
+  function parentReqLink(r) {
+    if (!r) return '';
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    return '<button class="dcard-back" data-request="' + r.id + '">' + I('chevLeft') +
+      'К запросу · ' + escAttr(c.name || r.title) + '</button>';
+  }
+  function cardNavRow(items) {
+    const list = (items || []).filter(Boolean);
+    if (!list.length) return '';
+    return '<div class="dcard-navrow">' + list.join('<span class="dcard-navsep">·</span>') + '</div>';
   }
   // Full-page entity view. The header is the way back and nothing else: the verbs live in the
   // action bar inside entityBody, which is the one place a card keeps them.
@@ -12225,6 +12284,22 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (list.length <= 1) return list[0] || '';
     return list.slice(0, -1).join(', ') + ' и ' + list[list.length - 1];
   }
+  /* Справка, следующий шаг и «сейчас» — те же, что стоят на карточке, и потому доступны
+     Консьержу. Собирать их у него заново значило бы завести второй источник: экран и ответ
+     разошлись бы на первой же правке одного из них, и брокер получил бы два разных положения
+     дел по одной сделке. */
+  function dealBrief(id) {
+    const d = D().deals.find((x) => x.id === id);
+    return d ? dealBriefSentences(d) : [];
+  }
+  function dealNext(id) {
+    const d = D().deals.find((x) => x.id === id);
+    return d ? dealNextStep(d) : null;
+  }
+  function reqNow(id) {
+    const r = requestById(id);
+    return r ? { сейчас: reqStatusPhrase(r), дальше: reqNextAction(r) } : null;
+  }
   function dealStatusBrief(d) {
     return dxSec('sparkle', 'Справка по сделке', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
       '<p class="deal-brief">' + dealBriefSentences(d).join(' ') + '</p>');
@@ -12770,13 +12845,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<div class="dcard-aside-m-b">' + reqAside(r) + '</div></details>';
     const title = '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
       '<div class="dcard-sub">' + sub + '</div>';
-    return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
-      '<div class="dcard">' +
-      '<div class="dcard-top">' + coverBand(bg, title) +
+    const nav = cardNavRow([backLink('requests', '', 'Назад ко входящим')]);
+    return '<div class="dcard">' +
+      '<div class="dcard-top">' + coverBand(bg, nav + title, entityActionBar(requestActions(r), 'icons')) +
       '<div class="dcard-pathrow">' + reqStepperSection(r) + '</div></div>' +
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + reqAside(r) + '</aside>' + aside +
-      '<div class="dcard-main">' + entityActionBar(requestActions(r)) +
+      '<div class="dcard-main">' +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       reqWork(r) + dealTabsBlock(spec) + '</div>' +
       '</div>' +
@@ -14277,7 +14352,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
   // ---- Карточка сделки: полоса сверху · слева справка и участники · справа работа · ввод снизу ----
   // Порядок блоков — по частоте обращения, а не по важности «вообще».
-  function dealTopBand(d) {
+  function dealTopBand(d, navHtml) {
     const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.goal, d.amount ? WS.AED(d.amount) : null]
       .filter(Boolean).join(' · ');
     // Обложка карточки — та же, что у объекта сделки: сделка узнаётся по объекту раньше,
@@ -14290,18 +14365,20 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
       '<div class="dcard-sub">' + sub + '</div>';
-    return '<div class="dcard-top">' + coverBand(bg, title) +
+    return '<div class="dcard-top">' +
+      coverBand(bg, (navHtml || '') + title, entityActionBar(dealActions(d), 'icons')) +
       '<div class="dcard-pathrow">' + dealPathSection(d) + '</div></div>';
   }
   /* Обложка карточки — она же первый экран: картинка объекта и поверх неё название и суть.
      Одна на сделку и на заявку, чтобы они не разъезжались снова. Без картинки полоса остаётся
      той же по составу — меняется только фон, а не раскладка. */
-  function coverBand(bg, inner) {
+  function coverBand(bg, inner, acts) {
     const style = bg
       ? ' style="background-image:linear-gradient(90deg,var(--surface) 10%,var(--wh-fade1) 58%,var(--wh-fade2) 100%),url(' + bg + ')"'
       : '';
     return '<div class="dcard-cover' + (bg ? '' : ' no-img') + '"' + style + '>' +
-      '<div class="dcard-hero-b">' + inner + '</div></div>';
+      '<div class="dcard-hero-b">' + inner + '</div>' +
+      (acts ? '<div class="dcard-acts">' + acts + '</div>' : '') + '</div>';
   }
   // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
   // у объектов, потому что ставка принадлежит объекту, а не сделке.
@@ -14461,19 +14538,18 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const spec = dealSpec(id);
     if (!spec) return viewClients();
     const d = D().deals.find((x) => x.id === id);
-    const crumb = (d && d.requestId) ? parentReqCrumb(requestById(d.requestId)) : '';
+    const crumb = (d && d.requestId) ? parentReqLink(requestById(d.requestId)) : '';
     // Узкий экран: левая колонка сворачивается в раскрываемую справку под названием, правая
     // встаёт стопкой. Свернули в <details>, а не во вкладки: он раскрывается без скрипта,
     // и ни один блок не пропадает — меняется только способ до него добраться.
     const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка и условия сделки</summary>' +
       '<div class="dcard-aside-m-b">' + dealAside(d) + '</div></details>';
-    return crumb +
-      '<div class="obj-page-head">' + backBtn('clients', 'deals', 'Назад к сделкам') + '</div>' +
-      '<div class="dcard">' + dealTopBand(d) +
+    return '<div class="dcard">' +
+      dealTopBand(d, cardNavRow([backLink('clients', 'deals', 'Назад к сделкам'), crumb])) +
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + dealAside(d) + '</aside>' +
       aside +
-      '<div class="dcard-main">' + entityActionBar(dealActions(d)) + dealChatPanel(d) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
+      '<div class="dcard-main">' + dealChatPanel(d) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
       '</div>' + dealComposer(d) + '</div>';
   }
   // Вкладки карточки (параметры, контакты, задачи, документы, история) остаются как были —
@@ -17297,7 +17373,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -17483,11 +17559,38 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   /* Вопрос про МНОЖЕСТВО, а не про открытую запись. Читается в двух местах — при разборе
      области вопроса и при уточнении, — поэтому живёт одним определением: два списка слов
      разъехались бы на первой же правке. */
-  const GLOBAL = /сколько|скольк|всего|все\s|всех|список|перечисл|покажи|показать|дай |выведи|в работе|по всем|у меня|воронк|конверси/i;
+  /* Разделено надвое. MANY — слова, которыми спрашивают ПРО МНОЖЕСТВО: «сколько», «все»,
+     «список», «воронка». GLOBAL — они же плюс глаголы показа. Глагол сам по себе множества не
+     означает: «покажи сводку сделки», стоя на сделке, — вопрос про неё, а отвечал он счётчиком
+     «8 сделок в работе, 20 228 000 AED». Одно определение, потому что два разъедутся. */
+  const MANY = new RegExp(['сколько|скольк|всего|все\\s|всех|список|перечисл|в работе|по всем|у меня|воронк|конверси',
+    /* Формы, которые бывают только множественными. Именительный («сделки», «заявки») сюда не
+       входит: он же — родительный единственного, и «саммари сделки» им бы отбилось. */
+    'сделок|сделкам|сделками|сделках|заявок|заявкам|заявками|заявках',
+    'запросов|запросам|запросами|запросах|объектов|объектам|объектами|объектах',
+    'контактов|контактам|клиентов|клиентам|компаний|компаниям|задачам|задачах'].join('|'), 'i');
+  const GLOBAL = new RegExp(MANY.source + '|покажи|показать|дай |выведи', 'i');
   // Слово, которым называют саму открытую запись. «Сделай саммари СДЕЛКИ», стоя на сделке, —
   // это вопрос про неё, даже когда указательного слова нет вовсе.
   const KIND_WORD = { 'сделка': /сделк|сдело/i, 'запрос': /заяв|запрос/i, 'контакт': /контакт|клиент/i,
     'компания': /компан/i, 'объект': /объект|лот/i };
+  /* Слова, которыми спрашивают про ОТКРЫТУЮ запись, не называя её. Брокер стоит на сделке и
+     пишет «саммари», «что дальше», «какой бюджет», «кто клиент»: подлежащего в этих фразах нет
+     вовсе. Прежнее правило требовало указательного слова («по этой») или слова-названия вида
+     записи («сделки») — и всё перечисленное падало в «Не понял вопрос. Вы стоите на записи
+     …, уточните, что по ней нужно». То есть Консьерж переспрашивал ровно про то, что у него
+     перед глазами, — это и создаёт впечатление, что он не понимает, где находится.
+     «Объекта» здесь нет намеренно: «какой этаж у объекта», заданное со сделки, — вопрос про
+     объект, и отвечать на него сводкой по сделке значит выдать левую информацию. */
+  const ASK_BRIEF = /саммари|сводк|резюме|кратк|коротко|в двух словах|о ч[её]м|суть|справк|бриф|расскажи|что по |что там|статус|состояни/i;
+  const ASK_NEXT = /что дальше|дальше по|следующ|что делать|какой шаг|на каком шаг|когда касани|когда звон/i;
+  const ASK_BLOCK = /мешает|блокир|застрял|тормоз|почему не|что не так|какие риск/i;
+  /* Только те поля, которые запись действительно несёт (см. screenContext): спрашивают про
+     бюджет, клиента, шаг и срок. Комиссии в записи нет — и её здесь нет тоже, иначе вопрос
+     «какая комиссия по активным сделкам» сузился бы до открытой сделки. */
+  const ASK_FIELD = /бюджет|сумм|стоимост|кто клиент|клиент|заказчик|шаг|стади|срок|дедлайн|касани/i;
+  const CARD_ASK = new RegExp([ASK_BRIEF, ASK_NEXT, ASK_BLOCK, ASK_FIELD]
+    .map((r) => r.source).join('|'), 'i');
   /* Вопрос, заданный из-под карточки, — вопрос про эту карточку.
      Раньше «сделай саммари сделки» уходило в общую аналитику и возвращалось сводкой по всему
      рабочему месту: «8 сделок в работе, 20 228 000 AED». Формально это ответ, по сути — левая
@@ -17506,36 +17609,99 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const own = [rec.клиент, (rec.тип === 'контакт' || rec.тип === 'компания') ? rec.название : null]
       .filter(Boolean).map(lc);
     if (named && named.name && own.indexOf(lc(named.name)) < 0) return null;
-    // «Сколько сделок в работе», «покажи все сделки» — вопрос про множество, а не про открытую
-    // запись. Указательное слово перевешивает: «сколько задач по этой сделке» — снова про неё.
-    if (GLOBAL.test(t) && !DEMONSTRATIVE.test(t)) return null;
+    // Указательное слово перевешивает всё: «сколько задач по этой сделке» — про неё.
+    if (DEMONSTRATIVE.test(t)) return rec;
+    /* Слово, которым спрашивают про запись, перевешивает глагол показа, но не перевешивает
+       множество: «покажи сводку сделки» — про открытую сделку, «сколько сделок» — про все. */
+    if (CARD_ASK.test(t)) return MANY.test(t) ? null : rec;
+    // «Сколько сделок в работе», «покажи все сделки» — вопрос про множество.
+    if (GLOBAL.test(t)) return null;
+    /* MANY здесь не проверяется намеренно: GLOBAL включает MANY целиком и стоит строкой выше,
+       так что до этой строки вопрос про множество не доходит. Вторая проверка выглядела бы
+       защитой, которая не срабатывает ни разу. */
     const kw = KIND_WORD[rec.тип];
-    if (!DEMONSTRATIVE.test(t) && !(kw && kw.test(t))) return null;
-    return rec;
+    return (kw && kw.test(t)) ? rec : null;
   }
+  /* Ответ про открытую запись.
+
+     Раньше он был перечнем полей с припиской «Спросите конкретнее — что собрать, что
+     просрочено, что дальше»: та же просьба переспросить, только другими словами. Спросили
+     справку — отдаётся справка, ТА ЖЕ, что стоит на карточке; спросили, что дальше, —
+     называется шаг, срок и кто ведёт; спросили, что мешает, — называется причина.
+
+     Ни одного числа сверх того, что уже посчитано для экрана: справку и следующий шаг даёт
+     `WS.ui`, а не отдельный расчёт здесь, — иначе ответ и карточка разошлись бы на первой же
+     правке одной из сторон, и брокер получил бы два разных положения дел по одной сделке. */
   function screenAnswer(text) {
     const rec = screenScoped(text);
     if (!rec) return null;
+    const t = lc(text || '');
+    const ui = WS.ui || {};
+    const say = (s) => ({ kind: 'answer', text: s, evidence: [], next: suggestions() });
     const money = (v) => (WS.AED ? WS.AED(v) : String(v));
-    const bits = [];
+    const named = 'сделке «' + rec.название + '»';
+
     if (rec.тип === 'сделка') {
-      bits.push('Открыта сделка «' + rec.название + '»');
-      if (rec.клиент) bits.push('клиент — ' + rec.клиент);
-      if (rec.шаг) bits.push('шаг «' + rec.шаг + '»');
-      if (rec.сумма) bits.push('сумма ' + money(rec.сумма));
-      if (rec.срок_следующего_шага) bits.push('следующее касание ' + rec.срок_следующего_шага);
-      if ((rec.объекты || []).length) bits.push('объект: ' + rec.объекты.join(', '));
-    } else if (rec.тип === 'запрос') {
-      bits.push('Открыт запрос «' + rec.название + '»');
-      if (rec.клиент) bits.push('клиент — ' + rec.клиент);
-      if (rec.стадия) bits.push('стадия «' + rec.стадия + '»');
-      if (rec.бюджет) bits.push('бюджет ' + money(rec.бюджет));
-      if (rec.срок) bits.push('срок ' + rec.срок);
-    } else {
-      bits.push('Открыт ' + rec.тип + ' «' + rec.название + '»');
+      const brief = (ui.dealBrief ? ui.dealBrief(rec.id) : []) || [];
+      if (ASK_BLOCK.test(t)) {
+        const stop = brief.filter((x) => /^Мешает:/.test(x))[0];
+        return say(stop
+          ? 'По ' + named + ' ' + stop.charAt(0).toLowerCase() + stop.slice(1)
+          : 'По ' + named + ' помех не отмечено: касание не просрочено, задаток внесён, ' +
+            'расхождений по полям нет. Ближайшее дело — ' + nextPhrase(ui, rec) + '.');
+      }
+      if (ASK_NEXT.test(t)) {
+        const nx = ui.dealNext ? ui.dealNext(rec.id) : null;
+        if (nx && nx.action) {
+          return say('Дальше по ' + named + ': ' + nx.action +
+            (nx.due ? ', срок — ' + nx.due : '') + (nx.owner ? ', ведёт ' + nx.owner : '') + '.' +
+            (nx.why ? ' Почему сейчас: ' + nx.why + '.' : ''));
+        }
+      }
+      if (ASK_FIELD.test(t) && !ASK_BRIEF.test(t)) {
+        if (/бюджет|сумм|стоимост/.test(t) && rec.сумма) return say('Сумма по ' + named + ' — ' + money(rec.сумма) + '.');
+        if (/клиент|заказчик/.test(t) && rec.клиент) return say('Клиент по ' + named + ' — ' + rec.клиент + '.');
+        if (/шаг|стади/.test(t) && rec.шаг) return say('Сделка «' + rec.название + '» на шаге «' + rec.шаг + '».');
+        if (/срок|дедлайн|касани/.test(t) && rec.срок_следующего_шага) {
+          return say('Следующее касание по ' + named + ' — ' + rec.срок_следующего_шага + '.');
+        }
+      }
+      if (brief.length) return say('Сделка «' + rec.название + '». ' + brief.join(' '));
     }
-    return { kind: 'answer', text: bits.join(', ') + '. Спросите конкретнее — что собрать, что просрочено, что дальше.',
-      evidence: [], next: suggestions() };
+
+    if (rec.тип === 'запрос') {
+      const now = ui.reqNow ? ui.reqNow(rec.id) : null;
+      if (now) {
+        const head = 'Запрос «' + rec.название + '»' + (rec.клиент ? ', клиент — ' + rec.клиент : '') + '.';
+        if (ASK_NEXT.test(t)) return say('Дальше по запросу «' + rec.название + '»: ' + now.дальше + '.');
+        if (ASK_FIELD.test(t) && !ASK_BRIEF.test(t)) {
+          if (/бюджет|сумм|стоимост/.test(t) && rec.бюджет) return say('Бюджет по запросу «' + rec.название + '» — ' + money(rec.бюджет) + '.');
+          if (/клиент|заказчик/.test(t) && rec.клиент) return say('Клиент по запросу «' + rec.название + '» — ' + rec.клиент + '.');
+          if (/стади|шаг/.test(t) && rec.стадия) return say('Запрос «' + rec.название + '» на стадии «' + rec.стадия + '».');
+          if (/срок|дедлайн|касани/.test(t) && rec.срок) return say('Срок по запросу «' + rec.название + '» — ' + rec.срок + '.');
+        }
+        return say(head + ' Сейчас: ' + now.сейчас +
+          (rec.бюджет ? ' Бюджет — ' + money(rec.бюджет) + '.' : '') +
+          (rec.срок ? ' Срок — ' + rec.срок + '.' : '') + ' Дальше: ' + now.дальше + '.');
+      }
+    }
+
+    // Остальные виды записей: то, что о записи известно, без просьбы переспросить.
+    const bits = ['Открыт' + (rec.тип === 'компания' ? 'а ' : ' ') + rec.тип + ' «' + rec.название + '»'];
+    if (rec.клиент) bits.push('клиент — ' + rec.клиент);
+    if (rec.шаг) bits.push('шаг «' + rec.шаг + '»');
+    if (rec.стадия) bits.push('стадия «' + rec.стадия + '»');
+    if (rec.сумма) bits.push('сумма ' + money(rec.сумма));
+    if (rec.бюджет) bits.push('бюджет ' + money(rec.бюджет));
+    if (rec.срок_следующего_шага) bits.push('следующее касание ' + rec.срок_следующего_шага);
+    if (rec.срок) bits.push('срок ' + rec.срок);
+    if ((rec.объекты || []).length) bits.push('объект: ' + rec.объекты.join(', '));
+    return say(bits.join(', ') + '.');
+  }
+  function nextPhrase(ui, rec) {
+    const nx = ui.dealNext ? ui.dealNext(rec.id) : null;
+    if (!nx || !nx.action) return 'работа по сделке идёт по плану';
+    return nx.action.charAt(0).toLowerCase() + nx.action.slice(1) + (nx.due ? ' (' + nx.due + ')' : '');
   }
   function dealsOf(clientId) {
     return (WS.store.data.deals || []).filter((x) => x.clientId === clientId);
@@ -18566,9 +18732,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
        по-прежнему отвечала общей сводкой на вопрос, заданный из-под конкретной сделки. */
     const sc = (WS.ui && WS.ui.screenContext) ? WS.ui.screenContext() : null;
     const rec = sc && sc.запись;
+    /* И правило чтения — вместе с ним. Описания экрана мало: модель видела, на чём стоит
+       брокер, и всё равно переспрашивала «вы имеете в виду эту сделку?», потому что в вопросе
+       без подлежащего подлежащего действительно нет. Правило принадлежит серверному промпту —
+       пока ветка прокси занята, оно едет в том единственном поле, которое сервер собирает. */
     const about = rec
       ? [sc.экран + ' «' + rec.название + '»', rec.клиент ? 'клиент ' + rec.клиент : null,
-         rec.шаг ? 'шаг ' + rec.шаг : (rec.стадия ? 'стадия ' + rec.стадия : null)]
+         rec.шаг ? 'шаг ' + rec.шаг : (rec.стадия ? 'стадия ' + rec.стадия : null),
+         'вопрос без явного подлежащего задан про эту запись — отвечайте сразу, не переспрашивая']
         .filter(Boolean).join(', ')
       : (th.label || th.id);
     return { id: th.id, о_чём: about, экран: sc ? sc.экран : null, реплик: (th.items || []).length };

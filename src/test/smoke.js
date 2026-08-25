@@ -779,9 +779,14 @@ setTimeout(async () => {
       check(name + ' · панель действий выше вкладок',
         !!bar && !!tabs && (bar.compareDocumentPosition(tabs) & 4) !== 0);
       check(name + ' · панель действий вне тела вкладки', !!bar && !bar.closest('.dx-tabbody'));
-      check(name + ' · в шапке страницы нет второго набора кнопок',
-        !!view && view.querySelectorAll('.obj-page-head button').length === 1,
-        view ? String(view.querySelectorAll('.obj-page-head button').length) : '');
+      /* Возврат ровно один — и это проверка про факт, а не про место: на сделке и заявке он
+         переехал в строку внутри обложки, на остальных карточках остался шапкой страницы.
+         Ссылка на родительскую заявку рядом с ним возвратом не считается — она ведёт вперёд,
+         к другой записи, поэтому и отбирается по признаку возврата, а не по соседству. */
+      const BACK = '.obj-page-head button, .dcard-navrow [data-act="navBack"], .dcard-navrow [data-nav]';
+      check(name + ' · возврат на карточке ровно один',
+        !!view && view.querySelectorAll(BACK).length === 1,
+        view ? String(view.querySelectorAll(BACK).length) : '');
       // A bar that scrolls sideways hides half its verbs with nothing to say so.
       check(name + ' · панель действий переносится, а не прокручивается',
         !!bar && !/overflow-x:\s*auto/.test(bar.getAttribute('style') || ''));
@@ -1265,9 +1270,9 @@ setTimeout(async () => {
     WS.ui.dealCard(nd.id);
     WS.store.navStack = [];
     WS.ui.render();
-    const head = app().querySelector('.obj-page-head');
+    const head = app().querySelector('.dcard-navrow');
     check('nav · без истории остаётся возврат к списку',
-      !!head && head.innerHTML.indexOf('data-nav=') >= 0, head ? head.innerHTML.slice(0, 120) : 'нет шапки');
+      !!head && head.innerHTML.indexOf('data-nav=') >= 0, head ? head.innerHTML.slice(0, 120) : 'нет строки возврата');
   }
 
   // ---- a step that the deal's contract does not have is refused, not silently applied ----
@@ -4370,6 +4375,14 @@ setTimeout(async () => {
         cssSrc.indexOf('.dcard-pair > .dx-sec { display: flex; flex-direction: column;') > 0 &&
         cssSrc.indexOf('.dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }') > 0,
         'правила равной высоты в CSS нет');
+      /* И сам ряд отбит от соседей на общий шаг колонки. Правило «.dx-sec + .dx-sec» его не
+         видит — между двумя секциями стоит не секция, а ряд, — и обе границы сходились
+         вплотную: замерено в браузере, 777→777 сверху и 1092→1092 снизу при 14 пикселях
+         между всеми остальными блоками. Высоту в jsdom не измерить, проверяется правило. */
+      check('карточка · ряд отбит от соседних блоков так же, как они друг от друга',
+        cssSrc.indexOf('.dcard-main > .dcard-pair { margin: var(--card-gap) 0; }') > 0 &&
+        cssSrc.indexOf('.dcard-main > .dcard-pair:first-child { margin-top: 0; }') > 0,
+        'правила отступа ряда в CSS нет');
     }
     /* «Вся история» раскрывается в ПРАВОЙ части карточки, а не переключает вкладку в самом
        низу: у вкладки внизу и у карточки сверху разные глаза, и, нажав «вся история», агент
@@ -5443,6 +5456,45 @@ setTimeout(async () => {
         check('консьерж · «' + q + '» остаётся вопросом про множество',
           a.text.indexOf(dl.title) < 0 && /\d/.test(a.text), (a.text || '').slice(0, 110));
       });
+      /* ---- Вопрос без подлежащего: Консьерж отвечает, а не переспрашивает ------------------
+         Брокер стоит на сделке и пишет «саммари», «что дальше», «какой бюджет», «кто клиент».
+         Подлежащего в этих фразах нет вовсе, и прежнее правило (нужно указательное слово или
+         слово-название вида записи) их не узнавало: все они падали в «Не понял вопрос. Вы
+         стоите на записи …, уточните, что по ней нужно» — Консьерж переспрашивал ровно про то,
+         что у него перед глазами. Это и создаёт впечатление, что он не понимает, где стоит. */
+      ['саммари', 'сделай резюме', 'что дальше', 'какой бюджет', 'кто клиент',
+       'на каком мы шаге', 'что мешает закрыть', 'бриф к звонку'].forEach((q) => {
+        const a = WS.agent.ask(q);
+        check('консьерж · «' + q + '» отвечается по открытой сделке, а не переспрашивается',
+          a.text.indexOf(dl.title) >= 0 && a.text.indexOf('Не понял') < 0 &&
+          a.text.indexOf('Спросите конкретнее') < 0, (a.text || '').slice(0, 130));
+      });
+      /* Глагол показа сам по себе множества не означает. «Покажи сводку сделки», заданное со
+         сделки, возвращало счётчик «8 сделок в работе, 20 228 000 AED» — ответ на вопрос,
+         которого никто не задавал. Слово, которым спрашивают про запись, перевешивает глагол. */
+      ['покажи сводку сделки', 'дай саммари сделки'].forEach((q) => {
+        const a = WS.agent.ask(q);
+        check('консьерж · «' + q + '» — про открытую сделку, а не счётчик по всем',
+          a.text.indexOf(dl.title) >= 0, (a.text || '').slice(0, 130));
+      });
+      /* Но однозначное множественное перевешивает и слово-название вида записи: «сделкам»
+         содержит «сделк», и на этом вопрос про комиссию по ВСЕМ активным сделкам сужался до
+         открытой и возвращался её справкой. */
+      {
+        const com = WS.agent.ask('какая комиссия набегает по активным сделкам');
+        check('консьерж · комиссия по активным сделкам считается по всем, а не по открытой',
+          com.text.indexOf('комиссия по активным сделкам') >= 0 && com.text.indexOf(dl.title) < 0,
+          (com.text || '').slice(0, 130));
+      }
+      /* Справка в ответе — ТА ЖЕ, что стоит на карточке. Второй источник разошёлся бы с экраном
+         на первой же правке одной из сторон, и брокер получил бы два разных положения дел. */
+      {
+        const brief = (WS.ui.dealBrief ? WS.ui.dealBrief('d_anna') : []) || [];
+        const a = WS.agent.ask('сделай саммари сделки');
+        check('консьерж · справка в ответе — та же, что на карточке',
+          brief.length > 0 && a.text.indexOf(brief[brief.length - 1]) >= 0,
+          'справка из ' + brief.length + ' предложений; ответ: ' + (a.text || '').slice(0, 90));
+      }
       /* Родительный множественного роняет корень: «сделок» не содержит «сделк», «заявок» не
          содержит «заявк». На этом молча ломались и разбор области, и подсказки показателей. */
       ['сколько сделок', 'сколько заявок'].forEach((q) => {
@@ -6599,6 +6651,34 @@ setTimeout(async () => {
     // Запланированное и последнее — в ряд, как в сделке.
     check('каркас · «что дальше» и «что было» в заявке тоже в ряд',
       !!doc.querySelector('#app .view .dcard-pair'));
+    /* ---- Служебная обвязка живёт в обложке, а не тремя полосами над работой ----------------
+       Возврат, путь к родительской заявке и ряд действий занимали три полосы во всю ширину:
+       замерено в браузере — от 128-го до 501-го пикселя, 373 точки высоты уходило на обвязку
+       прежде, чем начиналась работа, при пустующей правой половине обложки. После перекладки
+       работа начинается с 389-го: 112 пикселей вернулись экрану. */
+    [['сделка', () => WS.ui.dealCard(dOne.id)],
+     ['заявка', () => WS.ui.requestCard((dd().requests || [])[0].id)]].forEach(([name, open]) => {
+      open();
+      const v = () => doc.querySelector('#app .view');
+      check(name + ' · ряд действий стоит в обложке', !!doc.querySelector('#app .view .dcard-cover .qa-bar'));
+      check(name + ' · и не занимает собственной полосы в рабочей области',
+        !doc.querySelector('#app .view .dcard-main > .qa-bar'));
+      check(name + ' · возврат стоит строкой в обложке',
+        !!doc.querySelector('#app .view .dcard-cover .dcard-navrow [data-act="navBack"], ' +
+          '#app .view .dcard-cover .dcard-navrow [data-nav]'));
+      check(name + ' · отдельной полосы возврата над карточкой больше нет',
+        !v().querySelector('.obj-page-head') && !v().querySelector('.page-crumb'),
+        v().querySelector('.obj-page-head') ? 'осталась шапка' : 'остался путь');
+      /* Значок без слова — кнопка без назначения: ни подсказки при наведении, ни имени для
+         экранного диктора, ни текста для проверки. Слово прячет CSS, а не разметка. */
+      const icons = [].slice.call(doc.querySelectorAll('#app .view .qa-bar.qa-icons .qa-act'));
+      const mute = icons.filter((b) => !(b.getAttribute('aria-label') || '').trim() ||
+        !(b.getAttribute('title') || '').trim() || !b.textContent.trim());
+      check(name + ' · у каждого значка действия есть слово — в подсказке и для диктора',
+        icons.length >= 3 && mute.length === 0,
+        'значков ' + icons.length + ', без слова ' + mute.length);
+    });
+    WS.ui.requestCard((dd().requests || [])[0].id);
     // Строка ввода внизу одна и ведёт в тот же док.
     check('каркас · внизу заявки одна строка ввода',
       doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1,

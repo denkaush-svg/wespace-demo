@@ -716,6 +716,14 @@ button { font-family: inherit; cursor: pointer; }
 .qa-act.primary:hover { color: #fff; filter: brightness(1.05); }
 .qa-act.danger:hover { border-color: var(--stop); color: var(--stop); }
 @media (prefers-reduced-motion: reduce) { .qa-act { transition: none; } }
+/* Значками — там, где ряд стоит в обложке и ширины на слова нет. Слово при этом никуда не
+   девается: оно в подсказке при наведении, в aria-label и в самой разметке — спрятано
+   зрительно, а не выброшено. Кнопка без доступного имени — кнопка без назначения. */
+.qa-bar.qa-icons { padding: 0; margin: 0; gap: 6px; justify-content: flex-end; }
+.qa-bar.qa-icons .qa-act { padding: 0; width: 34px; justify-content: center; }
+.qa-bar.qa-icons .qa-act svg { width: 15px; height: 15px; }
+.qa-bar.qa-icons .qa-act > span { position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* Secondary actions dropdown. */
 .qa-more { position: relative; }
 .qa-more-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 1000; background: var(--surface);
@@ -2223,10 +2231,25 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    которую открывают ради работы, это чистая потеря экрана. */
 .dcard-cover { min-height: 96px; border-radius: var(--r); margin-bottom: 12px;
   background-size: cover; background-position: center; border: 1px solid var(--line);
-  display: flex; align-items: flex-end; padding: 14px 18px; }
+  display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 14px; padding: 14px 18px; }
 .dcard-cover.no-img { background: var(--surface-2); }
-.dcard-hero-b { min-width: 0; max-width: 72%; }
+.dcard-hero-b { min-width: 0; max-width: 72%; flex: 1 1 260px; }
 @media (max-width: 899.98px) { .dcard-cover { min-height: 76px; padding: 12px 14px; } .dcard-hero-b { max-width: 100%; } }
+/* ---- Служебная обвязка карточки живёт в обложке ---------------------------------------------
+   Над карточкой стояли три полосы во всю ширину: путь к родительской заявке, кнопка «Назад ·
+   Сделки» и ряд действий. Замерено: от 128-го до 501-го пикселя — 373 точки высоты уходило на
+   обвязку прежде, чем начиналась работа, при том что правая половина обложки пустовала.
+   Возврат и путь — мелкой строкой над названием, действия — значками справа в той же обложке. */
+.dcard-navrow { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; margin: 0 0 5px -6px; }
+.dcard-navsep { color: var(--faint); font-size: 11px; }
+.dcard-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none;
+  padding: 2px 6px; border-radius: 7px; font: inherit; font-size: 11.5px; font-weight: 600;
+  color: var(--mut); cursor: pointer; white-space: nowrap; }
+.dcard-back svg { width: 13px; height: 13px; flex: none; }
+.dcard-back:hover { background: var(--surface); color: var(--acc); }
+.dcard-back:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.dcard-acts { margin-left: auto; align-self: flex-end; }
+@media (max-width: 899.98px) { .dcard-acts { margin-left: 0; } }
 .dcard-title .deal-title-text { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.25;
   display: inline-block; min-width: 40%; padding: 2px 6px; margin-left: -6px; border-radius: 8px; outline: none; }
 .dcard-title .deal-title-text:hover { background: var(--acc-soft); }
@@ -2313,6 +2336,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Карточки ряда — соседи, и общее правило «.dx-sec + .dx-sec» опускало вторую на 14 пикселей.
    Ряд оставался кривым ровно на эту величину при верном grid-выравнивании. */
 .dcard-pair > .dx-sec + .dx-sec { margin-top: 0; }
+/* Сам ряд — такой же блок рабочей области, как секция, и стоять он обязан на том же
+   расстоянии от соседей. Правило «.dx-sec + .dx-sec» его не видело: между двумя секциями
+   стоит не секция, а ряд, — и обе границы сходились вплотную. Замерено на живом экране:
+   777→777 сверху и 1092→1092 снизу при 14 пикселях между всеми остальными блоками. */
+.dcard-main > .dcard-pair { margin: var(--card-gap) 0; }
+.dcard-main > .dcard-pair:first-child { margin-top: 0; }
 
 /* ---- «Требует вашего решения» -------------------------------------------------------------
    Единственное место на карточке, где от агента что-то требуется лично: подтвердить, поправить,

@@ -4225,26 +4225,32 @@
     }).join('');
     return '<div class="cx-stack">' + html + '</div>';
   }
-  function entityActionBar(items) {
+  /* `mode === 'icons'` — тот же ряд, но значками: он встаёт в свободную правую половину
+     обложки и не занимает собственной полосы во всю ширину. Слово при этом остаётся в
+     разметке — и в подсказке при наведении, и для экранного диктора; прячет его CSS, а не
+     эта функция. Кнопка, у которой слова нет вовсе, не опознаётся ни человеком, ни проверкой. */
+  function entityActionBar(items, mode) {
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
+    const icons = mode === 'icons';
+    const lbl = (a) => icons ? ' title="' + escAttr(a[1]) + '" aria-label="' + escAttr(a[1]) + '"' : '';
+    const act = (a, cls) => '<button class="qa-act' + cls + '" ' + a[2] + lbl(a) + '>' +
+      I(a[0]) + '<span>' + a[1] + '</span></button>';
+    const open = '<div class="qa-bar' + (icons ? ' qa-icons' : '') + '" role="group" aria-label="Действия">';
     const primary = list.filter((a) => a[3] === 'primary');
     const secondary = list.filter((a) => a[3] === 'secondary');
     const other = list.filter((a) => a[3] !== 'primary' && a[3] !== 'secondary');
     // If no primary/secondary specified, show all flat (backward compat for contract, etc.).
     if (primary.length === 0 && secondary.length === 0) {
-      return '<div class="qa-bar" role="group" aria-label="Действия">' +
-        list.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
-          I(a[0]) + '<span>' + a[1] + '</span></button>').join('') + '</div>';
+      return open + list.map((a) => act(a, a[3] ? ' ' + a[3] : '')).join('') + '</div>';
     }
     // Primary/secondary specified: show primary + non-classified in bar, secondary in dropdown
-    let html = '<div class="qa-bar" role="group" aria-label="Действия">' +
-      primary.map((a) => '<button class="qa-act primary" ' + a[2] + '>' +
-        I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
-      other.map((a) => '<button class="qa-act' + (a[3] ? ' ' + a[3] : '') + '" ' + a[2] + '>' +
-        I(a[0]) + '<span>' + a[1] + '</span></button>').join('');
+    let html = open +
+      primary.map((a) => act(a, ' primary')).join('') +
+      other.map((a) => act(a, a[3] ? ' ' + a[3] : '')).join('');
     if (secondary.length) {
-      html += '<div class="qa-more"><button class="qa-act secondary" data-act="toggleQaMore">' +
+      html += '<div class="qa-more"><button class="qa-act secondary" data-act="toggleQaMore"' +
+        (icons ? ' title="Ещё действия" aria-label="Ещё действия"' : '') + '>' +
         I('menu') + '<span>Ещё</span></button><div class="qa-more-menu">' +
         secondary.map((a) => '<button class="qa-more-item" ' + a[2] + '>' +
           I(a[0]) + '<span>' + a[1] + '</span></button>').join('') +
@@ -4320,6 +4326,30 @@
     const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
     if (!prev) return '<button class="btn sm" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' + I('chevLeft') + fallbackLabel + '</button>';
     return '<button class="btn sm" data-act="navBack" title="Назад (Alt+←)">' + I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
+  /* Возврат и путь одной мелкой строкой — внутри обложки, а не двумя полосами над карточкой.
+     Полоса «Назад · Сделки» и полоса «К запросу · Анна Петрова» занимали по 46 пикселей высоты
+     каждая и несли по одному слову. Строка несёт те же слова и стоит над названием сделки,
+     в обложке, где до этого пустовало место. Кнопка та же и по разметке: `data-act="navBack"`
+     и `data-nav` читаются теми же обработчиками — путь назад не изменился, изменился его вид. */
+  function backLink(fallbackNav, fallbackTab, fallbackLabel) {
+    const prev = WS.router && WS.router.peek ? WS.router.peek() : null;
+    if (!prev) return '<button class="dcard-back" data-nav="' + fallbackNav + '" data-tab="' + (fallbackTab || '') + '">' +
+      I('chevLeft') + escAttr(fallbackLabel) + '</button>';
+    return '<button class="dcard-back" data-act="navBack" title="Назад (Alt+←)">' +
+      I('chevLeft') + 'Назад · ' + escAttr(routeName(prev)) + '</button>';
+  }
+  // Путь к родительской заявке — звено той же строки, а не отдельная полоса над карточкой.
+  function parentReqLink(r) {
+    if (!r) return '';
+    const c = D().clients.find((x) => x.id === r.clientId) || {};
+    return '<button class="dcard-back" data-request="' + r.id + '">' + I('chevLeft') +
+      'К запросу · ' + escAttr(c.name || r.title) + '</button>';
+  }
+  function cardNavRow(items) {
+    const list = (items || []).filter(Boolean);
+    if (!list.length) return '';
+    return '<div class="dcard-navrow">' + list.join('<span class="dcard-navsep">·</span>') + '</div>';
   }
   // Full-page entity view. The header is the way back and nothing else: the verbs live in the
   // action bar inside entityBody, which is the one place a card keeps them.
@@ -5014,6 +5044,22 @@
     if (list.length <= 1) return list[0] || '';
     return list.slice(0, -1).join(', ') + ' и ' + list[list.length - 1];
   }
+  /* Справка, следующий шаг и «сейчас» — те же, что стоят на карточке, и потому доступны
+     Консьержу. Собирать их у него заново значило бы завести второй источник: экран и ответ
+     разошлись бы на первой же правке одного из них, и брокер получил бы два разных положения
+     дел по одной сделке. */
+  function dealBrief(id) {
+    const d = D().deals.find((x) => x.id === id);
+    return d ? dealBriefSentences(d) : [];
+  }
+  function dealNext(id) {
+    const d = D().deals.find((x) => x.id === id);
+    return d ? dealNextStep(d) : null;
+  }
+  function reqNow(id) {
+    const r = requestById(id);
+    return r ? { сейчас: reqStatusPhrase(r), дальше: reqNextAction(r) } : null;
+  }
   function dealStatusBrief(d) {
     return dxSec('sparkle', 'Справка по сделке', '<span class="badge ai-b">' + I('sparkle') + 'собрано AI</span>',
       '<p class="deal-brief">' + dealBriefSentences(d).join(' ') + '</p>');
@@ -5559,13 +5605,13 @@
       '<div class="dcard-aside-m-b">' + reqAside(r) + '</div></details>';
     const title = '<div class="dcard-title"><span class="deal-title-text">' + escAttr(r.title) + '</span></div>' +
       '<div class="dcard-sub">' + sub + '</div>';
-    return '<div class="obj-page-head">' + backBtn('requests', '', 'Назад ко входящим') + '</div>' +
-      '<div class="dcard">' +
-      '<div class="dcard-top">' + coverBand(bg, title) +
+    const nav = cardNavRow([backLink('requests', '', 'Назад ко входящим')]);
+    return '<div class="dcard">' +
+      '<div class="dcard-top">' + coverBand(bg, nav + title, entityActionBar(requestActions(r), 'icons')) +
       '<div class="dcard-pathrow">' + reqStepperSection(r) + '</div></div>' +
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + reqAside(r) + '</aside>' + aside +
-      '<div class="dcard-main">' + entityActionBar(requestActions(r)) +
+      '<div class="dcard-main">' +
       '<div class="deal-phrase">' + I('pulse') + '<span><b>Сейчас:</b> ' + reqStatusPhrase(r) + '</span></div>' +
       reqWork(r) + dealTabsBlock(spec) + '</div>' +
       '</div>' +
@@ -7066,7 +7112,7 @@
   // Deal / client as full-page views (не поп-ап): много информации — нужна страница со скроллом, как у объекта.
   // ---- Карточка сделки: полоса сверху · слева справка и участники · справа работа · ввод снизу ----
   // Порядок блоков — по частоте обращения, а не по важности «вообще».
-  function dealTopBand(d) {
+  function dealTopBand(d, navHtml) {
     const sub = [dealActionWord(d) + ' · ' + dealLotsLabel(d), d.goal, d.amount ? WS.AED(d.amount) : null]
       .filter(Boolean).join(' · ');
     // Обложка карточки — та же, что у объекта сделки: сделка узнаётся по объекту раньше,
@@ -7079,18 +7125,20 @@
       '<span class="deal-title-text" contenteditable="true" role="textbox" aria-label="Название сделки — нажмите, чтобы изменить" ' +
       'title="Кликните, чтобы изменить. Enter — сохранить, Esc — отменить">' + escAttr(d.title || 'Сделка') + '</span></div>' +
       '<div class="dcard-sub">' + sub + '</div>';
-    return '<div class="dcard-top">' + coverBand(bg, title) +
+    return '<div class="dcard-top">' +
+      coverBand(bg, (navHtml || '') + title, entityActionBar(dealActions(d), 'icons')) +
       '<div class="dcard-pathrow">' + dealPathSection(d) + '</div></div>';
   }
   /* Обложка карточки — она же первый экран: картинка объекта и поверх неё название и суть.
      Одна на сделку и на заявку, чтобы они не разъезжались снова. Без картинки полоса остаётся
      той же по составу — меняется только фон, а не раскладка. */
-  function coverBand(bg, inner) {
+  function coverBand(bg, inner, acts) {
     const style = bg
       ? ' style="background-image:linear-gradient(90deg,var(--surface) 10%,var(--wh-fade1) 58%,var(--wh-fade2) 100%),url(' + bg + ')"'
       : '';
     return '<div class="dcard-cover' + (bg ? '' : ' no-img') + '"' + style + '>' +
-      '<div class="dcard-hero-b">' + inner + '</div></div>';
+      '<div class="dcard-hero-b">' + inner + '</div>' +
+      (acts ? '<div class="dcard-acts">' + acts + '</div>' : '') + '</div>';
   }
   // Левая колонка: справка, условия запроса без заголовка, участники. Комиссии здесь нет — она
   // у объектов, потому что ставка принадлежит объекту, а не сделке.
@@ -7250,19 +7298,18 @@
     const spec = dealSpec(id);
     if (!spec) return viewClients();
     const d = D().deals.find((x) => x.id === id);
-    const crumb = (d && d.requestId) ? parentReqCrumb(requestById(d.requestId)) : '';
+    const crumb = (d && d.requestId) ? parentReqLink(requestById(d.requestId)) : '';
     // Узкий экран: левая колонка сворачивается в раскрываемую справку под названием, правая
     // встаёт стопкой. Свернули в <details>, а не во вкладки: он раскрывается без скрипта,
     // и ни один блок не пропадает — меняется только способ до него добраться.
     const aside = '<details class="dcard-aside-m"><summary>' + I('menu') + 'Справка и условия сделки</summary>' +
       '<div class="dcard-aside-m-b">' + dealAside(d) + '</div></details>';
-    return crumb +
-      '<div class="obj-page-head">' + backBtn('clients', 'deals', 'Назад к сделкам') + '</div>' +
-      '<div class="dcard">' + dealTopBand(d) +
+    return '<div class="dcard">' +
+      dealTopBand(d, cardNavRow([backLink('clients', 'deals', 'Назад к сделкам'), crumb])) +
       '<div class="dcard-cols">' +
       '<aside class="dcard-aside">' + dealAside(d) + '</aside>' +
       aside +
-      '<div class="dcard-main">' + entityActionBar(dealActions(d)) + dealChatPanel(d) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
+      '<div class="dcard-main">' + dealChatPanel(d) + dealWork(d) + dealTabsBlock(spec) + '</div>' +
       '</div>' + dealComposer(d) + '</div>';
   }
   // Вкладки карточки (параметры, контакты, задачи, документы, история) остаются как были —
@@ -10086,7 +10133,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
