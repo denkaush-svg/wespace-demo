@@ -1336,9 +1336,16 @@ setTimeout(async () => {
         sapi.setDealStage(early.id, 'won');
         check('шаги · кнопка «Успех» на карточке подчиняется тому же правилу',
           dealBy(early.id).stage === before, dealBy(early.id).stage);
-        sapi.setDealStage(early.id, last);
+        /* Разрешённый шаг та же кнопка ставит как раньше — иначе «дверь
+           спрашивает правило» незаметно стало бы «дверь заперта». Проверяется
+           «Отказом», а не подписью: шаги подписи, реестра и исполнения — это
+           те, на которых у сделки заводится договор, и тест, прогоняющий её
+           через них туда-обратно, оставляет за собой запись, которую
+           следующий тест справедливо считает лишней. Проверка правила не
+           должна оставлять следов работы. */
+        sapi.setDealStage(early.id, 'lost');
         check('шаги · а разрешённый шаг та же кнопка ставит как раньше',
-          dealBy(early.id).stage === last, dealBy(early.id).stage);
+          dealBy(early.id).stage === 'lost', dealBy(early.id).stage);
         sapi.setDealStage(early.id, wasStage);
       }
     }
