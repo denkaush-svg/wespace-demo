@@ -20,6 +20,15 @@
   // The route being LEFT is the one that was last rendered, not the one the store holds now: card
   // openers write their id before navigating, so reading the store at this point would already
   // return the destination.
+  /* Место, на котором экран оставили. Уходя со «Сделок» вглубь и возвращаясь, брокер
+     попадал в начало страницы — а он уходил с середины, из раздела, который сам и раскрыл.
+     Замерено: прокрутка 900 → 0. Положение снимается ЗДЕСЬ, пока уходящий экран ещё на
+     виду: после перерисовки его прокрутки уже не существует. */
+  function scrollNow() {
+    const m = document.getElementById('main');
+    const d = document.scrollingElement || document.documentElement;
+    return { main: m ? m.scrollTop : 0, doc: d ? d.scrollTop : 0 };
+  }
   function pushHistory() {
     const from = store.navHere, to = routeNow();
     if (!from || sameRoute(from, to)) return;
@@ -28,7 +37,7 @@
     // клиент → сделка → клиент would otherwise grow a trail nobody can walk back out of.
     const seen = st.findIndex((r) => sameRoute(r, to));
     if (seen >= 0) { st.length = seen; return; }
-    if (!sameRoute(st[st.length - 1], from)) st.push(from);
+    if (!sameRoute(st[st.length - 1], from)) st.push(Object.assign({}, from, { y: scrollNow() }));
     if (st.length > 24) st.shift();
   }
   WS.router = {
@@ -47,6 +56,8 @@
       if (!prev) return false;
       store.navOpen = false;
       WS.ui.closeModal();
+      // Возврат — не переход на новый экран, а продолжение прерванного: место восстанавливается.
+      WS.ui.restoreScroll(prev.y);
       const f = ROUTE_ID[prev.view];
       if (f) store[f] = prev.id;
       if (prev.tab) store.clientsTab = prev.tab;
@@ -87,6 +98,18 @@
   // Список фраз-ярлыков наружу: подсказка, которую система даёт брокеру, обязана состоять из
   // того, что она понимает, — либо планировщиком, либо этим списком. Проверять это можно только
   // зная обе половины.
+  /* `<details>` переключается сам, без нашего кода, и события `toggle` не всплывают —
+     поэтому слушаем на перехвате и только ЗАПИСЫВАЕМ выбор, не перерисовывая: перерисовка
+     здесь дралась бы с нативным раскрытием и мигала. */
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d || d.tagName !== 'DETAILS') return;
+    const key = d.getAttribute('data-pblock');
+    if (!key) return;
+    store.pulseOpen = store.pulseOpen || {};
+    store.pulseOpen[key] = d.open;
+  }, true);
+
   WS.router.promptShortcuts = () => Object.keys(PROMPT_SHORTCUTS);
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
@@ -276,6 +299,7 @@
       case 'contractDoc': WS.ui.contractDocOpen(t.dataset.kref, t.dataset.docname); break;
       case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
         WS.ui.contractAct(act, t.dataset.kref); break;
+      case 'goalDrill': WS.ui.goalDrill(t.dataset.goal); break;
       case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;

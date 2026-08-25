@@ -6362,6 +6362,99 @@ setTimeout(async () => {
       WS.store.prospIdx = 0;
       WS.router.go('start');
     }
+    /* ---- Качество экрана: ширина, возврат, углубление -------------------------------------
+       Проверено обходом всех кликабельных элементов Пульса в настоящем браузере (52 у агента,
+       31 у руководителя). Ниже закреплено то, что этот обход нашёл сломанным. */
+    {
+      const css = read('css/app.css');
+      /* Пульс был единственным экраном своей ширины: 1120 против 1180 у всех прочих, и при
+         переходе со «Сделок» страница уезжала на 30 пикселей вбок. Замерено в браузере:
+         start 1120@278, все остальные 1180@248. Высоту в jsdom не измерить — проверяется
+         правило, которое её задаёт. */
+      check('Пульс · рабочая область той же ширины, что у остальных экранов',
+        /\.start \{ max-width: 1180px; margin: 0 auto; padding: 26px 30px 80px; \}/.test(css) &&
+        /\.view \{ max-width: 1180px;/.test(css), 'ширина Пульса задана иначе, чем у .view');
+
+      /* Уходя вглубь и возвращаясь, брокер попадал в начало страницы — а уходил с середины.
+         Замерено: прокрутка 900 → 0, раскрытая «Аналитика» → закрыта. Прокрутки в jsdom нет,
+         поэтому проверяется механизм: место уезжает в след навигации и возвращается оттуда. */
+      WS.storeApi.resetAll(); WS.router.go('start'); WS.router.mark();
+      WS.ui.dealCard('d_anna');
+      const trail = (WS.store.navStack || [])[0];
+      check('Пульс · след навигации несёт место, с которого ушли',
+        !!trail && !!trail.y && typeof trail.y.main === 'number', JSON.stringify(trail));
+      /* Проверять `WS._restoreY` ПОСЛЕ возврата бессмысленно: перерисовка его тут же
+         съедает — в этом и смысл поля. Наблюдаем сам вызов и то, что уехало в него. */
+      const asked = [];
+      const origRestore = WS.ui.restoreScroll;
+      WS.ui.restoreScroll = (y) => { asked.push(y); return origRestore(y); };
+      WS.router.back();
+      WS.ui.restoreScroll = origRestore;
+      check('Пульс · «назад» просит вернуть это место, а не начало страницы',
+        asked.length === 1 && !!asked[0] && typeof asked[0].main === 'number', JSON.stringify(asked));
+
+      /* Раскрытый раздел — выбор пользователя, и он обязан пережить перерисовку. */
+      WS.store.pulseOpen = { analytics: true, day: false };
+      WS.router.go('start'); WS.ui.render();
+      const an = doc.querySelector('#app .start [data-pblock="analytics"]');
+      const dayB = doc.querySelector('#app .start [data-pblock="day"]');
+      check('Пульс · раскрытый раздел переживает перерисовку',
+        !!an && an.hasAttribute('open') && !!dayB && !dayB.hasAttribute('open'),
+        'analytics open=' + (an && an.hasAttribute('open')) + ' day open=' + (dayB && dayB.hasAttribute('open')));
+      WS.store.pulseOpen = {}; WS.ui.render();
+
+      /* Цель — самое крупное число на экране, и до сих пор оно никуда не вело. Теперь строка
+         ведёт к записям, из которых число сложилось, и НАЗЫВАЕТ перенесённый остаток, за
+         которым записей нет вовсе: без этой оговорки список молча не сходится с числом. */
+      const goalRow = doc.querySelector('#app .start .pgoal-row[data-act="goalDrill"]');
+      check('Пульс · строка цели ведёт к записям, из которых сложилось число', !!goalRow,
+        'строка цели не нажимается');
+      if (goalRow) {
+        goalRow.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        const m = doc.querySelector('#modal .modal');
+        const txt = m ? m.textContent.replace(/\s+/g, ' ') : '';
+        check('Пульс · раскрытие цели показывает сами сделки',
+          !!m && m.querySelectorAll('.feed-row').length >= 1 && /Из чего сложилось/.test(txt),
+          txt.slice(0, 110));
+        check('Пульс · и называет перенесённый остаток, за которым записей нет',
+          /строк за ними в стенде нет/.test(txt), txt.slice(0, 160));
+        WS.ui.closeModal();
+      }
+
+      /* Четыре плитки ряда открывали окно с записями, а «Проиграно» и «Средний цикл» уводили
+         на другой экран — в его начало, мимо обещанных причин. Одинаковые на вид плитки
+         обязаны вести себя одинаково. */
+      WS.router.go('start'); WS.ui.render();
+      doc.querySelectorAll('#app .start details').forEach((d2) => { d2.setAttribute('open', ''); });
+      ['lost', 'cycle'].forEach((k) => {
+        const t2 = doc.querySelector('#app .start [data-analytics="' + k + '"]');
+        check('Пульс · плитка «' + k + '» показывает записи, а не уводит на другой экран', !!t2,
+          'плитка ведёт не окном');
+        if (t2) {
+          t2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+          const m2 = doc.querySelector('#modal .modal');
+          check('Пульс · «' + k + '» открывает окно со строками',
+            !!m2 && m2.querySelectorAll('.feed-row').length >= 1,
+            m2 ? String(m2.querySelectorAll('.feed-row').length) : 'окна нет');
+          WS.ui.closeModal();
+        }
+      });
+
+      /* Объект, названный в возможности, открывается: до сих пор путь к юниту шёл через
+         «Объекты» и поиск по названию. */
+      WS.router.go('start'); WS.ui.render();
+      const link = doc.querySelector('#app .start .opps .opp-link[data-obj]');
+      check('Пульс · названный в возможности объект открывается с карточки', !!link,
+        'ссылки на объект нет');
+
+      /* Номера в стенде намеренно замаскированы. Ссылка «позвонить» на маску набрала бы не
+         того: из «+971 55 0•• ••34 (DEMO)» вычищается «+97155034». */
+      const ph = doc.querySelector('#app .start .pd-ph');
+      check('Пульс · замаскированный номер не притворяется набираемым',
+        !!ph && (ph.tagName === 'A' ? !/[•(]/.test(ph.textContent) : true),
+        ph ? ph.tagName + ' ' + ph.textContent.trim().slice(0, 30) : 'телефона нет');
+    }
+
     // То, что уже было выверено, перестройка сносить не имеет права.
     check('Пульс · строка Консьержа осталась первой', !!doc.getElementById('startPrompt'));
     check('Пульс · вход в «Сюжет дня» не потерян', !!pulse.querySelector('[data-act="presenter"]'));

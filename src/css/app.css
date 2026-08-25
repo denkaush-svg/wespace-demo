@@ -286,7 +286,14 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    START SCREEN — Concierge hero + analytics + quick actions
    ============================================================ */
-.start { max-width: 1120px; margin: 0 auto; padding: 30px 30px 80px; }
+/* Та же рабочая ширина, что у всех остальных экранов. Было 1120 против 1180 и 30 против 26
+   сверху: при переходе со «Сделок» на «Пульс» вся страница уезжала на 30 пикселей вбок и
+   меняла ширину колонки. Замерено: start ширина=1120 слева=278, все прочие 1180 и 248. */
+.start { max-width: 1180px; margin: 0 auto; padding: 26px 30px 80px; }
+/* Один шаг между разделами Пульса. Замерено до правки: 18 · 24 · 10 · 20 — четыре разных
+   зазора между пятью соседями. Пара «подпись раздела → его содержимое» намеренно теснее (10):
+   это не два раздела, а один. */
+.start > .wh { margin-bottom: 20px; }
 .greet { margin: 8px 0 22px; }
 .greet .eyebrow { font-size: 12px; color: var(--acc-2); font-weight: 600; letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
 .greet .eyebrow .live { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); animation: pulse 2.4s var(--ease) infinite; }
@@ -724,6 +731,31 @@ button { font-family: inherit; cursor: pointer; }
 .qa-bar.qa-icons .qa-act svg { width: 15px; height: 15px; }
 .qa-bar.qa-icons .qa-act > span { position: absolute; width: 1px; height: 1px; padding: 0;
   margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* Строка цели — кнопка к записям, из которых сложилось число. Кнопка не должна выглядеть
+   кнопкой: это полоса, к которой глаз привык, и менять её вид ради нажимаемости значило бы
+   переучивать чтению экрана ради одной новой возможности. */
+.pgoal-row { width: 100%; text-align: left; font: inherit; background: none; border: 0;
+  display: block; cursor: pointer; }
+.pgoal-drill { display: inline-flex; align-items: center; gap: 4px; margin-left: auto;
+  font-size: 11px; color: var(--faint); opacity: 0; transition: opacity .15s ease; }
+.pgoal-drill svg { width: 12px; height: 12px; }
+.pgoal-row:hover .pgoal-drill, .pgoal-row:focus-visible .pgoal-drill { opacity: 1; }
+.pgoal-row:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; border-radius: 10px; }
+/* Телефон в ежедневнике набирается. */
+.pd-ph { display: inline-flex; align-items: center; gap: 5px; color: var(--mut); text-decoration: none; }
+.pd-ph svg { width: 12px; height: 12px; opacity: .75; }
+.pd-ph:hover { color: var(--acc); }
+.pd-ph.is-masked { cursor: default; }
+.pd-ph.is-masked:hover { color: var(--mut); }
+/* Названный объект в возможности — ссылка на его карточку, а не подпись. */
+.opp-link { display: inline-flex; align-items: baseline; gap: 6px; text-align: left; font: inherit;
+  font-size: 12px; line-height: 1.45; color: var(--ink); background: none; border: 0; padding: 0;
+  cursor: pointer; }
+.opp-link svg { width: 12px; height: 12px; flex: none; color: var(--acc); opacity: .55; align-self: center; }
+.opp-link:hover { color: var(--acc); }
+.opp-link:hover svg { opacity: 1; }
+.opp-link:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 6px; }
+
 /* ==== Возможности в Пульсе ====================================================================
    Пять вопросов в одном порядке на каждой карточке: кому · почему · на чём основано · что
    предложить · что сделать. Раскладка держит этот порядок зрительно, чтобы взгляд находил

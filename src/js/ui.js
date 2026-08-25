@@ -347,17 +347,24 @@
   function closedBook(scope, period) {
     const deals = goalDeals(scope);
     const live = deals.filter(dealWon);
+    /* `live` — сделки, закрытые В СТЕНДЕ, у них есть записи. `carried` — итог периода,
+       перенесённый в профиль до начала стенда: строк за ним нет вовсе. Оба слагаемых уезжают
+       наружу, потому что «из чего сложилось» обязано назвать и то, чего показать нельзя, —
+       иначе список молча не сойдётся с числом над ним. */
     if (scope === 'team') {
       const attr = D().attribution || [];
+      const carried = { commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0)),
+        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0), what: 'книга агентства по источникам' };
       return {
-        commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
-        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + live.length,
+        commission: Math.round(carried.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+        deals: carried.deals + live.length, live: live, carried: carried,
       };
     }
     const own = ((D().users[S().role] || {}).closedPeriod || {})[period === 'quarter' ? 'quarter' : 'month'] || { commission: 0, deals: 0 };
     return {
       commission: Math.round(own.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
-      deals: own.deals + live.length,
+      deals: own.deals + live.length, live: live,
+      carried: { commission: own.commission, deals: own.deals, what: 'закрыто до начала стенда' },
     };
   }
   function goalFact(goal, scope) {
@@ -426,7 +433,11 @@
   function goalBandRow(goal, scope) {
     const p = computeGoalProgress(goal, scope);
     const pct = Math.max(0, Math.min(100, p.pct));
-    return '<div class="pgoal-row' + (p.behind ? ' is-behind' : '') + '" data-goal="' + goal.id + '">' +
+    /* Цель — самое крупное число на экране, и до сих пор оно никуда не вело: брокер видел
+       «выполнено 482 500» и не мог посмотреть, из каких сделок это сложилось. Строка стала
+       кнопкой к тем самым записям — по тому же разбору, по которому цифра и считалась. */
+    return '<button class="pgoal-row' + (p.behind ? ' is-behind' : '') +
+      '" data-act="goalDrill" data-goal="' + goal.id + '" title="Показать, из чего сложилось число">' +
       '<div class="pgoal-cells">' +
         '<div class="pgoal-cell"><div class="pgoal-k">Цель до ' + goalDeadline(goal) + '</div>' +
           '<div class="pgoal-v">Выполнено ' + goalValue(goal.metric, p.fact) + '</div></div>' +
@@ -435,13 +446,69 @@
       '</div>' +
       '<div class="pgoal-bar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="pgoal-foot"><span class="pgoal-pct">' + p.pct + '%</span>' +
-        I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
-      '</div>';
+        I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span>' +
+        '<span class="pgoal-drill">' + I('arrowRight') + 'из чего сложилось</span></div>' +
+      '</button>';
+  }
+  /* Записи, из которых сложилось число цели. Берутся тем же разбором, что и само число
+     (`goalFact` / `closedBook`), — иначе список и цифра разойдутся на первой же правке одной
+     из сторон, и брокер увидит на экране одно, а в раскрытии другое. */
+  function goalDrill(goalId) {
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    const goal = goalsOf(S().role).find((g) => g.id === goalId);
+    if (!goal) return;
+    const p = computeGoalProgress(goal, scope);
+    let rows = '', note = '', carried = '';
+    if (goal.metric === 'commission' || goal.metric === 'deals') {
+      const book = closedBook(scope, goal.period);
+      rows = (book.live || []).map((d) => feedRow('briefcase', 'i-ok', escAttr(d.title),
+        stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + ' · комиссия ' + WS.AED(Math.round(dealCommission(d))),
+        '<span data-deal="' + d.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
+      note = 'Закрытые сделки ' + (goal.period === 'quarter' ? 'за квартал' : 'за месяц') +
+        '. Комиссия по каждой — по ставке связанного объекта.';
+      const c = book.carried || {};
+      const cv = goal.metric === 'commission' ? c.commission : c.deals;
+      if (cv) {
+        carried = '<div class="prov" style="margin-bottom:10px"><span class="badge warn">' + I('lock') +
+          'Плюс ' + goalValue(goal.metric, cv) + ' — ' + escAttr(c.what || 'перенесённый итог') +
+          ': строк за ними в стенде нет</span></div>';
+      }
+    } else if (goal.metric === 'pipeline') {
+      const list = goalDeals(scope).filter((d) => !dealClosed(d) && !dealArchived(d));
+      rows = list.map((d) => feedRow('briefcase', 'i-acc', escAttr(d.title),
+        stageLabel(d.stage) + ' · ' + WS.AED(d.amount),
+        '<span data-deal="' + d.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
+      note = 'Сделки в работе прямо сейчас. Это остаток, а не накопление: темп к нему не применяется.';
+    } else if (goal.metric === 'shows') {
+      const mine = {}; goalDeals(scope).forEach((d) => { mine[d.clientId] = true; });
+      const list = (D().events || []).filter((e) => e.kind === 'show' && e.status !== 'canceled' &&
+        (scope === 'team' || mine[e.clientId]));
+      rows = list.map((e) => { const c = (D().clients || []).find((x) => x.id === e.clientId) || {};
+        return feedRow('calendar', 'i-acc', escAttr(e.title || 'Показ'),
+          [c.name, e.when].filter(Boolean).join(' · '), ''); }).join('');
+      note = 'Показы по вашим клиентам. В счёт идут состоявшиеся: назначенный на сегодня 16:00 ещё не считается.';
+    } else if (goal.metric === 'leads') {
+      const mine = {}; goalDeals(scope).forEach((d) => { mine[d.clientId] = true; });
+      const list = (D().clients || []).filter((c) => scope === 'team' || mine[c.id]);
+      rows = list.map((c) => feedRow('users', 'i-acc', escAttr(c.name),
+        [CONTACT_KIND_LABEL[c.contactKind], c.budget ? WS.AED(c.budget) : null].filter(Boolean).join(' · '),
+        '<span data-client="' + c.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
+      note = 'Контакты, по которым у вас есть сделка.';
+    }
+    openModal('Из чего сложилось · ' + escAttr(goal.label),
+      '<p style="font-size:12.5px;color:var(--mut);margin-top:0">' + escAttr(note) +
+      ' Выполнено ' + goalValue(goal.metric, p.fact) + ' из ' + goalValue(goal.metric, goal.target) + '.</p>' +
+      carried +
+      (rows ? '<div class="card"><div class="feed" style="padding:2px 16px">' + rows + '</div></div>'
+            : '<div class="card pad" style="color:var(--faint)">записей за период в стенде нет</div>'),
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
   function pulseMyGoals() {
     const goals = goalsOf(S().role);
     const pinned = goals.filter((g) => g.pinned);
-    const head = '<div class="wq-head" style="margin:24px 0 0"><div class="section-label" style="margin:0">' +
+    // Шаг между разделами Пульса один — 20 пикселей. Было 18 · 24 · 20 подряд, три разных
+    // зазора между четырьмя соседями: глаз читает это как случайность, а не как ритм.
+    const head = '<div class="wq-head" style="margin:20px 0 0"><div class="section-label" style="margin:0">' +
       (S().role === 'manager' ? 'План отдела' : 'Мои цели') + '</div>' +
       '<button class="btn sm" data-nav="profile">' + I('target') + 'Настроить цели</button></div>';
     if (!pinned.length) {
@@ -605,6 +672,8 @@
       if (kind === 'closed') { title = 'Успешные сделки'; list = deals.filter(dealWon); }
       else if (kind === 'hot') { title = 'Горячие сделки · SLA < 2 ч'; list = deals.filter((d) => d.hot); }
       else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d) && !dealArchived(d)); }
+      else if (kind === 'lost') { title = 'Проигранные сделки'; list = deals.filter((d) => d.stage === 'lost'); }
+      else if (kind === 'cycle') { title = 'Из чего считается средний цикл'; list = deals.filter(dealClosed); }
       else if (kind.indexOf('src:') === 0) { const s = kind.slice(4); title = 'Сделки · источник «' + s + '»'; list = deals.filter((d) => d.source === s); }
       rows = list.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') + '</div></div>' + I('arrowRight') + '</div>').join('');
     }
@@ -650,8 +719,14 @@
   // рабочую область в одном экране на семь тем. Взято его РАЗБИЕНИЕ, а не рисунок: те же разделы
   // стоят блоками сверху вниз, каждый сворачивается, и свёрнутый занимает одну строку.
   // Свёрнуто через <details> — раскрывается без скрипта, как и левая колонка карточки сделки.
+  /* Раскрытый раздел — это выбор пользователя, и он обязан пережить уход в карточку и
+     возврат. Раньше `<details>` перерисовывался с нуля, и «Аналитика», открытая минуту
+     назад, встречала закрытой. Состояние хранится по ключу раздела; умолчание остаётся
+     умолчанием только до первого касания. */
   function pulseBlock(key, title, sub, body, openByDefault) {
-    return '<details class="pblock"' + (openByDefault ? ' open' : '') + ' data-pblock="' + key + '">' +
+    const kept = (S().pulseOpen || {})[key];
+    const isOpen = kept === undefined ? openByDefault : kept;
+    return '<details class="pblock"' + (isOpen ? ' open' : '') + ' data-pblock="' + key + '">' +
       '<summary><span class="pb-t">' + title + '</span>' +
       (sub ? '<span class="pb-m">' + sub + '</span>' : '') + I('chevDown') + '</summary>' +
       '<div class="pb-body">' + body + '</div></details>';
@@ -704,7 +779,15 @@
         : '<span style="color:var(--faint)">без сделки</span>';
       const c = it.clientId ? (D().clients || []).find((x) => x.id === it.clientId) : null;
       const who = c ? '<button class="lnk" data-client="' + c.id + '">' + escAttr(c.name) + '</button>' +
-        (c.phone ? '<div class="pd-ph">' + escAttr(c.phone) + '</div>' : '') : '—';
+        /* Номер был текстом: агент видел его и не мог набрать. Но в стенде номера намеренно
+           замаскированы («+971 55 0•• ••34 (DEMO)»), и ссылка «позвонить» на такой номер
+           набрала бы не того: из маски вычищается «+97155034». Поэтому набирается только
+           ПОЛНЫЙ номер, а замаскированный остаётся тем, что он есть, — подписью. */
+        (c.phone ? (/^[+\d][\d\s()+-]*$/.test(c.phone)
+          ? '<a class="pd-ph" href="tel:' + escAttr(String(c.phone).replace(/[^\d+]/g, '')) +
+            '" title="Позвонить">' + I('phone') + escAttr(c.phone) + '</a>'
+          : '<span class="pd-ph is-masked" title="В стенде номер скрыт — звонок из карточки контакта">' +
+            I('phone') + escAttr(c.phone) + '</span>') : '') : '—';
       const k = DAY_KIND[it.kind] || ['Задача', 'check', 'k-task'];
       // Срочность — полосой слева на всю строку, а не только цветом даты: список читается
       // сверху вниз одним движением, «что горит» видно раньше, чем прочитано хоть одно слово.
@@ -1140,8 +1223,14 @@
       '<p class="opp-why">' + escAttr(p.why) + '</p>' +
       '<div class="opp-basis"><div class="opp-lbl">' + I('radar') + 'На чём основано</div>' + basis + '</div>' +
       '<div class="opp-plan">' +
+      /* Названный объект — ссылка на его карточку. Брокер читает «Creek Rise, Unit 2703 ·
+         1 880 000» и первым делом хочет посмотреть сам юнит; до сих пор это был просто текст,
+         и путь к объекту шёл через «Объекты» и поиск по названию. */
       '<div class="opp-line"><span class="opp-lbl">' + I('target') + 'Что предложить</span>' +
-      '<span class="opp-t">' + escAttr(p.offer) + '</span></div>' +
+      (p.objId
+        ? '<button class="opp-t opp-link" data-obj="' + p.objId + '" title="Открыть карточку объекта">' +
+          escAttr(p.offer) + I('arrowRight') + '</button>'
+        : '<span class="opp-t">' + escAttr(p.offer) + '</span>') + '</div>' +
       '<div class="opp-line"><span class="opp-lbl">' + I('arrowRight') + 'Первый шаг</span>' +
       '<span class="opp-t">' + escAttr(p.act) + '</span></div></div>' +
       '<footer class="opp-f"><button class="btn sm primary" data-client="' + p.clientId + '">' +
@@ -1252,8 +1341,12 @@
     return '<div class="tiles dash">' +
       tile('briefcase', 'Сделки в работе', live.length, '', 'span 4', 'по всем воронкам', '', 'accent', 'data-analytics="pipeline"') +
       tile('check', 'Закрыто успешно', won.length, '', 'span 4', won.length ? WS.AED(won.reduce((s, d) => s + (d.amount || 0), 0)) : '—', '', '', 'data-analytics="closed"') +
-      tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причины — в аналитике отдела', '', '', 'data-nav="analytics"') +
-      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'от заявки до закрытия', '', '', 'data-nav="analytics"') +
+      /* Четыре плитки ряда открывают окно с записями, а эти две уводили на другой экран — и
+         открывали его сверху, мимо обещанного: подпись «причины — в аналитике отдела» не
+         показывала причин. Одинаковые на вид плитки обязаны вести себя одинаково, и «показать
+         записи» — то, ради чего на цифру и нажимают. */
+      tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причина и сумма по каждой', '', '', 'data-analytics="lost"') +
+      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'из чего считается среднее', '', '', 'data-analytics="cycle"') +
       tile('money', 'Ожидаемая комиссия', WS.AED(computeMetrics().expectedComm), '', 'span 6', 'из активного пайплайна', '', '', 'data-analytics="pipeline"') +
       '<button class="tile wide" data-analytics="pipeline"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
@@ -10461,6 +10554,8 @@
 
   // Один и тот же экран с той же открытой записью — не переход, а обновление: прокрутка
   // сохраняется. Другая запись или другой раздел — начинаем сверху, как и раньше.
+  // Место, куда вернуться после «назад». Применяется один раз, ближайшей перерисовкой.
+  function restoreScroll(y) { WS._restoreY = y || null; }
   function renderKey(st) {
     return [st.view, st.dealId, st.requestId, st.clientId, st.companyId, st.objectId, st.contractId].join('|');
   }
@@ -10500,6 +10595,17 @@
     if (st.incompatible) { showIncompatible(); st.incompatible = false; }
 
     if (focusId) { const elx = document.getElementById(focusId); if (elx) { elx.focus(); try { elx.setSelectionRange(caret, caret); } catch (e) {} } }
+    // Возврат «назад» просит вернуть место, с которого ушли, — оно сильнее обычного правила
+    // «другой экран открывается сверху».
+    const back = WS._restoreY; WS._restoreY = null;
+    if (back) {
+      const scb = document.scrollingElement || document.documentElement;
+      const mb = document.getElementById('main');
+      requestAnimationFrame(() => {
+        if (scb && back.doc) scb.scrollTop = back.doc;
+        if (mb && back.main) mb.scrollTop = back.main;
+      });
+    }
     if (keepY || keepMainY) {
       const sc = document.scrollingElement || document.documentElement;
       if (sc && keepY) sc.scrollTop = keepY;
@@ -10524,7 +10630,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

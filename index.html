@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 00:36</title>
+  <title>WESPACE · сборка 01:01</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='00:36';
+    window.WS_BUILD='01:01';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -436,7 +436,14 @@ button { font-family: inherit; cursor: pointer; }
 /* ============================================================
    START SCREEN — Concierge hero + analytics + quick actions
    ============================================================ */
-.start { max-width: 1120px; margin: 0 auto; padding: 30px 30px 80px; }
+/* Та же рабочая ширина, что у всех остальных экранов. Было 1120 против 1180 и 30 против 26
+   сверху: при переходе со «Сделок» на «Пульс» вся страница уезжала на 30 пикселей вбок и
+   меняла ширину колонки. Замерено: start ширина=1120 слева=278, все прочие 1180 и 248. */
+.start { max-width: 1180px; margin: 0 auto; padding: 26px 30px 80px; }
+/* Один шаг между разделами Пульса. Замерено до правки: 18 · 24 · 10 · 20 — четыре разных
+   зазора между пятью соседями. Пара «подпись раздела → его содержимое» намеренно теснее (10):
+   это не два раздела, а один. */
+.start > .wh { margin-bottom: 20px; }
 .greet { margin: 8px 0 22px; }
 .greet .eyebrow { font-size: 12px; color: var(--acc-2); font-weight: 600; letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
 .greet .eyebrow .live { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); animation: pulse 2.4s var(--ease) infinite; }
@@ -874,6 +881,31 @@ button { font-family: inherit; cursor: pointer; }
 .qa-bar.qa-icons .qa-act svg { width: 15px; height: 15px; }
 .qa-bar.qa-icons .qa-act > span { position: absolute; width: 1px; height: 1px; padding: 0;
   margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* Строка цели — кнопка к записям, из которых сложилось число. Кнопка не должна выглядеть
+   кнопкой: это полоса, к которой глаз привык, и менять её вид ради нажимаемости значило бы
+   переучивать чтению экрана ради одной новой возможности. */
+.pgoal-row { width: 100%; text-align: left; font: inherit; background: none; border: 0;
+  display: block; cursor: pointer; }
+.pgoal-drill { display: inline-flex; align-items: center; gap: 4px; margin-left: auto;
+  font-size: 11px; color: var(--faint); opacity: 0; transition: opacity .15s ease; }
+.pgoal-drill svg { width: 12px; height: 12px; }
+.pgoal-row:hover .pgoal-drill, .pgoal-row:focus-visible .pgoal-drill { opacity: 1; }
+.pgoal-row:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; border-radius: 10px; }
+/* Телефон в ежедневнике набирается. */
+.pd-ph { display: inline-flex; align-items: center; gap: 5px; color: var(--mut); text-decoration: none; }
+.pd-ph svg { width: 12px; height: 12px; opacity: .75; }
+.pd-ph:hover { color: var(--acc); }
+.pd-ph.is-masked { cursor: default; }
+.pd-ph.is-masked:hover { color: var(--mut); }
+/* Названный объект в возможности — ссылка на его карточку, а не подпись. */
+.opp-link { display: inline-flex; align-items: baseline; gap: 6px; text-align: left; font: inherit;
+  font-size: 12px; line-height: 1.45; color: var(--ink); background: none; border: 0; padding: 0;
+  cursor: pointer; }
+.opp-link svg { width: 12px; height: 12px; flex: none; color: var(--acc); opacity: .55; align-self: center; }
+.opp-link:hover { color: var(--acc); }
+.opp-link:hover svg { opacity: 1; }
+.opp-link:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 6px; }
+
 /* ==== Возможности в Пульсе ====================================================================
    Пять вопросов в одном порядке на каждой карточке: кому · почему · на чём основано · что
    предложить · что сделать. Раскладка держит этот порядок зрительно, чтобы взгляд находил
@@ -4806,7 +4838,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', prospIdx: 0, prospDeck: false, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -4960,7 +4992,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.cgGroupCollapse = {};
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
-    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.prospIdx = 0; store.prospDeck = false; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
+    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.cgLang = 'ru'; store.cgDocLang = 'auto';
     store.dealArchivedOnly = false; store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
@@ -7661,17 +7693,24 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function closedBook(scope, period) {
     const deals = goalDeals(scope);
     const live = deals.filter(dealWon);
+    /* `live` — сделки, закрытые В СТЕНДЕ, у них есть записи. `carried` — итог периода,
+       перенесённый в профиль до начала стенда: строк за ним нет вовсе. Оба слагаемых уезжают
+       наружу, потому что «из чего сложилось» обязано назвать и то, чего показать нельзя, —
+       иначе список молча не сойдётся с числом над ним. */
     if (scope === 'team') {
       const attr = D().attribution || [];
+      const carried = { commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0)),
+        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0), what: 'книга агентства по источникам' };
       return {
-        commission: Math.round(attr.reduce((s2, x) => s2 + (x.commission || 0), 0) + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
-        deals: attr.reduce((s2, x) => s2 + (x.deals || 0), 0) + live.length,
+        commission: Math.round(carried.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
+        deals: carried.deals + live.length, live: live, carried: carried,
       };
     }
     const own = ((D().users[S().role] || {}).closedPeriod || {})[period === 'quarter' ? 'quarter' : 'month'] || { commission: 0, deals: 0 };
     return {
       commission: Math.round(own.commission + live.reduce((s2, d) => s2 + dealCommission(d), 0)),
-      deals: own.deals + live.length,
+      deals: own.deals + live.length, live: live,
+      carried: { commission: own.commission, deals: own.deals, what: 'закрыто до начала стенда' },
     };
   }
   function goalFact(goal, scope) {
@@ -7740,7 +7779,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function goalBandRow(goal, scope) {
     const p = computeGoalProgress(goal, scope);
     const pct = Math.max(0, Math.min(100, p.pct));
-    return '<div class="pgoal-row' + (p.behind ? ' is-behind' : '') + '" data-goal="' + goal.id + '">' +
+    /* Цель — самое крупное число на экране, и до сих пор оно никуда не вело: брокер видел
+       «выполнено 482 500» и не мог посмотреть, из каких сделок это сложилось. Строка стала
+       кнопкой к тем самым записям — по тому же разбору, по которому цифра и считалась. */
+    return '<button class="pgoal-row' + (p.behind ? ' is-behind' : '') +
+      '" data-act="goalDrill" data-goal="' + goal.id + '" title="Показать, из чего сложилось число">' +
       '<div class="pgoal-cells">' +
         '<div class="pgoal-cell"><div class="pgoal-k">Цель до ' + goalDeadline(goal) + '</div>' +
           '<div class="pgoal-v">Выполнено ' + goalValue(goal.metric, p.fact) + '</div></div>' +
@@ -7749,13 +7792,69 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '</div>' +
       '<div class="pgoal-bar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="pgoal-foot"><span class="pgoal-pct">' + p.pct + '%</span>' +
-        I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span></div>' +
-      '</div>';
+        I(p.behind ? 'warn' : 'check') + '<span>' + p.pace + '</span>' +
+        '<span class="pgoal-drill">' + I('arrowRight') + 'из чего сложилось</span></div>' +
+      '</button>';
+  }
+  /* Записи, из которых сложилось число цели. Берутся тем же разбором, что и само число
+     (`goalFact` / `closedBook`), — иначе список и цифра разойдутся на первой же правке одной
+     из сторон, и брокер увидит на экране одно, а в раскрытии другое. */
+  function goalDrill(goalId) {
+    const scope = S().role === 'manager' ? 'team' : 'me';
+    const goal = goalsOf(S().role).find((g) => g.id === goalId);
+    if (!goal) return;
+    const p = computeGoalProgress(goal, scope);
+    let rows = '', note = '', carried = '';
+    if (goal.metric === 'commission' || goal.metric === 'deals') {
+      const book = closedBook(scope, goal.period);
+      rows = (book.live || []).map((d) => feedRow('briefcase', 'i-ok', escAttr(d.title),
+        stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + ' · комиссия ' + WS.AED(Math.round(dealCommission(d))),
+        '<span data-deal="' + d.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
+      note = 'Закрытые сделки ' + (goal.period === 'quarter' ? 'за квартал' : 'за месяц') +
+        '. Комиссия по каждой — по ставке связанного объекта.';
+      const c = book.carried || {};
+      const cv = goal.metric === 'commission' ? c.commission : c.deals;
+      if (cv) {
+        carried = '<div class="prov" style="margin-bottom:10px"><span class="badge warn">' + I('lock') +
+          'Плюс ' + goalValue(goal.metric, cv) + ' — ' + escAttr(c.what || 'перенесённый итог') +
+          ': строк за ними в стенде нет</span></div>';
+      }
+    } else if (goal.metric === 'pipeline') {
+      const list = goalDeals(scope).filter((d) => !dealClosed(d) && !dealArchived(d));
+      rows = list.map((d) => feedRow('briefcase', 'i-acc', escAttr(d.title),
+        stageLabel(d.stage) + ' · ' + WS.AED(d.amount),
+        '<span data-deal="' + d.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
+      note = 'Сделки в работе прямо сейчас. Это остаток, а не накопление: темп к нему не применяется.';
+    } else if (goal.metric === 'shows') {
+      const mine = {}; goalDeals(scope).forEach((d) => { mine[d.clientId] = true; });
+      const list = (D().events || []).filter((e) => e.kind === 'show' && e.status !== 'canceled' &&
+        (scope === 'team' || mine[e.clientId]));
+      rows = list.map((e) => { const c = (D().clients || []).find((x) => x.id === e.clientId) || {};
+        return feedRow('calendar', 'i-acc', escAttr(e.title || 'Показ'),
+          [c.name, e.when].filter(Boolean).join(' · '), ''); }).join('');
+      note = 'Показы по вашим клиентам. В счёт идут состоявшиеся: назначенный на сегодня 16:00 ещё не считается.';
+    } else if (goal.metric === 'leads') {
+      const mine = {}; goalDeals(scope).forEach((d) => { mine[d.clientId] = true; });
+      const list = (D().clients || []).filter((c) => scope === 'team' || mine[c.id]);
+      rows = list.map((c) => feedRow('users', 'i-acc', escAttr(c.name),
+        [CONTACT_KIND_LABEL[c.contactKind], c.budget ? WS.AED(c.budget) : null].filter(Boolean).join(' · '),
+        '<span data-client="' + c.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
+      note = 'Контакты, по которым у вас есть сделка.';
+    }
+    openModal('Из чего сложилось · ' + escAttr(goal.label),
+      '<p style="font-size:12.5px;color:var(--mut);margin-top:0">' + escAttr(note) +
+      ' Выполнено ' + goalValue(goal.metric, p.fact) + ' из ' + goalValue(goal.metric, goal.target) + '.</p>' +
+      carried +
+      (rows ? '<div class="card"><div class="feed" style="padding:2px 16px">' + rows + '</div></div>'
+            : '<div class="card pad" style="color:var(--faint)">записей за период в стенде нет</div>'),
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
   function pulseMyGoals() {
     const goals = goalsOf(S().role);
     const pinned = goals.filter((g) => g.pinned);
-    const head = '<div class="wq-head" style="margin:24px 0 0"><div class="section-label" style="margin:0">' +
+    // Шаг между разделами Пульса один — 20 пикселей. Было 18 · 24 · 20 подряд, три разных
+    // зазора между четырьмя соседями: глаз читает это как случайность, а не как ритм.
+    const head = '<div class="wq-head" style="margin:20px 0 0"><div class="section-label" style="margin:0">' +
       (S().role === 'manager' ? 'План отдела' : 'Мои цели') + '</div>' +
       '<button class="btn sm" data-nav="profile">' + I('target') + 'Настроить цели</button></div>';
     if (!pinned.length) {
@@ -7919,6 +8018,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       if (kind === 'closed') { title = 'Успешные сделки'; list = deals.filter(dealWon); }
       else if (kind === 'hot') { title = 'Горячие сделки · SLA < 2 ч'; list = deals.filter((d) => d.hot); }
       else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d) && !dealArchived(d)); }
+      else if (kind === 'lost') { title = 'Проигранные сделки'; list = deals.filter((d) => d.stage === 'lost'); }
+      else if (kind === 'cycle') { title = 'Из чего считается средний цикл'; list = deals.filter(dealClosed); }
       else if (kind.indexOf('src:') === 0) { const s = kind.slice(4); title = 'Сделки · источник «' + s + '»'; list = deals.filter((d) => d.source === s); }
       rows = list.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') + '</div></div>' + I('arrowRight') + '</div>').join('');
     }
@@ -7964,8 +8065,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // рабочую область в одном экране на семь тем. Взято его РАЗБИЕНИЕ, а не рисунок: те же разделы
   // стоят блоками сверху вниз, каждый сворачивается, и свёрнутый занимает одну строку.
   // Свёрнуто через <details> — раскрывается без скрипта, как и левая колонка карточки сделки.
+  /* Раскрытый раздел — это выбор пользователя, и он обязан пережить уход в карточку и
+     возврат. Раньше `<details>` перерисовывался с нуля, и «Аналитика», открытая минуту
+     назад, встречала закрытой. Состояние хранится по ключу раздела; умолчание остаётся
+     умолчанием только до первого касания. */
   function pulseBlock(key, title, sub, body, openByDefault) {
-    return '<details class="pblock"' + (openByDefault ? ' open' : '') + ' data-pblock="' + key + '">' +
+    const kept = (S().pulseOpen || {})[key];
+    const isOpen = kept === undefined ? openByDefault : kept;
+    return '<details class="pblock"' + (isOpen ? ' open' : '') + ' data-pblock="' + key + '">' +
       '<summary><span class="pb-t">' + title + '</span>' +
       (sub ? '<span class="pb-m">' + sub + '</span>' : '') + I('chevDown') + '</summary>' +
       '<div class="pb-body">' + body + '</div></details>';
@@ -8018,7 +8125,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         : '<span style="color:var(--faint)">без сделки</span>';
       const c = it.clientId ? (D().clients || []).find((x) => x.id === it.clientId) : null;
       const who = c ? '<button class="lnk" data-client="' + c.id + '">' + escAttr(c.name) + '</button>' +
-        (c.phone ? '<div class="pd-ph">' + escAttr(c.phone) + '</div>' : '') : '—';
+        /* Номер был текстом: агент видел его и не мог набрать. Но в стенде номера намеренно
+           замаскированы («+971 55 0•• ••34 (DEMO)»), и ссылка «позвонить» на такой номер
+           набрала бы не того: из маски вычищается «+97155034». Поэтому набирается только
+           ПОЛНЫЙ номер, а замаскированный остаётся тем, что он есть, — подписью. */
+        (c.phone ? (/^[+\d][\d\s()+-]*$/.test(c.phone)
+          ? '<a class="pd-ph" href="tel:' + escAttr(String(c.phone).replace(/[^\d+]/g, '')) +
+            '" title="Позвонить">' + I('phone') + escAttr(c.phone) + '</a>'
+          : '<span class="pd-ph is-masked" title="В стенде номер скрыт — звонок из карточки контакта">' +
+            I('phone') + escAttr(c.phone) + '</span>') : '') : '—';
       const k = DAY_KIND[it.kind] || ['Задача', 'check', 'k-task'];
       // Срочность — полосой слева на всю строку, а не только цветом даты: список читается
       // сверху вниз одним движением, «что горит» видно раньше, чем прочитано хоть одно слово.
@@ -8454,8 +8569,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<p class="opp-why">' + escAttr(p.why) + '</p>' +
       '<div class="opp-basis"><div class="opp-lbl">' + I('radar') + 'На чём основано</div>' + basis + '</div>' +
       '<div class="opp-plan">' +
+      /* Названный объект — ссылка на его карточку. Брокер читает «Creek Rise, Unit 2703 ·
+         1 880 000» и первым делом хочет посмотреть сам юнит; до сих пор это был просто текст,
+         и путь к объекту шёл через «Объекты» и поиск по названию. */
       '<div class="opp-line"><span class="opp-lbl">' + I('target') + 'Что предложить</span>' +
-      '<span class="opp-t">' + escAttr(p.offer) + '</span></div>' +
+      (p.objId
+        ? '<button class="opp-t opp-link" data-obj="' + p.objId + '" title="Открыть карточку объекта">' +
+          escAttr(p.offer) + I('arrowRight') + '</button>'
+        : '<span class="opp-t">' + escAttr(p.offer) + '</span>') + '</div>' +
       '<div class="opp-line"><span class="opp-lbl">' + I('arrowRight') + 'Первый шаг</span>' +
       '<span class="opp-t">' + escAttr(p.act) + '</span></div></div>' +
       '<footer class="opp-f"><button class="btn sm primary" data-client="' + p.clientId + '">' +
@@ -8566,8 +8687,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return '<div class="tiles dash">' +
       tile('briefcase', 'Сделки в работе', live.length, '', 'span 4', 'по всем воронкам', '', 'accent', 'data-analytics="pipeline"') +
       tile('check', 'Закрыто успешно', won.length, '', 'span 4', won.length ? WS.AED(won.reduce((s, d) => s + (d.amount || 0), 0)) : '—', '', '', 'data-analytics="closed"') +
-      tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причины — в аналитике отдела', '', '', 'data-nav="analytics"') +
-      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'от заявки до закрытия', '', '', 'data-nav="analytics"') +
+      /* Четыре плитки ряда открывают окно с записями, а эти две уводили на другой экран — и
+         открывали его сверху, мимо обещанного: подпись «причины — в аналитике отдела» не
+         показывала причин. Одинаковые на вид плитки обязаны вести себя одинаково, и «показать
+         записи» — то, ради чего на цифру и нажимают. */
+      tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причина и сумма по каждой', '', '', 'data-analytics="lost"') +
+      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'из чего считается среднее', '', '', 'data-analytics="cycle"') +
       tile('money', 'Ожидаемая комиссия', WS.AED(computeMetrics().expectedComm), '', 'span 6', 'из активного пайплайна', '', '', 'data-analytics="pipeline"') +
       '<button class="tile wide" data-analytics="pipeline"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
@@ -17775,6 +17900,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
 
   // Один и тот же экран с той же открытой записью — не переход, а обновление: прокрутка
   // сохраняется. Другая запись или другой раздел — начинаем сверху, как и раньше.
+  // Место, куда вернуться после «назад». Применяется один раз, ближайшей перерисовкой.
+  function restoreScroll(y) { WS._restoreY = y || null; }
   function renderKey(st) {
     return [st.view, st.dealId, st.requestId, st.clientId, st.companyId, st.objectId, st.contractId].join('|');
   }
@@ -17814,6 +17941,17 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (st.incompatible) { showIncompatible(); st.incompatible = false; }
 
     if (focusId) { const elx = document.getElementById(focusId); if (elx) { elx.focus(); try { elx.setSelectionRange(caret, caret); } catch (e) {} } }
+    // Возврат «назад» просит вернуть место, с которого ушли, — оно сильнее обычного правила
+    // «другой экран открывается сверху».
+    const back = WS._restoreY; WS._restoreY = null;
+    if (back) {
+      const scb = document.scrollingElement || document.documentElement;
+      const mb = document.getElementById('main');
+      requestAnimationFrame(() => {
+        if (scb && back.doc) scb.scrollTop = back.doc;
+        if (mb && back.main) mb.scrollTop = back.main;
+      });
+    }
     if (keepY || keepMainY) {
       const sc = document.scrollingElement || document.documentElement;
       if (sc && keepY) sc.scrollTop = keepY;
@@ -17838,7 +17976,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -20337,6 +20475,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // The route being LEFT is the one that was last rendered, not the one the store holds now: card
   // openers write their id before navigating, so reading the store at this point would already
   // return the destination.
+  /* Место, на котором экран оставили. Уходя со «Сделок» вглубь и возвращаясь, брокер
+     попадал в начало страницы — а он уходил с середины, из раздела, который сам и раскрыл.
+     Замерено: прокрутка 900 → 0. Положение снимается ЗДЕСЬ, пока уходящий экран ещё на
+     виду: после перерисовки его прокрутки уже не существует. */
+  function scrollNow() {
+    const m = document.getElementById('main');
+    const d = document.scrollingElement || document.documentElement;
+    return { main: m ? m.scrollTop : 0, doc: d ? d.scrollTop : 0 };
+  }
   function pushHistory() {
     const from = store.navHere, to = routeNow();
     if (!from || sameRoute(from, to)) return;
@@ -20345,7 +20492,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     // клиент → сделка → клиент would otherwise grow a trail nobody can walk back out of.
     const seen = st.findIndex((r) => sameRoute(r, to));
     if (seen >= 0) { st.length = seen; return; }
-    if (!sameRoute(st[st.length - 1], from)) st.push(from);
+    if (!sameRoute(st[st.length - 1], from)) st.push(Object.assign({}, from, { y: scrollNow() }));
     if (st.length > 24) st.shift();
   }
   WS.router = {
@@ -20364,6 +20511,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       if (!prev) return false;
       store.navOpen = false;
       WS.ui.closeModal();
+      // Возврат — не переход на новый экран, а продолжение прерванного: место восстанавливается.
+      WS.ui.restoreScroll(prev.y);
       const f = ROUTE_ID[prev.view];
       if (f) store[f] = prev.id;
       if (prev.tab) store.clientsTab = prev.tab;
@@ -20404,6 +20553,18 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // Список фраз-ярлыков наружу: подсказка, которую система даёт брокеру, обязана состоять из
   // того, что она понимает, — либо планировщиком, либо этим списком. Проверять это можно только
   // зная обе половины.
+  /* `<details>` переключается сам, без нашего кода, и события `toggle` не всплывают —
+     поэтому слушаем на перехвате и только ЗАПИСЫВАЕМ выбор, не перерисовывая: перерисовка
+     здесь дралась бы с нативным раскрытием и мигала. */
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d || d.tagName !== 'DETAILS') return;
+    const key = d.getAttribute('data-pblock');
+    if (!key) return;
+    store.pulseOpen = store.pulseOpen || {};
+    store.pulseOpen[key] = d.open;
+  }, true);
+
   WS.router.promptShortcuts = () => Object.keys(PROMPT_SHORTCUTS);
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
@@ -20593,6 +20754,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'contractDoc': WS.ui.contractDocOpen(t.dataset.kref, t.dataset.docname); break;
       case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
         WS.ui.contractAct(act, t.dataset.kref); break;
+      case 'goalDrill': WS.ui.goalDrill(t.dataset.goal); break;
       case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
