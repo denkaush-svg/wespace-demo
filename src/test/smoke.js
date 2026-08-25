@@ -1646,8 +1646,10 @@ setTimeout(async () => {
 
     // Деньги заявки — намерение, деньги сделки — согласованная цифра. В одну строку они не идут.
     const prov = doc.querySelector('#app .card .prov').textContent;
-    check('воронка · пайплайн и потенциал названы порознь',
-      /Пайплайн по сделкам/.test(prov) && /Потенциал заявок/.test(prov), prov.slice(0, 90));
+    /* «Пайплайн» ушёл из интерфейса: на одном экране это же понятие называлось «активными
+       сделками» и «сделками в работе». Проверка про РАЗДЕЛЬНОСТЬ двух чисел, а не про слово. */
+    check('воронка · сделки в работе и потенциал заявок названы порознь',
+      /Сделки в работе/.test(prov) && /Потенциал заявок/.test(prov), prov.slice(0, 90));
 
     // Две конверсии считают разное, и у каждой виден свой знаменатель.
     const cv = [].slice.call(doc.querySelectorAll('#app .cv-cell')).map((c) => c.textContent);
@@ -6288,6 +6290,63 @@ setTimeout(async () => {
             clash.length === clash.filter((v, i, a) => a.indexOf(v) === i).length, clash.join(', '));
         }
       }
+      /* ---- Проданное и лоты внутри сделки — тоже занятые -----------------------------
+         Кросс-модельная вычитка: проверка занятости смотрела только на `objectId` НЕзакрытых
+         сделок. Мимо неё проходили проданный юнит (объект выигранной сделки числился
+         свободным) и дополнительные лоты (сделка с несколькими объектами держит их в `lots`).
+         На готовых данных ни то, ни другое не всплывало — другие отборы случайно закрывали
+         дыру, — поэтому проверка НАГРУЖАЕТ её: объект выигранной сделки и лот активной
+         подводятся под правила так, чтобы те за ними потянулись. */
+      {
+        const sold = (dd().deals || []).find((d) => d.stage === 'won' && d.objectId);
+        const multi = (dd().deals || []).find((d) => (d.lots || []).length > 1 && d.stage !== 'lost');
+        const lost = (dd().deals || []).find((d) => d.stage === 'lost' && d.objectId);
+        /* Проверяется САМО правило, а не его последствия. Первая версия расширяла клиентов и
+           смотрела, всплывут ли запретные объекты в предложениях, — и оставалась зелёной на
+           сломанной сборке: восемь правил сортируют по вознаграждению и до этих объектов
+           просто не доходили. Правило спрашивается напрямую, тремя случаями, ради которых
+           оно и переписано. */
+        check('Пульс · проданный юнит числится занятым',
+          !!sold && WS.ui.oppObjectBusy(sold.objectId) === true,
+          sold ? sold.objectId + ' · ' + WS.ui.oppObjectBusy(sold.objectId) : 'выигранной сделки нет');
+        check('Пульс · лот внутри активной сделки числится занятым',
+          !!multi && WS.ui.oppObjectBusy((multi.lots || [])[1]) === true,
+          multi ? (multi.lots || [])[1] + ' · ' + WS.ui.oppObjectBusy((multi.lots || [])[1]) : 'сделки с лотами нет');
+        /* А объект ПРОИГРАННОЙ сделки занятым не считается: он вернулся в рынок, и на этом
+           построено целое правило «объект проигранной сделки снова свободен». */
+        check('Пульс · объект проигранной сделки снова свободен',
+          !!lost && WS.ui.oppObjectBusy(lost.objectId) === false,
+          lost ? lost.objectId + ' · ' + WS.ui.oppObjectBusy(lost.objectId) : 'проигранной сделки нет');
+      }
+      /* ---- Раскрытие цели по показам считает то же, что и число над ним ----------------
+         `goalFact` берёт только СОСТОЯВШИЕСЯ показы, а раскрытие брало все. В готовых данных
+         показов нет вовсе, поэтому расхождение не всплывало: проверка добавляет два показа —
+         прошедший и будущий — и требует, чтобы список сошёлся с числом. */
+      {
+        const ev = dd().events || (dd().events = []);
+        const anyClient = ((dd().deals || [])[0] || {}).clientId || ((dd().clients || [])[0] || {}).id;
+        const added = [
+          { id: 'e_test_past', kind: 'show', clientId: anyClient, title: 'Показ вчера', when: 'вчера', status: 'done' },
+          { id: 'e_test_future', kind: 'show', clientId: anyClient, title: 'Показ завтра', when: 'завтра', status: 'planned' },
+        ];
+        ev.push(added[0], added[1]);
+        const u = dd().users[WS.store.role];
+        const wasGoals = u.goals;
+        u.goals = [{ id: 'g_shows_probe', label: 'Провести показы', metric: 'shows', target: 10, period: 'month', pinned: true }];
+        WS.router.go('start'); WS.ui.render();
+        const band = doc.querySelector('#app .start .pgoal-v');
+        const shownN = Number(String((band || {}).textContent || '').replace(/[^\d]/g, '')) || 0;
+        const row2 = doc.querySelector('#app .start .pgoal-row[data-act="goalDrill"]');
+        if (row2) row2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        const md = doc.querySelector('#modal .modal');
+        const rowsN = md ? md.querySelectorAll('.feed-row').length : -1;
+        WS.ui.closeModal();
+        u.goals = wasGoals;
+        added.forEach((x) => { const i = ev.indexOf(x); if (i >= 0) ev.splice(i, 1); });
+        WS.router.go('start'); WS.ui.render();
+        check('Пульс · раскрытие цели по показам сходится с числом над ним',
+          shownN === rowsN && shownN >= 1, 'на полосе ' + shownN + ', строк ' + rowsN);
+      }
       /* Названный объект обязан быть свободен и подходить клиенту по типу: инвестору в
          квартиры офис не предлагают, а занятый живой сделкой юнит не предлагают вовсе. */
       const bad = opps.filter((p) => {
@@ -6453,6 +6512,59 @@ setTimeout(async () => {
       check('Пульс · замаскированный номер не притворяется набираемым',
         !!ph && (ph.tagName === 'A' ? !/[•(]/.test(ph.textContent) : true),
         ph ? ph.tagName + ' ' + ph.textContent.trim().slice(0, 30) : 'телефона нет');
+    }
+
+    /* ---- Числа на одном экране не спорят друг с другом --------------------------------------
+       У руководителя стояло «12 закрытых сделок» (плитка отдела), «11 из 70 лидов»
+       (конверсия) и «Закрыто сделок 1» — три счёта одного и того же, а внизу блока обещание
+       «одинаковый запрос → одинаковые числа». Каждое число было верным в своей области:
+       книга квартала перенесена в стенд итогом и записей за собой не имеет. Проверяется, что
+       область у каждого названа и что части сходятся в целое. */
+    {
+      const wasRole = WS.store.role;
+      WS.store.role = 'manager'; WS.router.go('start'); WS.ui.render();
+      const t2 = (doc.getElementById('main') || doc.body).textContent.replace(/\s+/g, ' ');
+      /* Разбирается РАЗМЕТКА, а не склеенный текст экрана: в строке «Закрыто в самом стенде
+         1 1 750 000 AED» соседние числа сливаются, и первая версия этой проверки прочитала
+         «11» вместо «1» — то есть измеряла не то, что заявляла. Плитка знает, где у неё
+         значение, а где подпись: их и берём. */
+      const num = (x) => Number(String(x || '').replace(/[^\d]/g, '')) || 0;
+      const mtileBy = (label) => [].slice.call(doc.querySelectorAll('#app .mtile'))
+        .find((e) => ((e.querySelector('.ml') || {}).textContent || '').indexOf(label) >= 0);
+      const tileBy = (label) => [].slice.call(doc.querySelectorAll('#app .tile'))
+        .find((e) => ((e.querySelector('.th') || {}).textContent || '').indexOf(label) >= 0);
+      const canonT = mtileBy('Закрыто в самом стенде');
+      const depT = tileBy('Комиссия отдела за квартал');
+      const canonN = canonT ? num((canonT.querySelector('.mv') || {}).textContent) : null;
+      /* Разделители в подписях — типографские (средняя точка, длинное тире). Привязываться к
+         ним значит ломать проверку на первой же правке пунктуации: берём числа по краям. */
+      const bookM = canonT ? ((canonT.querySelector('.ms') || {}).textContent || '').match(/по книге[^\d]*(\d+)/) : null;
+      const depM = depT ? ((depT.querySelector('.sub') || {}).textContent || '')
+        .match(/(\d+)\D+?(\d+) в стенде/) : null;
+      check('Пульс · у каждого счёта закрытых сделок названа его область',
+        !!canonT && !!depT && !!bookM && !!depM,
+        [canonT ? canonT.textContent.replace(/\s+/g, ' ').trim().slice(0, 46) : 'нет плитки стенда',
+         depT ? ((depT.querySelector('.sub') || {}).textContent || '') : 'нет плитки отдела'].join(' | '));
+      check('Пульс · части сходятся в целое: книга плюс стенд равно итогу отдела',
+        !!depM && !!bookM && canonN !== null &&
+        Number(depM[1]) === Number(bookM[1]) + canonN && Number(depM[2]) === canonN,
+        depM ? depM[1] + ' = ' + (bookM ? bookM[1] : '?') + ' + ' + canonN : 'не разобрано');
+      WS.store.role = wasRole; WS.router.go('start'); WS.ui.render();
+    }
+    /* Одно понятие — одно слово, и русское, раз оно есть. «Пайплайн» стоял рядом с
+       «активными сделками» и «сделками в работе» на одном и том же экране. */
+    {
+      const both = [];
+      ['agent', 'manager'].forEach((r) => {
+        const was = WS.store.role;
+        WS.store.role = r; WS.router.go('start'); WS.ui.render();
+        both.push((doc.getElementById('main') || doc.body).textContent);
+        WS.store.role = was;
+      });
+      WS.router.go('start'); WS.ui.render();
+      check('Пульс · одно понятие названо одним словом — «пайплайна» на экране нет',
+        !/айплайн/i.test(both.join(' ')),
+        (both.join(' ').match(/.{0,40}айплайн.{0,30}/i) || [''])[0]);
     }
 
     // То, что уже было выверено, перестройка сносить не имеет права.

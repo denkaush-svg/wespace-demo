@@ -322,7 +322,7 @@
   const GOAL_METRICS = {
     commission: { label: 'Комиссия', unit: 'money', hint: 'закрытые сделки периода' },
     deals: { label: 'Закрытые сделки', unit: 'count', word: ['сделка', 'сделки', 'сделок'], hint: 'стадия «закрыта»' },
-    pipeline: { label: 'Пайплайн в работе', unit: 'money', hint: 'сумма активных сделок' },
+    pipeline: { label: 'Сумма сделок в работе', unit: 'money', hint: 'сколько денег сейчас в работе' },
     shows: { label: 'Показы', unit: 'count', word: ['показ', 'показа', 'показов'], hint: 'встречи на объектах' },
     leads: { label: 'Клиенты в работе', unit: 'count', word: ['клиент', 'клиента', 'клиентов'], hint: 'закреплены за вами' },
   };
@@ -480,8 +480,13 @@
         '<span data-deal="' + d.id + '" style="cursor:pointer">' + I('arrowRight') + '</span>')).join('');
       note = 'Сделки в работе прямо сейчас. Это остаток, а не накопление: темп к нему не применяется.';
     } else if (goal.metric === 'shows') {
+      /* Тот же отбор, что и в `goalFact`, включая границу по времени: показ, назначенный на
+         сегодня 16:00, в девять утра ещё не состоялся и в число не идёт. Без этой границы
+         список был бы длиннее числа над ним — расхождение, ради которого раскрытие и
+         существует, только с обратным знаком. */
       const mine = {}; goalDeals(scope).forEach((d) => { mine[d.clientId] = true; });
       const list = (D().events || []).filter((e) => e.kind === 'show' && e.status !== 'canceled' &&
+        ordFromWhen(e.when, UNDATED_ORD) <= NOW_ORD &&
         (scope === 'team' || mine[e.clientId]));
       rows = list.map((e) => { const c = (D().clients || []).find((x) => x.id === e.clientId) || {};
         return feedRow('calendar', 'i-acc', escAttr(e.title || 'Показ'),
@@ -652,9 +657,15 @@
     const loss = LOSS_REASONS.map((l) => '<div class="loss-row"><span>' + l.r + '</span><span class="badge">' + l.n + '</span></div>').join('');
     return '<div class="section-label" style="margin-top:24px">Аналитика · канонические метрики <span class="badge demo">' + I('lock') + 'демо</span></div>' +
       '<div class="mtiles">' +
-      mtile('Конверсия заявка → сделка', m.conv + '%', m.won + ' из ' + m.leads + ' лидов', 'data-analytics="conv"') +
-      mtile('Ожидаемая комиссия', WS.AED(m.expectedComm), 'из активного пайплайна', 'data-analytics="pipeline"') +
-      mtile('Закрыто сделок', m.closedCount, m.closedSum ? WS.AED(m.closedSum) : '—', 'data-analytics="closed"') +
+      /* На одном экране стояло «12 закрытых сделок» (плитка отдела), «11 из 70 лидов»
+         (конверсия) и «Закрыто сделок 1» — три разных счёта одного и того же, а внизу блока
+         обещание «одинаковый запрос → одинаковые числа». Числа при этом верны каждое: книга
+         квартала перенесена в стенд итогом, и записей за ней нет; в самом стенде закрыта
+         одна сделка. Противоречия нет там, где у числа названа его область, — и вот она. */
+      mtile('Конверсия заявка → сделка', m.conv + '%', m.won + ' из ' + m.leads + ' лидов · книга квартала', 'data-analytics="conv"') +
+      mtile('Ожидаемая комиссия', WS.AED(m.expectedComm), 'из сделок в работе', 'data-analytics="pipeline"') +
+      mtile('Закрыто в самом стенде', m.closedCount, (m.closedSum ? WS.AED(m.closedSum) : '—') +
+        ' · за квартал по книге — ' + m.won, 'data-analytics="closed"') +
       '</div>' +
       '<div class="section-label" style="margin-top:14px">Качество источника</div>' + srcQualityList() +
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
@@ -849,9 +860,21 @@
     const pct = o && o.commissionPct != null ? o.commissionPct : DEFAULT_COMM_PCT;
     return pct + '% от ' + WS.AED(o ? o.price : 0);
   }
-  // Занят ли объект живой сделкой — предлагать его второму клиенту нельзя.
+  /* Занят ли объект — предлагать его второму клиенту нельзя.
+
+     Прежняя проверка смотрела только на `objectId` НЕзакрытых сделок, и мимо неё проходили
+     две вещи сразу. Проданный юнит: объект выигранной сделки числился свободным, потому что
+     сделка закрыта, — и возможность могла предложить его ещё раз (в данных это `o_palmcourt`
+     из `d_won`). И дополнительные лоты: сделка с несколькими объектами держит их в `lots`, а
+     не в `objectId`, — так `o_difc_b` внутри активной `d_rentbiz` тоже считался свободным.
+
+     Проигранная сделка объект НЕ держит: он вернулся в рынок, и целое правило построено
+     ровно на этом. Поэтому исключение по исходу, а не по «закрыта или нет». */
   function oppObjectBusy(id) {
-    return (D().deals || []).some((d) => d.objectId === id && !dealClosed(d) && !dealArchived(d));
+    return (D().deals || []).some((d) => {
+      if (d.stage === 'lost' || dealArchived(d)) return false;
+      return d.objectId === id || (d.lots || []).indexOf(id) >= 0;
+    });
   }
   function oppHasLiveDeal(clientId) {
     return (D().deals || []).some((d) => d.clientId === clientId && !dealClosed(d) && !dealArchived(d));
@@ -1347,7 +1370,7 @@
          записи» — то, ради чего на цифру и нажимают. */
       tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причина и сумма по каждой', '', '', 'data-analytics="lost"') +
       tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'из чего считается среднее', '', '', 'data-analytics="cycle"') +
-      tile('money', 'Ожидаемая комиссия', WS.AED(computeMetrics().expectedComm), '', 'span 6', 'из активного пайплайна', '', '', 'data-analytics="pipeline"') +
+      tile('money', 'Ожидаемая комиссия', WS.AED(computeMetrics().expectedComm), '', 'span 6', 'из сделок в работе', '', '', 'data-analytics="pipeline"') +
       '<button class="tile wide" data-analytics="pipeline"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
         '<div class="val">' + pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
@@ -2681,7 +2704,7 @@
     }).join('');
     return '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Сводная воронка команды</div>' +
       '<div class="funnel funnel-bands">' + cells + '</div>' +
-      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Пайплайн по сделкам: ' + WS.AED(totalVal) + '</span>' +
+      '<div class="prov" style="margin:10px 0 4px"><span class="badge acc">' + I('money') + 'Сделки в работе: ' + WS.AED(totalVal) + '</span>' +
       '<span class="badge">' + I('mail') + 'Потенциал заявок: ' + WS.AED(potential) + '</span>' +
       '<span class="badge">' + I('briefcase') + live.length + ' ' + plural(live.length, 'активная сделка', 'активные сделки', 'активных сделок') + '</span>' +
       '<span class="badge">' + I('users') + Object.keys(byAgent).length + ' ' + plural(Object.keys(byAgent).length, 'агент', 'агента', 'агентов') + '</span></div>' +
@@ -8925,8 +8948,14 @@
     const stuck = deals.filter(stuckPred);
     const stuckSum = Math.round(stuck.reduce((s, d) => s + (d.amount || 0), 0) / 1e5) / 10;
     return '<div class="tiles" style="margin-top:20px">' +
-      tile('money', 'Комиссия отдела за квартал', WS.AED(earned), '', '', closedN + ' ' + plural(closedN, 'закрытая сделка', 'закрытые сделки', 'закрытых сделок'), 'up', 'accent', 'data-nav="analytics"') +
-      tile('briefcase', 'Пайплайн команды', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Активных сделок — ' + active.length, 'up', '', 'data-nav="clients"') +
+      /* Число складывается из книги квартала и того, что закрылось в стенде. Подпись называет
+         обе части: иначе оно спорит с «Закрыто в самом стенде» тремя строками ниже. */
+      tile('money', 'Комиссия отдела за квартал', WS.AED(earned), '', '',
+        closedN + ' ' + plural(closedN, 'закрытая сделка', 'закрытые сделки', 'закрытых сделок') +
+        ' · ' + deals.filter(dealWon).length + ' в стенде', 'up', 'accent', 'data-nav="analytics"') +
+      /* «Пайплайн» ушёл: на одном экране он же назывался «активными сделками» и «сделками в
+         работе». Одно понятие — одно слово, и русское, раз оно есть. */
+      tile('briefcase', 'Сделки команды в работе', pipeline.toLocaleString('ru-RU'), 'млн AED', '', 'Сделок в работе — ' + active.length, 'up', '', 'data-nav="clients"') +
       tile('clock', 'Застряли в стадии', stuck.length, '', '', stuckSum ? stuckSum.toLocaleString('ru-RU') + ' млн AED без движения 5+ дней' : 'всё движется', '', stuck.length ? 'accent' : '', 'data-savedview="stuck" data-nav="clients"') +
       tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
       tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
@@ -10630,7 +10659,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, goalDrill, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
