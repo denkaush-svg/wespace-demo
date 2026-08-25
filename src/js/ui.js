@@ -4726,7 +4726,13 @@
   }
   function dealNextStep(d) {
     const a = nbaActions(d);
-    return { owner: agentName(d.agent), due: d.nextDue || '', over: /просроч/i.test(d.nextDue || ''),
+    /* Срок закрытой сделки не наследуется. `nextDue` остаётся тем, что стоял в работе, и
+       «запросить отзыв» получало дедлайн «сегодня 16:00» от касания, которого больше нет —
+       вместе с признаком просрочки по нему же. Поле не чистится в данных намеренно: оно часть
+       истории сделки. Не наследует его тот, кто рисует следующий шаг. */
+    const closed = dealClosed(d);
+    return { owner: agentName(d.agent), due: closed ? '' : (d.nextDue || ''),
+      over: !closed && /просроч/i.test(d.nextDue || ''),
       action: a.doIt[0], why: a.why || '' };
   }
   // Planned events block: open tasks and calendar events with dates. Overdue first, marked visibly.
@@ -10144,7 +10150,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectOffer, prospectValue, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
