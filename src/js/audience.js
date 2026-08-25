@@ -10,22 +10,34 @@
   function getEffectiveConsent(recipient, options, allClients) {
     // Recipient has direct consent field: use it immediately
     if (recipient.consent !== undefined) {
-      return recipient.consent;
+      return { consent: recipient.consent };
     }
 
     // Recipient has own clientId: look up consent in allClients
     if (recipient.clientId) {
       const client = allClients.find(c => c.id === recipient.clientId);
-      return client ? client.consent : undefined;
+      return { consent: client ? client.consent : undefined };
     }
 
     // Recipient is participant without own clientId: inherit from deal client
     if (options && options.dealClients && options.dealClients.length > 0) {
+      // Only participants from "client" side can inherit consent from deal client
+      // Check role group using WS.ui.roleGroupOf if available
+      if (typeof WS !== 'undefined' && WS.ui && WS.ui.roleGroupOf) {
+        const roleGroup = WS.ui.roleGroupOf(recipient);
+        if (roleGroup !== 'client') {
+          // Participant from other side or broker cannot inherit client's consent
+          return {
+            consent: undefined,
+            reason: 'согласие принадлежит другому лицу'
+          };
+        }
+      }
       const dealClient = options.dealClients[0];
-      return dealClient.consent;
+      return { consent: dealClient.consent };
     }
 
-    return undefined;
+    return { consent: undefined };
   }
 
   function calculateAudience(recipients, options) {
@@ -43,7 +55,9 @@
     const excluded = [];
 
     recipients.forEach(recipient => {
-      const consent = getEffectiveConsent(recipient, options, allClients);
+      const result = getEffectiveConsent(recipient, options, allClients);
+      const consent = result.consent;
+      const inheritedReason = result.reason;
 
       // Check for channel before consent: if there is no channel to contact, exclude immediately
       if (!recipient.channel && consent !== false) {
@@ -65,6 +79,13 @@
           id: recipient.id,
           consent: false,
           reason: 'нет согласия'
+        });
+      } else if (inheritedReason) {
+        // Explicit reason from getEffectiveConsent (e.g., from non-client role group)
+        excluded.push({
+          id: recipient.id,
+          consent: undefined,
+          reason: inheritedReason
         });
       } else if (consent === undefined && options && options.dealClients) {
         // Inherited consent is undefined: means deal client had no consent field
