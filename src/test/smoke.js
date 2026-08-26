@@ -7026,6 +7026,44 @@ setTimeout(async () => {
         (cd ? cd.s : 'плитки нет') + ' · книга: ' + mm.won + ' сделок из ' + mm.leads + ' лидов');
       WS.store.pulseTab = wasTab || 'deals';
       WS.router.go('start'); WS.ui.render();
+
+      /* ---- Средний цикл: раскрытие не выдаёт чужие записи за своё число ----------------
+         На плитке стоит среднее по книге квартала, а раскрытие показывало закрытые сделки
+         стенда — две штуки, чей собственный средний срок другой. Объяснять цифру записями,
+         из которых она не считалась, — это то же самое, что не объяснять её вовсе. */
+      const dealTiles = [].slice.call(doc.querySelectorAll('#app .start .tile')).map((x) => ({
+        t: ((x.querySelector('.th') || {}).textContent || '').trim(),
+        v: ((x.querySelector('.val') || {}).textContent || '').trim(),
+        s: ((x.querySelector('.sub') || {}).textContent || '').trim(),
+      }));
+      const cyc = dealTiles.find((x) => /Средний цикл/.test(x.t));
+      check('Аналитика · у среднего цикла названа его область',
+        !!cyc && /книга квартала/i.test(cyc.s), cyc ? cyc.t + ' → ' + cyc.s : 'плитки нет');
+      WS.ui.openAnalyticsDrill('cycle');
+      {
+        const md = doc.querySelector('#modal .modal');
+        const prov = md && (md.querySelector('.prov') || {}).textContent || '';
+        const rows2 = md ? [].slice.call(md.querySelectorAll('.feed-row')) : [];
+        const days = rows2.map((r) => {
+          const mm2 = /(\d+)\s+(день|дня|дней) от заведения/.exec(r.textContent);
+          return mm2 ? +mm2[1] : null;
+        }).filter((x) => x != null);
+        const mean = days.length ? Math.round(days.reduce((x, y) => x + y, 0) / days.length) : null;
+        check('Аналитика · раскрытие цикла показывает срок каждой сделки',
+          rows2.length >= 2 && days.length === rows2.length, days.join(', ') + ' при строках ' + rows2.length);
+        check('Аналитика · и прямо говорит, что число на плитке посчитано не по этим строкам',
+          /книге квартала/i.test(prov) && /строк за ним в стенде нет/i.test(prov) &&
+          (mean == null || prov.indexOf(String(mean)) >= 0),
+          prov.trim().slice(0, 140) + ' · среднее по строкам ' + mean);
+        WS.ui.closeModal();
+      }
+      /* Одна величина — одно имя. Плитка «Воронка сделок» показывала сумму тех же сделок,
+         что сосчитаны плиткой «Сделки в работе», а подписана была про недельный тренд. */
+      const wide = dealTiles.find((x) => /млн AED/.test(x.v));
+      const liveN = (dd().deals || []).filter((d) => d.stage !== 'won' && d.stage !== 'lost' && !/архив/i.test(String(d.tags || ''))).length;
+      check('Аналитика · сумма сделок в работе названа тем же словом, что и их счёт',
+        !!wide && !/воронк/i.test(wide.t) && /в работе/i.test(wide.t) && wide.s.indexOf(String(liveN)) >= 0,
+        wide ? wide.t + ' → ' + wide.s : 'плитки нет');
     }
     // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
     check('Пульс · ввод Консьержа один, а не задвоен',

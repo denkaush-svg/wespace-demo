@@ -773,9 +773,19 @@
       '<div class="section-label" style="margin-top:14px">Причины проигрыша</div><div class="loss-list">' + loss + '</div>' +
       '<div style="font-size:11px;color:var(--faint);margin-top:8px">Одинаковый запрос → одинаковые числа. Клик по цифре — до записей. Комиссия платформы не показывается.</div>';
   }
+  /* Срок сделки от заведения до закрытия — по её же записям. «updated» у закрытой сделки и
+     есть дата закрытия: «29 апреля» читается как дата, «вчера» — как вчера. */
+  function dealCycleDays(d) {
+    const c = createdOn(d); if (!c) return null;
+    const now = demoNow();
+    const today = dayOfYear(now.d, now.mo);
+    const u = insDayOf(d.updated);
+    const end = u != null ? u : (/вчера/i.test(String(d.updated || '')) ? today - 1 : today);
+    return Math.max(0, end - dayOfYear(c.day, c.mo));
+  }
   function openAnalyticsDrill(kind) {
     const deals = D().deals || [];
-    let title = 'Записи', rows = '';
+    let title = 'Записи', rows = '', note = '', cycle = false;
     if (kind === 'overdue') {
       const list = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
       title = 'Просроченные задачи';
@@ -786,11 +796,29 @@
       else if (kind === 'hot') { title = 'Горячие сделки · SLA < 2 ч'; list = deals.filter((d) => d.hot); }
       else if (kind === 'conv' || kind === 'pipeline') { title = 'Активные сделки'; list = deals.filter((d) => !dealClosed(d) && !dealArchived(d)); }
       else if (kind === 'lost') { title = 'Проигранные сделки'; list = deals.filter((d) => d.stage === 'lost'); }
-      else if (kind === 'cycle') { title = 'Из чего считается средний цикл'; list = deals.filter(dealClosed); }
+      else if (kind === 'cycle') { title = 'Из чего считается средний цикл'; list = deals.filter(dealClosed); cycle = true; }
       else if (kind.indexOf('src:') === 0) { const s = kind.slice(4); title = 'Сделки · источник «' + s + '»'; list = deals.filter((d) => d.source === s); }
-      rows = list.map((d) => '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') + '</div></div>' + I('arrowRight') + '</div>').join('');
+      rows = list.map((d) => {
+        const dc = cycle ? dealCycleDays(d) : null;
+        const m2 = stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (d.source ? ' · ' + d.source : '') +
+          (dc != null ? ' · ' + oppDays(dc) + ' от заведения до закрытия' : '');
+        return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + d.title + '</div><div class="m">' + m2 + '</div></div>' + I('arrowRight') + '</div>';
+      }).join('');
+      /* Число на плитке — среднее по книге квартала, а строк за ним в стенде нет: закрытых
+         сделок здесь две, и их собственный средний срок другой. Раскрытие обязано это
+         сказать, иначе оно объясняет цифру записями, из которых она не считалась. */
+      if (cycle) {
+        const own = list.map(dealCycleDays).filter((x) => x != null);
+        const mean = own.length ? Math.round(own.reduce((a2, b2) => a2 + b2, 0) / own.length) : null;
+        const book = (D().analytics || {}).avgCycleDays;
+        note = '<div class="prov" style="margin-bottom:10px"><span class="badge warn">' + I('lock') +
+          book + ' ' + plural(book, 'день', 'дня', 'дней') + ' — среднее по книге квартала: строк за ним в стенде нет' +
+          (mean != null ? '. В самом стенде закрыто ' + list.length + ' ' +
+            plural(list.length, 'сделка', 'сделки', 'сделок') + ', их средний срок — ' + oppDays(mean) : '') +
+          '</span></div>';
+      }
     }
-    openModal(title, rows ? '<div class="card"><div class="feed" style="padding:2px 16px">' + rows + '</div></div>' : '<div class="card pad" style="color:var(--faint)">нет записей</div>', '<button class="btn" data-act="closeModal">Закрыть</button>');
+    openModal(title, note + (rows ? '<div class="card"><div class="feed" style="padding:2px 16px">' + rows + '</div></div>' : '<div class="card pad" style="color:var(--faint)">нет записей</div>'), '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
   // R10: immutable audit journal (separate from export/portability).
   function openAuditLog() {
@@ -1778,12 +1806,18 @@
          показывала причин. Одинаковые на вид плитки обязаны вести себя одинаково, и «показать
          записи» — то, ради чего на цифру и нажимают. */
       tile('warn', 'Проиграно', lost.length, '', 'span 4', 'причина и сумма по каждой', '', '', 'data-analytics="lost"') +
-      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6', 'из чего считается среднее', '', '', 'data-analytics="cycle"') +
+      tile('clock', 'Средний цикл сделки', a.avgCycleDays || 0, ' дн.', 'span 6',
+        'книга квартала · в стенде закрыто ' + (won.length + lost.length), '', '', 'data-analytics="cycle"') +
       tile('money', 'Ожидаемая комиссия', WS.AED(computeMetrics().expectedComm), '', 'span 6', 'из сделок в работе', '', '', 'data-analytics="pipeline"') +
-      '<button class="tile wide" data-analytics="pipeline"><div class="th">' + I('trend') + 'Воронка сделок</div>' +
+      /* Плитка называлась «Воронка сделок», а показывала сумму тех же восьми сделок, что
+         сосчитаны плиткой «Сделки в работе» двумя строками выше: два имени у одной величины
+         на одной панели. Подпись при этом говорила про тренд за неделю — то есть про
+         столбики, а не про число над ними. Теперь и число, и столбики названы каждый своим. */
+      '<button class="tile wide" data-analytics="pipeline"><div class="th">' + I('trend') + 'Сумма сделок в работе</div>' +
         '<div class="val">' + pipeline.toLocaleString('ru-RU') + '<span class="u">млн AED</span></div>' +
         '<div class="spark">' + spark + '</div>' +
-        '<div class="sub">Тренд новых сделок · 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
+        '<div class="sub">те же ' + live.length + ' ' + plural(live.length, 'сделка', 'сделки', 'сделок') +
+        ' · столбики — новые сделки за 7 дней <span class="trend up">' + I('trend') + '</span></div></button>' +
       '</div>' + pulseSummary(dealsSummaryLines(live, won, lost, a));
   }
   // Строки саммари собираются из тех же чисел, что стоят на плитках. Ни одного утверждения,
