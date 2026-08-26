@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 01:30</title>
+  <title>WESPACE · сборка 12:56</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='01:30';
+    window.WS_BUILD='12:56';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5715,11 +5715,29 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
 // Unified audience calculation module
 // Calculates who can be contacted based on consent rules
 (function (WS) {
+  /* Полный перечень причин, по которым адресат не попадает в выборку. Он не декоративный:
+     по нему строятся подписи и на нём держится обещание, что «исключён» всегда объяснимо.
+     Причина, которую модуль выдаёт, но здесь не перечисляет, — это причина без подписи. */
   const EXCLUSION_REASONS = [
     'нет согласия',
     'согласие унаследовано, источник его не имеет',
+    'согласие принадлежит другому лицу',
+    'роль участника не опознана',
     'нет канала связи'
   ];
+
+  /* Наследовать согласие клиента сделки может только сторона клиента — и только по роли,
+     которую справочник знает. Проверка «группа не client» этого не давала: `roleGroupOf`
+     на незнакомой роли возвращает `client` по умолчанию, и «Менеджер застройщика»
+     (опечатка вместо «Менеджер девелопера») получал согласие покупателя. Правило должно
+     разрешать по совпадению, а не запрещать по несовпадению. */
+  function clientSideRole(recipient) {
+    const ui = (typeof WS !== 'undefined' && WS.ui) || null;
+    if (!ui || !ui.roleOf || !ui.CONTACT_ROLES || !ui.roleGroupOf) return 'unknown';
+    const role = ui.roleOf(recipient);
+    if (ui.CONTACT_ROLES.indexOf(role) < 0) return 'unknown';
+    return ui.roleGroupOf(recipient) === 'client' ? 'client' : 'other';
+  }
 
   function getEffectiveConsent(recipient, options, allClients) {
     // Recipient has direct consent field: use it immediately
@@ -5735,18 +5753,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
 
     // Recipient is participant without own clientId: inherit from deal client
     if (options && options.dealClients && options.dealClients.length > 0) {
-      // Only participants from "client" side can inherit consent from deal client
-      // Check role group using WS.ui.roleGroupOf if available
-      if (typeof WS !== 'undefined' && WS.ui && WS.ui.roleGroupOf) {
-        const roleGroup = WS.ui.roleGroupOf(recipient);
-        if (roleGroup !== 'client') {
-          // Participant from other side or broker cannot inherit client's consent
-          return {
-            consent: undefined,
-            reason: 'согласие принадлежит другому лицу'
-          };
-        }
-      }
+      const side = clientSideRole(recipient);
+      /* Две разные причины, потому что разные и действия по ним. Со-брокеру согласие берут
+         у него самого; опечатку в роли — исправляют в карточке. Одна общая формулировка
+         послала бы агента не туда, а «нет согласия» сказало бы, что человек отказался. */
+      if (side === 'other') return { consent: undefined, reason: 'согласие принадлежит другому лицу' };
+      if (side === 'unknown') return { consent: undefined, reason: 'роль участника не опознана' };
       const dealClient = options.dealClients[0];
       return { consent: dealClient.consent };
     }
@@ -13738,7 +13750,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
        «потому что записи нет» значило бы обойти правило именем в свободном поле. */
     const dealClient = who ? D().clients.find((x) => x.id === who.clientId) : null;
     const audit = WS.audience.calculateAudience([p], { dealClients: dealClient ? [dealClient] : [] });
-    if (audit.excluded.length > 0) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
+    /* Причину называем ту, что вернул модуль. Одна общая подпись «нет согласия» говорила бы,
+       что человек отказался, — а он мог просто быть с другой стороны стола или иметь роль,
+       которой нет в справочнике. Разные причины — разные действия у агента. */
+    if (audit.excluded.length > 0) {
+      WS.storeApi.toast((audit.excluded[0].reason || 'нет согласия') + ' — отправка невозможна', 'warn');
+      return;
+    }
     o.state = 'sent';
     o.sentTo = contactDisplayName(p);
     o.sentAt = WS.storeApi.clockLabel().date;

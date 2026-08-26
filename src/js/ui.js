@@ -6392,7 +6392,13 @@
        «потому что записи нет» значило бы обойти правило именем в свободном поле. */
     const dealClient = who ? D().clients.find((x) => x.id === who.clientId) : null;
     const audit = WS.audience.calculateAudience([p], { dealClients: dealClient ? [dealClient] : [] });
-    if (audit.excluded.length > 0) { WS.storeApi.toast('Нет согласия на связь — отправка невозможна', 'warn'); return; }
+    /* Причину называем ту, что вернул модуль. Одна общая подпись «нет согласия» говорила бы,
+       что человек отказался, — а он мог просто быть с другой стороны стола или иметь роль,
+       которой нет в справочнике. Разные причины — разные действия у агента. */
+    if (audit.excluded.length > 0) {
+      WS.storeApi.toast((audit.excluded[0].reason || 'нет согласия') + ' — отправка невозможна', 'warn');
+      return;
+    }
     o.state = 'sent';
     o.sentTo = contactDisplayName(p);
     o.sentAt = WS.storeApi.clockLabel().date;

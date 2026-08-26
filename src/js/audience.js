@@ -1,11 +1,29 @@
 // Unified audience calculation module
 // Calculates who can be contacted based on consent rules
 (function (WS) {
+  /* Полный перечень причин, по которым адресат не попадает в выборку. Он не декоративный:
+     по нему строятся подписи и на нём держится обещание, что «исключён» всегда объяснимо.
+     Причина, которую модуль выдаёт, но здесь не перечисляет, — это причина без подписи. */
   const EXCLUSION_REASONS = [
     'нет согласия',
     'согласие унаследовано, источник его не имеет',
+    'согласие принадлежит другому лицу',
+    'роль участника не опознана',
     'нет канала связи'
   ];
+
+  /* Наследовать согласие клиента сделки может только сторона клиента — и только по роли,
+     которую справочник знает. Проверка «группа не client» этого не давала: `roleGroupOf`
+     на незнакомой роли возвращает `client` по умолчанию, и «Менеджер застройщика»
+     (опечатка вместо «Менеджер девелопера») получал согласие покупателя. Правило должно
+     разрешать по совпадению, а не запрещать по несовпадению. */
+  function clientSideRole(recipient) {
+    const ui = (typeof WS !== 'undefined' && WS.ui) || null;
+    if (!ui || !ui.roleOf || !ui.CONTACT_ROLES || !ui.roleGroupOf) return 'unknown';
+    const role = ui.roleOf(recipient);
+    if (ui.CONTACT_ROLES.indexOf(role) < 0) return 'unknown';
+    return ui.roleGroupOf(recipient) === 'client' ? 'client' : 'other';
+  }
 
   function getEffectiveConsent(recipient, options, allClients) {
     // Recipient has direct consent field: use it immediately
@@ -21,18 +39,12 @@
 
     // Recipient is participant without own clientId: inherit from deal client
     if (options && options.dealClients && options.dealClients.length > 0) {
-      // Only participants from "client" side can inherit consent from deal client
-      // Check role group using WS.ui.roleGroupOf if available
-      if (typeof WS !== 'undefined' && WS.ui && WS.ui.roleGroupOf) {
-        const roleGroup = WS.ui.roleGroupOf(recipient);
-        if (roleGroup !== 'client') {
-          // Participant from other side or broker cannot inherit client's consent
-          return {
-            consent: undefined,
-            reason: 'согласие принадлежит другому лицу'
-          };
-        }
-      }
+      const side = clientSideRole(recipient);
+      /* Две разные причины, потому что разные и действия по ним. Со-брокеру согласие берут
+         у него самого; опечатку в роли — исправляют в карточке. Одна общая формулировка
+         послала бы агента не туда, а «нет согласия» сказало бы, что человек отказался. */
+      if (side === 'other') return { consent: undefined, reason: 'согласие принадлежит другому лицу' };
+      if (side === 'unknown') return { consent: undefined, reason: 'роль участника не опознана' };
       const dealClient = options.dealClients[0];
       return { consent: dealClient.consent };
     }
