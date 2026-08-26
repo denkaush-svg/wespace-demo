@@ -6242,6 +6242,20 @@ setTimeout(async () => {
        на месте и что длина закраски совпадает с посчитанным процентом. */
     const band = pulse.querySelector('.pgoal');
     check('Пульс · цель стоит полосой над рабочей областью', !!band);
+    /* Значок и слова в подвале полосы обязаны говорить одно и то же. Стояла галочка рядом с
+       «до нормы не хватает 1 022 000 AED»: отставание для цели-ЗАПАСА считалось по проекции
+       дневного темпа, которая для запаса не значит ничего, а текст брался из факта. */
+    {
+      const rowsG = [].slice.call(pulse.querySelectorAll('.pgoal-row'));
+      const wrong = rowsG.filter((r) => {
+        const foot = (r.querySelector('.pgoal-foot') || {}).textContent || '';
+        const short = /не хватает|при текущем темпе/.test(foot);
+        return short !== r.classList.contains('is-behind');
+      });
+      check('Пульс · значок и слова в полосе цели говорят одно и то же',
+        rowsG.length >= 1 && wrong.length === 0,
+        wrong.map((r) => (r.querySelector('.pgoal-foot') || {}).textContent.trim()).join(' | ') || 'полос: ' + rowsG.length);
+    }
     if (band) {
       const row = band.querySelector('.pgoal-row');
       const t = row.textContent;
@@ -6311,13 +6325,74 @@ setTimeout(async () => {
       const RULES_EXPECTED = ['lease_window', 'repeat_offplan', 'yield_gap', 'handover_window',
         'consent_block', 'block_match', 'lost_return', 'management_upsell',
         'inbox_unreached', 'rejected_reason', 'price_window', 'cobroking_gap', 'referral_window'];
-      const missing = RULES_EXPECTED.filter((k) => rules.indexOf(k) < 0);
+      /* Считается по СРАБОТАВШИМ разборам, а не по карточкам: разбор, который влился доводом
+         в чужую возможность, своей строки не имеет и по карточкам выглядел бы выпавшим. */
+      const fired = WS.ui.prospectRulesFired();
+      const missing = RULES_EXPECTED.filter((k) => fired.indexOf(k) < 0);
       check('Пульс · каждый из тринадцати разборов нашёл повод, ни один не выпал',
-        missing.length === 0 && rules.length === RULES_EXPECTED.length,
+        missing.length === 0 && fired.length === RULES_EXPECTED.length,
         'нет повода у: ' + (missing.join(', ') || '—') + ' · лишние: ' +
-        (rules.filter((k) => RULES_EXPECTED.indexOf(k) < 0).join(', ') || '—'));
+        (fired.filter((k) => RULES_EXPECTED.indexOf(k) < 0).join(', ') || '—'));
       const byRule = (k, list) => (list || opps).filter((p) => p.rule === k);
       const rulesOf = () => WS.ui.pulseProspectList().map((p) => p.rule);
+
+      /* ---- Срок по чужому объекту вливается доводом, а не встаёт второй сделкой ---------
+         «Бюджет догоняет рынок» назвал тот же юнит, который предлагает другая возможность.
+         Две карточки об одном юните — это обещание одних денег дважды и просьба к брокеру
+         самому догадаться, что речь про один объект. */
+      {
+        const host = opps.find((p) => (p.merged || []).indexOf('price_window') >= 0);
+        check('Пульс · срок по уже названному объекту влит доводом в ту же карточку',
+          !!host && (host.basis || []).some((b) => b[0] === 'Срок по бюджету'),
+          host ? host.rule + ' · ' + JSON.stringify((host.basis || [])[host.basis.length - 1]) : 'ничего не влито');
+        check('Пульс · и второй карточкой про тот же объект не встаёт',
+          byRule('price_window').length === 0 && fired.indexOf('price_window') >= 0,
+          'карточек price_window: ' + byRule('price_window').length);
+      }
+
+      /* ---- Итог раздела не складывает взаимоисключающее -------------------------------
+         У Анны три повода, а покупка одна: сложенные подряд, они давали сумму, которой не
+         может быть. Подпись раздела обязана сходиться с «по одной сделке на клиента» и
+         сама это условие называть — рядом стоит «ожидаемая комиссия» из аналитики, и два
+         числа про одни деньги без подписи неразличимы. */
+      {
+        const best = {};
+        opps.forEach((p) => {
+          if (!(p.clientId in best) || best[p.clientId] < (p.value || 0)) best[p.clientId] = p.value || 0;
+        });
+        const honest = Object.keys(best).reduce((a2, k) => a2 + best[k], 0);
+        const raw = opps.reduce((a2, p) => a2 + (p.value || 0), 0);
+        WS.router.go('start'); WS.ui.render();
+        const sub = [].slice.call(doc.querySelectorAll('#app .start .pblock'))
+          .filter((b) => /Перспективные сделки/.test((b.querySelector('.pb-t') || {}).textContent || ''))
+          .map((b) => (b.querySelector('.pb-m') || {}).textContent || '')[0] || '';
+        const digits = (x) => String(x).replace(/[^\d]/g, '');
+        check('Пульс · итог раздела посчитан по одной сделке на клиента, а не сложением всего',
+          sub.indexOf(digits(honest)) >= 0 || sub.replace(/[^\d]/g, '').indexOf(digits(honest)) >= 0,
+          'в подписи «' + sub + '», честный итог ' + honest + ', сложением ' + raw);
+        check('Пульс · и подпись называет условие, при котором эта сумма верна',
+          /по одной сделке/i.test(sub) && /клиент/i.test(sub), sub);
+        check('Пульс · сложение всего подряд дало бы другое число — значит проверка не пустая',
+          raw > honest, raw + ' против ' + honest);
+      }
+
+      /* ---- Хвост списка свёрнут, но назван -------------------------------------------
+         Тринадцать карточек — четыре тысячи пикселей: «Инсайты» и «Аналитика» уезжали под
+         них. Список обрезан до шести, и обрезка не молчит: она называет, сколько за ней, и
+         разворачивается без скриптов. */
+      {
+        const grid = doc.querySelector('#app .start .opps');
+        const more = doc.querySelector('#app .start .opp-more');
+        check('Пульс · в сетке сразу видны шесть возможностей, а не все тринадцать',
+          !!grid && grid.querySelectorAll('.opp').length === 6,
+          grid ? String(grid.querySelectorAll('.opp').length) : 'сетки нет');
+        check('Пульс · остальные названы числом и раскрываются без скриптов',
+          !!more && more.tagName === 'DETAILS' && !!more.querySelector('summary') &&
+          /\d/.test(more.querySelector('summary').textContent) &&
+          more.querySelectorAll('.opp').length === opps.length - 6,
+          more ? more.querySelector('summary').textContent.trim() + ' · внутри ' +
+            more.querySelectorAll('.opp').length : 'хвоста нет');
+      }
 
       /* Входящее без ответа. Разбор читает канал входящих, а не клиентскую базу, и держится
          на одном признаке: сообщение осталось необработанным. Поднимем ему статус — повод
@@ -6360,16 +6435,21 @@ setTimeout(async () => {
          при том же темпе из бюджета реально выходит хотя бы один объект. Обнулим рост —
          повода не станет. */
       {
-        const card = byRule('price_window')[0];
+        /* Своей карточки у этого разбора на готовых данных нет — его срок влит доводом в ту,
+           что предлагает тот же объект. Значит и проверять надо влитую строку, а «сработал
+           или нет» спрашивать у перечня сработавших, а не у списка карточек. */
+        const host = opps.find((p) => (p.merged || []).indexOf('price_window') >= 0);
+        const line = host && (host.basis || []).find((b) => b[0] === 'Срок по бюджету');
         const rows = (WS.query.run({ from: 'market' }) || {}).rows || [];
         const hot = rows.filter((m) => m.изменениеЗаГодПроцент >= 9);
         const was = hot.map((m) => m.изменениеЗаГодПроцент);
         check('Пульс · окно по цене названо вместе с темпом района и горизонтом клиента',
-          !!card && (card.basis || []).some((b) => /\+\d+% за год/.test(String(b[1]))) &&
-          (card.basis || []).some((b) => /горизонт|месяц/i.test(String(b[0]) + String(b[1]))),
-          card ? JSON.stringify(card.basis) : 'повода нет');
+          !!line && /\+\d+% в год/.test(String(line[1])) && /месяц/i.test(String(line[1])) &&
+          /выше бюджета/.test(String(line[1])),
+          line ? line[1] : 'довода нет');
+        const firedOf = () => WS.ui.prospectRulesFired();
         hot.forEach((m) => { m.изменениеЗаГодПроцент = 0; });
-        const after = rulesOf();
+        const after = firedOf();
         hot.forEach((m, i) => { m.изменениеЗаГодПроцент = was[i]; });
         check('Пульс · без роста цен окна по цене не существует',
           after.indexOf('price_window') < 0, after.join(', '));
@@ -6378,10 +6458,10 @@ setTimeout(async () => {
            дело доходит до сравнения «сейчас против конца горизонта». Поэтому рост
            остаётся на месте, а бюджет поднимается настолько, что из него не выходит
            ничего: рост есть, окна нет — повода быть не должно. */
-        const who = card && (dd().clients || []).find((c) => c.id === card.clientId);
+        const who = host && (dd().clients || []).find((c) => c.id === host.clientId);
         if (who) {
           const wasB = who.budget; who.budget = wasB * 20;
-          const rich = rulesOf(); who.budget = wasB;
+          const rich = firedOf(); who.budget = wasB;
           check('Пульс · при росте, который ничего не выносит из бюджета, срочности нет',
             rich.indexOf('price_window') < 0, rich.join(', '));
         }
@@ -6745,6 +6825,35 @@ setTimeout(async () => {
     check('Пульс · и срок дел переключается',
       pulse.querySelectorAll('[data-dayfilter]').length >= 3,
       String(pulse.querySelectorAll('[data-dayfilter]').length));
+    /* ---- Ежедневник на узком экране разворачивается, а не уезжает вбок --------------
+       Замер в Chromium на 390: таблица 570 пикселей в окне 325, «Событие» (что делать) и
+       «Тип» — за правым краем. Боковая прокрутка прячет самое нужное поле. В jsdom
+       раскладки нет, поэтому проверяется то, чем это держится: подписи полей стоят в
+       самой разметке (без шапки значение обязано назвать себя), и правило переворота
+       написано в таблице стилей. */
+    {
+      const cells = [].slice.call(pulse.querySelectorAll('.pd-table tbody tr:first-child td'));
+      const labelled = cells.filter((c) => (c.getAttribute('data-l') || '').trim() || c.classList.contains('pd-due'));
+      check('Пульс · каждое поле строки дня называет себя и без шапки таблицы',
+        cells.length === 5 && labelled.length === 5,
+        cells.map((c) => c.getAttribute('data-l') || c.className).join(' | '));
+      const cssSrcDay = read('css/app.css');
+      const mq = /@media \(max-width: 760px\) \{[\s\S]*?\n\}/.exec(cssSrcDay);
+      const mqText = mq ? mq[0] : '';
+      check('Пульс · на узком экране строка дня становится карточкой, а не полосой прокрутки',
+        /\.pd-table thead \{ display: none/.test(mqText) &&
+        /\.pd-table tbody tr \{/.test(mqText) &&
+        /\.pd-wrap \{ overflow-x: visible/.test(mqText),
+        mqText ? mqText.slice(0, 120) : 'правила нет');
+      /* Вкладка Консьержа висела поверх содержимого и накрывала кнопку «Настроить цели».
+         На широком экране под неё резервируется жёлоб, на узком её нет вовсе — «Консьерж»
+         уже стоит в нижней панели, которая как раз там и появляется. */
+      const themeSrc = read('css/theme.css');
+      check('Пульс · вкладка Консьержа не лежит на содержимом',
+        /@media \(min-width:861px\)\{ #main\{ padding-right:34px; \} \}/.test(themeSrc) &&
+        /@media \(max-width:860px\)\{ \.cg-tab\{ display:none; \} \}/.test(themeSrc),
+        /cg-tab\{ display:none/.test(themeSrc) ? 'жёлоб не найден' : 'правил нет');
+    }
     // Разбор просроченных был отдельной плиткой; она уехала во вкладки, и путь к записям
     // обязан остаться — иначе список просроченных с Пульса больше не открыть.
     const odN = (dd().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;

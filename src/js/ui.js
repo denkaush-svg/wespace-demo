@@ -411,7 +411,14 @@
     else if (fact >= target) pace = 'цель закрыта';
     else if (share >= 100) pace = 'идёте с опережением — на ' + Math.max(1, daysAhead) + ' ' + plural(Math.max(1, daysAhead), 'день', 'дня', 'дней') + ' раньше срока';
     else pace = 'при текущем темпе — ' + share + '% к концу ' + (goal.period === 'quarter' ? 'квартала' : 'месяца');
-    return { fact: fact, target: target, pct: pct, remaining: Math.max(0, target - fact), pace: pace, behind: share < 100 && fact < target };
+    /* «Отстаём или нет» для запаса и для накопления считается по-разному. Темп имеет смысл
+       только там, где число НАКАПЛИВАЕТСЯ за период; для запаса («держать 5 млн в активных
+       сделках») проекция по дневному темпу — та самая бессмыслица, о которой сказано выше.
+       На ней экран и показывал галочку рядом со словами «до нормы не хватает 1 022 000»:
+       галочка бралась из проекции, а текст — из факта. Для запаса отставание — это просто
+       «сейчас меньше нормы». */
+    const behind = cumulative ? (share < 100 && fact < target) : (fact < target);
+    return { fact: fact, target: target, pct: pct, remaining: Math.max(0, target - fact), pace: pace, behind: behind };
   }
   function goalsOf(roleKey) { const u = D().users[roleKey]; return (u && u.goals) || []; }
   /* ---- Цель полосой над рабочей областью --------------------------------------------------
@@ -803,12 +810,16 @@
       // Срочность — полосой слева на всю строку, а не только цветом даты: список читается
       // сверху вниз одним движением, «что горит» видно раньше, чем прочитано хоть одно слово.
       const urg = it.when === 'overdue' ? ' pd-over' : (it.when === 'today' ? ' pd-today' : '');
+      /* Подписи полей стоят в разметке, а не только в шапке таблицы: на узком экране шапки
+         нет — строка разворачивается карточкой, и каждое значение обязано назвать себя само.
+         Порядок полей не меняется: состав и очередь колонок задал партнёр. */
       return '<tr class="pd-r' + urg + '">' +
         '<td class="pd-due"><span class="pd-dot"></span>' + escAttr(it.due) +
         (it.when === 'overdue' ? '<div class="pd-late">просрочено</div>' : '') + '</td>' +
-        '<td>' + what + '</td><td>' + who + '</td>' +
-        '<td class="pd-what">' + escAttr(it.title) + '</td>' +
-        '<td class="pd-type"><span class="pd-kind ' + k[2] + '">' + I(k[1]) + k[0] + '</span></td></tr>';
+        '<td data-l="Сделка или заявка">' + what + '</td>' +
+        '<td data-l="Контакт">' + who + '</td>' +
+        '<td class="pd-what" data-l="Событие">' + escAttr(it.title) + '</td>' +
+        '<td class="pd-type" data-l="Тип"><span class="pd-kind ' + k[2] + '">' + I(k[1]) + k[0] + '</span></td></tr>';
     }).join('');
     const body = rows
       ? '<div class="pd-wrap"><table class="pd-table"><thead><tr>' +
@@ -1347,9 +1358,10 @@
           out.push({
             clientId: c.id, client: c.name, role: oppRoleWord(c),
             why: 'Горизонт клиента — ' + oppMonths(months) + ', а ' + m.район + ' растёт на +' +
-              m.изменениеЗаГодПроцент + '% в год. К концу этого горизонта из сегодняшних ' +
-              stock.length + ' подходящих объектов в бюджет уложатся ' + later.length + '. ' +
-              'Ждать здесь — это не «подумать», а платить за раздумье.',
+              m.изменениеЗаГодПроцент + '% в год. К концу этого горизонта из ' + stock.length + ' ' +
+              plural(stock.length, 'подходящего объекта', 'подходящих объектов', 'подходящих объектов') +
+              ' в бюджет ' + plural(later.length, 'уложится', 'уложатся', 'уложатся') + ' ' + later.length +
+              '. Ждать здесь — это не «подумать», а платить за раздумье.',
             basis: [['Срез рынка · ' + m.район, WS.AED(m.ценаЗаМетр) + ' за м² · +' +
                 m.изменениеЗаГодПроцент + '% за год · ' + m.asOf],
               ['Горизонт клиента', c.horizon + ' · бюджет ' + WS.AED(c.budget)],
@@ -1363,6 +1375,16 @@
               ? leaving.name + ' — зафиксировать цену сейчас, пока она в бюджете'
               : 'Зафиксировать вход в ' + m.район + ' по сегодняшней цене',
             act: 'Показать расчёт «сегодня против конца горизонта» и предложить бронь по текущей цене',
+            /* Если объект, выходящий из бюджета, уже назван другой возможностью, это ОДНА
+               сделка, а не две. Тогда разбор не заводит вторую карточку, а отдаёт свой срок
+               доводом в ту, что этот объект предлагает: `mergeObj` говорит, к какой. */
+            mergeObj: leaving ? leaving.id : null,
+            mergeLabel: 'Срок по бюджету',
+            mergeFact: leaving
+              ? 'через ' + oppMonths(months) + ' при +' + m.изменениеЗаГодПроцент + '% в год — ' +
+                WS.AED(oppPriceIn(leaving.price, m.изменениеЗаГодПроцент, months)) +
+                ', выше бюджета ' + WS.AED(c.budget)
+              : '',
             value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
             valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget),
             ask: 'посчитай, как меняется выбор для ' + c.name + ' за ' + oppMonths(months) + ' при росте ' +
@@ -1463,13 +1485,18 @@
   /* Список возможностей. Правила идут по порядку, объект достаётся первому назвавшему.
      Сортировка — по ожидаемому вознаграждению; возможности без числа (их значение считается
      только после оценки) уходят в конец, а не притворяются нулевыми. */
+  /* Какие разборы дали повод в последнем обходе — включая те, что влились доводом в чужую
+     карточку и своей строкой не встали. Молчащий разбор иначе не отличить от слитого. */
+  let prospRulesFired = [];
   function pulseProspectList() {
     const claimed = [];   // объекты, уже названные возможностью: один юнит — одному клиенту
     const used = [];      // клиенты, которым в этом обходе уже есть что предложить
     const out = [];
+    const fired = [];
     PROSPECT_RULES.forEach((r) => {
       let found = [];
       try { found = r.find(claimed, used) || []; } catch (e) { found = []; }
+      if (found.length && fired.indexOf(r.key) < 0) fired.push(r.key);
       found.forEach((p, i) => {
         if (used.indexOf(p.clientId) < 0) used.push(p.clientId);
         out.push(Object.assign({
@@ -1477,8 +1504,27 @@
         }, p));
       });
     });
-    return out.sort((a, b) => (b.value || 0) - (a.value || 0));
+    prospRulesFired = fired;
+    /* Разбор может не заводить новую возможность, а усиливать чужую. Срок по объекту, который
+       другая карточка уже предлагает, — это не вторая сделка, а довод в первой: складывать их
+       вознаграждения значит обещать те деньги дважды, а показывать двумя карточками — заставить
+       брокера самого догадаться, что речь про один и тот же юнит. Такой разбор вливается
+       строкой в основание той карточки и своей не встаёт. */
+    const byObj = {};
+    out.forEach((p) => { if (p.objId) byObj[p.objId] = p; });
+    const kept = [];
+    out.forEach((p) => {
+      const host = p.mergeObj && p.mergeFact && byObj[p.mergeObj];
+      if (host && host !== p) {
+        host.basis = (host.basis || []).concat([[p.mergeLabel || p.ruleLabel, p.mergeFact]]);
+        host.merged = (host.merged || []).concat([p.rule]);
+        return;
+      }
+      kept.push(p);
+    });
+    return kept.sort((a, b) => (b.value || 0) - (a.value || 0));
   }
+  function prospectRulesFired() { pulseProspectList(); return prospRulesFired.slice(); }
   /* Карточка возможности. Пять вопросов в одном и том же порядке на всех карточках: кому ·
      почему это возможность · на чём основано · что предложить · что сделать первым. Порядок
      не украшение: брокер читает карточку перед звонком и должен находить нужное на том же
@@ -1531,7 +1577,20 @@
       '<button class="chip' + (S().prospDeck ? ' on' : '') + '" data-act="prospDeck">' + I('layers') + 'Колодой</button>' +
       '</div>';
     if (!S().prospDeck) {
-      return head + '<div class="opps pulse-prospects">' + list.map((p) => prospectCard(p)).join('') + '</div>';
+      /* Тринадцать карточек — четыре тысячи пикселей: «Инсайты» и «Аналитика» уезжали за
+         край видимого, и раздел, который читают каждый день, хоронил под собой два
+         следующих. Показываются шесть крупнейших, остальные — по требованию, и требование
+         называет их число: тихо обрезанный список читается как «это всё».
+         Раскрытие сделано <details>, а не кнопкой со скриптом: раздел обязан открываться
+         и там, где скрипты не выполняются. */
+      const HEAD_N = 6;
+      const top = list.slice(0, HEAD_N), rest = list.slice(HEAD_N);
+      return head + '<div class="opps pulse-prospects">' + top.map((p) => prospectCard(p)).join('') + '</div>' +
+        (rest.length
+          ? '<details class="opp-more"><summary>' + I('chevDown') + 'Показать остальные ' + rest.length + ' ' +
+            plural(rest.length, 'возможность', 'возможности', 'возможностей') + '</summary>' +
+            '<div class="opps pulse-prospects">' + rest.map((p) => prospectCard(p)).join('') + '</div></details>'
+          : '');
     }
     const i = Math.min(Math.max(S().prospIdx || 0, 0), list.length - 1);
     const p = list[i];
@@ -1857,7 +1916,18 @@
     const overdueN = day.filter((x) => x.when === 'overdue').length;
     const todayN = day.filter((x) => x.when === 'today').length;
     const prosp = pulseProspectList();
-    const prospSum = prosp.reduce((a, p) => a + (p.value || 0), 0);
+    /* Сумма по всем карточкам была бы неправдой. У одного клиента поводов несколько, а
+       покупка у него одна: «второй юнит», «показывали не то» и «повод в календаре» — это
+       три версии одной и той же сделки, и сложенные вместе они давали 930 317 там, где
+       столько заработать нельзя. Считается лучшая возможность на клиента, и подпись прямо
+       говорит, что это значит, — иначе рядом с «ожидаемой комиссией» из аналитики стоит
+       второе число про те же деньги. */
+    const prospBest = {};
+    prosp.forEach((p) => {
+      if (!(p.clientId in prospBest) || prospBest[p.clientId] < (p.value || 0)) prospBest[p.clientId] = p.value || 0;
+    });
+    const prospClients = Object.keys(prospBest).length;
+    const prospSum = Object.keys(prospBest).reduce((a, k) => a + prospBest[k], 0);
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
@@ -1868,7 +1938,8 @@
         pulseDay() + pulseNoNextStep(), true) +
       pulseBlock('prospects', 'Перспективные сделки',
         prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
-          ' · ' + WS.AED(prospSum) : '',
+          ' у ' + prospClients + ' ' + plural(prospClients, 'клиента', 'клиентов', 'клиентов') +
+          ' · ' + WS.AED(prospSum) + ', если по одной сделке на каждого' : '',
         pulseProspects(), true) +
       pulseBlock('insights', 'Инсайты и сюжет дня',
         INSIGHTS.length + ' ' + plural(INSIGHTS.length, 'наблюдение', 'наблюдения', 'наблюдений') +
@@ -10920,7 +10991,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, prospectRulesFired, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
