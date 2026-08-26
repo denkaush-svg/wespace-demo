@@ -1825,8 +1825,14 @@
     const scrapped = (D().inbox || []).filter((it) => (it.stage || 'new') === 'rejected').length;
     const inboxN = (D().inbox || []).length;
     return '<div class="tiles dash">' +
-      tile('mail', 'Заявок в работе', open.length, '', 'span 4', 'из ' + (D().requests || []).length + ' всего', '', 'accent', 'data-nav="requests"') +
-      tile('target', 'Конверсия заявка → сделка', m.conv, '%', 'span 4', m.won + ' из ' + m.leads + ' лидов', '', '', 'data-analytics="conv"') +
+      /* У каждого основания названа его область. На одной панели стояли «из 17 всего» и
+         «11 из 70 лидов»: первое — заявки самого стенда, второе — книга квартала по
+         источникам. Без подписи это читается как два счёта одного и того же, и вопрос
+         «а где ещё 53?» задаёт первый же, кто смотрит внимательно. */
+      tile('mail', 'Заявок в работе', open.length, '', 'span 4',
+        'из ' + (D().requests || []).length + ' в стенде', '', 'accent', 'data-nav="requests"') +
+      tile('target', 'Конверсия заявка → сделка', m.conv, '%', 'span 4',
+        m.won + ' из ' + m.leads + ' лидов · книга квартала', '', '', 'data-analytics="conv"') +
       tile('x', 'Брак во входящих', scrapped, '', 'span 4',
         inboxN ? 'из ' + inboxN + ' обращений в разборе' : 'разбирать пока нечего', '', '', 'data-nav="requests"') +
       tile('flame', 'Горячие клиенты', a.hotClients, '', 'span 4', 'ждут вашего шага сегодня', '', '', 'data-analytics="hot"') +
@@ -1922,15 +1928,22 @@
     const sp = marketingSpend();
     const commPerLead = m.leads ? Math.round((D().attribution || []).reduce((s2, x) => s2 + (x.commission || 0), 0) / m.leads) : 0;
     const cpl = m.leads ? Math.round(sp.total / m.leads) : 0;
-    const newDeals = (D().deals || []).length;
-    const cpd = newDeals ? Math.round(sp.all / newDeals) : 0;
+    /* Обе доли обязаны считаться по ОДНОЙ совокупности. Стоимость лида делилась на 70 лидов
+       книги квартала, а стоимость сделки — на 10 сделок самого стенда: два отношения из разных
+       населений, поставленные рядом как одна модель себестоимости, — и итоговая строка внизу
+       их же и сравнивала. Совпало это только потому, что чисел оказалось 10 и 11. */
+    const bookDeals = m.won;
+    const cpd = bookDeals ? Math.round(sp.all / bookDeals) : 0;
     const rows = sp.items.map((e) => '<div class="feed-row"><div class="fi i-mut">' + I(e[3]) + '</div>' +
       '<div class="ft"><div class="t">' + e[0] + '</div><div class="m">' + e[1] + '</div></div>' +
       '<div class="td-amt">' + WS.AED(e[2]) + '</div></div>').join('');
     return '<div class="tiles dash">' +
-      tile('money', 'Стоимость лида', WS.AED(cpl), '', 'span 4', 'бюджет привлечения ' + WS.AED(sp.total) + ' / ' + m.leads + ' лидов', '', 'accent', 'data-analytics="conv"') +
-      tile('briefcase', 'Стоимость сделки', WS.AED(cpd), '', 'span 4', 'вся смета ' + WS.AED(sp.all) + ' / ' + newDeals + ' сделок', '', '', 'data-analytics="pipeline"') +
-      tile('trend', 'Комиссия на лид', WS.AED(commPerLead), '', 'span 4', 'выручка на тот же лид', '', '', 'data-analytics="conv"') +
+      tile('money', 'Стоимость лида', WS.AED(cpl), '', 'span 4',
+        'бюджет привлечения ' + WS.AED(sp.total) + ' / ' + m.leads + ' лидов · книга квартала', '', 'accent', 'data-analytics="conv"') +
+      tile('briefcase', 'Стоимость сделки', WS.AED(cpd), '', 'span 4',
+        'вся смета ' + WS.AED(sp.all) + ' / ' + bookDeals + ' закрытых сделок · книга квартала', '', '', 'data-analytics="pipeline"') +
+      tile('trend', 'Комиссия на лид', WS.AED(commPerLead), '', 'span 4',
+        'выручка на тот же лид · книга квартала', '', '', 'data-analytics="conv"') +
       '</div>' +
       '<div class="card" style="margin-top:14px"><div class="section-label" style="padding:12px 16px 4px">Из чего собран бюджет привлечения</div>' +
       '<div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' +

@@ -6987,6 +6987,46 @@ setTimeout(async () => {
       const b2 = doc.querySelector('#app [data-dayfilter="today"]');
       if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     }
+    /* ---- «Аналитика»: у каждого основания названа его область -----------------------
+       На одной панели стояли «из 17 всего» (заявки самого стенда) и «11 из 70 лидов»
+       (книга квартала по источникам). А во вкладке «Стоимость» стоимость лида делилась на
+       70 лидов книги, стоимость сделки — на 10 сделок стенда, и итоговая строка эти два
+       отношения сравнивала между собой. Сошлось только потому, что чисел оказалось 10 и 11. */
+    {
+      const openTab = (key) => {
+        const b = doc.querySelector('#app [data-pulsetab="' + key + '"]');
+        if (b) b.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        return [].slice.call(doc.querySelectorAll('#app .start .tile')).map((x) => ({
+          t: ((x.querySelector('.th') || {}).textContent || '').trim(),
+          v: ((x.querySelector('.val') || {}).textContent || '').trim(),
+          s: ((x.querySelector('.sub') || {}).textContent || '').trim(),
+        }));
+      };
+      const wasTab = WS.store.pulseTab;
+      const reqTiles = openTab('requests');
+      const costTiles = openTab('cost');
+      const all = reqTiles.concat(costTiles);
+      /* Основание — это «из N чего-то» или «N / M чего-то». Каждое обязано назвать, откуда
+         оно: стенд, книга квартала или неделя. Иначе два счёта одного и того же неразличимы. */
+      const SCOPE = /в стенде|книга квартала|по книге|за неделю|в разборе|сегодня/i;
+      const unscoped = all.filter((x) => /\d+\s*(лид|сделок|заявок|обращени|всего)/i.test(x.s) && !SCOPE.test(x.s));
+      check('Аналитика · у каждого основания названа его область',
+        all.length >= 6 && unscoped.length === 0,
+        unscoped.map((x) => x.t + ' → ' + x.s).join(' | ') || 'плиток ' + all.length);
+      /* И обе доли себестоимости посчитаны по одной совокупности: делитель у стоимости лида
+         и у стоимости сделки берётся из одной и той же книги, а не один из книги, другой из
+         стенда. Считается заново из данных, а не читается с экрана. */
+      const mm = { leads: 0, won: 0 };
+      (dd().attribution || []).forEach((x) => { mm.leads += x.leads; mm.won += x.deals; });
+      const cd = costTiles.find((x) => /Стоимость сделки/.test(x.t));
+      const cl = costTiles.find((x) => /Стоимость лида/.test(x.t));
+      check('Аналитика · стоимость сделки делится на закрытые сделки той же книги, что и лиды',
+        !!cd && !!cl && cd.s.indexOf(String(mm.won)) >= 0 && cl.s.indexOf(String(mm.leads)) >= 0 &&
+        cd.s.indexOf(String((dd().deals || []).length) + ' сделок') < 0,
+        (cd ? cd.s : 'плитки нет') + ' · книга: ' + mm.won + ' сделок из ' + mm.leads + ' лидов');
+      WS.store.pulseTab = wasTab || 'deals';
+      WS.router.go('start'); WS.ui.render();
+    }
     // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
     check('Пульс · ввод Консьержа один, а не задвоен',
       pulse.querySelectorAll('.prompt input').length === 1,
