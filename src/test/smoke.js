@@ -6816,6 +6816,124 @@ setTimeout(async () => {
     check('Пульс · строка Консьержа осталась первой', !!doc.getElementById('startPrompt'));
     check('Пульс · вход в «Сюжет дня» не потерян', !!pulse.querySelector('[data-act="presenter"]'));
     check('Пульс · «Инсайты» на месте', /Инсайты/.test(pulse.textContent));
+    /* ---- Наблюдения считаются, а не написаны ----------------------------------------
+       Раздел под значком «собрано AI» держал четыре строки текста, и ни одна не сходилась
+       с данными стенда: «Анна — 3 дня без связи» при звонке ей сегодня в 16:00, отклонение
+       «8%» при 4 и посчитанное не по своему сегменту, «escrow через 4 дня» по сделке без
+       договора и Palm Court «под предпочтения Karim» — проданный Анне юнит в чужом районе.
+       Проверяется не наличие карточек, а происхождение каждой: убери причину — наблюдение
+       обязано исчезнуть. */
+    {
+      const ins = () => WS.ui.pulseInsights();
+      const list0 = ins();
+      check('Пульс · наблюдений столько, сколько нашлось причин', list0.length >= 3, String(list0.length));
+
+      // Ни одно наблюдение не зовёт в несуществующую запись — и не предлагает занятый объект.
+      const ids = { client: (dd().clients || []), deal: (dd().deals || []), obj: (dd().objects || []) };
+      const badTarget = [];
+      const busyObj = [];
+      list0.forEach((it) => {
+        const attr = String(it[4] || '');
+        const m = /data-(client|deal|obj|contract)="([^"]+)"/.exec(attr);
+        if (!m) return;
+        if (m[1] === 'contract') {
+          if (!(dd().contracts || []).some((k) => k.id === m[2])) badTarget.push(it[1]);
+          return;
+        }
+        if (!ids[m[1]].some((x) => x.id === m[2])) badTarget.push(it[1]);
+        if (m[1] === 'obj' && WS.ui.oppObjectBusy(m[2])) busyObj.push(it[1] + ' → ' + m[2]);
+      });
+      check('Пульс · каждое наблюдение ведёт в существующую запись', badTarget.length === 0, badTarget.join(', '));
+      check('Пульс · и ни одно не зовёт к объекту, который занят чужой сделкой',
+        busyObj.length === 0, busyObj.join(', '));
+
+      // Недоставленное письмо: доставь его — наблюдения не станет.
+      {
+        const bad = (dd().inbox || []).find((i) => i.stage === 'rejected');
+        if (bad) {
+          const was = bad.stage; bad.stage = 'new';
+          const after = ins(); bad.stage = was;
+          check('Пульс · наблюдение о недоставке держится на самой недоставке',
+            after.length === list0.length - 1, after.length + ' против ' + list0.length);
+        }
+      }
+      // Ближайший срок — тот же, что у ближайшего договора, а не назначенный текстом.
+      {
+        const near = (dd().contracts || []).filter((k) => k.status === 'active' && k.nextDue)
+          .map((k) => ({ k: k, t: k.nextDue }))
+          .filter((x) => /(\d{1,2})\s+([а-яё]{3,})/i.test(x.t))
+          .map((x) => { const mm = /(\d{1,2})\s+([а-яё]{3,})/i.exec(x.t); return { k: x.k, day: +mm[1], mon: mm[2] }; });
+        const card = list0.find((it) => /через \d+ (день|дня|дней)/.test(it[1]));
+        const named = card && near.find((x) => String(card[2]).indexOf(x.k.number) >= 0);
+        check('Пульс · названный срок принадлежит договору, который его назначил',
+          !!card && !!named && String(card[1]).indexOf(String(named.k.nextDue).split('—')[0].trim().slice(1)) >= 0,
+          card ? card[1] + ' | ' + card[2].slice(0, 60) : 'наблюдения о сроке нет');
+        /* И это именно БЛИЖАЙШИЙ срок. Проверка выше держится только на согласованности:
+           взять самый дальний договор она пропускает, потому что он тоже «свой». Ближайший
+           считается здесь заново, из фикстур, и сравнивается по номеру. */
+        {
+          const MON = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+          const MD = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+          const doy = (day, mo) => { let n = day; for (let i = 0; i < mo - 1; i++) n += MD[i]; return n; };
+          const nowD = doy(WS.fixtures.DEMO_NOW.d, WS.fixtures.DEMO_NOW.mo);
+          const withDate = near.map((x) => ({ k: x.k, left: doy(x.day, MON.indexOf(x.mon.slice(0, 3)) + 1) - nowD }))
+            .filter((x) => x.left >= 0).sort((a, b) => a.left - b.left);
+          const first = withDate[0];
+          check('Пульс · и это ближайший срок, а не любой из договоров',
+            !!card && !!first && String(card[2]).indexOf(first.k.number) >= 0 &&
+            String(card[1]).indexOf(String(first.left)) >= 0,
+            card ? card[1] + ' · ближайший ' + (first ? first.k.number + ' через ' + first.left : '—') : 'наблюдения нет');
+        }
+      }
+      // Устаревшая проверка доступности: подтверди её сегодня — наблюдения не станет.
+      {
+        const old = (dd().objects || []).find((o) => /апр/.test(String(o.checkedAt || '')));
+        if (old) {
+          const was = old.checkedAt; old.checkedAt = '13 мая 2026';
+          const after = ins(); old.checkedAt = was;
+          check('Пульс · наблюдение о непроверенной доступности держится на дате проверки',
+            after.length === list0.length - 1, after.length + ' против ' + list0.length);
+        }
+      }
+      /* Отклонение цены считается внутри своего сегмента. Офис против индекса квартир — это
+         не отклонение, а разные рынки: прежняя строка сравнивала именно так и выдавала −23%
+         на офисе в районе, где индекс посчитан по квартирам. */
+      {
+        const card = list0.find((it) => /выше среза района/.test(it[1]));
+        const named = card && (dd().objects || []).find((o) => String(card[1]).indexOf(o.name) === 0);
+        const rows = (WS.query.run({ from: 'market' }) || {}).rows || [];
+        const idx = named && rows.find((m) => m.район === named.area);
+        const want = named && /офис|office|block|блок/i.test(named.name + ' ' + (named.br || '')) ? 'офисы' : 'квартиры';
+        check('Пульс · цена сравнивается с индексом СВОЕГО сегмента',
+          !!card && !!named && !!idx && idx.сегмент === want,
+          card ? card[1] + ' · сегмент индекса ' + (idx ? idx.сегмент : '—') + ', нужен ' + want : 'наблюдения о цене нет');
+        if (idx) {
+          const wasP = idx.ценаЗаМетр; idx.ценаЗаМетр = Math.round(named.price / named.size * 1.2);
+          const after = ins(); idx.ценаЗаМетр = wasP;
+          check('Пульс · наблюдение о цене держится на самом отклонении',
+            after.length === list0.length - 1, after.length + ' против ' + list0.length);
+        }
+        /* Нагрузка на сам запрет межсегментного сравнения. На готовых данных он не виден:
+           единственный офис в районе с индексом квартир стоит НИЖЕ индекса, а правило ловит
+           превышение. Поставим ему цену выше — офис не имеет права всплыть в районе, где
+           индекс посчитан по квартирам. */
+        {
+          const office = (dd().objects || []).find((o) => /офис|office|block|блок/i.test(o.name + ' ' + (o.br || '')) &&
+            rows.some((m) => m.район === o.area && m.сегмент === 'квартиры') &&
+            !rows.some((m) => m.район === o.area && m.сегмент === 'офисы'));
+          if (office) {
+            const idxA = rows.find((m) => m.район === office.area);
+            const wasPrice = office.price;
+            office.price = Math.round(idxA.ценаЗаМетр * office.size * 1.3);
+            const after2 = ins();
+            office.price = wasPrice;
+            const leaked = after2.filter((it) => String(it[1]).indexOf(office.name) === 0);
+            check('Пульс · офис не сравнивается с индексом квартир, даже если стал дороже его',
+              leaked.length === 0, leaked.map((x) => x[1]).join(', ') || office.name + ' не всплыл — верно');
+          }
+        }
+      }
+    }
     // Ежедневник: состав строки задан партнёром дословно — дата, сделка или заявка, контакт,
     // событие, тип. Проверяется по шапке таблицы, а не по наличию слова «дела» на экране.
     const heads = [].slice.call(pulse.querySelectorAll('.pd-table thead th')).map((e) => e.textContent.trim());

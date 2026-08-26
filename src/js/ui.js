@@ -627,19 +627,114 @@
       row('flame', 'i-acc', 'Горячие · SLA < 2 ч', hot, 'data-analytics="hot"') +
       '</div>';
   }
-  // Инсайты — «второй мозг»: агент-отобранные гипотезы/находки по клиентам, объектам и комплаенсу.
-  // Каждый инсайт = находка + почему важно + предложенное действие (клик ведёт в сущность).
-  // Инсайты = автоматически сгенерированные Консьержем группы задач (рекомендательная система).
-  // Один источник для Пульса (краткий блок) и экрана «Задачи» (типизированные AI-группы).
-  const INSIGHTS = [
-    ['sparkle', 'Анна Петрова — 3 дня без связи', 'High-priority клиент остывает: был активен, интерес к Creekline подтверждён.', 'Связаться', 'data-client="c_anna"'],
-    ['trend', 'Bayline 1603 — на 8% ниже компов', 'Сильный аргумент под инвестора: доходность выше среднего по району.', 'Предложить Виктору', 'data-deal="d_viktor"'],
-    ['shield', 'Escrow по Creekline — через 4 дня', 'Комплаенс-риск off-plan: нужен receipt до дедлайна DLD.', 'Открыть сделку', 'data-deal="d_anna"'],
-    ['star', 'Karim Aziz ценит статус', 'По психопрофилю Palm Court под его предпочтения: престиж + вид.', 'Подобрать объект', 'data-client="c_partner"'],
-  ];
+  /* ==== Инсайты — то, что может стоить денег, а не то, где их заработать ==================
+
+     Здесь стояли четыре строки текста под значком «собрано AI». Ни одна не сходилась с
+     данными стенда. «Анна Петрова — 3 дня без связи» — при звонке Анне сегодня в 16:00 и двух
+     её задачах на сегодня, которые видно двумя разделами выше. «Bayline 1603 — на 8% ниже
+     компов» — отклонение 4%, и считалось оно к тому же не по своему сегменту. «Escrow по
+     Creekline — через 4 дня» — по этой сделке договора нет вовсе, а ближайший платёж по
+     единственному off-plan договору — 20 июня. «Karim Aziz · Palm Court под его предпочтения»
+     — Palm Court продан Анне (`d_won`), стоит в JVC при районе Karim «Downtown» и стоит
+     1,69 млн при его бюджете 2,6 млн. То есть раздел предлагал брокеру проданный юнит — ровно
+     та ошибка, от которой разборы возможностей защищены проверкой занятости.
+
+     Наблюдения считаются из тех же данных, что и всё остальное, и отвечают на другой вопрос,
+     чем «Перспективные сделки». Там — где заработать. Здесь — что сгорит, если не тронуть:
+     недоставленное письмо, срок в договоре, непроверенная доступность, цена выше среза. */
+  /* Месяц читается по трём буквам: даты в стенде написаны и полностью («13 мая 2026»),
+     и сокращённо («2 апр 2026»). Словарь берётся в момент вызова, а не при загрузке файла:
+     RU_MONTHS объявлен ниже по файлу, и обращение к нему на верхнем уровне — обращение к
+     ещё не созданной константе (стенд падал на загрузке ровно на этом). */
+  function insDayOf(text) {
+    const m = /(\d{1,2})\s+([а-яё]{3,})/i.exec(String(text || ''));
+    if (!m) return null;
+    const p = m[2].toLowerCase().slice(0, 3);
+    const mi = RU_MONTHS.map((x) => x.slice(0, 3)).indexOf(p);
+    if (mi < 0) return null;
+    return dayOfYear(parseInt(m[1], 10), mi + 1);
+  }
+  function insDaysSince(text) {
+    const d = insDayOf(text); if (d == null) return null;
+    const now = demoNow();
+    return dayOfYear(now.d, now.mo) - d;
+  }
+  /* Индекс района берётся из СВОЕГО сегмента: офис против индекса квартир — это не отклонение,
+     а разные рынки. Прежняя строка сравнивала именно так и потому давала «−23%» на офисе. */
+  function insIndexFor(o) {
+    const want = oppTypeOf(o) === 'office' ? 'офисы' : 'квартиры';
+    return oppMarket().find((m) => m.район === o.area && m.сегмент === want) || null;
+  }
+  function insDeviation(o) {
+    const m = insIndexFor(o);
+    if (!m || !o.size || !m.ценаЗаМетр) return null;
+    const per = Math.round(o.price / o.size);
+    return { per: per, idx: m.ценаЗаМетр, area: m.район, pct: Math.round((per / m.ценаЗаМетр - 1) * 100) };
+  }
+  function pulseInsights() {
+    const out = [];
+    // 1. Отправленное не дошло. Клиент считает, что мы молчим, — и это худший вид молчания.
+    (D().inbox || []).filter((i) => i.stage === 'rejected').forEach((i) => {
+      const c = i.clientId ? oppClient(i.clientId) : null;
+      const hot = c && (D().requests || []).find((r) => r.clientId === c.id && r.temperature === 'hot');
+      const late = c && (D().tasks || []).find((t) => t.clientId === c.id && t.when === 'overdue' && t.status !== 'done');
+      out.push(['warn', (c ? c.name : 'Адресат') + ' не получил отправленное',
+        String(i.text || 'Отправка отклонена адресом.') +
+        (hot ? ' У клиента горячая заявка «' + hot.title + '».' : '') +
+        (late ? ' И просроченная задача: «' + late.title + '».' : '') +
+        ' Для клиента это выглядит как молчание с нашей стороны.',
+        c ? 'Открыть контакт' : 'Открыть входящие',
+        c ? 'data-client="' + c.id + '"' : 'data-nav="requests"']);
+    });
+    // 2. Ближайший срок по договору. Единственный срок, который назначили не мы.
+    const due = (D().contracts || []).filter((k) => k.status === 'active' && k.nextDue)
+      .map((k) => ({ k: k, d: insDayOf(k.nextDue) })).filter((x) => x.d != null)
+      .map((x) => Object.assign(x, { left: x.d - dayOfYear(demoNow().d, demoNow().mo) }))
+      .filter((x) => x.left >= 0).sort((a, b) => a.left - b.left)[0];
+    if (due) {
+      const k = due.k;
+      const what = String(k.nextDue).split('—')[0].trim();
+      const c = oppClient(k.clientId);
+      out.push(['clock', what.charAt(0).toUpperCase() + what.slice(1) + ' — через ' + oppDays(due.left),
+        contractKind(k).label + ' ' + k.number +
+        (k.amount ? ' · ' + WS.AED(k.amount) + ' в год' : '') + (c ? ' · ' + c.name : '') +
+        '. Срок назван в самом договоре — передоговариваться о нём не с кем.',
+        'Открыть договор', 'data-contract="' + k.id + '"']);
+    }
+    // 3. Доступность не подтверждали дольше всех. Хуже, если по объекту уже идёт сделка.
+    const stale = (D().objects || []).map((o) => ({ o: o, age: insDaysSince(o.checkedAt) }))
+      .filter((x) => x.age != null).sort((a, b) => b.age - a.age)[0];
+    if (stale && stale.age >= 14) {
+      const o = stale.o;
+      const inDeal = (D().deals || []).find((d) => !dealClosed(d) && !dealArchived(d) &&
+        (d.objectId === o.id || (d.lots || []).indexOf(o.id) >= 0));
+      out.push(['shield', o.name + ' — доступность не подтверждали ' + oppDays(stale.age),
+        'Проверено ' + o.checkedAt + (o.availability === 'stale' ? ', статус «под вопросом»' : '') + '. ' +
+        (inDeal ? 'По объекту уже идёт сделка «' + inDeal.title + '» — если он ушёл, это узнается на подписании.'
+          : 'Предложение по неподтверждённому объекту разваливается на первом звонке владельцу.'),
+        inDeal ? 'Открыть сделку' : 'Открыть объект',
+        inDeal ? 'data-deal="' + inDeal.id + '"' : 'data-obj="' + o.id + '"']);
+    }
+    // 4. Цена выше среза своего сегмента — до того, как её отправили клиенту.
+    const over = (D().objects || []).filter((o) => o.availability === 'available')
+      .map((o) => ({ o: o, dv: insDeviation(o) })).filter((x) => x.dv && x.dv.pct >= 5)
+      .sort((a, b) => b.dv.pct - a.dv.pct)[0];
+    if (over) {
+      const o = over.o, dv = over.dv;
+      out.push(['trend', o.name + ' — на ' + dv.pct + '% выше среза района',
+        WS.AED(dv.per) + ' за м² против ' + WS.AED(dv.idx) + ' по срезу ' + dv.area +
+        '. Разницу спросят на первом же сравнении — ответ лучше иметь до отправки, а не после.',
+        'Открыть объект', 'data-obj="' + o.id + '"']);
+    }
+    return out;
+  }
   function insightCards() {
-    return '<div class="insights">' + INSIGHTS.map((it) => '<div class="insight"><div class="insight-h"><span class="insight-ic">' + I(it[0]) + '</span><div class="insight-t">' + it[1] + '</div></div>' +
-      '<div class="insight-w">' + it[2] + '</div>' +
+    const list = pulseInsights();
+    if (!list.length) {
+      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Наблюдений сейчас нет: ничего не сгорает, сроки не близко, доступность подтверждена.</div>';
+    }
+    return '<div class="insights">' + list.map((it) => '<div class="insight"><div class="insight-h"><span class="insight-ic">' + I(it[0]) + '</span><div class="insight-t">' + escAttr(it[1]) + '</div></div>' +
+      '<div class="insight-w">' + escAttr(it[2]) + '</div>' +
       '<div class="insight-a"><button class="btn sm" ' + it[4] + '>' + I('arrowRight') + it[3] + '</button></div></div>').join('') + '</div>';
   }
   function insightsBlock() {
@@ -1915,6 +2010,7 @@
     const day = pulseDayItems();
     const overdueN = day.filter((x) => x.when === 'overdue').length;
     const todayN = day.filter((x) => x.when === 'today').length;
+    const insN = pulseInsights().length;
     const prosp = pulseProspectList();
     /* Сумма по всем карточкам была бы неправдой. У одного клиента поводов несколько, а
        покупка у него одна: «второй юнит», «показывали не то» и «повод в календаре» — это
@@ -1942,7 +2038,7 @@
           ' · ' + WS.AED(prospSum) + ', если по одной сделке на каждого' : '',
         pulseProspects(), true) +
       pulseBlock('insights', 'Инсайты и сюжет дня',
-        INSIGHTS.length + ' ' + plural(INSIGHTS.length, 'наблюдение', 'наблюдения', 'наблюдений') +
+        insN + ' ' + plural(insN, 'наблюдение', 'наблюдения', 'наблюдений') +
         ' · сюжет дня ' + (eventsPlayed ? eventsPlayed + ' из 5' : 'не запускался'),
         dayHint + insightCards(), false) +
       pulseBlock('analytics', 'Аналитика',
@@ -10991,7 +11087,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, prospectRulesFired, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
