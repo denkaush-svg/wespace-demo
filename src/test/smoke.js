@@ -6303,6 +6303,136 @@ setTimeout(async () => {
         !(p.offer || '').trim() || !(p.act || '').trim());
       check('Пульс · каждая возможность говорит кому, почему, на чём основано, что предложить и что сделать',
         thin.length === 0, thin.map((p) => p.rule).join(', '));
+      /* ---- Каждый разбор действительно даёт повод на готовых данных --------------------
+         Правила соревнуются за один и тот же скудный инвентарь: объект достаётся первому
+         назвавшему, и разбор, стоящий ниже, может остаться без объекта и молча исчезнуть.
+         Перечень поимённый, а не «сколько-то штук»: иначе выпавшее правило прячется за
+         числом, которое всё ещё выглядит большим. */
+      const RULES_EXPECTED = ['lease_window', 'repeat_offplan', 'yield_gap', 'handover_window',
+        'consent_block', 'block_match', 'lost_return', 'management_upsell',
+        'inbox_unreached', 'rejected_reason', 'price_window', 'cobroking_gap', 'referral_window'];
+      const missing = RULES_EXPECTED.filter((k) => rules.indexOf(k) < 0);
+      check('Пульс · каждый из тринадцати разборов нашёл повод, ни один не выпал',
+        missing.length === 0 && rules.length === RULES_EXPECTED.length,
+        'нет повода у: ' + (missing.join(', ') || '—') + ' · лишние: ' +
+        (rules.filter((k) => RULES_EXPECTED.indexOf(k) < 0).join(', ') || '—'));
+      const byRule = (k, list) => (list || opps).filter((p) => p.rule === k);
+      const rulesOf = () => WS.ui.pulseProspectList().map((p) => p.rule);
+
+      /* Входящее без ответа. Разбор читает канал входящих, а не клиентскую базу, и держится
+         на одном признаке: сообщение осталось необработанным. Поднимем ему статус — повод
+         обязан исчезнуть, иначе правило читает не то, что называет. */
+      {
+        const un = (dd().inbox || []).find((i) => i.stage === 'unreached' && i.clientId);
+        const card = byRule('inbox_unreached')[0];
+        check('Пульс · входящее без ответа названо вместе со временем и текстом обращения',
+          !!un && !!card && (card.basis || []).some((b) => String(b[1]).indexOf(un.at) >= 0) &&
+          (card.basis || []).some((b) => String(b[1]).indexOf(String(un.text).slice(0, 20)) >= 0),
+          card ? JSON.stringify(card.basis) : 'повода нет');
+        if (un) {
+          const was = un.stage; un.stage = 'new';
+          const after = rulesOf(); un.stage = was;
+          check('Пульс · отвеченное входящее возможностью уже не считается',
+            after.indexOf('inbox_unreached') < 0, after.join(', '));
+        }
+      }
+
+      /* Отказ с названной причиной. Ценность разбора — в том, что мотив ЗАПИСАН словами
+         клиента, а не выведен из полей. Значит причина обязана попасть в карточку дословно:
+         пересказ своими словами здесь и есть потеря данных. */
+      {
+        const req = (dd().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'rejected' && o.reason));
+        const bad = req && (req.offered || []).find((o) => o.state === 'rejected' && o.reason);
+        const card = byRule('rejected_reason')[0];
+        check('Пульс · причина отказа процитирована дословно, а не пересказана',
+          !!bad && !!card && (card.basis || []).some((b) => String(b[1]).indexOf(bad.reason) >= 0),
+          bad ? bad.reason : 'отказа с причиной в данных нет');
+        if (bad) {
+          const was = bad.reason; delete bad.reason;
+          const after = rulesOf(); bad.reason = was;
+          check('Пульс · отказ без записанной причины повода не даёт',
+            after.indexOf('rejected_reason') < 0, after.join(', '));
+        }
+      }
+
+      /* Бюджет догоняет рынок. Единственный разбор, который считает БУДУЩЕЕ, и потому
+         единственный, где легко выдумать срочность. Условие жёсткое: повод есть, только если
+         при том же темпе из бюджета реально выходит хотя бы один объект. Обнулим рост —
+         повода не станет. */
+      {
+        const card = byRule('price_window')[0];
+        const rows = (WS.query.run({ from: 'market' }) || {}).rows || [];
+        const hot = rows.filter((m) => m.изменениеЗаГодПроцент >= 9);
+        const was = hot.map((m) => m.изменениеЗаГодПроцент);
+        check('Пульс · окно по цене названо вместе с темпом района и горизонтом клиента',
+          !!card && (card.basis || []).some((b) => /\+\d+% за год/.test(String(b[1]))) &&
+          (card.basis || []).some((b) => /горизонт|месяц/i.test(String(b[0]) + String(b[1]))),
+          card ? JSON.stringify(card.basis) : 'повода нет');
+        hot.forEach((m) => { m.изменениеЗаГодПроцент = 0; });
+        const after = rulesOf();
+        hot.forEach((m, i) => { m.изменениеЗаГодПроцент = was[i]; });
+        check('Пульс · без роста цен окна по цене не существует',
+          after.indexOf('price_window') < 0, after.join(', '));
+        /* И отдельно — сам запрет на выдуманную срочность. Проверка выше его НЕ ловит:
+           обнулённый рост отсекает район ещё на подборе, и правило исчезает раньше, чем
+           дело доходит до сравнения «сейчас против конца горизонта». Поэтому рост
+           остаётся на месте, а бюджет поднимается настолько, что из него не выходит
+           ничего: рост есть, окна нет — повода быть не должно. */
+        const who = card && (dd().clients || []).find((c) => c.id === card.clientId);
+        if (who) {
+          const wasB = who.budget; who.budget = wasB * 20;
+          const rich = rulesOf(); who.budget = wasB;
+          check('Пульс · при росте, который ничего не выносит из бюджета, срочности нет',
+            rich.indexOf('price_window') < 0, rich.join(', '));
+        }
+      }
+
+      /* Спрос там, где нет инвентаря. Разбор сводит два списка — районы клиента и наши
+         объекты — и держится на нуле в пересечении. Поставим в этот район объект: повода не
+         должно остаться, иначе правило говорит «у нас нет», не посмотрев. */
+      {
+        const card = byRule('cobroking_gap')[0];
+        const area = card && (card.basis || []).map((b) => /объектов в (.+?) —/.exec(String(b[1])))
+          .filter(Boolean).map((m) => m[1])[0];
+        check('Пульс · разрыв инвентаря назван районом, в котором объектов правда ноль',
+          !!area && !(dd().objects || []).some((o) => o.area === area),
+          area ? area + ' · объектов: ' + (dd().objects || []).filter((o) => o.area === area).length : 'повода нет');
+        if (area) {
+          const donor = (dd().objects || [])[0];
+          const wasArea = donor.area; donor.area = area;
+          const after = rulesOf(); donor.area = wasArea;
+          check('Пульс · как только объект в этом районе появился, разрыва больше нет',
+            after.indexOf('cobroking_gap') < 0, after.join(', '));
+        }
+      }
+
+      /* Повод в календаре. Разбор сводит дату из карточки клиента со статистикой источников —
+         два набора, которые обычно не встречаются. Обе опоры проверяются порознь: без даты
+         повода нет, а число берётся из атрибуции, а не назначается. */
+      {
+        const card = byRule('referral_window')[0];
+        const ref = (dd().attribution || []).find((a2) => /рефер|рекоменд/i.test(a2.source));
+        check('Пульс · средняя комиссия по каналу рекомендаций посчитана из атрибуции',
+          !!card && !!ref && card.value === Math.round(ref.commission / ref.deals),
+          card ? card.value + ' против ' + (ref ? Math.round(ref.commission / ref.deals) : '—') : 'повода нет');
+        /* Вторая опора — та самая, ради которой просьба о знакомстве вообще уместна: клиент
+           уже ЗАКРЫЛ с нами сделку. Проверка смотрит не на наличие строки, а на исход
+           названной в ней сделки: «Закрытая сделка: <сделка, которая ещё идёт>» — это ложь
+           в карточке, которую брокер понесёт в разговор. */
+        const line = card && (card.basis || []).find((b) => b[0] === 'Закрытая сделка');
+        const named = line && (dd().deals || []).filter((d) => d.clientId === card.clientId)
+          .find((d) => String(line[1]).indexOf(d.title) === 0);
+        check('Пульс · «закрытая сделка» в поводе — действительно выигранная',
+          !!named && named.stage === 'won',
+          line ? line[1] + ' → ' + (named ? named.stage : 'сделка не найдена') : 'строки нет');
+        const who = card && (dd().clients || []).find((c) => c.id === card.clientId);
+        if (who) {
+          const wasB = who.birthday; delete who.birthday;
+          const after = rulesOf(); who.birthday = wasB;
+          check('Пульс · без даты в карточке повода в календаре не возникает',
+            after.indexOf('referral_window') < 0, after.join(', '));
+        }
+      }
       /* Один объект — одному клиенту. Иначе один и тот же юнит уходит в предложение двум
          клиентам сразу, и брокер узнаёт об этом от них.
 

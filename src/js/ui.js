@@ -906,6 +906,34 @@
   function oppRoleWord(c) {
     return [CONTACT_KIND_LABEL[c.contactKind], CONTACT_INTEREST_LABEL[c.interest]].filter(Boolean).join(' · ');
   }
+  /* Верхний край горизонта в месяцах: «1–3 месяца» → 3, «3–6 месяцев» → 6. Ноль означает
+     «не назван», а не «сегодня»: правило, которое считает молчание срочностью, врёт. */
+  function oppHorizonMax(c) {
+    const n = String((c && c.horizon) || '').match(/\d+/g);
+    return n ? Math.max.apply(null, n.map(Number)) : 0;
+  }
+  /* Район у клиента и район в срезе рынка написаны по-разному: «Downtown» против
+     «Downtown Dubai». Сначала точное совпадение, и только потом приближение — иначе
+     «Dubai Creek Harbour» рискует притянуть «Dubai Marina». */
+  function oppMarketNear(area) {
+    if (!area) return null;
+    return oppMarketOf(area) ||
+      oppMarket().find((m) => String(m.район).indexOf(area) === 0 || area.indexOf(String(m.район)) === 0) || null;
+  }
+  // Что клиенту уже показывали — по всем его заявкам, включая закрытые: повторное предложение
+  // того же объекта читается как «нас не слушали».
+  function oppOfferedIds(clientId) {
+    const out = [];
+    (D().requests || []).filter((r) => r.clientId === clientId)
+      .forEach((r) => (r.offered || []).forEach((o) => { if (out.indexOf(o.id) < 0) out.push(o.id); }));
+    return out;
+  }
+  // Цена через N месяцев при том же годовом темпе. Линейно и без притворства: срез
+  // иллюстративный, и вторая цифра после запятой была бы обещанием точности, которой нет.
+  function oppPriceIn(price, growthPct, months) {
+    return Math.round((price || 0) * (1 + (growthPct || 0) / 100 * months / 12));
+  }
+  function oppMonths(n) { return n + ' ' + plural(n, 'месяц', 'месяца', 'месяцев'); }
 
   const PROSPECT_RULES = [
     /* 1. Договор аренды у окна уведомления. Решение о продлении принимает арендатор, и
@@ -1203,6 +1231,233 @@
         });
         return out;
       } },
+
+    /* 9. Входящее, на которое никто не ответил. Разбор не по клиентской базе, а по каналу
+          входящих: сообщение уже содержит бюджет, район и тип — квалифицировать нечего,
+          а счёт идёт на часы. Ночное обращение теряется тише всех: утром лента длиннее. */
+    { key: 'inbox_unreached', label: 'Входящее без ответа', icon: 'mail',
+      find(claimed, used) {
+        const out = [];
+        (D().inbox || []).filter((i) => i.stage === 'unreached' && i.clientId).forEach((i) => {
+          const c = oppClient(i.clientId); if (!c) return;
+          const pick = oppFreeObjects(claimed).filter((o) => (c.areas || []).indexOf(o.area) >= 0 &&
+            (o.price || 0) <= (c.budget || 0) * 1.05 && oppTypeFit(c, o))
+            .sort((a, b) => oppComm(b) - oppComm(a))[0];
+          const m = oppMarketNear((c.areas || [])[0]);
+          if (pick) claimed.push(pick.id);
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            tone: 'stop',
+            why: 'Обращение пришло в ' + i.at + ' и осталось без ответа. В нём уже названы бюджет, ' +
+              'район и тип — квалифицировать нечего, лид готов. Такие теряются не потому, что не ' +
+              'подошли, а потому, что к утру лента длиннее.',
+            basis: [['Входящее', chanMeta(i.channel)[1] + ' · ' + i.at + ' · без ответа'],
+              ['Что написано', '«' + String(i.text || '').slice(0, 120) + '»'],
+              ['Карточка клиента', (c.budget ? WS.AED(c.budget) : 'бюджет не назван') + ' · ' +
+                ((c.areas || []).join(', ') || 'район не назван')],
+              pick ? ['Подходит сейчас', pick.name + ' · ' + WS.AED(pick.price) + ' · ' + pick.size + ' м², ' + pick.br]
+                : ['Подходит сейчас', 'в бюджете и районе свободного нет — запрашивать у партнёров'],
+              m ? ['Рынок · ' + m.район, oppDays(m.дней_на_рынке) + ' экспозиции — время на ответ есть, но немного'] : null,
+            ].filter(Boolean),
+            offer: pick ? pick.name + ' — ' + pick.size + ' м², ' + pick.br + ', ' + pick.area
+              : 'Ответ в том же канале и подборка от партнёров под названный бюджет',
+            act: 'Ответить в том же канале первым делом с утра — и сразу вариантом, а не вопросом',
+            value: pick ? oppComm(pick) : Math.round((c.budget || 0) * DEFAULT_COMM_PCT / 100),
+            valueNote: pick ? oppCommNote(pick) : DEFAULT_COMM_PCT + '% от названного бюджета',
+            ask: 'собери ответ на ночное обращение ' + c.name + ' с двумя вариантами',
+            objId: pick ? pick.id : null,
+          });
+        });
+        return out;
+      } },
+
+    /* 10. Отказ, у которого записана причина. Разбор по истории показов: клиент своими словами
+           сказал, что именно не подошло, — и это единственный вид данных, где мотив написан, а
+           не выведен. Возможность есть, если в инвентаре стоит свободный объект, который под
+           эту причину подходит и которого клиенту не показывали. */
+    { key: 'rejected_reason', label: 'Показывали не то — причина названа', icon: 'eye',
+      find(claimed, used) {
+        const out = [];
+        (D().requests || []).forEach((r) => {
+          const bad = (r.offered || []).find((o) => o.state === 'rejected' && o.reason);
+          if (!bad) return;
+          const c = oppClient(r.clientId); if (!c) return;
+          const rejected = oppObject(bad.id);
+          const seen = oppOfferedIds(c.id);
+          /* Район отклонённого объекта исключается целиком: клиент отказался не от юнита, а от
+             места. Предложить второй адрес на той же улице — это не услышать сказанное. */
+          /* Свободный объект здесь не условие, а исход. Когда в инвентаре вне отклонённого
+             района подходящего нет — это и есть содержание возможности: клиенту показывали
+             ровно то, что он назвал в начале, а он с тех пор сказал другое. Так же устроен
+             разбор доходности: «объектов в районе нет — запрашивать у партнёров» — это
+             первый шаг, а не повод промолчать. */
+          const pick = oppFreeObjects(claimed).filter((o) => seen.indexOf(o.id) < 0 &&
+            (!rejected || o.area !== rejected.area) &&
+            (o.price || 0) <= (c.budget || 0) * 1.05 && oppTypeFit(c, o))
+            .sort((a, b) => oppComm(b) - oppComm(a))[0];
+          if (pick) claimed.push(pick.id);
+          const shown = (r.offered || []).length;
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Клиент назвал причину отказа своими словами, и она про место, а не про цену. ' +
+              'Значит устарел сам список районов в заявке: подбирать надо под сказанное, а не ' +
+              'под то, что он перечислил до просмотра.',
+            basis: [['Заявка', r.title + ' · ' + r.leadStatus],
+              ['Сказано дословно', '«' + bad.reason + '»'],
+              ['Показано по заявке', shown + ' ' + plural(shown, 'вариант', 'варианта', 'вариантов') +
+                (rejected ? ' · отклонён ' + rejected.name : '')],
+              ['Районы в заявке', ((c.areas || []).join(', ') || 'не названы') +
+                (rejected ? ' — включая ' + rejected.area + ', от которого клиент отказался' : '')],
+              pick ? ['Не показывали', pick.name + ' · ' + pick.area + ' · ' + WS.AED(pick.price)]
+                : ['В инвентаре под причину', 'свободного вне ' + (rejected ? rejected.area : 'отклонённого района') +
+                  ' в бюджете сейчас нет — собирать через партнёров'],
+            ],
+            offer: pick
+              ? pick.name + ' — ' + pick.area + ', ' + pick.size + ' м², ' + pick.br
+              : 'Подборка под сказанное — и заново записанный список районов в заявке',
+            act: pick
+              ? 'Отправить один вариант и сослаться на его же формулировку, а не на новую подборку'
+              : 'Переспросить про район словами клиента, переписать заявку и запросить подборку у партнёров',
+            value: pick ? oppComm(pick) : Math.round((c.budget || 0) * DEFAULT_COMM_PCT / 100),
+            valueNote: pick ? oppCommNote(pick) : DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget || 0),
+            ask: 'подбери вариант для ' + c.name + ' с учётом отказа: ' + bad.reason,
+            objId: pick ? pick.id : null,
+          });
+        });
+        return out;
+      } },
+
+    /* 11. Бюджет догоняет рынок. Разбор во времени, а не в сравнении: район растёт, горизонт
+           клиента длинный, и к концу этого горизонта часть сегодняшнего выбора выходит из
+           бюджета. Возможность заводится, только если выходит РЕАЛЬНО — иначе это не срочность,
+           а её имитация, и брокер это увидит с первого же звонка. */
+    { key: 'price_window', label: 'Бюджет догоняет рынок', icon: 'trend',
+      find(claimed, used) {
+        const out = [];
+        (D().clients || []).filter((c) => c.consent !== false && c.budget && oppHorizonMax(c) >= 4).forEach((c) => {
+          const area = (c.areas || []).find((a) => { const m = oppMarketNear(a); return m && m.изменениеЗаГодПроцент >= 9; });
+          const m = oppMarketNear(area); if (!m) return;
+          const months = oppHorizonMax(c);
+          const stock = (D().objects || []).filter((o) => o.area === area && o.availability === 'available' &&
+            !oppObjectBusy(o.id) && oppTypeFit(c, o) && (o.price || 0) <= c.budget);
+          const later = stock.filter((o) => oppPriceIn(o.price, m.изменениеЗаГодПроцент, months) <= c.budget);
+          if (!stock.length || later.length >= stock.length) return;
+          const leaving = stock.filter((o) => later.indexOf(o) < 0)
+            .sort((a, b) => (b.price || 0) - (a.price || 0))[0];
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Горизонт клиента — ' + oppMonths(months) + ', а ' + m.район + ' растёт на +' +
+              m.изменениеЗаГодПроцент + '% в год. К концу этого горизонта из сегодняшних ' +
+              stock.length + ' подходящих объектов в бюджет уложатся ' + later.length + '. ' +
+              'Ждать здесь — это не «подумать», а платить за раздумье.',
+            basis: [['Срез рынка · ' + m.район, WS.AED(m.ценаЗаМетр) + ' за м² · +' +
+                m.изменениеЗаГодПроцент + '% за год · ' + m.asOf],
+              ['Горизонт клиента', c.horizon + ' · бюджет ' + WS.AED(c.budget)],
+              ['В бюджете сейчас', stock.length + ' ' + plural(stock.length, 'объект', 'объекта', 'объектов') +
+                ' · через ' + oppMonths(months) + ' — ' + later.length],
+              leaving ? ['Выходит из бюджета первым', leaving.name + ' · ' + WS.AED(leaving.price) +
+                ' → ' + WS.AED(oppPriceIn(leaving.price, m.изменениеЗаГодПроцент, months)) +
+                ' при том же темпе'] : null,
+            ].filter(Boolean),
+            offer: leaving
+              ? leaving.name + ' — зафиксировать цену сейчас, пока она в бюджете'
+              : 'Зафиксировать вход в ' + m.район + ' по сегодняшней цене',
+            act: 'Показать расчёт «сегодня против конца горизонта» и предложить бронь по текущей цене',
+            value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
+            valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget),
+            ask: 'посчитай, как меняется выбор для ' + c.name + ' за ' + oppMonths(months) + ' при росте ' +
+              m.изменениеЗаГодПроцент + '%',
+          });
+        });
+        return out;
+      } },
+
+    /* 12. Спрос есть, инвентаря нет. Разбор на стыке двух списков: район назван клиентом, а
+           в нашем инвентаре по нему ноль объектов. Это не «предложить нечего» — это co-broking:
+           у партнёра, чей профиль и есть этот район, объекты найдутся, а половина комиссии
+           наша. Молчание здесь стоит ровно одного письма. */
+    { key: 'cobroking_gap', label: 'Спрос там, где у нас нет инвентаря', icon: 'handshake',
+      find(claimed, used) {
+        const partners = (typeof PARTNERS !== 'undefined' ? PARTNERS : []).filter((p) => p.status === 'active');
+        const out = [];
+        (D().clients || []).filter((c) => c.consent !== false && c.budget).forEach((c) => {
+          const area = (c.areas || []).find((a) => {
+            const m = oppMarketNear(a);
+            return m && !(D().objects || []).some((o) => o.area === a || o.area === m.район);
+          });
+          if (!area) return;
+          const m = oppMarketNear(area);
+          const p = partners.find((x) => String(x.focus || '').indexOf(area) >= 0) || partners[0];
+          if (!p) return;
+          const half = String(p.split || '').indexOf('50') >= 0;
+          const full = Math.round(c.budget * DEFAULT_COMM_PCT / 100);
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Район назван клиентом, а в нашем инвентаре по нему нет ни одного объекта. Это не ' +
+              '«вариантов нет» — это co-broking: у партнёра, чей профиль и есть ' + area + ', ' +
+              'объекты найдутся' + (half ? ', и половина комиссии наша' : '') + '. Запрос стоит одного письма.',
+            basis: [['Что просит клиент', WS.AED(c.budget) + ' · ' + area +
+                (c.horizon ? ' · горизонт ' + c.horizon : '')],
+              ['В нашем инвентаре', 'объектов в ' + area + ' — ни одного из ' + (D().objects || []).length],
+              m ? ['Срез рынка · ' + m.район, WS.AED(m.ценаЗаМетр) + ' за м² · доходность ' +
+                m.доходностьПроцент + '% · ' + oppDays(m.дней_на_рынке) + ' экспозиции'] : null,
+              ['Партнёр по профилю', p.name + ' · ' + p.focus + ' · сплит ' + p.split],
+            ].filter(Boolean),
+            offer: 'Подборка от ' + p.name + ' в ' + area + ' под названный бюджет — по сплиту ' + p.split,
+            act: 'Отправить партнёру запрос с бюджетом и требованиями, ответ ждать в сутки',
+            value: half ? Math.round(full / 2) : full,
+            valueNote: half
+              ? 'половина от ' + DEFAULT_COMM_PCT + '% · сплит ' + p.split
+              : DEFAULT_COMM_PCT + '% от бюджета · сплит по договорённости',
+            ask: 'составь запрос партнёру ' + p.name + ' по ' + area + ' для ' + c.name,
+          });
+        });
+        return out;
+      } },
+
+    /* 13. Повод в календаре и самый конверсионный канал. Разбор двух наборов, которые обычно
+           не встречаются: дата в карточке клиента и статистика источников. Поздравление само по
+           себе не сделка; сделкой его делает то, что рекомендация закрывается чаще любого
+           платного размещения, — и число этому есть. */
+    { key: 'referral_window', label: 'Повод в календаре и канал рекомендаций', icon: 'star',
+      find(claimed, used) {
+        const now = demoNow();
+        const src = (D().attribution || []).slice();
+        const ref = src.find((a) => /рефер|рекоменд/i.test(a.source));
+        if (!ref || !ref.deals) return [];
+        const worst = src.filter((a) => a !== ref && a.leads)
+          .sort((a, b) => (a.deals / a.leads) - (b.deals / b.leads))[0];
+        const out = [];
+        (D().clients || []).filter((c) => c.consent !== false && c.birthday).forEach((c) => {
+          const m = /^(\d+)\s*([а-яё]+)/i.exec(c.birthday); if (!m) return;
+          const mi = RU_MONTHS.indexOf(m[2].toLowerCase()); if (mi < 0) return;
+          const days = dayOfYear(parseInt(m[1], 10), mi + 1) - dayOfYear(now.d, now.mo);
+          if (days < 0 || days > 30) return;
+          const won = (D().deals || []).filter((d) => d.clientId === c.id && dealWon(d))[0];
+          if (!won) return;
+          out.push({
+            clientId: c.id, client: c.name, role: oppRoleWord(c),
+            why: 'Через ' + oppDays(days) + ' у клиента день рождения — повод, который не надо ' +
+              'придумывать. Он уже закрыл с нами сделку, а рекомендация закрывается чаще любого ' +
+              'другого источника: просить о ней в этот разговор уместно, в холодный — нет.',
+            basis: [['Дата', c.birthday + ' · через ' + oppDays(days)],
+              ['Закрытая сделка', won.title + ' · ' + WS.AED(won.amount)],
+              ['Канал «' + ref.source + '»', ref.leads + ' ' + plural(ref.leads, 'лид', 'лида', 'лидов') +
+                ' → ' + ref.deals + ' ' + plural(ref.deals, 'сделка', 'сделки', 'сделок') +
+                ' · ' + WS.AED(ref.commission) + ' комиссии'],
+              worst ? ['Для сравнения · ' + worst.source, worst.leads + ' ' +
+                plural(worst.leads, 'лид', 'лида', 'лидов') + ' → ' + worst.deals + ' ' +
+                plural(worst.deals, 'сделка', 'сделки', 'сделок')] : null,
+            ].filter(Boolean),
+            offer: 'Поздравление и просьба об одном знакомстве — не «порекомендуйте нас», а одно имя',
+            act: 'Позвонить ' + c.birthday + ' голосом; шаблонное сообщение этот повод тратит впустую',
+            value: Math.round(ref.commission / ref.deals),
+            valueNote: 'средняя комиссия сделки из канала «' + ref.source + '»',
+            ask: 'подготовь разговор с ' + c.name + ' ко дню рождения с просьбой о знакомстве',
+          });
+        });
+        return out;
+      } },
   ];
 
   /* Список возможностей. Правила идут по порядку, объект достаётся первому назвавшему.
@@ -1267,7 +1522,7 @@
   function pulseProspects() {
     const list = pulseProspectList();
     if (!list.length) {
-      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Возможностей сейчас нет: ни один из восьми разборов не нашёл повода. Как только появится — договор подойдёт к сроку, объект освободится, срез рынка разойдётся с районом клиента, — она встанет сюда.</div>';
+      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Возможностей сейчас нет: ни один из тринадцати разборов не нашёл повода. Как только появится — договор подойдёт к сроку, объект освободится, срез рынка разойдётся с районом клиента, — она встанет сюда.</div>';
     }
     /* Счёт и сумма стоят в подписи раздела и повторять их в сорока пикселях ниже незачем:
        один и тот же факт, набранный дважды, читается как два разных. */
