@@ -1463,6 +1463,31 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .greet-slim { margin: 6px 0 18px; text-align: center; }
 .greet-slim h1 { font-size: clamp(24px, 5vw, 34px); line-height: 1.2; letter-spacing: -.015em; max-width: none; }
 .greet-slim .eyebrow { font-size: 13px; margin-bottom: 10px; display: inline-flex; justify-content: center; }
+/* Строка утра. Тон «стоп», потому что это не подсказка, а долг: обращение без ответа —
+   единственное на Пульсе, где счёт идёт на часы. Ширину не делит ни с чем: строку читают
+   одним движением глаза, а не выбирают из двух. */
+.morn-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
+.morn { flex: 1 1 320px; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left;
+  cursor: pointer; background: var(--stop-soft, var(--acc-soft)); border: 1px solid var(--stop);
+  border-radius: var(--r); padding: 12px 14px; transition: .15s var(--ease); }
+.morn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.morn-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--stop); color: #fff; flex: none; }
+.morn-ic svg { width: 17px; height: 17px; }
+.morn-t { flex: 1 1 auto; min-width: 0; }
+.morn-t b { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.morn-m { display: block; font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.morn-go { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  font-weight: 700; color: var(--stop); white-space: nowrap; }
+.morn-go svg { width: 14px; height: 14px; }
+.morn-more { flex: none; font-size: 11.5px; font-weight: 650; color: var(--mut); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; }
+.morn-more:hover { border-color: var(--stop); color: var(--stop); }
+@media (max-width: 620px) {
+  .morn { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .morn-go { align-self: flex-end; }
+}
+
 .day-hint { margin-top: 18px; }
 
 .day-hint { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; cursor: pointer;

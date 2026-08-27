@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:30</title>
+  <title>WESPACE · сборка 13:15</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:30';
+    window.WS_BUILD='13:15';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1613,6 +1613,31 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .greet-slim { margin: 6px 0 18px; text-align: center; }
 .greet-slim h1 { font-size: clamp(24px, 5vw, 34px); line-height: 1.2; letter-spacing: -.015em; max-width: none; }
 .greet-slim .eyebrow { font-size: 13px; margin-bottom: 10px; display: inline-flex; justify-content: center; }
+/* Строка утра. Тон «стоп», потому что это не подсказка, а долг: обращение без ответа —
+   единственное на Пульсе, где счёт идёт на часы. Ширину не делит ни с чем: строку читают
+   одним движением глаза, а не выбирают из двух. */
+.morn-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
+.morn { flex: 1 1 320px; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left;
+  cursor: pointer; background: var(--stop-soft, var(--acc-soft)); border: 1px solid var(--stop);
+  border-radius: var(--r); padding: 12px 14px; transition: .15s var(--ease); }
+.morn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.morn-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--stop); color: #fff; flex: none; }
+.morn-ic svg { width: 17px; height: 17px; }
+.morn-t { flex: 1 1 auto; min-width: 0; }
+.morn-t b { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.morn-m { display: block; font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.morn-go { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  font-weight: 700; color: var(--stop); white-space: nowrap; }
+.morn-go svg { width: 14px; height: 14px; }
+.morn-more { flex: none; font-size: 11.5px; font-weight: 650; color: var(--mut); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; }
+.morn-more:hover { border-color: var(--stop); color: var(--stop); }
+@media (max-width: 620px) {
+  .morn { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .morn-go { align-self: flex-end; }
+}
+
 .day-hint { margin-top: 18px; }
 
 .day-hint { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; cursor: pointer;
@@ -8285,6 +8310,61 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     meet: ['Встреча', 'calendar', 'k-meet'], visit: ['Встреча', 'calendar', 'k-meet'], mail: ['Коммуникация', 'mail', 'k-msg'],
   };
   const DAY_WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+  /* ==== Строка утра ======================================================================
+     Первое, что видит брокер, открыв стенд, — не приборная панель, а одно предложение: кто
+     ждёт ответа и сколько именно. Обращение, оставшееся без ответа, — единственный случай,
+     где счёт идёт на часы: лид уходит не к тому, кто лучше, а к тому, кто раньше.
+
+     Если ждущих нет — строки НЕТ ВОВСЕ. Зелёное «всё в порядке» занимает то же место и
+     обесценивает случай, когда строка появится по делу. */
+  function inboxWaitMin(it) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String((it && it.at) || '').trim());
+    if (!m) return null;
+    const now = demoNow();
+    let d = (now.h * 60 + now.mi) - (parseInt(m[1], 10) * 60 + parseInt(m[2], 10));
+    // Написали вечером, читаем утром: отрицательная разница — это прошлая ночь, а не будущее.
+    if (d < 0) d += 24 * 60;
+    return d;
+  }
+  function waitLabel(min) {
+    if (min == null) return '';
+    if (min < 60) return min + ' ' + plural(min, 'минуту', 'минуты', 'минут');
+    const h = Math.floor(min / 60), r = min % 60;
+    return h + ' ' + plural(h, 'час', 'часа', 'часов') +
+      (r ? ' ' + r + ' ' + plural(r, 'минуту', 'минуты', 'минут') : '');
+  }
+  // Неотвеченные, самый давний первым. Обращение без разобранного времени не притворяется
+  // свежим — оно уходит в конец и показывает не длительность, а момент.
+  function inboxWaiting() {
+    return (D().inbox || []).filter((i) => i.stage === 'unreached')
+      .map((i) => ({ it: i, wait: inboxWaitMin(i) }))
+      .sort((a, b) => (b.wait == null ? -1 : b.wait) - (a.wait == null ? -1 : a.wait));
+  }
+  function pulseMorningRow() {
+    const q = inboxWaiting();
+    if (!q.length) return '';
+    const top = q[0], it = top.it;
+    const c = it.clientId ? oppClient(it.clientId) : null;
+    const who = c ? c.name : 'Обращение без карточки контакта';
+    const meta = [chanMeta(it.channel)[1] + ', ' + escAttr(it.at),
+      c && c.budget ? WS.AED(c.budget) : null,
+      c && (c.areas || []).length ? escAttr((c.areas || [])[0]) : null].filter(Boolean).join(' · ');
+    const how = top.wait != null
+      ? 'ждёт ответа ' + waitLabel(top.wait)
+      : 'ждёт ответа с ' + escAttr(it.at);
+    const rest = q.length - 1;
+    return '<div class="morn-wrap">' +
+      '<button class="morn" ' + (c ? 'data-client="' + c.id + '"' : 'data-nav="requests"') +
+      ' title="Открыть обращение">' +
+      '<span class="morn-ic">' + I('clock') + '</span>' +
+      '<span class="morn-t"><b>' + escAttr(who) + ' — ' + how + '</b>' +
+      '<span class="morn-m">' + meta + '</span></span>' +
+      '<span class="morn-go">Открыть обращение' + I('arrowRight') + '</span></button>' +
+      (rest > 0
+        ? '<button class="morn-more" data-nav="requests">и ещё ' + rest + ' без ответа</button>'
+        : '') +
+      '</div>';
+  }
   function pulseDayItems() {
     const out = [];
     (D().tasks || []).forEach((t) => {
@@ -9474,6 +9554,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const prospSum = Object.keys(prospBest).reduce((a, k) => a + prospBest[k], 0);
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
+      /* Строка утра стоит ВЫШЕ строки Консьержа: она про то, что уже случилось и ждёт, а
+         Консьерж — про то, что брокер хочет поручить. Сначала долг, потом замысел. */
+      pulseMorningRow() +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       pulseMyGoals() +
       '<div class="pblocks">' +
@@ -18535,7 +18618,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

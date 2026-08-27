@@ -6240,6 +6240,89 @@ setTimeout(async () => {
        На каждом листе макета партнёра сверху стоит одна и та же полоса: срок · что заработать ·
        выполнено · осталось · прогресс. Проверяется не «полоса есть», а что все четыре текста
        на месте и что длина закраски совпадает с посчитанным процентом. */
+    /* ---- Строка утра ----------------------------------------------------------------
+       Первое, что видит брокер, — не панель, а одно предложение: кто ждёт ответа и сколько.
+       Проверяется происхождение числа (считается из `at` и демо-часов, а не написано), порядок
+       при нескольких ждущих, исчезновение после ответа и то, что при нуле строки НЕТ. */
+    {
+      const morn = () => doc.querySelector('#app .start .morn');
+      const inbox = dd().inbox || [];
+      const un = inbox.filter((i) => i.stage === 'unreached');
+      const row = morn();
+      check('Пульс · строка утра стоит выше строки Консьержа',
+        !!row && !!doc.getElementById('startPrompt') &&
+        (row.compareDocumentPosition(doc.getElementById('startPrompt')) & 4) !== 0,
+        row ? 'строка есть' : 'строки нет при ' + un.length + ' без ответа');
+      if (row && un.length) {
+        const first = un[0];
+        const c0 = (dd().clients || []).find((x) => x.id === first.clientId);
+        // Время считаем ЗАНОВО из данных: цифра на экране обязана быть посчитанной, а не набранной.
+        const now = WS.fixtures.DEMO_NOW;
+        const mm = /^(\d{1,2}):(\d{2})$/.exec(String(first.at));
+        let want = mm ? (now.h * 60 + now.mi) - (+mm[1] * 60 + +mm[2]) : null;
+        if (want != null && want < 0) want += 1440;
+        const hh = want != null ? Math.floor(want / 60) : null;
+        check('Пульс · строка утра называет, кто ждёт и сколько именно',
+          !!c0 && row.textContent.indexOf(c0.name) >= 0 &&
+          (hh == null || row.textContent.indexOf(String(hh)) >= 0),
+          row.textContent.replace(/\s+/g, ' ').trim().slice(0, 90) + ' · ожидание ' + want + ' мин');
+        check('Пульс · и ведёт в существующую запись',
+          !!(row.getAttribute('data-client') &&
+            (dd().clients || []).some((x) => x.id === row.getAttribute('data-client'))) ||
+          row.getAttribute('data-nav') === 'requests',
+          row.getAttribute('data-client') || row.getAttribute('data-nav') || 'цели нет');
+      }
+      /* Ответили — строки не стало. Иначе она врёт о состоянии сильнее, чем её отсутствие. */
+      {
+        const was = un.map((i) => i.stage);
+        un.forEach((i) => { i.stage = 'new'; });
+        WS.router.go('start'); WS.ui.render();
+        check('Пульс · после ответа строка утра исчезает, а не остаётся зелёной',
+          !morn(), morn() ? morn().textContent.slice(0, 60) : 'строки нет — верно');
+        un.forEach((i, k) => { i.stage = was[k]; });
+        WS.router.go('start'); WS.ui.render();
+      }
+      /* Порядок при нескольких ждущих — по давности, и остальные названы числом.
+         Нагрузка намеренная: в готовых данных ждущий один, и правило порядка молчит. */
+      {
+        const others = inbox.filter((i) => i.stage !== 'unreached').slice(0, 2);
+        const wasS = others.map((i) => i.stage), wasA = others.map((i) => i.at);
+        others.forEach((i, k) => { i.stage = 'unreached'; i.at = k === 0 ? '08:55' : '08:40'; });
+        // Самым давним делаем ЧУЖОЕ обращение — иначе порядок подтверждается совпадением.
+        const oldest = others[1];
+        oldest.at = '00:05';
+        WS.router.go('start'); WS.ui.render();
+        const r2 = morn();
+        /* Проверяется ЧИСЛО, а не имя. Первая версия искала в строке имя клиента самого
+           давнего обращения — и оставалась зелёной на сломанном порядке, потому что самым
+           давним в нагрузке оказалось обращение БЕЗ карточки контакта: имени нет, условие
+           прошло вхолостую. Порядок спрашивается у самого разбора и сверяется с максимумом. */
+        const q2 = WS.ui.inboxWaiting();
+        const sorted = q2.every((x, k) => k === 0 ||
+          (q2[k - 1].wait == null ? -1 : q2[k - 1].wait) >= (x.wait == null ? -1 : x.wait));
+        const maxWait = q2.reduce((m2, x) => Math.max(m2, x.wait == null ? -1 : x.wait), -1);
+        check('Пульс · при нескольких ждущих первым стоит самый давний',
+          q2.length >= 3 && sorted && q2[0].wait === maxWait &&
+          !!r2 && r2.textContent.indexOf(String(Math.floor(maxWait / 60))) >= 0,
+          'очередь ' + JSON.stringify(q2.map((x) => x.wait)) + ' · в строке «' +
+          (r2 ? r2.textContent.replace(/\s+/g, ' ').slice(0, 60) : 'строки нет') + '»');
+        const more = doc.querySelector('#app .start .morn-more');
+        check('Пульс · и остальные названы числом, а не спрятаны',
+          !!more && /\b2\b/.test(more.textContent), more ? more.textContent.trim() : 'счётчика нет');
+        others.forEach((i, k) => { i.stage = wasS[k]; i.at = wasA[k]; });
+        WS.router.go('start'); WS.ui.render();
+      }
+      /* Написали ночью, читаем утром: разница отрицательная, и без поправки на сутки строка
+         сказала бы «ждёт −20 минут». */
+      check('Пульс · вечернее обращение считается прошедшей ночью, а не будущим',
+        WS.ui.inboxWaitMin({ at: '23:40' }) > 0 &&
+        WS.ui.inboxWaitMin({ at: '23:40' }) === (WS.fixtures.DEMO_NOW.h * 60 + WS.fixtures.DEMO_NOW.mi) + 1440 - (23 * 60 + 40),
+        String(WS.ui.inboxWaitMin({ at: '23:40' })));
+      check('Пульс · обращение без разобранного времени не выдумывает длительность',
+        WS.ui.inboxWaitMin({ at: 'вчера вечером' }) === null,
+        String(WS.ui.inboxWaitMin({ at: 'вчера вечером' })));
+    }
+
     const band = pulse.querySelector('.pgoal');
     check('Пульс · цель стоит полосой над рабочей областью', !!band);
     /* Значок и слова в подвале полосы обязаны говорить одно и то же. Стояла галочка рядом с

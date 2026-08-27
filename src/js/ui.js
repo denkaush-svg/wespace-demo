@@ -884,6 +884,61 @@
     meet: ['Встреча', 'calendar', 'k-meet'], visit: ['Встреча', 'calendar', 'k-meet'], mail: ['Коммуникация', 'mail', 'k-msg'],
   };
   const DAY_WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+  /* ==== Строка утра ======================================================================
+     Первое, что видит брокер, открыв стенд, — не приборная панель, а одно предложение: кто
+     ждёт ответа и сколько именно. Обращение, оставшееся без ответа, — единственный случай,
+     где счёт идёт на часы: лид уходит не к тому, кто лучше, а к тому, кто раньше.
+
+     Если ждущих нет — строки НЕТ ВОВСЕ. Зелёное «всё в порядке» занимает то же место и
+     обесценивает случай, когда строка появится по делу. */
+  function inboxWaitMin(it) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String((it && it.at) || '').trim());
+    if (!m) return null;
+    const now = demoNow();
+    let d = (now.h * 60 + now.mi) - (parseInt(m[1], 10) * 60 + parseInt(m[2], 10));
+    // Написали вечером, читаем утром: отрицательная разница — это прошлая ночь, а не будущее.
+    if (d < 0) d += 24 * 60;
+    return d;
+  }
+  function waitLabel(min) {
+    if (min == null) return '';
+    if (min < 60) return min + ' ' + plural(min, 'минуту', 'минуты', 'минут');
+    const h = Math.floor(min / 60), r = min % 60;
+    return h + ' ' + plural(h, 'час', 'часа', 'часов') +
+      (r ? ' ' + r + ' ' + plural(r, 'минуту', 'минуты', 'минут') : '');
+  }
+  // Неотвеченные, самый давний первым. Обращение без разобранного времени не притворяется
+  // свежим — оно уходит в конец и показывает не длительность, а момент.
+  function inboxWaiting() {
+    return (D().inbox || []).filter((i) => i.stage === 'unreached')
+      .map((i) => ({ it: i, wait: inboxWaitMin(i) }))
+      .sort((a, b) => (b.wait == null ? -1 : b.wait) - (a.wait == null ? -1 : a.wait));
+  }
+  function pulseMorningRow() {
+    const q = inboxWaiting();
+    if (!q.length) return '';
+    const top = q[0], it = top.it;
+    const c = it.clientId ? oppClient(it.clientId) : null;
+    const who = c ? c.name : 'Обращение без карточки контакта';
+    const meta = [chanMeta(it.channel)[1] + ', ' + escAttr(it.at),
+      c && c.budget ? WS.AED(c.budget) : null,
+      c && (c.areas || []).length ? escAttr((c.areas || [])[0]) : null].filter(Boolean).join(' · ');
+    const how = top.wait != null
+      ? 'ждёт ответа ' + waitLabel(top.wait)
+      : 'ждёт ответа с ' + escAttr(it.at);
+    const rest = q.length - 1;
+    return '<div class="morn-wrap">' +
+      '<button class="morn" ' + (c ? 'data-client="' + c.id + '"' : 'data-nav="requests"') +
+      ' title="Открыть обращение">' +
+      '<span class="morn-ic">' + I('clock') + '</span>' +
+      '<span class="morn-t"><b>' + escAttr(who) + ' — ' + how + '</b>' +
+      '<span class="morn-m">' + meta + '</span></span>' +
+      '<span class="morn-go">Открыть обращение' + I('arrowRight') + '</span></button>' +
+      (rest > 0
+        ? '<button class="morn-more" data-nav="requests">и ещё ' + rest + ' без ответа</button>'
+        : '') +
+      '</div>';
+  }
   function pulseDayItems() {
     const out = [];
     (D().tasks || []).forEach((t) => {
@@ -2073,6 +2128,9 @@
     const prospSum = Object.keys(prospBest).reduce((a, k) => a + prospBest[k], 0);
     return '<div class="start fadeup">' +
       heroViz('pulse', 'Пульс', headline, { descBig: true }) +
+      /* Строка утра стоит ВЫШЕ строки Консьержа: она про то, что уже случилось и ждёт, а
+         Консьерж — про то, что брокер хочет поручить. Сначала долг, потом замысел. */
+      pulseMorningRow() +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       pulseMyGoals() +
       '<div class="pblocks">' +
@@ -11134,7 +11192,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, goalDrill, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
