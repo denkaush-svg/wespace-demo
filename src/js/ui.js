@@ -2513,6 +2513,10 @@
         '<div class="ptt-row">' +
           '<button class="ptt' + (voiceOff ? ' off' : '') + '" data-act="voice" aria-label="Диктовать Консьержу">' + I('mic') + '</button>' +
           '<span class="ptt-hint">' + (voiceOff ? 'Диктовка недоступна в этом браузере' : 'Нажмите и говорите') + '</span>' +
+          /* A label, not a button: pressing it focuses the input, and the input
+             being focused is what opens the text row. No state, no handler —
+             the same reason the row closes again by itself. */
+          '<label class="ptt-kb" for="' + inputId + '">' + I('pencil') + '<span>Набрать текстом</span></label>' +
         '</div>' +
       '</div>';
   }

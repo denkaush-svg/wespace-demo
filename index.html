@@ -1778,6 +1778,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
                              animation: rec-pulse 1.5s var(--ease) infinite; }
   .ptt.off { background: var(--surface-2); color: var(--faint); border: 1px solid var(--line); box-shadow: none; }
   .ptt-hint { font-size: 12.5px; color: var(--mut); }
+
+  /* On the phone the order is inverted: the button you came to press is first,
+     the parameters are a row of icons under it, and the keyboard is a choice
+     rather than the default. The text row is present but closed; focusing the
+     input opens it, and it stays open while there is something in it. */
+  .prompt.composer { padding-top: 10px; }
+  .prompt.composer .ptt-row { order: 1; }
+  .prompt.composer .cg-bar { order: 2; justify-content: center; }
+  .prompt.composer .prompt-top { order: 3; max-height: 0; opacity: 0; overflow: hidden;
+                                 transition: max-height .18s var(--ease), opacity .18s var(--ease); }
+  .prompt.composer:focus-within .prompt-top,
+  .prompt.composer:has(input:not(:placeholder-shown)) .prompt-top { max-height: 64px; opacity: 1; }
+  .prompt.composer .cg-actions .voice { display: none; }
+  .prompt.composer .cg-tool:not(.mode) .lb { display: none; }
+  .ptt-kb { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; padding: 6px 12px;
+            border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+            font-size: 12.5px; color: var(--mut); }
+  .ptt-kb svg { width: 15px; height: 15px; }
 }
 .cg-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .cg-tool-wrap { position: static; flex: 0 0 auto; }
@@ -9997,6 +10015,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         '<div class="ptt-row">' +
           '<button class="ptt' + (voiceOff ? ' off' : '') + '" data-act="voice" aria-label="Диктовать Консьержу">' + I('mic') + '</button>' +
           '<span class="ptt-hint">' + (voiceOff ? 'Диктовка недоступна в этом браузере' : 'Нажмите и говорите') + '</span>' +
+          /* A label, not a button: pressing it focuses the input, and the input
+             being focused is what opens the text row. No state, no handler —
+             the same reason the row closes again by itself. */
+          '<label class="ptt-kb" for="' + inputId + '">' + I('pencil') + '<span>Набрать текстом</span></label>' +
         '</div>' +
       '</div>';
   }
