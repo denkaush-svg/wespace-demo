@@ -2505,6 +2505,15 @@
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
         '</div>' +
+        /* On the phone the hands are the scarce thing, not the screen. The mic
+           in the bar is a 32px target reachable only with a second hand, so the
+           phone gets the control the posture actually calls for: one round
+           button, thumb-sized, under everything else. Same data-act, so the
+           same handler and the same recording state paint it. */
+        '<div class="ptt-row">' +
+          '<button class="ptt' + (voiceOff ? ' off' : '') + '" data-act="voice" aria-label="Диктовать Консьержу">' + I('mic') + '</button>' +
+          '<span class="ptt-hint">' + (voiceOff ? 'Диктовка недоступна в этом браузере' : 'Нажмите и говорите') + '</span>' +
+        '</div>' +
       '</div>';
   }
   function dockPrompt() {

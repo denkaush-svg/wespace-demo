@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:08</title>
+  <title>WESPACE · сборка 19:30</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:08';
+    window.WS_BUILD='19:30';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1762,6 +1762,23 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .prompt.composer .cg-actions .send { width: 34px; height: 34px; }
 .prompt.composer .cg-actions .send svg { width: 17px; height: 17px; }
 .cg-bar { position: static; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+/* Push to talk. Hidden at the desk, where the mic in the bar is next to the
+   cursor anyway; on the phone it is the primary control, because the reason to
+   reach for the phone between viewings is to say something, not to type it. */
+.ptt-row { display: none; }
+@media (max-width: 899.98px) {
+  .ptt-row { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 12px 0 2px; }
+  .ptt { width: 74px; height: 74px; border-radius: 50%; border: 0; background: var(--acc); color: #fff;
+         display: grid; place-items: center; box-shadow: 0 10px 24px rgba(207, 90, 37, .30);
+         transition: .15s var(--ease); }
+  .ptt:active { transform: scale(.96); }
+  .ptt svg { width: 30px; height: 30px; }
+  .ptt.rec, .ptt.rec:hover { background: var(--stop); box-shadow: 0 10px 24px rgba(179, 52, 31, .34);
+                             animation: rec-pulse 1.5s var(--ease) infinite; }
+  .ptt.off { background: var(--surface-2); color: var(--faint); border: 1px solid var(--line); box-shadow: none; }
+  .ptt-hint { font-size: 12.5px; color: var(--mut); }
+}
 .cg-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .cg-tool-wrap { position: static; flex: 0 0 auto; }
 .cg-tool { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line, #e2dacb); background: var(--card, #fff); color: var(--ink, #211d16); cursor: pointer; font-size: 12px; font-weight: 600; transition: .15s; white-space: nowrap; }
@@ -9971,6 +9988,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
               '">' + I('mic') + '</button>' +
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
+        '</div>' +
+        /* On the phone the hands are the scarce thing, not the screen. The mic
+           in the bar is a 32px target reachable only with a second hand, so the
+           phone gets the control the posture actually calls for: one round
+           button, thumb-sized, under everything else. Same data-act, so the
+           same handler and the same recording state paint it. */
+        '<div class="ptt-row">' +
+          '<button class="ptt' + (voiceOff ? ' off' : '') + '" data-act="voice" aria-label="Диктовать Консьержу">' + I('mic') + '</button>' +
+          '<span class="ptt-hint">' + (voiceOff ? 'Диктовка недоступна в этом браузере' : 'Нажмите и говорите') + '</span>' +
         '</div>' +
       '</div>';
   }
