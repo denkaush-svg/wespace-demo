@@ -671,6 +671,55 @@
     const per = Math.round(o.price / o.size);
     return { per: per, idx: m.ценаЗаМетр, area: m.район, pct: Math.round((per / m.ценаЗаМетр - 1) * 100) };
   }
+  /* ==== Срок согласия ====================================================================
+     Согласие на связь было true/false без даты: стенд честно блокировал отправку без
+     согласия и при этом не знал, что согласие протухает. Разбор критиков назвал это, и по
+     коду подтвердилось — поля не было вовсе. Теперь у согласия есть дата выдачи и срок, и
+     истёкшее согласие блокирует ровно так же, как отсутствующее: закон смотрит на срок, а
+     не на галочку.
+
+     Дни считаются грубо — год за 365 дней. Точности тут взяться неоткуда: даты в стенде
+     написаны словами, а разница нужна с точностью до «через сколько», не до часа. */
+  function consentUntilDay(c) {
+    const m = /(\d{1,2})\s+([а-яё]{3,})\s*(\d{4})?/i.exec(String((c && c.consentUntil) || ''));
+    if (!m) return null;
+    const mi = RU_MONTHS.map((x) => x.slice(0, 3)).indexOf(m[2].toLowerCase().slice(0, 3));
+    if (mi < 0) return null;
+    const now = demoNow();
+    const y = m[3] ? parseInt(m[3], 10) : now.y;
+    return (y - now.y) * 365 + dayOfYear(parseInt(m[1], 10), mi + 1);
+  }
+  function consentDaysLeft(c) {
+    const d = consentUntilDay(c); if (d == null) return null;
+    const now = demoNow();
+    return d - dayOfYear(now.d, now.mo);
+  }
+  /* Четыре состояния, и «нет согласия» отличается от «срок истёк» намеренно: агенту, читающему
+     первое, кажется, что человек отказался, — а он согласие давал, просто год назад. */
+  function consentState(c) {
+    if (!c || c.consent !== true) return { state: 'none', days: null };
+    const days = consentDaysLeft(c);
+    if (days == null) return { state: 'ok', days: null };       // срок не записан — не выдумываем
+    if (days < 0) return { state: 'expired', days: days };
+    if (days <= 30) return { state: 'soon', days: days };
+    return { state: 'ok', days: days };
+  }
+  /* Та же строка без ведущего существительного — для мест, где рядом уже стоит подпись
+     «Согласие»: «Согласие: согласие от 14 мая…» тратит слово, которое человек прочтёт. */
+  function consentLineShort(c) {
+    const st = consentState(c);
+    if (st.state === 'none') return 'не получено — адресные отправки заблокированы';
+    if (st.state === 'expired') return 'истекло ' + escAttr(c.consentUntil) + ' — отправки заблокированы';
+    if (st.state === 'soon') return 'до ' + escAttr(c.consentUntil) + ' — истекает через ' + oppDays(st.days);
+    return 'от ' + escAttr(c.consentAt || '—') + ', действует до ' + escAttr(c.consentUntil || '—');
+  }
+  function consentLine(c) {
+    const st = consentState(c);
+    if (st.state === 'none') return 'согласия на связь нет — адресные отправки заблокированы';
+    if (st.state === 'expired') return 'срок согласия истёк ' + escAttr(c.consentUntil) + ' — отправки заблокированы';
+    if (st.state === 'soon') return 'согласие до ' + escAttr(c.consentUntil) + ' — истекает через ' + oppDays(st.days);
+    return 'согласие от ' + escAttr(c.consentAt || '—') + ', действует до ' + escAttr(c.consentUntil || '—');
+  }
   function pulseInsights() {
     const out = [];
     // 1. Отправленное не дошло. Клиент считает, что мы молчим, — и это худший вид молчания.
@@ -715,7 +764,21 @@
         inDeal ? 'Открыть сделку' : 'Открыть объект',
         inDeal ? 'data-deal="' + inDeal.id + '"' : 'data-obj="' + o.id + '"']);
     }
-    // 4. Цена выше среза своего сегмента — до того, как её отправили клиенту.
+    /* 4. Согласие, у которого кончается срок. Пока оно живо, всё работает; в день, когда оно
+          кончится, клиент молча выпадет из любой рассылки, и причину будут искать в воронке. */
+    const soon = (D().clients || []).map((c) => ({ c: c, st: consentState(c) }))
+      .filter((x) => x.st.state === 'soon' || x.st.state === 'expired')
+      .sort((a, b) => (a.st.days || 0) - (b.st.days || 0))[0];
+    if (soon) {
+      const c = soon.c, expired = soon.st.state === 'expired';
+      out.push(['lock', c.name + (expired ? ' — срок согласия истёк' : ' — согласие истекает через ' + oppDays(soon.st.days)),
+        'Согласие от ' + (c.consentAt || '—') + ', действует до ' + (c.consentUntil || '—') + '. ' +
+        (expired
+          ? 'Адресные отправки этому клиенту уже заблокированы — и это не отказ, а истёкший срок.'
+          : 'После этой даты он молча выпадет из любой адресной отправки, и причину будут искать в воронке.'),
+        'Открыть контакт', 'data-client="' + c.id + '"']);
+    }
+    // 5. Цена выше среза своего сегмента — до того, как её отправили клиенту.
     const over = (D().objects || []).filter((o) => o.availability === 'available')
       .map((o) => ({ o: o, dv: insDeviation(o) })).filter((x) => x.dv && x.dv.pct >= 5)
       .sort((a, b) => b.dv.pct - a.dv.pct)[0];
@@ -928,16 +991,169 @@
       : 'ждёт ответа с ' + escAttr(it.at);
     const rest = q.length - 1;
     return '<div class="morn-wrap">' +
-      '<button class="morn" ' + (c ? 'data-client="' + c.id + '"' : 'data-nav="requests"') +
-      ' title="Открыть обращение">' +
+      '<button class="morn" ' + (c ? 'data-act="answerInbox" data-inbox="' + it.id + '"' : 'data-nav="requests"') +
+      ' title="Собрать ответ клиенту">' +
       '<span class="morn-ic">' + I('clock') + '</span>' +
       '<span class="morn-t"><b>' + escAttr(who) + ' — ' + how + '</b>' +
       '<span class="morn-m">' + meta + '</span></span>' +
-      '<span class="morn-go">Открыть обращение' + I('arrowRight') + '</span></button>' +
+      '<span class="morn-go">' + (c ? 'Собрать ответ' : 'Открыть входящие') + I('arrowRight') + '</span></button>' +
       (rest > 0
         ? '<button class="morn-more" data-nav="requests">и ещё ' + rest + ' без ответа</button>'
         : '') +
       '</div>';
+  }
+  /* ==== Окно «Ответ клиенту» =============================================================
+     Второй шаг утра. Между «вижу, что человек ждёт» и «человек получил ответ» лежала дыра,
+     которую брокер проходил вне стенда: открывал WhatsApp и писал с нуля.
+
+     Три правила этого окна:
+     1. Язык ответа — язык клиента, и это видно словами. Сегодня это лежало заметкой в
+        заявке («клиент пишет по-английски»); заметку читает человек, а правило исполняет
+        система.
+     2. Согласие показывается с датой и сроком, а не галочкой. Истёкшее блокирует так же,
+        как отсутствующее, и говорит об этом иначе — человек не отказывался.
+     3. Клиенту — факты, брокеру — предупреждение. Отклонение цены от индекса района в
+        письмо не идёт: это довод для разговора, а не строка в предложении. Оно стоит рядом
+        с объектом с пометкой, что видно только своим. */
+  function replyPicks(c) {
+    if (!c) return [];
+    return oppFreeObjects([]).filter((o) => (c.areas || []).indexOf(o.area) >= 0 &&
+      (o.price || 0) <= (c.budget || 0) * 1.05 && oppTypeFit(c, o))
+      .sort((a, b) => oppComm(b) - oppComm(a)).slice(0, 2);
+  }
+  /* Сумма в письме набрана на языке письма. «1 300 000 AED» внутри английского текста —
+     мелочь, которую клиент не назовёт, но заметит: это чужая типографика в своём письме. */
+  function aedIn(n, en) {
+    return en ? 'AED ' + Number(n || 0).toLocaleString('en-US') : WS.AED(n);
+  }
+  function replyDraft(c, it, picks, withObjects) {
+    const en = String((c && c.lang) || 'RU').toUpperCase() === 'EN';
+    const first = String((c && c.name) || '').split(' ')[0];
+    const money = (o) => aedIn(o.price, en) + ' (' + aedIn(Math.round(o.price / o.size), en) + (en ? ' per m²)' : ' за м²)');
+    const line = (o) => '— ' + o.name + ' · ' + o.br + ' · ' + o.size + (en ? ' m² · ' : ' м² · ') + money(o);
+    if (en) {
+      const body = [
+        'Good morning, ' + first + '.',
+        'Apologies for the delay — your message came in at ' + it.at + ', and I am on it now.',
+      ];
+      if (withObjects && picks.length) {
+        body.push('Two options in ' + ((c.areas || [])[0] || 'the area') + ' within ' + aedIn(c.budget, true) + ':');
+        picks.forEach((o) => body.push(line(o)));
+        body.push('Both are available as of today. Would 11:00 or 15:00 tomorrow suit you for a viewing?');
+      } else {
+        body.push('Could you confirm the area and the timeline? I will put a shortlist together today.');
+      }
+      body.push('Marina, WESPACE');
+      return body.join('\n');
+    }
+    const body = [
+      'Доброе утро, ' + first + '.',
+      'Извините за паузу — ваше сообщение пришло в ' + it.at + ', беру в работу сейчас.',
+    ];
+    if (withObjects && picks.length) {
+      body.push('Два варианта в ' + ((c.areas || [])[0] || 'вашем районе') + ' в бюджете ' + WS.AED(c.budget) + ':');
+      picks.forEach((o) => body.push(line(o)));
+      body.push('Оба свободны на сегодня. Удобно посмотреть завтра в 11:00 или в 15:00?');
+    } else {
+      body.push('Подтвердите, пожалуйста, район и сроки — соберу подборку сегодня же.');
+    }
+    body.push('Марина, WESPACE');
+    return body.join('\n');
+  }
+  function openReplyDraft(inboxId, textOnly) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId);
+    if (!it) return;
+    const c = it.clientId ? oppClient(it.clientId) : null;
+    const st = consentState(c);
+    const wait = inboxWaitMin(it);
+    const en = String((c && c.lang) || 'RU').toUpperCase() === 'EN';
+    const picks = textOnly ? [] : replyPicks(c);
+    const left =
+      '<div class="rw-side">' +
+      '<div class="rw-lbl">' + I('chat') + 'Что написал клиент</div>' +
+      '<div class="rw-quote">«' + escAttr(it.text || '') + '»<span>' +
+      chanMeta(it.channel)[1] + ', ' + escAttr(it.at) +
+      (wait != null ? ' · без ответа ' + waitLabel(wait) : '') + '</span></div>' +
+      (c
+        ? '<div class="rw-lbl" style="margin-top:14px">' + I('users') + 'Карточка клиента</div>' +
+          '<div class="opp-b"><span class="k">Бюджет</span><span class="v">' +
+          (c.budget ? WS.AED(c.budget) : 'не назван') + '</span></div>' +
+          '<div class="opp-b"><span class="k">Районы</span><span class="v">' +
+          ((c.areas || []).join(', ') || 'не названы') + '</span></div>' +
+          '<div class="opp-b"><span class="k">Интерес</span><span class="v">' +
+          (CONTACT_INTEREST_LABEL[c.interest] || '—') + '</span></div>' +
+          '<div class="opp-b"><span class="k">Согласие</span><span class="v' +
+          (st.state === 'none' || st.state === 'expired' ? ' rw-stop' : '') + '">' +
+          consentLineShort(c) + '</span></div>'
+        : '<div class="rw-quote" style="margin-top:14px">Карточки контакта нет — сначала заведите контакт.<span>без карточки отправка невозможна</span></div>') +
+      '</div>';
+    /* Без действующего согласия окно НЕ показывает черновик. Показать текст, который нельзя
+       отправить, значит предложить его скопировать в мессенджер — то есть обойти правило
+       руками, ровно то, ради чего правило и существует. */
+    const blocked = !c || st.state === 'none' || st.state === 'expired';
+    const right = blocked
+      ? '<div class="rw-main"><div class="rw-blocked">' + I('lock') +
+        /* Заголовок называет состояние, подпись говорит, что с этим делать. Повторять
+           заголовок другими словами — значит потратить строку, которую человек прочтёт. */
+        '<div><b>' + (st.state === 'expired' ? 'Срок согласия истёк' : 'Согласия на связь нет') + '</b>' +
+        '<span>' + (!c
+          ? 'У обращения нет карточки контакта — заведите контакт, и ответ соберётся.'
+          : st.state === 'expired'
+            ? 'Согласие от ' + escAttr(c.consentAt || '—') + ' действовало до ' + escAttr(c.consentUntil || '—') +
+              '. Это не отказ — истёк срок, и его нужно переполучить.'
+            : 'Адресные отправки заблокированы. Сначала — согласие, ответ идёт следом и уже законно.') +
+        '</span></div></div></div>'
+      : '<div class="rw-main">' +
+        '<div class="rw-lang">' + I('globe') + 'язык ответа: ' + (en ? 'английский' : 'русский') +
+        ' — так пишет клиент</div>' +
+        '<textarea id="replyText" class="rw-text" rows="11">' +
+        escAttr(replyDraft(c, it, picks, !textOnly)) + '</textarea>' +
+        (picks.length
+          ? '<div class="rw-lbl" style="margin-top:12px">' + I('eye') + 'Видно только вам</div>' +
+            picks.map((o) => {
+              const dv = insDeviation(o);
+              const note = !dv ? 'индекса по этому сегменту в срезе нет'
+                : dv.pct >= 5 ? 'на ' + dv.pct + '% выше среза ' + dv.area + ' — спросят на первом сравнении'
+                : dv.pct <= -5 ? 'на ' + Math.abs(dv.pct) + '% ниже среза ' + dv.area + ' — сильный довод'
+                : 'в коридоре среза ' + dv.area;
+              return '<div class="opp-b"><span class="k">' + escAttr(o.name) + '</span><span class="v">' +
+                note + '</span></div>';
+            }).join('')
+          : '') +
+        '<div class="rw-prov">' + I('radar') + 'черновик собран из карточки клиента и свободного инвентаря · ' +
+        'согласие проверено · отправка имитируется (DEMO)</div>' +
+        '</div>';
+    const foot = blocked
+      ? (c ? '<button class="btn primary" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
+        '<button class="btn" data-act="closeModal">Закрыть</button>'
+      : '<button class="btn primary" data-act="sendReply" data-inbox="' + it.id + '">' + I('send') + 'Отправить</button>' +
+        '<button class="btn" data-act="replyTextOnly" data-inbox="' + it.id + '">' +
+        I('doc') + (textOnly ? 'Вернуть объекты' : 'Только текст, без объектов') + '</button>' +
+        '<button class="btn" data-act="closeModal">Закрыть</button>';
+    openModal('Ответ клиенту', '<div class="rw">' + left + right + '</div>', foot, { wide: true });
+  }
+  function sendReply(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId); if (!it) return;
+    const c = it.clientId ? oppClient(it.clientId) : null;
+    // Та же проверка, что и у любой другой адресной отправки в стенде — не своя, отдельная.
+    const audit = WS.audience.calculateAudience([{ id: it.id, clientId: it.clientId, channel: it.channel }]);
+    if (!c || audit.excluded.length) {
+      WS.storeApi.toast(((audit.excluded[0] || {}).reason || 'нет карточки контакта') + ' — отправка невозможна', 'warn');
+      return;
+    }
+    const el = document.getElementById('replyText');
+    const text = el ? String(el.value || '').trim() : '';
+    if (!text) { WS.storeApi.toast('Пустой ответ отправить нельзя', 'warn'); return; }
+    /* Ответ снимает обращение со стадии «не вышли на связь». Ставим «квалифицирована», а не
+       «новое»: в сообщении уже названы бюджет, район и тип — квалифицировать нечего, и
+       откатывать обращение в начало разбора значит терять то, что клиент уже сказал. */
+    it.stage = 'qualified';
+    const req = (D().requests || []).find((r) => r.clientId === c.id && reqStage(r) !== 'closed');
+    if (req) addEventEntry('request', req.id, { type: 'msg', text: 'Ответ отправлен — ' + c.name + '. Отправка имитируется (DEMO).' });
+    else addEventEntry('contact', c.id, { type: 'msg', text: 'Ответ отправлен. Отправка имитируется (DEMO).' });
+    WS.storeApi.touch();
+    closeModal();
+    WS.storeApi.toast('Ответ отправлен — ' + c.name, 'ok');
   }
   function pulseDayItems() {
     const out = [];
@@ -11192,7 +11408,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, openReplyDraft, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

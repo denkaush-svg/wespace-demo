@@ -300,6 +300,9 @@
       case 'contractAmend': case 'contractInvoice': case 'contractRenew': case 'contractTerminate':
         WS.ui.contractAct(act, t.dataset.kref); break;
       case 'goalDrill': WS.ui.goalDrill(t.dataset.goal); break;
+      case 'answerInbox': WS.ui.openReplyDraft(t.dataset.inbox); break;
+      case 'replyTextOnly': WS.ui.openReplyDraft(t.dataset.inbox, !document.querySelector('#modal .rw-main .opp-b')); break;
+      case 'sendReply': WS.ui.sendReply(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;

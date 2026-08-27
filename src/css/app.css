@@ -1488,6 +1488,35 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .morn-go { align-self: flex-end; }
 }
 
+/* Окно ответа: слева то, на что отвечаем, справа — сам ответ. Две колонки, потому что их
+   читают одновременно, а не по очереди; на узком экране — одна, потому что рядом не помещаются. */
+.rw { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 18px; }
+.rw-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+.rw-lbl svg { width: 12px; height: 12px; }
+.rw-quote { font-size: 12.5px; line-height: 1.5; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px; }
+.rw-quote span { display: block; font-size: 11px; color: var(--mut); margin-top: 6px; }
+.rw-side .opp-b:first-of-type { border-top: 1px solid var(--line); }
+.rw-stop { color: var(--stop); font-weight: 700; }
+.rw-lang { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 650;
+  color: var(--acc-ink); background: var(--acc-soft); border: 1px solid var(--acc-line);
+  border-radius: 999px; padding: 5px 11px; margin-bottom: 9px; }
+.rw-lang svg { width: 13px; height: 13px; }
+.rw-text { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.6;
+  color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; resize: vertical; }
+.rw-text:focus { outline: none; border-color: var(--acc); }
+.rw-prov { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; color: var(--faint);
+  margin-top: 10px; }
+.rw-prov svg { width: 12px; height: 12px; flex: none; margin-top: 1px; }
+.rw-blocked { display: flex; gap: 12px; align-items: flex-start; background: var(--stop-soft, var(--acc-soft));
+  border: 1px solid var(--stop); border-radius: 12px; padding: 14px 16px; }
+.rw-blocked svg { width: 20px; height: 20px; color: var(--stop); flex: none; }
+.rw-blocked b { display: block; font-size: 13.5px; color: var(--ink); }
+.rw-blocked span { display: block; font-size: 12.5px; color: var(--mut); margin-top: 4px; line-height: 1.5; }
+@media (max-width: 760px) { .rw { grid-template-columns: minmax(0, 1fr); } }
+
 .day-hint { margin-top: 18px; }
 
 .day-hint { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; cursor: pointer;

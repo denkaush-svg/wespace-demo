@@ -6,6 +6,7 @@
      Причина, которую модуль выдаёт, но здесь не перечисляет, — это причина без подписи. */
   const EXCLUSION_REASONS = [
     'нет согласия',
+    'срок согласия истёк',
     'согласие унаследовано, источник его не имеет',
     'согласие принадлежит другому лицу',
     'роль участника не опознана',
@@ -26,14 +27,24 @@
   }
 
   function getEffectiveConsent(recipient, options, allClients) {
+    /* Согласие с истёкшим сроком — это НЕ согласие. Проверка спрашивает ui о состоянии по
+       дате; если помощника нет, поведение остаётся прежним, а не становится строже наугад. */
+    const expired = (c) => {
+      if (!c || c.consent !== true) return false;
+      const ui = (typeof WS !== 'undefined' && WS.ui) || null;
+      return !!(ui && ui.consentState && ui.consentState(c).state === 'expired');
+    };
+
     // Recipient has direct consent field: use it immediately
     if (recipient.consent !== undefined) {
+      if (expired(recipient)) return { consent: undefined, reason: 'срок согласия истёк' };
       return { consent: recipient.consent };
     }
 
     // Recipient has own clientId: look up consent in allClients
     if (recipient.clientId) {
       const client = allClients.find(c => c.id === recipient.clientId);
+      if (expired(client)) return { consent: undefined, reason: 'срок согласия истёк' };
       return { consent: client ? client.consent : undefined };
     }
 
@@ -46,6 +57,7 @@
       if (side === 'other') return { consent: undefined, reason: 'согласие принадлежит другому лицу' };
       if (side === 'unknown') return { consent: undefined, reason: 'роль участника не опознана' };
       const dealClient = options.dealClients[0];
+      if (expired(dealClient)) return { consent: undefined, reason: 'срок согласия истёк' };
       return { consent: dealClient.consent };
     }
 

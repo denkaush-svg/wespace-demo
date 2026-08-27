@@ -5035,6 +5035,27 @@ setTimeout(async () => {
         verdict('Менеджер застройщика') === 'роль участника не опознана' &&
         verdict('Наблюдатель') === 'роль участника не опознана',
         verdict('Менеджер застройщика') + ' | ' + verdict('Наблюдатель'));
+      /* ---- Срок согласия проверяется В САМОМ ШЛЮЗЕ, а не только в окне ответа ---------
+         Через `calculateAudience` уходят все адресные отправки стенда — предложения,
+         партнёрские рассылки, клубные размещения. Проверка через окно ответа этот путь не
+         задевает: окно спрашивает состояние согласия напрямую, и подмена в шлюзе осталась бы
+         незамеченной. Спрашиваем шлюз сам, по одному клиенту, с живым и с истёкшим сроком. */
+      {
+        const who = (dd().clients || []).find((c) => c.consent === true && c.consentUntil);
+        if (who) {
+          const live = WS.audience.calculateAudience([{ id: 'p_live', clientId: who.id, channel: 'wa' }]);
+          const wasU = who.consentUntil;
+          who.consentUntil = '01 января 2026';
+          const dead = WS.audience.calculateAudience([{ id: 'p_dead', clientId: who.id, channel: 'wa' }]);
+          who.consentUntil = wasU;
+          check('согласие · с живым сроком адресат проходит шлюз отправки',
+            live.suitable.length === 1 && live.excluded.length === 0,
+            who.name + ' · ' + JSON.stringify(live.excluded));
+          check('согласие · с истёкшим сроком шлюз не пропускает и называет причину сроком',
+            dead.suitable.length === 0 && (dead.excluded[0] || {}).reason === 'срок согласия истёк',
+            (dead.excluded[0] || {}).reason || 'пропущен');
+        }
+      }
       /* Причина, которую модуль выдаёт, но не перечисляет, — причина без подписи: она не
          попадёт ни в один разбор выборки, и «исключён» останется без объяснения. */
       const listed = WS.audience.getExclusionReasons();
@@ -6267,10 +6288,10 @@ setTimeout(async () => {
           (hh == null || row.textContent.indexOf(String(hh)) >= 0),
           row.textContent.replace(/\s+/g, ' ').trim().slice(0, 90) + ' · ожидание ' + want + ' мин');
         check('Пульс · и ведёт в существующую запись',
-          !!(row.getAttribute('data-client') &&
-            (dd().clients || []).some((x) => x.id === row.getAttribute('data-client'))) ||
+          !!(row.getAttribute('data-inbox') &&
+            (dd().inbox || []).some((x) => x.id === row.getAttribute('data-inbox'))) ||
           row.getAttribute('data-nav') === 'requests',
-          row.getAttribute('data-client') || row.getAttribute('data-nav') || 'цели нет');
+          row.getAttribute('data-inbox') || row.getAttribute('data-nav') || 'цели нет');
       }
       /* Ответили — строки не стало. Иначе она врёт о состоянии сильнее, чем её отсутствие. */
       {
@@ -6321,6 +6342,86 @@ setTimeout(async () => {
       check('Пульс · обращение без разобранного времени не выдумывает длительность',
         WS.ui.inboxWaitMin({ at: 'вчера вечером' }) === null,
         String(WS.ui.inboxWaitMin({ at: 'вчера вечером' })));
+    }
+
+    /* ---- Окно «Ответ клиенту» --------------------------------------------------------
+       Второй шаг утра. Между «вижу, что человек ждёт» и «человек получил ответ» лежала дыра,
+       которую брокер проходил вне стенда. Проверяется не наличие окна, а три правила:
+       язык ответа берётся у клиента, согласие показано сроком и блокирует по сроку, а
+       отклонение цены от индекса в ПИСЬМО не попадает — оно довод для брокера. */
+    {
+      const un0 = (dd().inbox || []).find((i) => i.stage === 'unreached' && i.clientId);
+      if (un0) {
+        const c0 = (dd().clients || []).find((x) => x.id === un0.clientId);
+        WS.ui.openReplyDraft(un0.id);
+        const md = doc.querySelector('#modal .modal');
+        const ta = md && md.querySelector('#replyText');
+        const en = String((c0.lang || 'RU')).toUpperCase() === 'EN';
+        check('Утро · окно ответа собирает черновик, а не пустое поле',
+          !!ta && String(ta.value || '').trim().length > 60, ta ? String(ta.value).length + ' знаков' : 'поля нет');
+        check('Утро · язык ответа взят у клиента и назван словами',
+          !!md && /язык ответа: (английский|русский)/.test(md.textContent) &&
+          /язык ответа: (английский|русский)/.exec(md.textContent)[1] === (en ? 'английский' : 'русский'),
+          (md.querySelector('.rw-lang') || {}).textContent || 'подписи нет');
+        check('Утро · и сам черновик написан на этом языке',
+          !!ta && (en ? /Good morning|Apologies/.test(ta.value) : /Доброе утро|Извините/.test(ta.value)),
+          String((ta || {}).value || '').slice(0, 50));
+        check('Утро · согласие показано датой и сроком, а не галочкой',
+          !!md && md.textContent.indexOf(String(c0.consentUntil || '@@')) >= 0,
+          c0.consentUntil || 'срока нет в данных');
+        /* Отклонение от индекса — довод брокеру, а не строка клиенту. Если оно уедет в
+           письмо, клиент прочтёт «этот на 7% дороже рынка» раньше, чем брокер объяснит. */
+        const notes = [].slice.call(md.querySelectorAll('.rw-main .opp-b')).map((x) => x.textContent);
+        check('Утро · предупреждение о цене видно брокеру и не уходит в письмо',
+          notes.length >= 1 && /% (выше|ниже) среза|коридоре среза|индекса/.test(notes.join(' ')) &&
+          !/среза|индекс/.test(String((ta || {}).value || '')),
+          'заметок ' + notes.length + ' · в письме про срез: ' +
+          (/среза|индекс/.test(String((ta || {}).value || '')) ? 'ЕСТЬ' : 'нет'));
+        check('Утро · и сумма в письме набрана на языке письма',
+          !!ta && (!en || /AED [\d,]+/.test(ta.value)),
+          String((ta || {}).value || '').split('\n').filter((l) => /AED/.test(l))[0] || '—');
+        WS.ui.closeModal();
+
+        /* Без действующего согласия окно НЕ показывает черновик: показать текст, который
+           нельзя отправить, — значит предложить скопировать его в мессенджер руками. */
+        {
+          const wasU = c0.consentUntil;
+          c0.consentUntil = '01 января 2026';       // срок истёк
+          WS.ui.openReplyDraft(un0.id);
+          const md2 = doc.querySelector('#modal .modal');
+          check('Утро · при истёкшем сроке согласия черновика нет вовсе',
+            !!md2 && !md2.querySelector('#replyText') && !!md2.querySelector('.rw-blocked'),
+            md2 && md2.querySelector('#replyText') ? 'черновик показан' : 'черновика нет — верно');
+          check('Утро · и сказано, что это не отказ, а истёкший срок',
+            !!md2 && /не отказ/i.test(md2.textContent) && /срок/i.test(md2.textContent),
+            (md2.querySelector('.rw-blocked') || {}).textContent || '—');
+          WS.ui.closeModal();
+          c0.consentUntil = wasU;
+        }
+
+        /* Отправка снимает обращение со стадии «не вышли на связь», оставляет след в ленте
+           и убирает строку утра — последствие видно там, откуда его не ждали. */
+        {
+          WS.ui.openReplyDraft(un0.id);
+          const ta2 = doc.querySelector('#modal #replyText');
+          if (ta2) ta2.value = 'Проверочный ответ.';
+          WS.ui.sendReply(un0.id);
+          check('Утро · после отправки обращение больше не «без ответа»',
+            un0.stage !== 'unreached', un0.stage);
+          const req = (dd().requests || []).find((r) => r.clientId === c0.id);
+          const tl = ((dd().requestTimeline || {})[req ? req.id : ''] || [])
+            .concat((dd().contactTimeline || {})[c0.id] || []);
+          check('Утро · и след остался в ленте, с пометкой, что отправка имитируется',
+            tl.some((e) => /Ответ отправлен/.test(String(e.text || '')) && /DEMO/.test(String(e.text || ''))),
+            tl.map((e) => String(e.text || '').slice(0, 40)).slice(-2).join(' | ') || 'ленты нет');
+          WS.router.go('start'); WS.ui.render();
+          check('Утро · и строка утра по этому обращению исчезла',
+            !doc.querySelector('#app .start .morn[data-inbox="' + un0.id + '"]'),
+            doc.querySelector('#app .start .morn') ? 'строка ещё есть' : 'строки нет — верно');
+        }
+        WS.storeApi.resetAll();
+        WS.router.go('start'); WS.ui.render();
+      }
     }
 
     const band = pulse.querySelector('.pgoal');
