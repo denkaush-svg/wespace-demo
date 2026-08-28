@@ -6419,6 +6419,102 @@ setTimeout(async () => {
             !doc.querySelector('#app .start .morn[data-inbox="' + un0.id + '"]'),
             doc.querySelector('#app .start .morn') ? 'строка ещё есть' : 'строки нет — верно');
         }
+        /* ---- Подборка как документ -----------------------------------------------
+           То, что реально уйдёт клиенту. Проверяется, что документ показывает свою основу,
+           делает вывод из чисел, а не из шаблона, честно ведёт себя при пустом инвентаре и
+           перепроверяет доступность в момент отправки — по тому составу, который брокер
+           видел, а не по тому, который подобрался бы заново. */
+        {
+          WS.ui.openSelection(un0.id);
+          const sd = doc.querySelector('#modal .modal');
+          const cards = sd ? [].slice.call(sd.querySelectorAll('.sel-card')) : [];
+          check('Утро · подборка собрана документом с карточками объектов',
+            cards.length >= 2 && !!sd.querySelector('.sel-for'),
+            'карточек ' + cards.length);
+          /* Чужой снимок в документе для клиента — сочинённый факт, и он ещё и выглядит как
+             ошибка: подстановка общей фотографии давала две одинаковые картинки на двух разных
+             юнитах. Где своего снимка нет — только карта, она у каждого объекта настоящая. */
+          {
+            const borrowed = cards.filter((x) => {
+              const nm = ((x.querySelector('h4') || {}).textContent || '').trim();
+              const ob = (dd().objects || []).find((o) => o.name === nm);
+              return ob && !((WS.photos || {})[ob.id]) && !!x.querySelector('.sel-photo');
+            });
+            check('Утро · подборка не подставляет чужую фотографию вместо своей',
+              cards.length > 0 && borrowed.length === 0,
+              borrowed.map((x) => (x.querySelector('h4') || {}).textContent).join(', ') || 'своих снимков нет — стоят карты');
+          }
+          check('Утро · каждая карточка называет цену метра и её отношение к срезу района',
+            cards.length > 0 && cards.every((x) => /за м²/.test(x.textContent) &&
+              /(выше|ниже|вровень) сре|индекса по этому сегменту/.test(x.textContent)),
+            cards.map((x) => (x.querySelector('h4') || {}).textContent).join(' | '));
+          /* Срез в стенде иллюстративный — так помечено в самих данных. В документе, который
+             клиент понесёт сравнивать, это обязано стоять словами, иначе «на 10% ниже среза»
+             читается как биржевая котировка. */
+          const rows = (WS.query.run({ from: 'market' }) || {}).rows || [];
+          check('Утро · документ называет основу: дату среза и то, что он иллюстративный',
+            !!sd && sd.textContent.indexOf(String((rows[0] || {}).asOf || '@@')) >= 0 &&
+            /иллюстративн/i.test(sd.textContent),
+            (sd.querySelector('.sel-prov') || {}).textContent || 'основы нет');
+          /* Вывод выводится из чисел этих же карточек, а не написан заранее. */
+          const objs0 = WS.ui.selectionObjects(c0);
+          const means = WS.ui.selectionMeaning(objs0, c0);
+          check('Утро · вывод «что это значит» посчитан из тех же объектов',
+            means.length >= 1 && means.some((t) => objs0.some((o) => t.indexOf(o.name) >= 0)),
+            means.join(' // ').slice(0, 120) || 'вывода нет');
+          WS.ui.closeModal();
+
+          /* Пустая подборка не притворяется подборкой. */
+          {
+            const wasB = c0.budget; c0.budget = 1;
+            WS.ui.openSelection(un0.id);
+            const sd2 = doc.querySelector('#modal .modal');
+            check('Утро · при пустом инвентаре документ говорит, чего нет, а не показывает пусто',
+              !!sd2 && !!sd2.querySelector('.sel-empty') && !sd2.querySelector('.sel-card'),
+              sd2 && sd2.querySelector('.sel-card') ? 'карточки всё равно есть' : 'сказано — верно');
+            WS.ui.closeModal();
+            c0.budget = wasB;
+          }
+
+          /* Перепроверка доступности при отправке. Нагрузка обязательна: без запоминания
+             состава список пересобирается сам и ушедший объект молча выпадает — проверка
+             «нет занятых» проходит на подмене, которой брокер не видел. */
+          {
+            /* Обращение возвращается в «без ответа» ЯВНО. К этому месту предыдущий шаг его уже
+               закрыл, и проверка «стадия не изменилась» выполнялась сама собой — на сломанной
+               сборке она оставалась зелёной, потому что менять было уже нечего. */
+            un0.stage = 'unreached';
+            WS.ui.openSelection(un0.id);
+            const pinned = (WS._sel || {}).ids || [];
+            const victim = (dd().objects || []).find((o) => o.id === pinned[0]);
+            check('Утро · состав подборки запомнен, а не пересобирается при отправке',
+              pinned.length >= 2 && !!victim, JSON.stringify(pinned));
+            if (victim) {
+              const wasA = victim.availability;
+              victim.availability = 'stale';
+              WS.ui.sendSelection(un0.id);
+              check('Утро · ушедший объект останавливает отправку, а не выпадает молча',
+                un0.stage === 'unreached', un0.stage + ' (ожидалось unreached)');
+              victim.availability = wasA;
+              WS.ui.closeModal();
+            }
+          }
+          /* И на живых данных отправка проходит, оставляя след с составом. */
+          {
+            WS.ui.openSelection(un0.id);
+            WS.ui.sendSelection(un0.id);
+            check('Утро · на свободных объектах подборка уходит и обращение закрывается',
+              un0.stage !== 'unreached', un0.stage);
+            const req2 = (dd().requests || []).find((r) => r.clientId === c0.id);
+            const tl2 = ((dd().requestTimeline || {})[req2 ? req2.id : ''] || [])
+              .concat((dd().contactTimeline || {})[c0.id] || []);
+            check('Утро · и в ленте записан состав подборки, а не просто «отправлено»',
+              tl2.some((e) => /Отправлена подборка/.test(String(e.text || '')) &&
+                (dd().objects || []).some((o) => String(e.text || '').indexOf(o.name) >= 0)),
+              tl2.filter((e) => /подборк/i.test(String(e.text || ''))).map((e) => String(e.text).slice(0, 60))[0] || 'записи нет');
+          }
+        }
+
         WS.storeApi.resetAll();
         WS.router.go('start'); WS.ui.render();
       }

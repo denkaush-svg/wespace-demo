@@ -1517,6 +1517,43 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .rw-blocked span { display: block; font-size: 12.5px; color: var(--mut); margin-top: 4px; line-height: 1.5; }
 @media (max-width: 760px) { .rw { grid-template-columns: minmax(0, 1fr); } }
 
+/* Подборка — документ, а не экран приложения: его читают целиком и показывают клиенту,
+   поэтому здесь крупнее шрифт, больше воздуха и нет служебных значков. */
+.sel-head { margin-bottom: 16px; }
+.sel-for { font-size: 17px; font-weight: 800; color: var(--ink); }
+.sel-req { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
+.sel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.sel-card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.sel-media { display: grid; grid-template-columns: 2fr 1fr; height: 128px; }
+.sel-photo, .sel-map { background-size: cover; background-position: center; }
+.sel-map { position: relative; border-left: 1px solid var(--line); }
+/* Своего снимка нет — карта занимает всё место, а не жмётся к подставному кадру. */
+.sel-media--map { grid-template-columns: 1fr; }
+.sel-media--map .sel-map { border-left: 0; }
+.sel-pin { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px rgba(255,255,255,.9); }
+.sel-body { padding: 13px 15px 15px; }
+.sel-body h4 { margin: 0; font-size: 14.5px; font-weight: 750; color: var(--ink); }
+.sel-sub { font-size: 12px; color: var(--mut); margin: 2px 0 10px; }
+.sel-f { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--line); }
+.sel-f:first-of-type { border-top: 0; }
+.sel-f .k { flex: 0 0 38%; font-size: 11px; color: var(--mut); }
+.sel-f .v { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: var(--ink); }
+.sel-f .v b { font-weight: 800; }
+.sel-why { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: var(--mut); }
+.sel-mean { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 15px;
+  background: var(--surface-2); }
+.sel-mean p { margin: 7px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.sel-prov { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; color: var(--faint); margin-top: 12px; }
+.sel-prov svg { width: 12px; height: 12px; flex: none; margin-top: 1px; }
+.sel-empty { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; background: var(--surface-2); }
+.sel-empty svg { width: 20px; height: 20px; color: var(--mut); flex: none; }
+.sel-empty b { display: block; font-size: 13.5px; color: var(--ink); }
+.sel-empty span { display: block; font-size: 12.5px; color: var(--mut); margin-top: 4px; line-height: 1.5; }
+@media (max-width: 620px) { .sel-media { grid-template-columns: 1fr; height: 150px; }
+  .sel-map { display: none; } }
+
 .day-hint { margin-top: 18px; }
 
 .day-hint { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; cursor: pointer;

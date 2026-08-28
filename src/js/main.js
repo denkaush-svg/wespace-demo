@@ -303,6 +303,8 @@
       case 'answerInbox': WS.ui.openReplyDraft(t.dataset.inbox); break;
       case 'replyTextOnly': WS.ui.openReplyDraft(t.dataset.inbox, !document.querySelector('#modal .rw-main .opp-b')); break;
       case 'sendReply': WS.ui.sendReply(t.dataset.inbox); break;
+      case 'openSelection': WS.ui.openSelection(t.dataset.inbox); break;
+      case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;

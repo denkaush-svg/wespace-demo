@@ -1127,6 +1127,8 @@
       ? (c ? '<button class="btn primary" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
         '<button class="btn" data-act="closeModal">Закрыть</button>'
       : '<button class="btn primary" data-act="sendReply" data-inbox="' + it.id + '">' + I('send') + 'Отправить</button>' +
+        '<button class="btn" data-act="openSelection" data-inbox="' + it.id + '">' +
+        I('layers') + 'Показать подборку</button>' +
         '<button class="btn" data-act="replyTextOnly" data-inbox="' + it.id + '">' +
         I('doc') + (textOnly ? 'Вернуть объекты' : 'Только текст, без объектов') + '</button>' +
         '<button class="btn" data-act="closeModal">Закрыть</button>';
@@ -1154,6 +1156,146 @@
     WS.storeApi.touch();
     closeModal();
     WS.storeApi.toast('Ответ отправлен — ' + c.name, 'ok');
+  }
+  /* ==== Подборка как документ ============================================================
+     Третий шаг утра. До сих пор «что предложить» существовало как строка в карточке
+     возможности и как две строки внутри письма. То, что реально уходит клиенту — страница с
+     фотографией, картой, ценой метра и планом оплаты, — собиралось руками в мессенджере.
+
+     Документ показывает СВОЮ основу. Срез рынка в стенде иллюстративный, так помечено в самих
+     данных, — и в документе, который клиент понесёт сравнивать, это обязано стоять словами.
+     Иначе цифра «на 10% ниже среза» читается как биржевая котировка.
+
+     Отклонение от индекса здесь ПОКАЗЫВАЕТСЯ, в отличие от письма: письмо клиент читает с
+     телефона за минуту, документ — сидя, и там сравнение уместно. В письме оно звучало бы как
+     оценка чужого товара, здесь — как основание выбора. */
+  function selectionFact(k, v) {
+    return '<div class="sel-f"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>';
+  }
+  function selectionCard(o, c) {
+    const dv = insDeviation(o);
+    /* Фотография — ТОЛЬКО своя. Подстановка общей давала две одинаковые картинки на двух
+       разных юнитах и выдавала чужой кадр за этот объект: в документе, который клиент понесёт
+       на просмотр, это ровно тот сочинённый факт, которого мы избегаем везде. Где своего
+       снимка нет — карта во всю ширину: она у каждого объекта настоящая. */
+    const ph = (WS.photos && WS.photos[o.id]) || '';
+    const mp = (WS.maps && WS.maps[o.id]) || '';
+    const perM = o.size ? Math.round(o.price / o.size) : 0;
+    const dvLine = dv
+      ? WS.AED(dv.per) + ' за м² · ' + (dv.pct === 0 ? 'вровень со срезом ' + dv.area
+        : (dv.pct > 0 ? 'на ' + dv.pct + '% выше' : 'на ' + Math.abs(dv.pct) + '% ниже') + ' среза ' + dv.area)
+      : (perM ? WS.AED(perM) + ' за м² · индекса по этому сегменту в срезе нет' : '—');
+    const ready = o.segment === 'off-plan'
+      ? 'строится, сдача ' + (o.handover || 'срок не назван')
+      : (o.occupancy || 'готовое');
+    return '<article class="sel-card">' +
+      '<div class="sel-media' + (ph ? '' : ' sel-media--map') + '">' +
+      (ph ? '<div class="sel-photo" style="background-image:url(' + ph + ')"></div>' : '') +
+      (mp ? '<div class="sel-map" style="background-image:url(' + mp + ')"><span class="sel-pin"></span></div>' : '') +
+      '</div>' +
+      '<div class="sel-body"><h4>' + escAttr(o.name) + '</h4>' +
+      '<div class="sel-sub">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + o.size + ' м²</div>' +
+      selectionFact('Цена', '<b>' + WS.AED(o.price) + '</b>') +
+      selectionFact('Цена метра', dvLine) +
+      selectionFact('Готовность', escAttr(ready)) +
+      (o.paymentPlan ? selectionFact('План оплаты', escAttr(o.paymentPlan)) : '') +
+      (o.serviceCharge ? selectionFact('Обслуживание', escAttr(o.serviceCharge)) : '') +
+      (o.match ? '<p class="sel-why">' + escAttr(o.match) + '</p>' : '') +
+      '</div></article>';
+  }
+  /* «Что это значит» — три строки прямым текстом. Клиент, получивший две карточки без вывода,
+     сравнивает их сам и обычно выбирает дешевле; строка вывода — это то, за что платят
+     брокеру. Каждая строка выводится из чисел выше, а не написана заранее. */
+  function selectionMeaning(objs, c) {
+    const out = [];
+    const dv = objs.map((o) => ({ o: o, d: insDeviation(o) })).filter((x) => x.d);
+    if (dv.length >= 2) {
+      const lo = dv.slice().sort((a, b) => a.d.pct - b.d.pct)[0];
+      const hi = dv.slice().sort((a, b) => b.d.pct - a.d.pct)[0];
+      if (lo.o !== hi.o) {
+        out.push(lo.o.name + ' дешевле среза района на ' + Math.abs(lo.d.pct) + '%, ' +
+          hi.o.name + ' — ' + (hi.d.pct >= 0 ? 'дороже на ' + hi.d.pct + '%' : 'дешевле на ' + Math.abs(hi.d.pct) + '%') +
+          '. Разница в цене метра — ' + WS.AED(Math.abs(hi.d.per - lo.d.per)) + '.');
+      }
+    }
+    objs.forEach((o) => {
+      const lost = (D().deals || []).find((d) => d.stage === 'lost' && (d.objectId === o.id || (d.lots || []).indexOf(o.id) >= 0));
+      if (lost) out.push(o.name + ' — тот объект, вокруг которого шла сделка «' + lost.title + '»; она не состоялась, объект снова свободен.');
+    });
+    if (c && c.budget) {
+      const buy = objs.filter((o) => (o.price || 0) <= c.budget);
+      if (buy.length) out.push('Бюджет ' + WS.AED(c.budget) + ' покрывает ' +
+        (buy.length === objs.length ? 'оба варианта' : buy.map((o) => o.name).join(', ')) + ' на покупку.');
+    }
+    return out;
+  }
+  function selectionObjects(c) { return replyPicks(c); }
+  function openSelection(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId); if (!it) return;
+    const c = it.clientId ? oppClient(it.clientId) : null; if (!c) return;
+    const objs = selectionObjects(c);
+    /* Состав подборки ЗАПОМИНАЕТСЯ. Иначе перепроверка при отправке ничего не проверяет:
+       список пересобирается заново, ушедший объект молча выпадает, и клиент получает не ту
+       подборку, которую брокер прочитал. Тихая подмена хуже отказа — про отказ он узнает. */
+    WS._sel = { inbox: it.id, ids: objs.map((o) => o.id) };
+    const asOf = (oppMarket()[0] || {});
+    const head = '<div class="sel-head"><div class="sel-for">Подборка для ' + escAttr(c.name) + '</div>' +
+      '<div class="sel-req">' + (c.goal ? escAttr(c.goal) + ' · ' : '') +
+      (c.budget ? 'бюджет ' + WS.AED(c.budget) : 'бюджет не назван') + ' · ' +
+      ((c.areas || []).join(', ') || 'район не назван') + '</div></div>';
+    /* Пустая подборка не притворяется подборкой. Если под запрос нет ни одного свободного
+       объекта, документ говорит, чего именно не хватает, — так же, как это делает разбор
+       доходности, когда в районе нет инвентаря. */
+    const body = objs.length
+      ? '<div class="sel-grid">' + objs.map((o) => selectionCard(o, c)).join('') + '</div>' +
+        (selectionMeaning(objs, c).length
+          ? '<div class="sel-mean"><div class="opp-lbl">' + I('target') + 'Что это значит</div>' +
+            selectionMeaning(objs, c).map((t) => '<p>' + escAttr(t) + '</p>').join('') + '</div>'
+          : '') +
+        '<div class="sel-prov">' + I('radar') + 'Срез рынка ' + escAttr(asOf.asOf || '—') +
+        ', ' + escAttr(asOf.basis || 'иллюстративно') + '. Доступность подтверждена на дату проверки объекта.</div>'
+      : '<div class="sel-empty">' + I('warn') +
+        '<div><b>Свободных объектов под этот запрос сейчас нет</b><span>Бюджет ' +
+        (c.budget ? WS.AED(c.budget) : 'не назван') + ', районы ' + ((c.areas || []).join(', ') || 'не названы') +
+        '. Собирать через партнёров или расширять район — придумывать варианты документ не будет.</span></div></div>';
+    const foot = (objs.length
+        ? '<button class="btn primary" data-act="sendSelection" data-inbox="' + it.id + '">' +
+          I('send') + 'Отправить клиенту</button>'
+        : '') +
+      '<button class="btn" data-act="answerInbox" data-inbox="' + it.id + '">' + I('chevLeft') + 'Назад к письму</button>' +
+      '<button class="btn" data-act="closeModal">Закрыть</button>';
+    openModal('Подборка · то, что уйдёт клиенту', head + body, foot, { wide: true });
+  }
+  function sendSelection(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId); if (!it) return;
+    const c = it.clientId ? oppClient(it.clientId) : null;
+    const audit = WS.audience.calculateAudience([{ id: it.id, clientId: it.clientId, channel: it.channel }]);
+    if (!c || audit.excluded.length) {
+      WS.storeApi.toast(((audit.excluded[0] || {}).reason || 'нет карточки контакта') + ' — отправка невозможна', 'warn');
+      return;
+    }
+    /* Доступность перепроверяется В МОМЕНТ ОТПРАВКИ, а не берётся из момента сборки. Между
+       тем, как брокер собрал подборку, и тем, как он нажал «отправить», объект мог уйти —
+       и письмо с занятым юнитом разваливается на первом же звонке владельцу. */
+    /* Сверяем то, что брокер ВИДЕЛ, а не то, что подобралось бы сейчас. */
+    const shown = (WS._sel && WS._sel.inbox === inboxId) ? WS._sel.ids : null;
+    const objs = shown ? shown.map(oppObject).filter(Boolean) : selectionObjects(c);
+    const gone = objs.filter((o) => o.availability !== 'available' || oppObjectBusy(o.id));
+    if (!objs.length || gone.length) {
+      WS.storeApi.toast(gone.length
+        ? gone.map((o) => o.name).join(', ') + ' — объект уже занят, подборка пересобрана'
+        : 'Свободных объектов под запрос нет — отправлять нечего', 'warn');
+      openSelection(inboxId);
+      return;
+    }
+    it.stage = 'qualified';
+    const req = (D().requests || []).find((r) => r.clientId === c.id && reqStage(r) !== 'closed');
+    const what = 'Отправлена подборка: ' + objs.map((o) => o.name).join(', ') + '. Отправка имитируется (DEMO).';
+    if (req) addEventEntry('request', req.id, { type: 'msg', text: what });
+    else addEventEntry('contact', c.id, { type: 'msg', text: what });
+    WS.storeApi.touch();
+    closeModal();
+    WS.storeApi.toast('Подборка отправлена — ' + c.name, 'ok');
   }
   function pulseDayItems() {
     const out = [];
@@ -11421,7 +11563,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, openReplyDraft, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, openReplyDraft, openSelection, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
