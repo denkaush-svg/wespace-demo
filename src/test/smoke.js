@@ -7497,6 +7497,77 @@ setTimeout(async () => {
         WS.router.go('start'); WS.ui.render();
       }
     }
+    /* ---- Вторая нить утра: отчёт собственнику ----------------------------------------
+       Всё утро до сих пор шло со стороны покупателя. Половина работы брокера — те, чьи
+       объекты он ведёт, и в стенде эта сторона есть: договор управления, вехи, график
+       платежей. Отчёт СОБИРАЕТСЯ из этих записей, а не пишется заново. */
+    {
+      const km = (dd().contracts || []).find((x) => x.kind === 'management' && x.status === 'active');
+      if (km) {
+        const owner = (dd().clients || []).find((x) => x.id === km.clientId);
+        const ins2 = WS.ui.pulseInsights().find((x) => /Отчёт собственнику/i.test(x[1]));
+        check('Утро · наблюдение о сроке договора зовёт СОБРАТЬ отчёт, а не просто посмотреть',
+          !!ins2 && /Собрать отчёт/.test(ins2[3]) && /ownerReport/.test(ins2[4]),
+          ins2 ? ins2[3] + ' · ' + ins2[4] : 'наблюдения нет');
+        WS.ui.openOwnerReport(km.id);
+        const rp = doc.querySelector('#modal .modal');
+        const done = (km.milestones || []).filter((x) => x.state === 'done');
+        check('Утро · отчёт собран из вех договора, а не написан заранее',
+          !!rp && done.length > 0 && done.every((x) => rp.textContent.indexOf(x.client || x.label) >= 0),
+          done.map((x) => x.at).join(', ') || 'вех нет');
+        /* Просроченный платёж — то, ради чего отчёт читают. Он назван словом и стоит выше
+           оплаченного, а не последней строкой мелким шрифтом. */
+        const late = (km.schedule || []).filter((x) => x.state === 'overdue');
+        const txt = rp ? rp.textContent : '';
+        check('Утро · просроченный платёж назван словом и стоит раньше оплаченного',
+          late.length === 0 || (/Просрочен/i.test(txt) &&
+            txt.indexOf('Просрочен') < (txt.indexOf('Оплачено') < 0 ? 1e9 : txt.indexOf('Оплачено'))),
+          late.map((x) => x.label).join(', ') || 'просроченных нет');
+        /* Второй объект — из тех же правил, что и «Перспективные сделки»: свободен, в бюджете
+           собственника, подходящего типа, и назван вместе с вознаграждением. */
+        const second = WS.ui.ownerSecondObject(owner);
+        check('Утро · второй объект в разговор свободен и укладывается в бюджет собственника',
+          !second || (second.availability === 'available' && !WS.ui.oppObjectBusy(second.id) &&
+            (second.price || 0) <= (owner.budget || 0) && txt.indexOf(second.name) >= 0),
+          second ? second.name + ' · ' + second.price + ' против бюджета ' + owner.budget : 'второго объекта нет');
+        check('Утро · и назван вместе с ожидаемым вознаграждением',
+          !second || /Ожидаемое вознаграждение/.test(txt), second ? 'названо' : '—');
+        check('Утро · отчёт называет, из чего собран',
+          /Собрано из вех и графика договора/.test(txt) && txt.indexOf(km.number) >= 0,
+          (rp.querySelector('.sel-prov') || {}).textContent || 'основы нет');
+        /* Убери веху — строка исчезнет: это и отличает сборку от шаблона. */
+        {
+          const wasM = km.milestones;
+          km.milestones = (wasM || []).slice(0, 1);
+          WS.ui.openOwnerReport(km.id);
+          const rp2 = doc.querySelector('#modal .modal');
+          const dropped = (wasM || []).slice(1).filter((x) => x.state === 'done');
+          check('Утро · отчёт следует за записями: убрана веха — ушла и строка',
+            dropped.length === 0 || dropped.every((x) => rp2.textContent.indexOf(x.client || x.label) < 0),
+            dropped.map((x) => x.label).join(', ') || 'убирать нечего');
+          km.milestones = wasM;
+        }
+        /* Отправка проходит через тот же шлюз согласия и оставляет след с номером договора. */
+        WS.ui.openOwnerReport(km.id);
+        WS.ui.sendOwnerReport(km.id);
+        const otl = (dd().contactTimeline || {})[km.clientId] || [];
+        check('Утро · отправленный отчёт оставил след с номером договора и пометкой DEMO',
+          otl.some((e) => /Отправлен отчёт собственнику/.test(String(e.text || '')) &&
+            String(e.text).indexOf(km.number) >= 0 && /DEMO/.test(String(e.text))),
+          otl.filter((e) => /отчёт/i.test(String(e.text || ''))).map((e) => String(e.text).slice(0, 70))[0] || 'следа нет');
+        {
+          const wasC = owner.consent; owner.consent = false;
+          const before2 = ((dd().contactTimeline || {})[km.clientId] || []).length;
+          WS.ui.sendOwnerReport(km.id);
+          check('Утро · без согласия собственника отчёт не уходит',
+            (((dd().contactTimeline || {})[km.clientId]) || []).length === before2,
+            String(before2));
+          owner.consent = wasC;
+        }
+        WS.storeApi.resetAll();
+        WS.router.go('start'); WS.ui.render();
+      }
+    }
     // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
     check('Пульс · ввод Консьержа один, а не задвоен',
       pulse.querySelectorAll('.prompt input').length === 1,

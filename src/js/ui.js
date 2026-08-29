@@ -748,7 +748,12 @@
         contractKind(k).label + ' ' + k.number +
         (k.amount ? ' · ' + WS.AED(k.amount) + ' в год' : '') + (c ? ' · ' + c.name : '') +
         '. Срок назван в самом договоре — передоговариваться о нём не с кем.',
-        'Открыть договор', 'data-contract="' + k.id + '"']);
+        /* У наблюдения про срок теперь есть не «посмотреть», а «сделать»: отчёт, ради
+           которого этот срок и назван, собирается тут же. */
+        k.kind === 'management' ? 'Собрать отчёт' : 'Открыть договор',
+        k.kind === 'management'
+          ? 'data-act="ownerReport" data-contract="' + k.id + '"'
+          : 'data-contract="' + k.id + '"']);
     }
     // 3. Доступность не подтверждали дольше всех. Хуже, если по объекту уже идёт сделка.
     const stale = (D().objects || []).map((o) => ({ o: o, age: insDaysSince(o.checkedAt) }))
@@ -1533,6 +1538,101 @@
     if (!rec) { WS.storeApi.toast('Итог записать не удалось', 'warn'); return; }
     closeModal();
     WS.storeApi.toast('Итог записан черновиком — подтвердите в карточке', 'ok');
+  }
+  /* ==== Отчёт собственнику ===============================================================
+     Вторая нить того же утра — сторона СОБСТВЕННИКА. До сих пор всё утро шло со стороны
+     покупателя: обращение, ответ, подборка, показ. Но половина работы брокера — это те, чьи
+     объекты он ведёт, и в стенде эта сторона уже есть: мандат, эксклюзив, договор управления,
+     оценка объекта и посчитанный срок отчёта.
+
+     Отчёт СОБИРАЕТСЯ из записей договора, а не пишется заново: вехи с датами, график платежей,
+     документы, срез района. Ничего не придумывается — если строки нет, её нет и в отчёте.
+     Просроченный платёж не прячется: он и есть то, ради чего отчёт читают.
+
+     В тот же разговор ложится второй объект — тем же разбором, который уже стоит в
+     «Перспективных сделках»: повод есть сам собой, придумывать его не нужно. */
+  function ownerSecondObject(c) {
+    if (!c || !c.budget) return null;
+    return oppFreeObjects([]).filter((o) => (c.areas || []).indexOf(o.area) >= 0 &&
+      (o.price || 0) <= c.budget && oppTypeFit(c, o))
+      .sort((a, b) => oppComm(b) - oppComm(a))[0] || null;
+  }
+  function ownerReportRows(k) {
+    const done = (k.milestones || []).filter((m) => m.state === 'done');
+    const now = (k.milestones || []).filter((m) => m.state === 'now');
+    return { done: done, now: now };
+  }
+  function openOwnerReport(contractId) {
+    const k = (D().contracts || []).find((x) => x.id === contractId); if (!k) return;
+    const c = oppClient(k.clientId);
+    const ms = ownerReportRows(k);
+    const paid = (k.schedule || []).filter((x) => x.state === 'paid');
+    const late = (k.schedule || []).filter((x) => x.state === 'overdue');
+    const due = (k.schedule || []).filter((x) => x.state === 'due');
+    const sum = (list) => list.reduce((a, x) => a + (x.amount || 0), 0);
+    const m = c ? oppMarketNear((c.areas || [])[0]) : null;
+    const second = ownerSecondObject(c);
+    const period = (k.signedAt || '—') + ' — ' + String(k.nextDue || '').split('—').pop().trim();
+    const head = '<div class="sel-head"><div class="sel-for">Отчёт собственнику · ' +
+      escAttr(c ? c.name : 'собственник') + '</div>' +
+      '<div class="sel-req">' + escAttr(contractKind(k).label) + ' ' + escAttr(k.number) +
+      ' · ' + WS.AED(k.amount) + ' в год · период ' + escAttr(period) + '</div></div>';
+    const didRows = ms.done.map((x) => '<div class="opp-b"><span class="k">' + escAttr(x.at) +
+      '</span><span class="v">' + escAttr(x.client || x.label) + '</span></div>').join('') +
+      ms.now.map((x) => '<div class="opp-b"><span class="k">' + escAttr(x.at) +
+        '</span><span class="v">' + escAttr(x.client || x.label) + ' · в работе</span></div>').join('');
+    /* Просроченное называется первым и словом «просрочен». Отчёт, который упоминает долг
+       последней строкой мелким шрифтом, читается как попытка его не заметить. */
+    const money = (late.length
+        ? '<div class="opp-b"><span class="k rw-stop">Просрочено</span><span class="v rw-stop">' +
+          late.map((x) => escAttr(x.label) + ' · ' + WS.AED(x.amount)).join('; ') + '</span></div>'
+        : '') +
+      (due.length ? '<div class="opp-b"><span class="k">К оплате</span><span class="v">' +
+        due.map((x) => escAttr(x.label) + ' · ' + WS.AED(x.amount) + ' до ' + escAttr(x.due)).join('; ') +
+        '</span></div>' : '') +
+      (paid.length ? '<div class="opp-b"><span class="k">Оплачено за период</span><span class="v">' +
+        WS.AED(sum(paid)) + ' · ' + paid.length + ' ' + plural(paid.length, 'платёж', 'платежа', 'платежей') +
+        '</span></div>' : '');
+    const market = m
+      ? '<div class="opp-b"><span class="k">' + escAttr(m.район) + '</span><span class="v">аренда ' +
+        WS.AED(m.арендаЗаМетрВГод) + ' за м² в год · доходность ' + m.доходностьПроцент + '% · ' +
+        (m.изменениеЗаГодПроцент >= 0 ? '+' : '') + m.изменениеЗаГодПроцент + '% за год</span></div>'
+      : '<div class="opp-b"><span class="k">Рынок</span><span class="v">среза по району собственника в данных нет</span></div>';
+    const offer = second
+      ? '<div class="sel-mean"><div class="opp-lbl">' + I('target') + 'В тот же разговор</div>' +
+        '<p>' + escAttr(second.name) + ' · ' + WS.AED(second.price) + ' · ' + escAttr(second.area) +
+        ' — свободен и укладывается в бюджет собственника ' + WS.AED(c.budget) +
+        '. Под то же управление, что и первый объект.</p>' +
+        '<p class="sel-why">Ожидаемое вознаграждение — ' + WS.AED(oppComm(second)) + ' (' + escAttr(oppCommNote(second)) + ').</p></div>'
+      : '';
+    openModal('Отчёт собственнику',
+      head +
+      '<div class="opp-lbl">' + I('check') + 'Что сделано за период</div>' + (didRows || '<div class="opp-b"><span class="v">записей за период нет</span></div>') +
+      '<div class="opp-lbl" style="margin-top:14px">' + I('wallet') + 'Деньги по договору</div>' + (money || '<div class="opp-b"><span class="v">графика платежей нет</span></div>') +
+      '<div class="opp-lbl" style="margin-top:14px">' + I('trend') + 'Рынок района за период</div>' + market +
+      offer +
+      '<div class="sel-prov">' + I('radar') + 'Собрано из вех и графика договора ' + escAttr(k.number) +
+      '. Срез рынка ' + escAttr((oppMarket()[0] || {}).asOf || '—') + ', ' +
+      escAttr((oppMarket()[0] || {}).basis || 'иллюстративно') + '.</div>',
+      '<button class="btn primary" data-act="sendOwnerReport" data-contract="' + k.id + '">' +
+      I('send') + 'Отправить отчёт</button>' +
+      '<button class="btn" data-act="closeModal">Закрыть</button>', { wide: true });
+  }
+  function sendOwnerReport(contractId) {
+    const k = (D().contracts || []).find((x) => x.id === contractId); if (!k) return;
+    const c = oppClient(k.clientId);
+    const audit = WS.audience.calculateAudience([{ id: k.id, clientId: k.clientId, channel: (c || {}).channel }]);
+    if (!c || audit.excluded.length) {
+      WS.storeApi.toast(((audit.excluded[0] || {}).reason || 'нет карточки собственника') + ' — отправка невозможна', 'warn');
+      return;
+    }
+    const second = ownerSecondObject(c);
+    addEventEntry('contact', c.id, { type: 'msg',
+      text: 'Отправлен отчёт собственнику по договору ' + k.number +
+        (second ? '; в отчёт вложено предложение по ' + second.name : '') + '. Отправка имитируется (DEMO).' });
+    WS.storeApi.touch();
+    closeModal();
+    WS.storeApi.toast('Отчёт отправлен — ' + c.name, 'ok');
   }
   function pulseDay() {
     const f = S().pulseDay || 'today';
@@ -11786,7 +11886,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

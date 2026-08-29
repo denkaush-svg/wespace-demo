@@ -315,6 +315,8 @@
       case 'dayTable': store.dayView = 'table'; api.emit(); break;
       case 'createShow': WS.ui.createShow(t.dataset.inbox); break;
       case 'showOutcome': WS.ui.openShowOutcome(t.dataset.ev); break;
+      case 'ownerReport': WS.ui.openOwnerReport(t.dataset.contract); break;
+      case 'sendOwnerReport': WS.ui.sendOwnerReport(t.dataset.contract); break;
       case 'saveShowOutcome': WS.ui.saveShowOutcome(t.dataset.ev); break;
       case 'ocDictate': {
         const box = document.getElementById('ocText');
