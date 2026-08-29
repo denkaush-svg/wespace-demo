@@ -3509,6 +3509,35 @@
   const CONTACT_KIND_LABEL = {}; CONTACT_KINDS.forEach((x) => { CONTACT_KIND_LABEL[x[0]] = x[1]; });
   const CONTACT_INTEREST_LABEL = {}; CONTACT_INTERESTS.forEach((x) => { CONTACT_INTEREST_LABEL[x[0]] = x[1]; });
   const OBJ_INTEREST_LABEL = {}; OBJ_INTERESTS.forEach((x) => { OBJ_INTEREST_LABEL[x[0]] = x[1]; });
+  // Преобразование текста типа объекта из заявки в ключ словаря OBJ_INTERESTS.
+  // Это единственное место, где живёт соответствие текста ключу.
+  function objectTypeToKey(textType) {
+    const t = String(textType || '').toLowerCase();
+    if (/квартир|апартамент|villa|вилла|резидениция|дом/i.test(textType)) return 'apart';
+    if (/офис|office|блок|block/i.test(textType)) return 'office';
+    if (/ритейл|retail|магазин/i.test(textType)) return 'retail';
+    if (/склад|warehouse|хранилище/i.test(textType)) return 'warehouse';
+    if (/земл|land|участок/i.test(textType)) return 'land';
+    if (/габ|gab/i.test(textType)) return 'gab';
+    return 'apart';  // безопасное умолчание
+  }
+  // Заполнение интереса контакта к типам объектов из его заявок.
+  // Правило: если интерес уже установлен (ручное значение), не меняется.
+  // Если интерес пуст, заполняется из всех уникальных типов заявок.
+  function fillContactObjTypesFromRequests(c) {
+    if (c.objTypes && c.objTypes.length > 0) return false;  // ручное значение не менять
+    const reqs = (D().requests || []).filter((r) => r.clientId === c.id);
+    if (!reqs.length) return false;  // нет заявок — нечего заполнять
+    const types = new Set();
+    reqs.forEach((r) => {
+      if (r.objectType) types.add(objectTypeToKey(r.objectType));
+    });
+    if (types.size > 0) {
+      c.objTypes = Array.from(types);
+      return true;
+    }
+    return false;
+  }
   // Тип компании из её собственного словаря («Застройщик», «Фонд», «Агентство») сводится
   // к тому же перечню: иначе один фильтр отбирал бы по двум разным наборам значений.
   function companyKind(co) { return /застройщик|девелопер/i.test(co.kind || '') ? 'developer' : 'company'; }
@@ -4829,6 +4858,8 @@
     ], overdue ? 'hot' : undefined);
   }
   function clientTabContent(c, tab) {
+    // Убедиться, что objTypes инициализированы перед выводом карточки
+    initContactObjTypes();
     if (tab === 'profile') {
       return dxSec('sparkle', 'Портрет клиента', '', psychInner(c));
     }
@@ -4889,6 +4920,8 @@
       return names;
     })();
     const key = dxSec('target', 'Профиль предпочтений', '', '<div class="dfields cols2">' +
+      dfPair('Интерес контакта к типам', (c.objTypes || []).length > 0 ? (c.objTypes || []).map((k) => OBJ_INTEREST_LABEL[k] || k).join(', ') : '(не указан)') +
+      (c.interest ? dfPair('Интерес сделки', CONTACT_INTEREST_LABEL[c.interest] || c.interest) : '') +
       (dir.types.length ? dfPair('Типы объектов', joinRu(dir.types)) : '') +
       (dir.ready.length ? dfPair('Готовность', joinRu(dir.ready)) : '') +
       (dir.services.length ? dfPair('Интересуют услуги', joinRu(dir.services)) : '') +
@@ -11864,9 +11897,20 @@
   function renderKey(st) {
     return [st.view, st.dealId, st.requestId, st.clientId, st.companyId, st.objectId, st.contractId].join('|');
   }
+  // Инициализация интереса контактов к типам объектов из заявок.
+  // Вызывается один раз при первом рендере.
+  function initContactObjTypes() {
+    if (WS._contactObjTypesInited) return;
+    const d = D();
+    if (!d || !d.clients) return;
+    WS._contactObjTypesInited = true;
+    d.clients.forEach((c) => fillContactObjTypesFromRequests(c));
+  }
   function render() {
     const app = document.getElementById('app');
     const st = S();
+    // Инициализация интереса контактов — один раз при загрузке
+    initContactObjTypes();
     // preserve focus in prompt inputs across renders
     const active = document.activeElement;
     const focusId = active && active.id ? active.id : null;
@@ -11950,7 +11994,10 @@
     dealHasNextStep, dealsWithoutNextStep, pulseNoNextStep,
     dealTransferForm, saveTransfer, dealPartnerForm, savePartner,
     offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
-    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn };
+    openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn, fillContactObjTypesFromRequests };
   WS.partners = PARTNERS;
+  // Инициализация интереса контактов при загрузке модуля ui.js (синхронно, без задержки)
+  // Это гарантирует, что контакты заполнены до вычисления Пульса (pulseProspectList)
+  try { initContactObjTypes(); } catch (e) {}
 })(window.WS = window.WS || {});
 
