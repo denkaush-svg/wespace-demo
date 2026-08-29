@@ -116,6 +116,13 @@
 
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
+    const slot = e.target.closest('[data-showslot]');
+    if (slot) {
+      WS._showSlot = slot.getAttribute('data-showslot');
+      [].slice.call(document.querySelectorAll('[data-showslot]')).forEach((b) => b.classList.remove('on'));
+      slot.classList.add('on');
+      return;
+    }
     const t = e.target.closest('[data-nav],[data-scn],[data-chain],[data-thread],[data-replay],[data-scenereset],[data-role],[data-objfilter],[data-objarea],[data-shortlist],[data-podbor],[data-fin],[data-scen],[data-artopen],[data-taskdone],[data-taskreopen],[data-tasksnooze],[data-taskreassign],[data-taskassign],[data-deal],[data-dealmove],[data-dealstage],[data-event],[data-evplay],[data-fb],[data-mqual],[data-mpsych],[data-caldir],[data-calday],[data-newthread],[data-client],[data-obj],[data-doc],[data-eng],[data-cgctx],[data-cgctxdel],[data-cgmode],[data-cgatt],[data-cgdepth],[data-dfconfirm],[data-conflict],[data-notedel],[data-cnotedel],[data-conotedel],[data-fetype],[data-funnel],[data-savedview],[data-exresolve],[data-analytics],[data-signaltoggle],[data-company],[data-viz],[data-export],[data-contacttype],[data-valobj],[data-promo],[data-dcedit],[data-dcdel],[data-etab],[data-oggal],[data-clubcomm],[data-clubreq],[data-svcreq],[data-dealbudget],[data-dealsrc],[data-objpurpose],[data-teamagent],[data-leadassign],[data-approve],[data-reject],[data-taskpreset],[data-tasksdue],[data-tasksstatus],[data-netchat],[data-netsel],[data-nettype],[data-task],[data-navtoggle],[data-agok],[data-agcancel],[data-agev],[data-agnext],[data-request],[data-reqobj],[data-reqaddobj],[data-commsfilter],[data-contactfilter],[data-group-toggle],[data-gate],[data-contract],[data-agsay],[data-rpopen],[data-rpsave],[data-relstage],[data-cueok],[data-cueno],[data-lotexit],[data-lotunblock],[data-offernew],[data-offeredit],[data-ocok],[data-ocno],[data-reqturn],[data-instage],[data-cgask],[data-pulsetab],[data-dayfilter],[data-prosp],[data-rightpane],[data-act]');
     if (!t) return;
     // Typing is not navigating. A click that starts inside an editable field belongs to the field,
@@ -304,6 +311,10 @@
       case 'replyTextOnly': WS.ui.openReplyDraft(t.dataset.inbox, !document.querySelector('#modal .rw-main .opp-b')); break;
       case 'sendReply': WS.ui.sendReply(t.dataset.inbox); break;
       case 'openSelection': WS.ui.openSelection(t.dataset.inbox); break;
+      case 'showForm': WS.ui.openShowForm(t.dataset.inbox); break;
+      case 'dayTable': store.dayView = 'table'; api.emit(); break;
+      case 'createShow': WS.ui.createShow(t.dataset.inbox); break;
+      case 'dayLine': store.dayView = 'line'; api.emit(); break;
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
       case 'settings': WS.router.go('settings'); break;

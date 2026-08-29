@@ -1554,6 +1554,29 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 @media (max-width: 620px) { .sel-media { grid-template-columns: 1fr; height: 150px; }
   .sel-map { display: none; } }
 
+/* Лента дня: время слева, дело в середине, место справа. Между точками — оценка дороги,
+   подписанная словом «оценка»: маршрутизации у стенда нет, и прикидку по району нельзя
+   выдавать за расчёт. */
+.dayline { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.dl-row { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--line); }
+.dl-row:first-child { border-top: 0; }
+.dl-when { flex: 0 0 92px; font-size: 12px; font-weight: 700; color: var(--mut); }
+.dl-row.is-late .dl-when { color: var(--stop); }
+.dl-body { flex: 1 1 auto; min-width: 0; }
+.dl-t { font-size: 13.5px; font-weight: 650; color: var(--ink); line-height: 1.35; }
+.dl-m { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; font-size: 11.5px; color: var(--mut); }
+.dl-ad { color: var(--faint); }
+.dl-map { flex: none; width: 74px; height: 54px; border-radius: 9px; border: 1px solid var(--line);
+  background-size: cover; background-position: center; position: relative; }
+.dl-hop { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint);
+  padding: 5px 14px 5px 106px; background: var(--surface-2); border-top: 1px solid var(--line); }
+.dl-hop svg { width: 12px; height: 12px; }
+@media (max-width: 620px) {
+  .dl-row { flex-wrap: wrap; }
+  .dl-when { flex: 0 0 100%; }
+  .dl-hop { padding-left: 14px; }
+}
+
 .day-hint { margin-top: 18px; }
 
 .day-hint { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; cursor: pointer;

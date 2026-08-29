@@ -947,6 +947,24 @@
     meet: ['Встреча', 'calendar', 'k-meet'], visit: ['Встреча', 'calendar', 'k-meet'], mail: ['Коммуникация', 'mail', 'k-msg'],
   };
   const DAY_WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
+  /* Срок события записан словами и временем — «сегодня 16:00», «завтра 11:30». Разбор срока
+     знал только голые ключи, поэтому ВСЯКОЕ датированное событие падало в «потом»: звонок,
+     назначенный на сегодня на четыре часа дня, не попадал в фильтр «На сегодня» и был виден
+     только во «Всех». Для ежедневника это не мелочь — это ровно то, ради чего его открывают. */
+  function dayBucket(w) {
+    const t = String(w || '').toLowerCase().trim();
+    if (DAY_WHEN_ORD[t] != null) return t;
+    if (/^сегодня/.test(t)) return 'today';
+    if (/^завтра/.test(t)) return 'tomorrow';
+    if (/^(вчера|позавчера)/.test(t) || /просроч/.test(t)) return 'overdue';
+    if (/^(послезавтра|на этой неделе)/.test(t)) return 'week';
+    return 'later';
+  }
+  // Время внутри срока — для порядка в ленте дня. Нет времени — событие идёт после тех, у кого оно есть.
+  function dayTime(w) {
+    const m = /(\d{1,2}):(\d{2})/.exec(String(w || ''));
+    return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+  }
   /* ==== Строка утра ======================================================================
      Первое, что видит брокер, открыв стенд, — не приборная панель, а одно предложение: кто
      ждёт ответа и сколько именно. Обращение, оставшееся без ответа, — единственный случай,
@@ -1294,27 +1312,149 @@
     if (req) addEventEntry('request', req.id, { type: 'msg', text: what });
     else addEventEntry('contact', c.id, { type: 'msg', text: what });
     WS.storeApi.touch();
-    closeModal();
     WS.storeApi.toast('Подборка отправлена — ' + c.name, 'ok');
+    // Подборка ушла — следующий шаг утра сам открывается, а не ищется в меню.
+    openShowForm(inboxId);
   }
   function pulseDayItems() {
     const out = [];
     (D().tasks || []).forEach((t) => {
       if (t.status === 'done') return;
-      out.push({ when: t.when || 'later', due: t.due || '—', title: t.title || 'Задача',
-        kind: t.kind || 'task', clientId: t.clientId, dealId: t.dealId, requestId: t.requestId });
+      out.push({ when: dayBucket(t.when || t.due), due: t.due || '—', at: dayTime(t.due || t.when),
+        title: t.title || 'Задача', kind: t.kind || 'task', clientId: t.clientId, dealId: t.dealId,
+        requestId: t.requestId, objectId: t.objectId || null });
     });
     (D().events || []).forEach((e) => {
       if (e.status === 'canceled') return;
       const w = e.when || e.at;
       if (!w) return;
-      out.push({ when: DAY_WHEN_ORD[w] != null ? w : 'later', due: w, title: e.title || e.text || 'Событие',
-        kind: e.kind || 'meet', clientId: e.clientId, dealId: e.dealId, requestId: e.requestId });
+      out.push({ when: dayBucket(w), due: w, at: dayTime(w), title: e.title || e.text || 'Событие',
+        kind: e.kind || 'meet', clientId: e.clientId, dealId: e.dealId, requestId: e.requestId,
+        objectId: e.objectId || null });
     });
-    return out.sort((a, b) => (DAY_WHEN_ORD[a.when] == null ? 9 : DAY_WHEN_ORD[a.when]) -
-      (DAY_WHEN_ORD[b.when] == null ? 9 : DAY_WHEN_ORD[b.when]));
+    return out.sort((a, b) => {
+      const d = (DAY_WHEN_ORD[a.when] == null ? 9 : DAY_WHEN_ORD[a.when]) -
+        (DAY_WHEN_ORD[b.when] == null ? 9 : DAY_WHEN_ORD[b.when]);
+      if (d) return d;
+      // Внутри одного срока — по времени; без времени идёт последним, а не первым.
+      return (a.at == null ? 1e9 : a.at) - (b.at == null ? 1e9 : b.at);
+    });
   }
   const DAY_FILTERS = [['today', 'На сегодня'], ['tomorrow', 'На завтра'], ['overdue', 'Просроченные'], ['all', 'Все']];
+  /* ==== Вид «Днём» ======================================================================
+     Таблица отвечает на вопрос «что у меня есть», лента дня — на вопрос «куда я сейчас еду».
+     Это разные вопросы, и партнёрская таблица остаётся видом по умолчанию: её состав и
+     порядок колонок он задал сам.
+
+     Оценка дороги между точками — именно ОЦЕНКА и подписана словом. Настоящей маршрутизации
+     у стенда нет: он знает район и адрес, но не пробки. Выдавать прикидку по району за расчёт
+     значит обещать точность, которой неоткуда взяться. */
+  const DAY_HOP_SAME = 10, DAY_HOP_OTHER = 35;
+  /* Ездят только между делами, где нужно быть лично. Первая версия считала дорогу между
+     двумя звонками и между звонком и задачей — то есть между делами, которые делаются с
+     одного места. Оценка дороги там, где никто никуда не едет, обесценивает её там, где едут. */
+  const DAY_ONSITE = { show: true, meet: true, visit: true };
+  function dayOnsite(it) { return !!DAY_ONSITE[it && it.kind]; }
+  function dayHop(a, b) {
+    if (!a || !b) return null;
+    return (a === b) ? DAY_HOP_SAME : DAY_HOP_OTHER;
+  }
+  function dayPlaceOf(it) {
+    const o = it.objectId ? oppObject(it.objectId) : null;
+    if (o) return { area: o.area, addr: o.address || o.name, map: (WS.maps || {})[o.id] || '' };
+    const d = it.dealId ? (D().deals || []).find((x) => x.id === it.dealId) : null;
+    const o2 = d && d.objectId ? oppObject(d.objectId) : null;
+    if (o2) return { area: o2.area, addr: o2.address || o2.name, map: (WS.maps || {})[o2.id] || '' };
+    return null;
+  }
+  function pulseDayLine(list) {
+    if (!list.length) {
+      return '<div class="empty" style="padding:22px">' + I('checkCircle') +
+        '<div style="font-weight:700;color:var(--ink)">На этот срок дел нет</div></div>';
+    }
+    let prev = null;
+    const rows = list.map((it) => {
+      const c = it.clientId ? oppClient(it.clientId) : null;
+      const pl = dayPlaceOf(it);
+      const k = DAY_KIND[it.kind] || ['Задача', 'check', 'k-task'];
+      const onsite = dayOnsite(it);
+      const hop = (onsite && prev && pl && prev.area) ? dayHop(prev.area, pl.area) : null;
+      if (onsite && pl) prev = pl;
+      const gap = hop != null
+        ? '<div class="dl-hop">' + I('chevDown') + 'дорога ≈ ' + hop + ' мин · оценка по району</div>'
+        : '';
+      return gap + '<div class="dl-row' + (it.when === 'overdue' ? ' is-late' : '') + '">' +
+        '<div class="dl-when">' + escAttr(it.due) + '</div>' +
+        '<div class="dl-body"><div class="dl-t">' + escAttr(it.title) + '</div>' +
+        '<div class="dl-m"><span class="pd-kind ' + k[2] + '">' + I(k[1]) + k[0] + '</span>' +
+        (c ? '<button class="lnk" data-client="' + c.id + '">' + escAttr(c.name) + '</button>' : '') +
+        (pl ? '<span class="dl-ad">' + escAttr(pl.addr) + '</span>' : '') + '</div></div>' +
+        (pl && pl.map
+          ? '<div class="dl-map" style="background-image:url(' + pl.map + ')"><span class="sel-pin"></span></div>'
+          : '') + '</div>';
+    }).join('');
+    return '<div class="dayline">' + rows + '</div>';
+  }
+  /* ==== Назначение показа ===============================================================
+     Четвёртый шаг утра. Подборка ушла — дальше брокер зовёт смотреть, и до сих пор это
+     происходило в мессенджере и в голове. Слоты предлагаются готовыми: набирать время руками
+     в девять утра между двумя звонками никто не станет.
+
+     Два объекта — два показа подряд, второй через полтора часа: столько занимает один показ
+     с дорогой внутри района. Это допущение, и оно названо в самом окне. */
+  const SHOW_SLOTS = [['сегодня 12:00', 'Сегодня, 12:00'], ['сегодня 14:30', 'Сегодня, 14:30'],
+    ['завтра 11:00', 'Завтра, 11:00'], ['завтра 15:00', 'Завтра, 15:00']];
+  const SHOW_GAP_MIN = 90;
+  function showShift(when, minutes) {
+    const m = /^(\S+)\s+(\d{1,2}):(\d{2})$/.exec(String(when || ''));
+    if (!m) return when;
+    const t = parseInt(m[2], 10) * 60 + parseInt(m[3], 10) + minutes;
+    return m[1] + ' ' + String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+  }
+  function openShowForm(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId); if (!it) return;
+    const c = it.clientId ? oppClient(it.clientId) : null; if (!c) return;
+    const ids = (WS._sel && WS._sel.inbox === inboxId) ? WS._sel.ids : selectionObjects(c).map((o) => o.id);
+    const objs = ids.map(oppObject).filter(Boolean);
+    if (!objs.length) { WS.storeApi.toast('Показывать нечего — в подборке нет объектов', 'warn'); return; }
+    const slots = SHOW_SLOTS.map((s, i) =>
+      '<button class="chip' + (i === 0 ? ' on' : '') + '" data-showslot="' + escAttr(s[0]) + '">' +
+      I('calendar') + s[1] + '</button>').join('');
+    const rows = objs.map((o, i) => '<div class="opp-b"><span class="k">' + escAttr(o.name) +
+      '</span><span class="v">' + escAttr(o.area) + ' · ' + escAttr(o.address || '') + '</span></div>').join('');
+    openModal('Назначить показ · ' + escAttr(c.name),
+      '<div class="rw-lbl">' + I('calendar') + 'Когда</div><div class="qa-row" style="margin-bottom:14px">' + slots + '</div>' +
+      '<div class="rw-lbl">' + I('building') + 'Что показываем</div>' + rows +
+      '<div class="rw-prov">' + I('radar') + 'Два показа подряд, второй через ' + SHOW_GAP_MIN +
+      ' минут — допущение стенда: столько занимает один показ с дорогой внутри района.</div>',
+      '<button class="btn primary" data-act="createShow" data-inbox="' + it.id + '">' +
+      I('check') + 'Назначить</button><button class="btn" data-act="closeModal">Закрыть</button>',
+      { wide: false });
+    WS._showSlot = SHOW_SLOTS[0][0];
+  }
+  function createShow(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId); if (!it) return;
+    const c = it.clientId ? oppClient(it.clientId) : null; if (!c) return;
+    const ids = (WS._sel && WS._sel.inbox === inboxId) ? WS._sel.ids : selectionObjects(c).map((o) => o.id);
+    const objs = ids.map(oppObject).filter(Boolean);
+    const slot = WS._showSlot || SHOW_SLOTS[0][0];
+    const req = (D().requests || []).find((r) => r.clientId === c.id && reqStage(r) !== 'closed');
+    (D().events || (D().events = [])).push.apply(D().events, objs.map((o, i) => ({
+      id: 'e_show_' + o.id + '_' + ((D().events || []).length + i),
+      clientId: c.id, requestId: req ? req.id : null, objectId: o.id,
+      title: 'Показ · ' + o.name, when: showShift(slot, i * SHOW_GAP_MIN), kind: 'show',
+    })));
+    if (req) addEventEntry('request', req.id, { type: 'meet',
+      text: 'Назначен показ: ' + objs.map((o) => o.name).join(', ') + ' — ' + slot + '.' });
+    /* Открываем ленту дня: показ назначен ради того, чтобы он встал в маршрут, и брокер
+       должен увидеть это сразу, а не искать переключатель вида. */
+    S().dayView = 'line';
+    S().pulseDay = /^завтра/.test(slot) ? 'tomorrow' : 'today';
+    WS.storeApi.touch();
+    closeModal();
+    WS.storeApi.toast(objs.length + ' ' + plural(objs.length, 'показ назначен', 'показа назначено', 'показов назначено') +
+      ' — ' + slot, 'ok');
+  }
   function pulseDay() {
     const f = S().pulseDay || 'today';
     const all = pulseDayItems();
@@ -1363,11 +1503,15 @@
         '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<div class="empty" style="padding:22px">' + I('checkCircle') +
         '<div style="font-weight:700;color:var(--ink)">На этот срок дел нет</div></div>';
+    const line = S().dayView === 'line';
+    const views = '<button class="chip' + (line ? '' : ' on') + '" data-act="dayTable">' + I('grid') + 'Таблицей</button>' +
+      '<button class="chip' + (line ? ' on' : '') + '" data-act="dayLine">' + I('clock') + 'Днём</button>';
     return '<div class="qa-row pd-bar">' + chips +
       '<span class="df-sep"></span><span class="pd-n">' + list.length + ' ' +
       plural(list.length, 'дело', 'дела', 'дел') + '</span>' +
       '<button class="btn sm" data-nav="tasks" style="margin-left:auto">' + I('arrowRight') + 'Все задачи</button></div>' +
-      body;
+      '<div class="qa-row pd-bar">' + views + '</div>' +
+      (line ? pulseDayLine(list) : body);
   }
 
   /* ==== «Перспективные сделки» — ВОЗМОЖНОСТИ, а не дела внутри сделок ========================
@@ -11563,7 +11707,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, openReplyDraft, openSelection, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

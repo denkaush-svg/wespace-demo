@@ -7220,6 +7220,30 @@ setTimeout(async () => {
     check('Пульс · «Мои дела» — ежедневник с колонками партнёра',
       ['Дата', 'Сделка или заявка', 'Контакт', 'Событие', 'Тип'].every((h, i) => heads[i] === h),
       heads.join(' | '));
+    /* ---- Датированное событие попадает в свой день -----------------------------------
+       Срок записан словами и временем — «сегодня 16:00». Разбор знал только голые ключи, и
+       ВСЯКОЕ датированное событие падало в «потом»: звонок на сегодня на четыре часа дня не
+       попадал в фильтр «На сегодня» и был виден только во «Всех». Для ежедневника это то
+       самое, ради чего его открывают. */
+    {
+      check('Пульс · «сегодня 16:00» — это сегодня, а не «потом»',
+        WS.ui.dayBucket('сегодня 16:00') === 'today' && WS.ui.dayBucket('завтра 11:30') === 'tomorrow' &&
+        WS.ui.dayBucket('today') === 'today' && WS.ui.dayBucket('через месяц') === 'later',
+        [WS.ui.dayBucket('сегодня 16:00'), WS.ui.dayBucket('завтра 11:30'), WS.ui.dayBucket('через месяц')].join(', '));
+      const dated = (dd().events || []).filter((e) => /^сегодня/.test(String(e.when || '')));
+      const items = WS.ui.pulseDayItems();
+      check('Пульс · и такое событие действительно считается в сегодняшних',
+        dated.length === 0 || dated.every((e) => items.some((x) => x.title === e.title && x.when === 'today')),
+        dated.map((e) => e.when + ' → ' + (items.find((x) => x.title === e.title) || {}).when).join(' | ') || 'датированных нет');
+      /* Внутри одного дня порядок по времени, а дело без времени идёт после тех, у кого оно
+         есть: выдумывать ему час нельзя, а ставить первым — врать про порядок дня. */
+      const today = items.filter((x) => x.when === 'today');
+      const timed = today.filter((x) => x.at != null);
+      const okOrder = timed.every((x, i) => i === 0 || timed[i - 1].at <= x.at) &&
+        today.every((x, i) => x.at != null || today.slice(i).every((y) => y.at == null));
+      check('Пульс · внутри дня дела идут по времени, а бессрочные — после',
+        okOrder, today.map((x) => x.due + (x.at == null ? '' : '=' + x.at)).join(' | '));
+    }
     check('Пульс · и срок дел переключается',
       pulse.querySelectorAll('[data-dayfilter]').length >= 3,
       String(pulse.querySelectorAll('[data-dayfilter]').length));
@@ -7344,6 +7368,72 @@ setTimeout(async () => {
       check('Аналитика · сумма сделок в работе названа тем же словом, что и их счёт',
         !!wide && !/воронк/i.test(wide.t) && /в работе/i.test(wide.t) && wide.s.indexOf(String(liveN)) >= 0,
         wide ? wide.t + ' → ' + wide.s : 'плитки нет');
+    }
+    /* ---- Лента дня и назначение показа ------------------------------------------------
+       Таблица отвечает «что у меня есть», лента — «куда я сейчас еду». Таблица остаётся видом
+       по умолчанию: её состав и порядок колонок задал партнёр. */
+    {
+      const wasView = WS.store.dayView, wasDay = WS.store.pulseDay;
+      check('Пульс · таблица осталась видом по умолчанию',
+        wasView === 'table' && !!doc.querySelector('#app .pd-table'), String(wasView));
+      WS.store.dayView = 'line'; WS.store.pulseDay = 'all';
+      WS.router.go('start'); WS.ui.render();
+      check('Пульс · «Днём» — вторая подача того же списка, а не другой список',
+        !!doc.querySelector('#app .dayline') && !doc.querySelector('#app .pd-table') &&
+        doc.querySelectorAll('#app .dayline .dl-row').length === WS.ui.pulseDayItems().length,
+        doc.querySelectorAll('#app .dayline .dl-row').length + ' против ' + WS.ui.pulseDayItems().length);
+      /* Оценка дороги — только между делами, где нужно быть лично. Между двумя звонками
+         никто не едет, и оценка там обесценивает её там, где едут. */
+      const rowsAll = [].slice.call(doc.querySelectorAll('#app .dayline > *'));
+      const badHop = rowsAll.filter((el, i) => {
+        if (!el.classList.contains('dl-hop')) return false;
+        const next = rowsAll[i + 1];
+        return !next || !/Встреча/.test(next.textContent);
+      });
+      check('Пульс · дорога считается только между делами, где нужно присутствие',
+        badHop.length === 0, badHop.map((h) => h.textContent.trim()).join(' | ') || 'лишних переходов нет');
+      WS.store.dayView = wasView; WS.store.pulseDay = wasDay;
+      WS.router.go('start'); WS.ui.render();
+    }
+    /* Назначение показа: два объекта — два показа подряд, второй через полтора часа, оба с
+       объектом и адресом, и оба сразу видны в ленте дня. */
+    {
+      const un1 = (dd().inbox || []).find((i) => i.clientId);
+      if (un1) {
+        const before = (dd().events || []).length;
+        WS.ui.openSelection(un1.id);
+        const ids = (WS._sel || {}).ids || [];
+        WS.ui.createShow(un1.id);
+        const made = (dd().events || []).slice(before);
+        check('Утро · показ назначен на каждый объект подборки',
+          made.length === ids.length && made.every((e) => e.kind === 'show' && !!e.objectId),
+          made.map((e) => e.when + ' · ' + e.title).join(' | ') || 'событий не создано');
+        const times = made.map((e) => WS.ui.dayTime(e.when)).filter((x) => x != null);
+        check('Утро · второй показ стоит через полтора часа после первого, а не в тот же час',
+          times.length < 2 || (times[1] - times[0]) === 90, times.join(' → '));
+        check('Утро · и вид переключился на ленту дня сам, а не ищется в меню',
+          WS.store.dayView === 'line', WS.store.dayView);
+        WS.ui.render();
+        const line = doc.querySelector('#app .dayline');
+        check('Утро · назначенные показы стоят в ленте с адресом объекта',
+          !!line && made.every((e) => line.textContent.indexOf(e.title) >= 0) &&
+          /District|Tower|Unit/.test(line.textContent),
+          line ? line.textContent.replace(/\s+/g, ' ').slice(0, 90) : 'ленты нет');
+        const req3 = (dd().requests || []).find((r) => r.clientId === un1.clientId);
+        const tl3 = (dd().requestTimeline || {})[req3 ? req3.id : ''] || [];
+        /* Переходы проверяются ЗДЕСЬ, где они наконец существуют. В предыдущем блоке та же
+           проверка проходила вхолостую: показов в готовых данных нет, переходов ноль, а
+           «все переходы подписаны» по пустому списку истинно. */
+        const hops2 = [].slice.call(doc.querySelectorAll('#app .dayline .dl-hop'));
+        check('Утро · между двумя показами появилась оценка дороги, подписанная словом «оценка»',
+          hops2.length >= 1 && hops2.every((h) => /оценка/i.test(h.textContent)),
+          hops2.map((h) => h.textContent.replace(/\s+/g, ' ').trim()).join(' | ') || 'переходов нет');
+        check('Утро · и в ленте заявки записано, что и когда показываем',
+          tl3.some((e) => /Назначен показ/.test(String(e.text || ''))),
+          tl3.filter((e) => /показ/i.test(String(e.text || ''))).map((e) => String(e.text).slice(0, 60))[0] || 'записи нет');
+        WS.storeApi.resetAll();
+        WS.router.go('start'); WS.ui.render();
+      }
     }
     // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
     check('Пульс · ввод Консьержа один, а не задвоен',
