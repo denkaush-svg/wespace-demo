@@ -7568,6 +7568,81 @@ setTimeout(async () => {
         WS.router.go('start'); WS.ui.render();
       }
     }
+    /* ---- Сквозная проверка утра: обе нити от начала до конца -------------------------
+       Проверяются не отдельные окна, а ПУТЬ: каждое действие оставляет состояние, которое
+       видно в другом месте, и мера утра растёт вместе с ними. Отдельные шаги уже проверены
+       выше поимённо; здесь важно, что они соединяются.
+
+       Строки «сегодня сдвинуто» на пустом утре НЕТ. Зелёное «вы молодец» на пустом утре
+       обесценивает её же на полном. */
+    {
+      WS.storeApi.resetAll();
+      WS.router.go('start'); WS.ui.render();
+      const moved = () => doc.querySelector('#app .start .moved');
+      check('Утро · пока ничего не сдвинуто, строки итога нет',
+        !moved(), moved() ? moved().textContent.trim() : 'строки нет — верно');
+
+      const un2 = (dd().inbox || []).find((i) => i.stage === 'unreached' && i.clientId);
+      const km2 = (dd().contracts || []).find((x) => x.kind === 'management' && x.status === 'active');
+      if (un2 && km2) {
+        const seen = [];
+        // 1. Ответ
+        WS.ui.openReplyDraft(un2.id);
+        const t1 = doc.getElementById('replyText'); if (t1) t1.value = 'Ответ клиенту.';
+        WS.ui.sendReply(un2.id);
+        WS.router.go('start'); WS.ui.render();
+        seen.push(WS.ui.movedCounts().reply);
+        check('Утро · шаг 1 — ответ отмечен в мере утра и снял строку утра',
+          WS.ui.movedCounts().reply === 1 && !doc.querySelector('#app .start .morn[data-inbox="' + un2.id + '"]'),
+          JSON.stringify(WS.ui.movedCounts()));
+        // 2. Подборка
+        WS.ui.openSelection(un2.id);
+        WS.ui.sendSelection(un2.id);
+        check('Утро · шаг 2 — подборка отмечена отдельно от ответа',
+          WS.ui.movedCounts().selection === 1 && WS.ui.movedCounts().reply === 1,
+          JSON.stringify(WS.ui.movedCounts()));
+        // 3. Показ
+        WS.ui.createShow(un2.id);
+        const shows2 = (dd().events || []).filter((e) => e.kind === 'show');
+        check('Утро · шаг 3 — показ назначен, и это ОДИН сдвиг, сколько бы объектов в нём ни было',
+          WS.ui.movedCounts().show === 1 && shows2.length >= 2,
+          'показов ' + shows2.length + ' · сдвигов ' + WS.ui.movedCounts().show);
+        // 4. Итог показа
+        WS.ui.openShowOutcome(shows2[0].id);
+        const t2 = doc.getElementById('ocText'); if (t2) t2.value = 'Понравился, думает.';
+        WS.ui.saveShowOutcome(shows2[0].id);
+        check('Утро · шаг 4 — итог показа записан и посчитан по черновику, а не по строке ленты',
+          WS.ui.movedCounts().outcome === 1, JSON.stringify(WS.ui.movedCounts()));
+        // 5. Вторая нить — отчёт собственнику
+        WS.ui.openOwnerReport(km2.id);
+        WS.ui.sendOwnerReport(km2.id);
+        check('Утро · шаг 5 — вторая нить отмечена своей строкой, а не смешана с первой',
+          WS.ui.movedCounts().report === 1, JSON.stringify(WS.ui.movedCounts()));
+
+        WS.router.go('start'); WS.ui.render();
+        const line = moved();
+        check('Утро · мера утра называет состояния, а не нажатия',
+          !!line && /отправлен/.test(line.textContent) && /назначен/.test(line.textContent) &&
+          /записан/.test(line.textContent),
+          line ? line.textContent.replace(/\s+/g, ' ').trim() : 'строки нет');
+        check('Утро · и в ней ровно те пять состояний, что и произошли',
+          !!line && ['ответ', 'подборка', 'показ', 'итог', 'отчёт'].every((w) => line.textContent.indexOf(w) >= 0),
+          line ? line.textContent.replace(/\s+/g, ' ').trim() : 'строки нет');
+        /* Полоса цели при этом НЕ двинулась: ни одна сделка не закрылась, и рисовать движение
+           там, где его нет, — то же самое, что дописать себе цифру. */
+        const bandNow = doc.querySelector('#app .start .pgoal .pgoal-v');
+        check('Утро · полоса цели не сдвинулась — ни одна сделка не закрылась',
+          !!bandNow && /Выполнено/.test(bandNow.textContent),
+          bandNow ? bandNow.textContent.trim() : 'полосы нет');
+        /* И «Сброс» возвращает стенд в утро: демонстрацию показывают не один раз. */
+        WS.storeApi.resetAll();
+        WS.router.go('start'); WS.ui.render();
+        check('Утро · «Сброс» возвращает стенд в начало утра',
+          !moved() && !!doc.querySelector('#app .start .morn'),
+          (moved() ? 'мера осталась' : '') + (doc.querySelector('#app .start .morn') ? '' : ' строки утра нет'));
+      }
+      WS.router.go('start'); WS.ui.render();
+    }
     // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
     check('Пульс · ввод Консьержа один, а не задвоен',
       pulse.querySelectorAll('.prompt input').length === 1,

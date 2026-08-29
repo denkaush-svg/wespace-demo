@@ -1578,6 +1578,14 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .dl-hop { padding-left: 14px; }
 }
 
+/* «Сегодня сдвинуто» — тихая строка под целью. Не плашка достижения: утро, в котором не
+   закрылась сделка, всё равно рабочее, и мера ему нужна спокойная. */
+.moved { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 10px 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2);
+  font-size: 12.5px; color: var(--ink); }
+.moved svg { width: 15px; height: 15px; color: var(--ok, var(--acc)); flex: none; }
+.moved b { font-weight: 700; }
+
 .day-hint { margin-top: 18px; }
 
 .day-hint { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left; cursor: pointer;

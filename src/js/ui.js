@@ -1174,8 +1174,10 @@
        откатывать обращение в начало разбора значит терять то, что клиент уже сказал. */
     it.stage = 'qualified';
     const req = (D().requests || []).find((r) => r.clientId === c.id && reqStage(r) !== 'closed');
-    if (req) addEventEntry('request', req.id, { type: 'msg', text: 'Ответ отправлен — ' + c.name + '. Отправка имитируется (DEMO).' });
-    else addEventEntry('contact', c.id, { type: 'msg', text: 'Ответ отправлен. Отправка имитируется (DEMO).' });
+    const trace = req
+      ? addEventEntry('request', req.id, { type: 'msg', text: 'Ответ отправлен — ' + c.name + '. Отправка имитируется (DEMO).' })
+      : addEventEntry('contact', c.id, { type: 'msg', text: 'Ответ отправлен. Отправка имитируется (DEMO).' });
+    if (trace) trace.moved = 'reply';
     WS.storeApi.touch();
     closeModal();
     WS.storeApi.toast('Ответ отправлен — ' + c.name, 'ok');
@@ -1314,8 +1316,9 @@
     it.stage = 'qualified';
     const req = (D().requests || []).find((r) => r.clientId === c.id && reqStage(r) !== 'closed');
     const what = 'Отправлена подборка: ' + objs.map((o) => o.name).join(', ') + '. Отправка имитируется (DEMO).';
-    if (req) addEventEntry('request', req.id, { type: 'msg', text: what });
-    else addEventEntry('contact', c.id, { type: 'msg', text: what });
+    const trace = req ? addEventEntry('request', req.id, { type: 'msg', text: what })
+      : addEventEntry('contact', c.id, { type: 'msg', text: what });
+    if (trace) trace.moved = 'selection';
     WS.storeApi.touch();
     WS.storeApi.toast('Подборка отправлена — ' + c.name, 'ok');
     // Подборка ушла — следующий шаг утра сам открывается, а не ищется в меню.
@@ -1455,8 +1458,11 @@
       clientId: c.id, requestId: req ? req.id : null, objectId: o.id,
       title: 'Показ · ' + o.name, when: showShift(slot, i * SHOW_GAP_MIN), kind: 'show',
     })));
-    if (req) addEventEntry('request', req.id, { type: 'meet',
+    const trace = req && addEventEntry('request', req.id, { type: 'meet',
       text: 'Назначен показ: ' + objs.map((o) => o.name).join(', ') + ' — ' + slot + '.' });
+    // Один след — один сдвиг, сколько бы объектов ни вошло в этот показ: строка считает
+    // состояния, а не объекты, и «два показа» здесь были бы двойным счётом одного действия.
+    if (trace) trace.moved = 'show';
     /* Открываем ленту дня: показ назначен ради того, чтобы он встал в маршрут, и брокер
        должен увидеть это сразу, а не искать переключатель вида. */
     S().dayView = 'line';
@@ -1627,12 +1633,54 @@
       return;
     }
     const second = ownerSecondObject(c);
-    addEventEntry('contact', c.id, { type: 'msg',
+    const trace = addEventEntry('contact', c.id, { type: 'msg',
       text: 'Отправлен отчёт собственнику по договору ' + k.number +
         (second ? '; в отчёт вложено предложение по ' + second.name : '') + '. Отправка имитируется (DEMO).' });
+    if (trace) trace.moved = 'report';
     WS.storeApi.touch();
     closeModal();
     WS.storeApi.toast('Отчёт отправлен — ' + c.name, 'ok');
+  }
+  /* ==== «Сегодня сдвинуто» ===============================================================
+     Последний шаг утра. В нём не закрылась ни одна сделка — полоса цели не двинулась, и
+     рисовать там движение нельзя. Но утро, в котором ответили ждущему клиенту, отправили
+     подборку, назначили показ, записали его итог и отчитались собственнику, — это рабочее
+     утро, и единственная честная его мера стоит здесь.
+
+     Считаются СОСТОЯНИЯ, а не нажатия: «отправлено», «назначено», «записан». Отправленный и
+     тут же переписанный ответ — один ответ, а не два, потому что след в ленте один. Каждая
+     строка привязана к записи, которую можно открыть и прочитать.
+
+     Пока ничего не сдвинуто — строки нет. Зелёное «вы молодец» на пустом утре обесценивает
+     её же на полном. */
+  const MOVED_WORDS = {
+    reply: ['ответ отправлен', 'ответа отправлено', 'ответов отправлено'],
+    selection: ['подборка отправлена', 'подборки отправлено', 'подборок отправлено'],
+    show: ['показ назначен', 'показа назначено', 'показов назначено'],
+    outcome: ['итог показа записан', 'итога показа записано', 'итогов показа записано'],
+    report: ['отчёт собственнику отправлен', 'отчёта собственнику отправлено', 'отчётов собственнику отправлено'],
+  };
+  const MOVED_ORDER = ['reply', 'selection', 'show', 'outcome', 'report'];
+  function movedCounts() {
+    const n = { reply: 0, selection: 0, show: 0, outcome: 0, report: 0 };
+    ['contactTimeline', 'requestTimeline', 'dealTimeline', 'companyTimeline'].forEach((key) => {
+      const bag = D()[key] || {};
+      Object.keys(bag).forEach((id) => {
+        (bag[id] || []).forEach((e) => { if (e && e.moved && n[e.moved] != null) n[e.moved] += 1; });
+      });
+    });
+    // Итоги считаются по самим черновикам: запись итога — это черновик, а не строка в ленте.
+    n.outcome = (D().outcomes || []).filter((x) => x.factId &&
+      (D().events || []).some((e) => e.id === x.factId && e.kind === 'show')).length;
+    return n;
+  }
+  function pulseMoved() {
+    const n = movedCounts();
+    const parts = MOVED_ORDER.filter((k) => n[k] > 0)
+      .map((k) => n[k] + ' ' + plural(n[k], MOVED_WORDS[k][0], MOVED_WORDS[k][1], MOVED_WORDS[k][2]));
+    if (!parts.length) return '';
+    return '<div class="moved">' + I('checkCircle') + '<span><b>Сегодня сдвинуто:</b> ' +
+      parts.join(' · ') + '</span></div>';
   }
   function pulseDay() {
     const f = S().pulseDay || 'today';
@@ -2814,6 +2862,7 @@
       pulseMorningRow() +
       cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
       pulseMyGoals() +
+      pulseMoved() +
       '<div class="pblocks">' +
       pulseBlock('day', 'Мои дела',
         'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
@@ -11886,7 +11935,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
