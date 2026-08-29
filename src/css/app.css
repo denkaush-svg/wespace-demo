@@ -1566,6 +1566,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dl-t { font-size: 13.5px; font-weight: 650; color: var(--ink); line-height: 1.35; }
 .dl-m { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; font-size: 11.5px; color: var(--mut); }
 .dl-ad { color: var(--faint); }
+.dl-act { flex: none; }
 .dl-map { flex: none; width: 74px; height: 54px; border-radius: 9px; border: 1px solid var(--line);
   background-size: cover; background-position: center; position: relative; }
 .dl-hop { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint);

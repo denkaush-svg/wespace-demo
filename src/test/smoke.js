@@ -7431,6 +7431,68 @@ setTimeout(async () => {
         check('Утро · и в ленте заявки записано, что и когда показываем',
           tl3.some((e) => /Назначен показ/.test(String(e.text || ''))),
           tl3.filter((e) => /показ/i.test(String(e.text || ''))).map((e) => String(e.text).slice(0, 60))[0] || 'записи нет');
+        /* ---- Итог показа --------------------------------------------------------
+           Записывается заметка брокера, а не разговор клиента: диктует он сам, после
+           просмотра. Итог остаётся ЧЕРНОВИКОМ и до подтверждения не участвует в выводах.
+           Следующий шаг выводится из записей — клиента и объекта, — а не из надиктованной
+           фразы: угадывать намерение по тексту значит выдавать догадку за вывод. */
+        {
+          const shows = (dd().events || []).filter((e) => e.kind === 'show');
+          const ev = shows[0];
+          check('Утро · у показа в ленте есть, чем записать итог',
+            !!ev && !!doc.querySelector('#app .dayline [data-act="showOutcome"]'),
+            shows.length + ' показов в данных');
+          if (ev) {
+            WS.ui.openShowOutcome(ev.id);
+            const md3 = doc.querySelector('#modal .modal');
+            check('Утро · окно итога говорит, что это заметка брокера, а не запись разговора',
+              !!md3 && /заметка брокера/i.test(md3.textContent) && /не запись разговора/i.test(md3.textContent),
+              (md3 || {}).textContent ? 'сказано' : 'окна нет');
+            const step = WS.ui.showNextStep(ev);
+            check('Утро · следующий шаг стоит в окне с указанием, откуда он взят',
+              !step || (md3.textContent.indexOf(step) >= 0 &&
+                /выведено из карточки/i.test(md3.textContent)),
+              step || 'вывести не из чего — строки нет, и это верно');
+            /* И он ДЕЙСТВИТЕЛЬНО выведен, а не написан заранее: проверка выше на постоянной
+               строке проходит — подпись «выведено из карточки» остаётся на месте, что бы
+               функция ни возвращала. Меняем запись, из которой он выводится, и требуем, чтобы
+               шаг изменился. */
+            {
+              const cl = (dd().clients || []).find((x) => x.id === ev.clientId);
+              const wasB = cl ? cl.budget : null, wasI = cl ? cl.interest : null;
+              if (cl) { cl.budget = 1; cl.interest = 'invest'; }
+              const step2 = WS.ui.showNextStep(ev);
+              if (cl) { cl.budget = wasB; cl.interest = wasI; }
+              check('Утро · и меняется вслед за записями, а не написан заранее',
+                !!cl && step2 !== step, '«' + step + '» → «' + step2 + '»');
+            }
+            /* Пустой итог не записывается: пустая заметка в ленте хуже её отсутствия — она
+               выглядит как работа. */
+            const scope0 = (dd().requests || []).find((r) => r.clientId === ev.clientId && r.leadStatus !== 'Закрыта');
+            const before = WS.ui.outcomesFor('request', scope0 ? scope0.id : '').length;
+            const box = doc.getElementById('ocText'); if (box) box.value = '   ';
+            WS.ui.saveShowOutcome(ev.id);
+            check('Утро · пустой итог не записывается',
+              WS.ui.outcomesFor('request', scope0 ? scope0.id : '').length === before,
+              String(before));
+            if (box) box.value = 'Понравился объект, смущает этаж.';
+            WS.ui.saveShowOutcome(ev.id);
+            const list = WS.ui.outcomesFor('request', scope0 ? scope0.id : '');
+            const rec = list.find((x) => x.factId === ev.id);
+            check('Утро · итог записан черновиком и привязан к этому показу',
+              !!rec && rec.state === 'draft' && rec.text.indexOf('смущает этаж') >= 0,
+              rec ? rec.state + ' · factId=' + rec.factId : 'итога нет');
+            check('Утро · и следующий шаг лёг в тот же итог',
+              !step || (!!rec && rec.text.indexOf(step) >= 0),
+              rec ? rec.text.slice(0, 80) : '—');
+            WS.ui.render();
+            check('Утро · строка показа помечена «итог записан», а не предлагает записать снова',
+              !doc.querySelector('#app .dayline [data-act="showOutcome"][data-ev="' + ev.id + '"]') &&
+              /итог записан/i.test((doc.querySelector('#app .dayline') || {}).textContent || ''),
+              (doc.querySelector('#app .dayline') || {}).textContent ? 'помечена' : 'ленты нет');
+          }
+        }
+
         WS.storeApi.resetAll();
         WS.router.go('start'); WS.ui.render();
       }

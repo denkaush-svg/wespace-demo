@@ -314,6 +314,13 @@
       case 'showForm': WS.ui.openShowForm(t.dataset.inbox); break;
       case 'dayTable': store.dayView = 'table'; api.emit(); break;
       case 'createShow': WS.ui.createShow(t.dataset.inbox); break;
+      case 'showOutcome': WS.ui.openShowOutcome(t.dataset.ev); break;
+      case 'saveShowOutcome': WS.ui.saveShowOutcome(t.dataset.ev); break;
+      case 'ocDictate': {
+        const box = document.getElementById('ocText');
+        if (WS.voice && WS.voice.dictate) WS.voice.dictate((txt) => { if (box) box.value = txt; });
+        break;
+      }
       case 'dayLine': store.dayView = 'line'; api.emit(); break;
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;

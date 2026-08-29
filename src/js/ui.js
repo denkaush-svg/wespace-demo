@@ -1330,7 +1330,7 @@
       if (!w) return;
       out.push({ when: dayBucket(w), due: w, at: dayTime(w), title: e.title || e.text || 'Событие',
         kind: e.kind || 'meet', clientId: e.clientId, dealId: e.dealId, requestId: e.requestId,
-        objectId: e.objectId || null });
+        objectId: e.objectId || null, evId: e.id, hasOutcome: showHasOutcome(e) });
     });
     return out.sort((a, b) => {
       const d = (DAY_WHEN_ORD[a.when] == null ? 9 : DAY_WHEN_ORD[a.when]) -
@@ -1389,6 +1389,12 @@
         '<div class="dl-m"><span class="pd-kind ' + k[2] + '">' + I(k[1]) + k[0] + '</span>' +
         (c ? '<button class="lnk" data-client="' + c.id + '">' + escAttr(c.name) + '</button>' : '') +
         (pl ? '<span class="dl-ad">' + escAttr(pl.addr) + '</span>' : '') + '</div></div>' +
+        (it.kind === 'show' && it.evId
+          ? '<div class="dl-act">' + (it.hasOutcome
+            ? '<span class="rel-tag">итог записан</span>'
+            : '<button class="btn xs" data-act="showOutcome" data-ev="' + it.evId + '">' +
+              I('mic') + 'Итог голосом</button>') + '</div>'
+          : '') +
         (pl && pl.map
           ? '<div class="dl-map" style="background-image:url(' + pl.map + ')"><span class="sel-pin"></span></div>'
           : '') + '</div>';
@@ -1454,6 +1460,79 @@
     closeModal();
     WS.storeApi.toast(objs.length + ' ' + plural(objs.length, 'показ назначен', 'показа назначено', 'показов назначено') +
       ' — ' + slot, 'ok');
+  }
+  /* ==== Итог показа ======================================================================
+     Пятый шаг утра, и самый дешёвый: механизм уже был целиком — черновик итога, приёмка,
+     отклонение со следом, голосовой ввод. Не хватало только привязки к показу.
+
+     Записывается НЕ разговор, а заметка брокера — он диктует сам, в машине, после просмотра.
+     Разница не юридическая казуистика: запись клиента требует его согласия, надиктованная
+     заметка — нет, и окно говорит это словами, чтобы вопрос не возникал.
+
+     Итог остаётся ЧЕРНОВИКОМ до подтверждения и до тех пор не участвует в выводах. Следующий
+     шаг выводится не из надиктованного текста, а из записей — клиента и объекта: угадывать
+     намерение по фразе значит выдавать догадку за вывод. Если вывести не из чего — строки
+     следующего шага нет вовсе. */
+  function showNextStep(ev) {
+    const c = ev && ev.clientId ? oppClient(ev.clientId) : null;
+    const o = ev && ev.objectId ? oppObject(ev.objectId) : null;
+    if (!c || !o) return '';
+    if (c.interest === 'rent' && (c.budget || 0) >= (o.price || 0)) {
+      return 'Следующий шаг: расчёт покупки против аренды — бюджет ' + WS.AED(c.budget) +
+        ' покрывает цену объекта.';
+    }
+    const dv = insDeviation(o);
+    if (dv && dv.pct >= 5) {
+      return 'Следующий шаг: подготовить ответ про цену — объект на ' + dv.pct + '% выше среза ' + dv.area + '.';
+    }
+    return '';
+  }
+  function showOutcomeScope(ev) {
+    const req = (D().requests || []).find((r) => r.id === ev.requestId) ||
+      (D().requests || []).find((r) => r.clientId === ev.clientId && reqStage(r) !== 'closed');
+    if (req) return { scope: 'request', id: req.id };
+    return ev.clientId ? { scope: 'contact', id: ev.clientId } : null;
+  }
+  function showHasOutcome(ev) {
+    const sc = showOutcomeScope(ev); if (!sc) return false;
+    return outcomesFor(sc.scope, sc.id).some((x) => x.factId === ev.id);
+  }
+  function openShowOutcome(evId) {
+    const ev = (D().events || []).find((x) => x.id === evId); if (!ev) return;
+    const o = ev.objectId ? oppObject(ev.objectId) : null;
+    const next = showNextStep(ev);
+    const canDictate = !!(WS.voice && WS.voice.canDictate && WS.voice.canDictate());
+    openModal('Итог показа · ' + escAttr(o ? o.name : ev.title),
+      '<div class="rw-lbl">' + I('mic') + 'Надиктуйте одной фразой</div>' +
+      '<textarea id="ocText" class="rw-text" rows="4" placeholder="Что сказал клиент и что он решил"></textarea>' +
+      (canDictate
+        ? '<div class="qa-row" style="margin-top:8px"><button class="btn sm" data-act="ocDictate">' +
+          I('mic') + 'Говорить</button></div>'
+        : '<div class="rw-prov" style="margin-top:8px">' + I('mic') +
+          'Диктовка недоступна в этом браузере — напечатайте, механизм тот же.</div>') +
+      (next ? '<div class="rw-lbl" style="margin-top:14px">' + I('arrowRight') + 'Следующий шаг</div>' +
+        '<div class="rw-quote">' + escAttr(next) + '<span>выведено из карточки клиента и объекта, а не из надиктованного</span></div>' : '') +
+      '<div class="rw-prov">' + I('lock') + 'Это заметка брокера, а не запись разговора. ' +
+      'Итог остаётся черновиком и не участвует в выводах, пока вы его не подтвердите.</div>',
+      '<button class="btn primary" data-act="saveShowOutcome" data-ev="' + ev.id + '">' +
+      I('check') + 'Записать итог</button><button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+  function saveShowOutcome(evId) {
+    const ev = (D().events || []).find((x) => x.id === evId); if (!ev) return;
+    const el = document.getElementById('ocText');
+    const said = el ? String(el.value || '').trim() : '';
+    if (!said) { WS.storeApi.toast('Пустой итог записывать нечего', 'warn'); return; }
+    const sc = showOutcomeScope(ev);
+    if (!sc) { WS.storeApi.toast('Не к чему привязать итог — нет заявки и контакта', 'warn'); return; }
+    const next = showNextStep(ev);
+    const rec = addOutcomeDraft(sc.scope, sc.id, {
+      text: said + (next ? ' ' + next : ''),
+      by: (D().users[S().role] || {}).name || 'Агент',
+      factId: ev.id,
+    });
+    if (!rec) { WS.storeApi.toast('Итог записать не удалось', 'warn'); return; }
+    closeModal();
+    WS.storeApi.toast('Итог записан черновиком — подтвердите в карточке', 'ok');
   }
   function pulseDay() {
     const f = S().pulseDay || 'today';
@@ -11707,7 +11786,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
