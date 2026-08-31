@@ -793,7 +793,10 @@ button { font-family: inherit; cursor: pointer; }
    «На чём основано» — таблица «признак → значение», а не строка серых чипов. Чипы читаются
    как украшение; это единственная часть карточки, которую агент проверяет глазами, прежде
    чем повторить клиенту, и она обязана читаться как выписка, а не как теги. */
-.opps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+/* Карточка возможности теперь начинается с предложения-заголовка, а заголовок — это фраза.
+   При двух колонках в разделе шириной 689 она ломалась на четыре строки. Порог поднят: на
+   ноутбуке колонка одна и заголовок читается строкой, на широком мониторе снова две. */
+.opps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
 .opp { display: flex; flex-direction: column; gap: 11px; min-width: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
 .opp-h { display: flex; align-items: flex-start; gap: 10px; }
@@ -801,19 +804,34 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--acc-soft); color: var(--acc); }
 .opp-ic svg { width: 15px; height: 15px; }
 .opp-kind { min-width: 0; flex: 1 1 auto; }
-.opp-rule { font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.opp-title { font-size: 13.5px; font-weight: 750; color: var(--ink); line-height: 1.3; }
 .opp-who { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+/* Название разбора — ярлык, а не оглавление: аргумент, по которому возможность нашлась. */
+.opp-rule { font-size: 10.5px; color: var(--faint); margin-top: 3px; }
 .opp-val { flex: none; text-align: right; }
 .opp-val b { display: block; font-size: 15px; font-weight: 800; color: var(--acc-ink); white-space: nowrap; }
-.opp-val span { display: block; font-size: 10.5px; color: var(--faint); margin-top: 1px; max-width: 130px; }
+.opp-val span { display: block; font-size: 10.5px; color: var(--faint); margin-top: 1px; max-width: 118px; }
 /* Возможность без числа не притворяется нулевой: прочерк и условие, при котором число появится. */
 .opp-val.none b { color: var(--faint); }
 .opp-why { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
 .opp-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
 .opp-lbl svg { width: 12px; height: 12px; }
-.opp-basis { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--surface-2); }
-.opp-basis .opp-lbl { margin-bottom: 7px; }
+/* Основание свёрнуто: его читает тот, кто сомневается. В свёрнутом виде видна одна самая
+   сильная строка — закрытая дверь без единого доказательства оставляет число висеть. */
+.opp-basis { border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); }
+.opp-basis > summary { cursor: pointer; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 9px 12px; list-style: none; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--faint); }
+.opp-basis > summary::-webkit-details-marker { display: none; }
+.opp-basis > summary svg { width: 12px; height: 12px; flex: none; }
+.opp-basis > summary > svg:last-child { margin-left: auto; transition: transform .18s ease; }
+.opp-basis[open] > summary > svg:last-child { transform: rotate(180deg); }
+.opp-basis > summary i { flex: 1 1 100%; font-style: normal; font-size: 11px; font-weight: 600;
+  letter-spacing: 0; text-transform: none; color: var(--ink); }
+.opp-basis > .opp-why { margin: 0; padding: 0 12px 8px; }
+.opp-basis > .opp-b { margin: 0 12px; }
+.opp-basis > .opp-b:last-child { margin-bottom: 11px; }
 .opp-b { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); }
 .opp-b:first-of-type { border-top: 0; padding-top: 0; }
 .opp-b .k { flex: 0 0 40%; font-size: 11px; color: var(--mut); }

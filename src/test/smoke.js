@@ -6609,6 +6609,41 @@ setTimeout(async () => {
       const rules = opps.map((p) => p.rule).filter((v, i, a) => a.indexOf(v) === i);
       check('Пульс · возможности выведены разными разборами, а не одним',
         rules.length >= 6, rules.join(', '));
+      /* ---- Заголовок называет сделку, а не критерий разбора ---------------------------
+         «Бюджет совпал с целым объектом» — это рубрика, по которой возможность нашлась.
+         Агенту нужна новость: «Показать Сергею Орлову DIFC Gate Avenue, Block 3 целиком».
+         Глагол — про НАШЕ действие, а не про исход: «Показать», а не «Продать»; заголовок не
+         обещает того, чего мы не контролируем. */
+      {
+        const VERBS = ['Показать', 'Предложить', 'Позвонить', 'Собрать', 'Ответить', 'Спросить',
+          'Запросить', 'Взять', 'Вложить', 'Переписать'];
+        const noTitle = opps.filter((p) => !(p.title || '').trim());
+        check('Пульс · у каждой возможности есть заголовок-сделка',
+          noTitle.length === 0, noTitle.map((p) => p.rule).join(', '));
+        const badVerb = opps.filter((p) => !VERBS.some((v) => (p.title || '').indexOf(v) === 0));
+        check('Пульс · заголовок начинается с нашего действия, а не с критерия',
+          badVerb.length === 0, badVerb.map((p) => p.title).join(' | '));
+        /* Обещание исхода в заголовке — «Продать», «Закрыть», «Купить»: мы этого не
+           контролируем, и первый же скептик на это укажет. */
+        const promises = opps.filter((p) => /^(Продать|Закрыть|Купить|Сдать)\b/.test(p.title || ''));
+        check('Пульс · заголовок не обещает исхода, которого мы не контролируем',
+          promises.length === 0, promises.map((p) => p.title).join(' | '));
+        const longOnes = opps.filter((p) => (p.title || '').length > 72);
+        check('Пульс · заголовок читается за раз — не длиннее семидесяти двух знаков',
+          longOnes.length === 0, longOnes.map((p) => p.title.length + ': ' + p.title).join(' | '));
+        /* Имя клиента стоит в падеже, которого требует глагол. Формы записаны у клиента явно;
+           именительный в заголовке — признак того, что форму не заполнили. */
+        const wrongCase = opps.filter((p) => {
+          const c2 = (dd().clients || []).find((x) => x.id === p.clientId);
+          if (!c2 || !c2.nameDat || c2.nameDat === c2.name) return false;   // несклоняемое имя
+          return (p.title || '').indexOf(c2.name) >= 0;
+        });
+        check('Пульс · имя клиента в заголовке склоняется, а не стоит в именительном',
+          wrongCase.length === 0, wrongCase.map((p) => p.title).join(' | '));
+        const noForms = (dd().clients || []).filter((c2) => !c2.nameDat || !c2.nameGen);
+        check('Пульс · у каждого клиента заданы обе падежные формы',
+          noForms.length === 0, noForms.map((c2) => c2.name).join(', '));
+      }
       // Пять вопросов, на которые обязана отвечать каждая карточка.
       const thin = opps.filter((p) => !p.clientId || !p.client ||
         !(p.why || '').trim() || (p.basis || []).length < 2 ||
@@ -6922,6 +6957,39 @@ setTimeout(async () => {
       check('Пульс · возможности показаны сеткой карточек, а их много',
         cards.length === opps.length, cards.length + ' из ' + opps.length);
       const first = cards[0];
+      /* Порядок частей — как в судебном акте: резолютивная часть впереди, мотивировочная
+         ниже и под свёрткой. Её читает тот, кто сомневается, а не каждый, кто пробегает
+         список. В свёрнутом виде видна одна самая сильная строка: закрытая дверь без единого
+         доказательства оставляет число висеть неподтверждённым. */
+      {
+        const kids = first ? [].slice.call(first.children).map((e) => e.className.split(' ')[0]) : [];
+        check('Пульс · что предложить стоит выше основания, а не под ним',
+          kids.indexOf('opp-plan') >= 0 && kids.indexOf('opp-basis') > kids.indexOf('opp-plan'),
+          kids.join(' → '));
+        const det = first && first.querySelector('details.opp-basis');
+        check('Пульс · основание свёрнуто и раскрывается без скриптов',
+          !!det && det.tagName === 'DETAILS' && !det.hasAttribute('open') && !!det.querySelector('summary'),
+          det ? 'открыто=' + det.hasAttribute('open') : 'свёртки нет');
+        const sum = det && det.querySelector('summary');
+        check('Пульс · в свёрнутом виде видно число признаков и самый сильный из них',
+          !!sum && /\d+\s+признак/.test(sum.textContent) && !!sum.querySelector('i') &&
+          sum.querySelector('i').textContent.trim().length > 3,
+          sum ? sum.textContent.replace(/\s+/g, ' ').trim().slice(0, 80) : 'сводки нет');
+        /* На ЭКРАНЕ заголовком стоит именно сделка. Проверки выше читают заголовок из
+           данных и подмену в разметке пропускают: там можно вывести название разбора, и все
+           они останутся зелёными. */
+        const shown = first && first.querySelector('.opp-title');
+        const firstOpp = opps[0];
+        check('Пульс · на карточке заголовком стоит сделка, а не название разбора',
+          !!shown && !!firstOpp && shown.textContent.trim() === firstOpp.title &&
+          shown.textContent.trim() !== firstOpp.ruleLabel,
+          shown ? shown.textContent.trim() : 'заголовка нет');
+        /* Название разбора не пропало — оно стало ярлыком, а не оглавлением. */
+        const rule = first && first.querySelector('.opp-rule');
+        check('Пульс · название разбора осталось подписью, а не заголовком',
+          !!rule && /^разбор:/.test(rule.textContent.trim()),
+          rule ? rule.textContent.trim() : 'ярлыка нет');
+      }
       check('Пульс · карточка несёт все пять частей', !!first &&
         !!first.querySelector('.opp-rule') && !!first.querySelector('.opp-who') &&
         !!first.querySelector('.opp-why') && first.querySelectorAll('.opp-basis .opp-b').length >= 2 &&

@@ -1856,6 +1856,23 @@
     const fresh = list.filter((c) => used.indexOf(c.id) < 0);
     return (fresh.length ? fresh : list)[0] || null;
   }
+  /* Имя в заголовке стоит в падеже, которого требует глагол: «Показать Сергею Орлову», а не
+     «Показать Сергей Орлов». Формы записаны у клиента явно — склонять русские фамилии
+     алгоритмом значит гадать: «Орлов» и «Крылова» склоняются по-разному, а «Sarah Mansour»
+     не склоняется вовсе. Нет формы — берём именительный: заголовок станет корявым, но
+     не сломается, а проверка укажет, у кого её не заполнили. */
+  /* В заголовке объект называется так, как его называет брокер вслух: «Park Terrace JVC 903»,
+     а не «Park Terrace JVC, Unit 903». Запятая и слово «Unit» нужны в карточке объекта и в
+     письме клиенту; в строке, которую читают за секунду, они съедают шесть знаков из
+     семидесяти и ничего не добавляют. */
+  function oppShort(o) {
+    // Сокращается ТОЛЬКО «Unit»: «Park Terrace JVC, Unit 903» → «Park Terrace JVC 903»,
+    // номер читается сам. «Block 3» и «Tower B» — имена, а не номера: без слова «Block»
+    // остаётся «DIFC Gate Avenue 3», где тройка не значит ничего.
+    return String((o && o.name) || '').replace(/,\s*Unit\s+/i, ' ');
+  }
+  function cDat(c) { return (c && (c.nameDat || c.name)) || ''; }
+  function cGen(c) { return (c && (c.nameGen || c.name)) || ''; }
   function oppRoleWord(c) {
     return [CONTACT_KIND_LABEL[c.contactKind], CONTACT_INTEREST_LABEL[c.interest]].filter(Boolean).join(' · ');
   }
@@ -1910,7 +1927,8 @@
               act: 'Позвонить до окна уведомления и спросить о планах на следующий срок',
               value: Math.round((k.amount || 0) * LEASE_FEE_PCT / 100),
               valueNote: LEASE_FEE_PCT + '% годовой аренды · ставка агентства',
-              ask: 'сравни продление и переезд для ' + c.name + ' по бюджету текущей аренды',
+              title: 'Спросить ' + cGen(c) + ' о планах на новый срок аренды',
+            ask: 'сравни продление и переезд для ' + c.name + ' по бюджету текущей аренды',
             };
           }).filter(Boolean);
       } },
@@ -1959,6 +1977,7 @@
             offer: pick.name + ' — ' + pick.size + ' м², ' + pick.br + ', ' + pick.area,
             act: 'Позвонить сразу после ближайшего платежа и предложить смотреть второй юнит',
             value: oppComm(pick), valueNote: oppCommNote(pick),
+            title: 'Предложить ' + cDat(c) + ' второй юнит — ' + oppShort(pick),
             ask: 'подготовь сравнение второго юнита ' + pick.name + ' для ' + c.name,
             objId: pick.id,
           });
@@ -2004,6 +2023,7 @@
                 : 'Запросить у партнёров подборку в ' + best.район + ' и приложить сравнение доходности',
               value: c.budget ? Math.round(c.budget * DEFAULT_COMM_PCT / 100) : 0,
               valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + (c.budget ? WS.AED(c.budget) : ''),
+              title: 'Собрать ' + cDat(c) + ' подборку в ' + best.район,
               ask: 'сравни доходность ' + cur.район + ' и ' + best.район + ' для ' + c.name,
             };
           }).filter(Boolean);
@@ -2039,6 +2059,7 @@
             offer: o.name + ' — рассрочка застройщика до сдачи ' + o.handover,
             act: 'Показать план оплаты и назначить просмотр макета корпуса',
             value: oppComm(o), valueNote: oppCommNote(o),
+            title: 'Показать ' + cDat(c) + ' рассрочку по ' + oppShort(o),
             ask: 'собери расчёт рассрочки по ' + o.name + ' для ' + c.name,
             objId: o.id,
           });
@@ -2078,6 +2099,7 @@
               act: 'Взять согласие лично или формой на сайте — до него канал закрыт',
               value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
               valueNote: DEFAULT_COMM_PCT + '% от бюджета · считается после согласия',
+              title: 'Взять согласие на связь у ' + cGen(c),
               ask: 'что законно можно сделать по ' + c.name + ' без согласия на связь',
             };
           });
@@ -2113,6 +2135,7 @@
             offer: pick.name + ' целиком — ' + pick.size + ' м², ' + (pick.segment || ''),
             act: 'Назначить осмотр и запросить рент-ролл по действующим арендаторам',
             value: oppComm(pick), valueNote: oppCommNote(pick),
+            title: 'Показать ' + cDat(c) + ' ' + oppShort(pick) + ' целиком',
             ask: 'собери расчёт доходности по ' + pick.name + ' для ' + c.name,
             objId: pick.id,
           });
@@ -2147,6 +2170,7 @@
             act: 'Позвонить и сказать, что объект вернулся в рынок; предложить пересмотр',
             value: buy ? oppComm(o) : Math.round((d.amount || 0) * LEASE_FEE_PCT / 100),
             valueNote: buy ? oppCommNote(o) : LEASE_FEE_PCT + '% годовой аренды · ставка агентства',
+            title: 'Показать ' + cDat(c) + ' ' + oppShort(o) + ' снова' + (buy ? ' — теперь на покупку' : ''),
             ask: 'сравни аренду и покупку ' + o.name + ' для ' + c.name,
             objId: o.id,
           });
@@ -2178,6 +2202,7 @@
             offer: pick.name + ' — и сразу под то же управление, что и первый объект',
             act: 'Приложить к отчёту одностраничный расчёт по второму объекту',
             value: oppComm(pick), valueNote: oppCommNote(pick),
+            title: 'Вложить ' + oppShort(pick) + ' в отчёт ' + cDat(c),
             ask: 'посчитай доходность ' + pick.name + ' под управлением для ' + c.name,
             objId: pick.id,
           });
@@ -2217,6 +2242,7 @@
             act: 'Ответить в том же канале первым делом с утра — и сразу вариантом, а не вопросом',
             value: pick ? oppComm(pick) : Math.round((c.budget || 0) * DEFAULT_COMM_PCT / 100),
             valueNote: pick ? oppCommNote(pick) : DEFAULT_COMM_PCT + '% от названного бюджета',
+            title: 'Ответить ' + cDat(c) + ' и сразу дать вариант',
             ask: 'собери ответ на ночное обращение ' + c.name + ' с двумя вариантами',
             objId: pick ? pick.id : null,
           });
@@ -2273,6 +2299,9 @@
               : 'Переспросить про район словами клиента, переписать заявку и запросить подборку у партнёров',
             value: pick ? oppComm(pick) : Math.round((c.budget || 0) * DEFAULT_COMM_PCT / 100),
             valueNote: pick ? oppCommNote(pick) : DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget || 0),
+            title: pick
+              ? 'Показать ' + cDat(c) + ' ' + oppShort(pick) + ' — вне отклонённого района'
+              : 'Переписать заявку ' + cGen(c) + ': список районов устарел',
             ask: 'подбери вариант для ' + c.name + ' с учётом отказа: ' + bad.reason,
             objId: pick ? pick.id : null,
           });
@@ -2329,6 +2358,7 @@
               : '',
             value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
             valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget),
+            title: 'Показать ' + cDat(c) + ' расчёт «сегодня против конца горизонта»',
             ask: 'посчитай, как меняется выбор для ' + c.name + ' за ' + oppMonths(months) + ' при росте ' +
               m.изменениеЗаГодПроцент + '%',
           });
@@ -2373,6 +2403,7 @@
             valueNote: half
               ? 'половина от ' + DEFAULT_COMM_PCT + '% · сплит ' + p.split
               : DEFAULT_COMM_PCT + '% от бюджета · сплит по договорённости',
+            title: 'Запросить у ' + p.name + ' подборку в ' + area + ' для ' + cGen(c),
             ask: 'составь запрос партнёру ' + p.name + ' по ' + area + ' для ' + c.name,
           });
         });
@@ -2417,6 +2448,7 @@
             act: 'Позвонить ' + c.birthday + ' голосом; шаблонное сообщение этот повод тратит впустую',
             value: Math.round(ref.commission / ref.deals),
             valueNote: 'средняя комиссия сделки из канала «' + ref.source + '»',
+            title: 'Позвонить ' + cDat(c) + ' ' + c.birthday + ' и попросить об одном знакомстве',
             ask: 'подготовь разговор с ' + c.name + ' ко дню рождения с просьбой о знакомстве',
           });
         });
@@ -2481,13 +2513,23 @@
       : '<div class="opp-val none"><b>—</b><span>' + escAttr(p.valueNote || 'считается после оценки') + '</span></div>';
     const basis = (p.basis || []).map((b) =>
       '<div class="opp-b"><span class="k">' + escAttr(b[0]) + '</span><span class="v">' + escAttr(b[1]) + '</span></div>').join('');
+    /* Заголовок называет СДЕЛКУ, а не критерий, по которому она нашлась. «Бюджет совпал с
+       целым объектом» — это рубрика; агенту нужна новость: «Показать Сергею Орлову блок DIFC
+       целиком». Глагол — про НАШЕ действие, а не про исход: «Показать», а не «Продать», —
+       заголовок не обещает того, чего мы не контролируем. Название разбора остаётся, но
+       становится подписью-ярлыком: аргумент перестаёт быть оглавлением.
+
+       Порядок частей — как в судебном акте: сначала резолютивная часть (что предложить и
+       первый шаг), мотивировочная ниже и под свёрткой. Её читает тот, кто сомневается, а не
+       каждый, кто пробегает список. В свёрнутом виде видна ОДНА самая сильная строка: закрытая
+       дверь без единого доказательства оставляет число неподтверждённым. */
+    const strongest = (p.basis || [])[0];
     return '<article class="opp' + (p.tone ? ' t-' + p.tone : '') + '">' +
       '<header class="opp-h"><span class="opp-ic">' + I(p.icon) + '</span>' +
-      '<div class="opp-kind"><div class="opp-rule">' + escAttr(p.ruleLabel) + '</div>' +
-      '<div class="opp-who">' + escAttr(p.client) + (p.role ? ' · ' + escAttr(p.role) : '') + '</div></div>' +
+      '<div class="opp-kind"><div class="opp-title">' + escAttr(p.title || p.ruleLabel) + '</div>' +
+      '<div class="opp-who">' + escAttr(p.client) + (p.role ? ' · ' + escAttr(p.role) : '') + '</div>' +
+      '<div class="opp-rule">разбор: ' + escAttr(p.ruleLabel) + '</div></div>' +
       val + '</header>' +
-      '<p class="opp-why">' + escAttr(p.why) + '</p>' +
-      '<div class="opp-basis"><div class="opp-lbl">' + I('radar') + 'На чём основано</div>' + basis + '</div>' +
       '<div class="opp-plan">' +
       /* Названный объект — ссылка на его карточку. Брокер читает «Creek Rise, Unit 2703 ·
          1 880 000» и первым делом хочет посмотреть сам юнит; до сих пор это был просто текст,
@@ -2499,6 +2541,11 @@
         : '<span class="opp-t">' + escAttr(p.offer) + '</span>') + '</div>' +
       '<div class="opp-line"><span class="opp-lbl">' + I('arrowRight') + 'Первый шаг</span>' +
       '<span class="opp-t">' + escAttr(p.act) + '</span></div></div>' +
+      '<details class="opp-basis"><summary>' + I('radar') +
+      '<span>На чём основано · ' + (p.basis || []).length + ' ' +
+      plural((p.basis || []).length, 'признак', 'признака', 'признаков') + '</span>' +
+      (strongest ? '<i>' + escAttr(strongest[1]) + '</i>' : '') + I('chevDown') + '</summary>' +
+      '<p class="opp-why">' + escAttr(p.why) + '</p>' + basis + '</details>' +
       '<footer class="opp-f"><button class="btn sm primary" data-client="' + p.clientId + '">' +
       I('users') + 'Открыть контакт</button>' +
       '<button class="btn sm" data-cgask="' + escAttr(p.ask || p.act) + '">' + I('sparkle') + 'Поручить Консьержу</button>' +
@@ -12022,7 +12069,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

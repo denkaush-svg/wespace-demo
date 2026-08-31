@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 14:18</title>
+  <title>WESPACE · сборка 16:16</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='14:18';
+    window.WS_BUILD='16:16';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -943,7 +943,10 @@ button { font-family: inherit; cursor: pointer; }
    «На чём основано» — таблица «признак → значение», а не строка серых чипов. Чипы читаются
    как украшение; это единственная часть карточки, которую агент проверяет глазами, прежде
    чем повторить клиенту, и она обязана читаться как выписка, а не как теги. */
-.opps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+/* Карточка возможности теперь начинается с предложения-заголовка, а заголовок — это фраза.
+   При двух колонках в разделе шириной 689 она ломалась на четыре строки. Порог поднят: на
+   ноутбуке колонка одна и заголовок читается строкой, на широком мониторе снова две. */
+.opps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
 .opp { display: flex; flex-direction: column; gap: 11px; min-width: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
 .opp-h { display: flex; align-items: flex-start; gap: 10px; }
@@ -951,19 +954,34 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--acc-soft); color: var(--acc); }
 .opp-ic svg { width: 15px; height: 15px; }
 .opp-kind { min-width: 0; flex: 1 1 auto; }
-.opp-rule { font-size: 12.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.opp-title { font-size: 13.5px; font-weight: 750; color: var(--ink); line-height: 1.3; }
 .opp-who { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+/* Название разбора — ярлык, а не оглавление: аргумент, по которому возможность нашлась. */
+.opp-rule { font-size: 10.5px; color: var(--faint); margin-top: 3px; }
 .opp-val { flex: none; text-align: right; }
 .opp-val b { display: block; font-size: 15px; font-weight: 800; color: var(--acc-ink); white-space: nowrap; }
-.opp-val span { display: block; font-size: 10.5px; color: var(--faint); margin-top: 1px; max-width: 130px; }
+.opp-val span { display: block; font-size: 10.5px; color: var(--faint); margin-top: 1px; max-width: 118px; }
 /* Возможность без числа не притворяется нулевой: прочерк и условие, при котором число появится. */
 .opp-val.none b { color: var(--faint); }
 .opp-why { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
 .opp-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
 .opp-lbl svg { width: 12px; height: 12px; }
-.opp-basis { border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: var(--surface-2); }
-.opp-basis .opp-lbl { margin-bottom: 7px; }
+/* Основание свёрнуто: его читает тот, кто сомневается. В свёрнутом виде видна одна самая
+   сильная строка — закрытая дверь без единого доказательства оставляет число висеть. */
+.opp-basis { border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); }
+.opp-basis > summary { cursor: pointer; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 9px 12px; list-style: none; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--faint); }
+.opp-basis > summary::-webkit-details-marker { display: none; }
+.opp-basis > summary svg { width: 12px; height: 12px; flex: none; }
+.opp-basis > summary > svg:last-child { margin-left: auto; transition: transform .18s ease; }
+.opp-basis[open] > summary > svg:last-child { transform: rotate(180deg); }
+.opp-basis > summary i { flex: 1 1 100%; font-style: normal; font-size: 11px; font-weight: 600;
+  letter-spacing: 0; text-transform: none; color: var(--ink); }
+.opp-basis > .opp-why { margin: 0; padding: 0 12px 8px; }
+.opp-basis > .opp-b { margin: 0 12px; }
+.opp-basis > .opp-b:last-child { margin-bottom: 11px; }
 .opp-b { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); }
 .opp-b:first-of-type { border-top: 0; padding-top: 0; }
 .opp-b .k { flex: 0 0 40%; font-size: 11px; color: var(--mut); }
@@ -3466,7 +3484,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
 
   const clients = [
     {
-      id: 'c_anna', name: 'Анна Петрова', tag: 'main', lang: 'RU', channel: 'whatsapp',
+      id: 'c_anna', name: 'Анна Петрова', nameDat: 'Анне Петровой', nameGen: 'Анны Петровой', tag: 'main', lang: 'RU', channel: 'whatsapp',
       // Тип клиента — правило движка поводов («инвестор покупает раз в год»), а не ярлык.
       ctype: 'investor', birthday: '18 мая',
       contactKind: 'buyer', interest: 'invest', objTypes: ['apart'],
@@ -3481,15 +3499,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         triggers: ['График первого платежа', 'Подтверждённая доходность'], bestTime: 'Будни, вечер',
         source: 'выведено из переписки G1–G3 (сигналы стиля)' },
     },
-    { id: 'c_lead15', name: 'Дмитрий Соколов', tag: 's15', lang: 'RU', channel: 'telegram', consent: true, consentAt: '28 мая 2025', consentUntil: '28 мая 2026', ctype: 'investor',
+    { id: 'c_lead15', name: 'Дмитрий Соколов', nameDat: 'Дмитрию Соколову', nameGen: 'Дмитрия Соколова', tag: 's15', lang: 'RU', channel: 'telegram', consent: true, consentAt: '28 мая 2025', consentUntil: '28 мая 2026', ctype: 'investor',
       contactKind: 'buyer', interest: 'invest', objTypes: ['apart'],
       goal: 'Инвестиционная квартира до 1,5 млн', budget: 1500000, areas: ['Дубай — район не указан'], horizon: 'не указан',
       note: 'Новый неквалифицированный лид. «Ищу инвестиционную квартиру в Дубае до 1,5 млн».', phone: '+971 52 •••• ••11 (DEMO)' },
-    { id: 'c_night', name: 'Sarah Mansour', tag: 's14', lang: 'EN', channel: 'whatsapp', consent: true, consentAt: '14 мая 2026', consentUntil: '14 мая 2027', ctype: 'investor',
+    { id: 'c_night', name: 'Sarah Mansour', nameDat: 'Sarah Mansour', nameGen: 'Sarah Mansour', tag: 's14', lang: 'EN', channel: 'whatsapp', consent: true, consentAt: '14 мая 2026', consentUntil: '14 мая 2027', ctype: 'investor',
       contactKind: 'buyer', interest: 'rent', objTypes: ['apart'],
       goal: 'Квартира 1BR под аренду', budget: 1300000, areas: ['JVC', 'Business Bay'], horizon: '2–4 месяца',
       note: 'Ночное входящее в 02:14. Ожидает агента.', phone: '+971 50 •••• ••77 (DEMO)' },
-    { id: 'c_overdue', name: 'Игорь Лебедев', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true, consentAt: '02 мая 2026', consentUntil: '02 мая 2027', ctype: 'investor',
+    { id: 'c_overdue', name: 'Игорь Лебедев', nameDat: 'Игорю Лебедеву', nameGen: 'Игоря Лебедева', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true, consentAt: '02 мая 2026', consentUntil: '02 мая 2027', ctype: 'investor',
       contactKind: 'buyer', interest: 'invest', objTypes: ['apart'],
       goal: 'Апартаменты под перепродажу', budget: 2400000, areas: ['Business Bay'], horizon: '1–2 месяца',
       note: 'Просроченное касание (обещали КП 12 мая).', phone: '+971 55 •••• ••02 (DEMO)',
@@ -3498,23 +3516,23 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         channel: 'WhatsApp + звонок; любит голосовые', tone: 'Коротко, с эксклюзивом и срочностью',
         triggers: ['Эксклюзив/закрытый доступ', 'Ограниченность предложения'], bestTime: 'Утро',
         source: 'выведено из истории касаний (сигналы стиля)' } },
-    { id: 'c_noconsent', name: 'Марат Ибрагимов', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false, ctype: 'enduser',
+    { id: 'c_noconsent', name: 'Марат Ибрагимов', nameDat: 'Марату Ибрагимову', nameGen: 'Марата Ибрагимова', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false, ctype: 'enduser',
       contactKind: 'buyer', interest: 'live', objTypes: ['apart'],
       goal: 'Квартира у воды', budget: 1800000, areas: ['Dubai Creek Harbour'], horizon: '3–6 месяцев',
       note: 'Нет действующего согласия — исключается из адресных отправок.', phone: '+971 54 •••• ••90 (DEMO)' },
-    { id: 'c_ambig', name: 'Елена Крылова', tag: 'g3', lang: 'RU', channel: 'call', consent: true, consentAt: '21 февраля 2026', consentUntil: '21 февраля 2027', ctype: 'owner',
+    { id: 'c_ambig', name: 'Елена Крылова', nameDat: 'Елене Крыловой', nameGen: 'Елены Крыловой', tag: 'g3', lang: 'RU', channel: 'call', consent: true, consentAt: '21 февраля 2026', consentUntil: '21 февраля 2027', ctype: 'owner',
       contactKind: 'owner', interest: 'office', objTypes: ['office'],
       goal: 'Офис под сдачу после отделки', budget: 2100000, areas: ['Business Bay'], horizon: '1–3 месяца',
       note: 'Две активные сделки — неоднозначная привязка заметки в G3.', phone: '+971 56 •••• ••45 (DEMO)' },
-    { id: 'c_docs', name: 'Виктор Орлов', tag: 's4', lang: 'RU', channel: 'email', consent: true, consentAt: '06 апреля 2026', consentUntil: '06 апреля 2027', ctype: 'enduser',
+    { id: 'c_docs', name: 'Виктор Орлов', nameDat: 'Виктору Орлову', nameGen: 'Виктора Орлова', tag: 's4', lang: 'RU', channel: 'email', consent: true, consentAt: '06 апреля 2026', consentUntil: '06 апреля 2027', ctype: 'enduser',
       contactKind: 'buyer', interest: 'invest', objTypes: ['apart'],
       goal: 'Квартира у воды под инвестицию', budget: 1950000, areas: ['Dubai Creek Harbour', 'DIFC'], horizon: '1–3 месяца',
       note: 'Документ в подготовке (S4).', phone: '+971 55 •••• ••28 (DEMO)' },
-    { id: 'c_partner', name: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true, consentAt: '30 марта 2026', consentUntil: '30 марта 2027', ctype: 'investor',
+    { id: 'c_partner', name: 'Karim Aziz', nameDat: 'Karim Aziz', nameGen: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true, consentAt: '30 марта 2026', consentUntil: '30 марта 2027', ctype: 'investor',
       contactKind: 'buyer', interest: 'live', objTypes: ['apart'],
       goal: 'Резиденция в Downtown для семьи', budget: 2600000, areas: ['Downtown'], horizon: '1–2 месяца',
       note: 'Требуется подключение клубного партнёра (S6).', phone: '+971 50 •••• ••63 (DEMO)' },
-    { id: 'c_owner', name: 'Сергей Орлов', tag: 'own', lang: 'RU', channel: 'email', consent: true, consentAt: '09 мая 2026', consentUntil: '09 мая 2027', ctype: 'owner',
+    { id: 'c_owner', name: 'Сергей Орлов', nameDat: 'Сергею Орлову', nameGen: 'Сергея Орлова', tag: 'own', lang: 'RU', channel: 'email', consent: true, consentAt: '09 мая 2026', consentUntil: '09 мая 2027', ctype: 'owner',
       contactKind: 'owner', interest: 'develop', objTypes: ['office', 'gab'],
       goal: 'Реализовать офисный блок в DIFC', budget: 12000000, areas: ['DIFC'], horizon: '3–6 месяцев',
       note: 'Управляющий портфелем Altura Capital. Собственник со стороны продажи — отдаёт блок на эксклюзив.',
@@ -9456,6 +9474,23 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const fresh = list.filter((c) => used.indexOf(c.id) < 0);
     return (fresh.length ? fresh : list)[0] || null;
   }
+  /* Имя в заголовке стоит в падеже, которого требует глагол: «Показать Сергею Орлову», а не
+     «Показать Сергей Орлов». Формы записаны у клиента явно — склонять русские фамилии
+     алгоритмом значит гадать: «Орлов» и «Крылова» склоняются по-разному, а «Sarah Mansour»
+     не склоняется вовсе. Нет формы — берём именительный: заголовок станет корявым, но
+     не сломается, а проверка укажет, у кого её не заполнили. */
+  /* В заголовке объект называется так, как его называет брокер вслух: «Park Terrace JVC 903»,
+     а не «Park Terrace JVC, Unit 903». Запятая и слово «Unit» нужны в карточке объекта и в
+     письме клиенту; в строке, которую читают за секунду, они съедают шесть знаков из
+     семидесяти и ничего не добавляют. */
+  function oppShort(o) {
+    // Сокращается ТОЛЬКО «Unit»: «Park Terrace JVC, Unit 903» → «Park Terrace JVC 903»,
+    // номер читается сам. «Block 3» и «Tower B» — имена, а не номера: без слова «Block»
+    // остаётся «DIFC Gate Avenue 3», где тройка не значит ничего.
+    return String((o && o.name) || '').replace(/,\s*Unit\s+/i, ' ');
+  }
+  function cDat(c) { return (c && (c.nameDat || c.name)) || ''; }
+  function cGen(c) { return (c && (c.nameGen || c.name)) || ''; }
   function oppRoleWord(c) {
     return [CONTACT_KIND_LABEL[c.contactKind], CONTACT_INTEREST_LABEL[c.interest]].filter(Boolean).join(' · ');
   }
@@ -9510,7 +9545,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
               act: 'Позвонить до окна уведомления и спросить о планах на следующий срок',
               value: Math.round((k.amount || 0) * LEASE_FEE_PCT / 100),
               valueNote: LEASE_FEE_PCT + '% годовой аренды · ставка агентства',
-              ask: 'сравни продление и переезд для ' + c.name + ' по бюджету текущей аренды',
+              title: 'Спросить ' + cGen(c) + ' о планах на новый срок аренды',
+            ask: 'сравни продление и переезд для ' + c.name + ' по бюджету текущей аренды',
             };
           }).filter(Boolean);
       } },
@@ -9559,6 +9595,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             offer: pick.name + ' — ' + pick.size + ' м², ' + pick.br + ', ' + pick.area,
             act: 'Позвонить сразу после ближайшего платежа и предложить смотреть второй юнит',
             value: oppComm(pick), valueNote: oppCommNote(pick),
+            title: 'Предложить ' + cDat(c) + ' второй юнит — ' + oppShort(pick),
             ask: 'подготовь сравнение второго юнита ' + pick.name + ' для ' + c.name,
             objId: pick.id,
           });
@@ -9604,6 +9641,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
                 : 'Запросить у партнёров подборку в ' + best.район + ' и приложить сравнение доходности',
               value: c.budget ? Math.round(c.budget * DEFAULT_COMM_PCT / 100) : 0,
               valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + (c.budget ? WS.AED(c.budget) : ''),
+              title: 'Собрать ' + cDat(c) + ' подборку в ' + best.район,
               ask: 'сравни доходность ' + cur.район + ' и ' + best.район + ' для ' + c.name,
             };
           }).filter(Boolean);
@@ -9639,6 +9677,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             offer: o.name + ' — рассрочка застройщика до сдачи ' + o.handover,
             act: 'Показать план оплаты и назначить просмотр макета корпуса',
             value: oppComm(o), valueNote: oppCommNote(o),
+            title: 'Показать ' + cDat(c) + ' рассрочку по ' + oppShort(o),
             ask: 'собери расчёт рассрочки по ' + o.name + ' для ' + c.name,
             objId: o.id,
           });
@@ -9678,6 +9717,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
               act: 'Взять согласие лично или формой на сайте — до него канал закрыт',
               value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
               valueNote: DEFAULT_COMM_PCT + '% от бюджета · считается после согласия',
+              title: 'Взять согласие на связь у ' + cGen(c),
               ask: 'что законно можно сделать по ' + c.name + ' без согласия на связь',
             };
           });
@@ -9713,6 +9753,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             offer: pick.name + ' целиком — ' + pick.size + ' м², ' + (pick.segment || ''),
             act: 'Назначить осмотр и запросить рент-ролл по действующим арендаторам',
             value: oppComm(pick), valueNote: oppCommNote(pick),
+            title: 'Показать ' + cDat(c) + ' ' + oppShort(pick) + ' целиком',
             ask: 'собери расчёт доходности по ' + pick.name + ' для ' + c.name,
             objId: pick.id,
           });
@@ -9747,6 +9788,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             act: 'Позвонить и сказать, что объект вернулся в рынок; предложить пересмотр',
             value: buy ? oppComm(o) : Math.round((d.amount || 0) * LEASE_FEE_PCT / 100),
             valueNote: buy ? oppCommNote(o) : LEASE_FEE_PCT + '% годовой аренды · ставка агентства',
+            title: 'Показать ' + cDat(c) + ' ' + oppShort(o) + ' снова' + (buy ? ' — теперь на покупку' : ''),
             ask: 'сравни аренду и покупку ' + o.name + ' для ' + c.name,
             objId: o.id,
           });
@@ -9778,6 +9820,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             offer: pick.name + ' — и сразу под то же управление, что и первый объект',
             act: 'Приложить к отчёту одностраничный расчёт по второму объекту',
             value: oppComm(pick), valueNote: oppCommNote(pick),
+            title: 'Вложить ' + oppShort(pick) + ' в отчёт ' + cDat(c),
             ask: 'посчитай доходность ' + pick.name + ' под управлением для ' + c.name,
             objId: pick.id,
           });
@@ -9817,6 +9860,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             act: 'Ответить в том же канале первым делом с утра — и сразу вариантом, а не вопросом',
             value: pick ? oppComm(pick) : Math.round((c.budget || 0) * DEFAULT_COMM_PCT / 100),
             valueNote: pick ? oppCommNote(pick) : DEFAULT_COMM_PCT + '% от названного бюджета',
+            title: 'Ответить ' + cDat(c) + ' и сразу дать вариант',
             ask: 'собери ответ на ночное обращение ' + c.name + ' с двумя вариантами',
             objId: pick ? pick.id : null,
           });
@@ -9873,6 +9917,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
               : 'Переспросить про район словами клиента, переписать заявку и запросить подборку у партнёров',
             value: pick ? oppComm(pick) : Math.round((c.budget || 0) * DEFAULT_COMM_PCT / 100),
             valueNote: pick ? oppCommNote(pick) : DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget || 0),
+            title: pick
+              ? 'Показать ' + cDat(c) + ' ' + oppShort(pick) + ' — вне отклонённого района'
+              : 'Переписать заявку ' + cGen(c) + ': список районов устарел',
             ask: 'подбери вариант для ' + c.name + ' с учётом отказа: ' + bad.reason,
             objId: pick ? pick.id : null,
           });
@@ -9929,6 +9976,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
               : '',
             value: Math.round(c.budget * DEFAULT_COMM_PCT / 100),
             valueNote: DEFAULT_COMM_PCT + '% от бюджета ' + WS.AED(c.budget),
+            title: 'Показать ' + cDat(c) + ' расчёт «сегодня против конца горизонта»',
             ask: 'посчитай, как меняется выбор для ' + c.name + ' за ' + oppMonths(months) + ' при росте ' +
               m.изменениеЗаГодПроцент + '%',
           });
@@ -9973,6 +10021,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             valueNote: half
               ? 'половина от ' + DEFAULT_COMM_PCT + '% · сплит ' + p.split
               : DEFAULT_COMM_PCT + '% от бюджета · сплит по договорённости',
+            title: 'Запросить у ' + p.name + ' подборку в ' + area + ' для ' + cGen(c),
             ask: 'составь запрос партнёру ' + p.name + ' по ' + area + ' для ' + c.name,
           });
         });
@@ -10017,6 +10066,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             act: 'Позвонить ' + c.birthday + ' голосом; шаблонное сообщение этот повод тратит впустую',
             value: Math.round(ref.commission / ref.deals),
             valueNote: 'средняя комиссия сделки из канала «' + ref.source + '»',
+            title: 'Позвонить ' + cDat(c) + ' ' + c.birthday + ' и попросить об одном знакомстве',
             ask: 'подготовь разговор с ' + c.name + ' ко дню рождения с просьбой о знакомстве',
           });
         });
@@ -10081,13 +10131,23 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       : '<div class="opp-val none"><b>—</b><span>' + escAttr(p.valueNote || 'считается после оценки') + '</span></div>';
     const basis = (p.basis || []).map((b) =>
       '<div class="opp-b"><span class="k">' + escAttr(b[0]) + '</span><span class="v">' + escAttr(b[1]) + '</span></div>').join('');
+    /* Заголовок называет СДЕЛКУ, а не критерий, по которому она нашлась. «Бюджет совпал с
+       целым объектом» — это рубрика; агенту нужна новость: «Показать Сергею Орлову блок DIFC
+       целиком». Глагол — про НАШЕ действие, а не про исход: «Показать», а не «Продать», —
+       заголовок не обещает того, чего мы не контролируем. Название разбора остаётся, но
+       становится подписью-ярлыком: аргумент перестаёт быть оглавлением.
+
+       Порядок частей — как в судебном акте: сначала резолютивная часть (что предложить и
+       первый шаг), мотивировочная ниже и под свёрткой. Её читает тот, кто сомневается, а не
+       каждый, кто пробегает список. В свёрнутом виде видна ОДНА самая сильная строка: закрытая
+       дверь без единого доказательства оставляет число неподтверждённым. */
+    const strongest = (p.basis || [])[0];
     return '<article class="opp' + (p.tone ? ' t-' + p.tone : '') + '">' +
       '<header class="opp-h"><span class="opp-ic">' + I(p.icon) + '</span>' +
-      '<div class="opp-kind"><div class="opp-rule">' + escAttr(p.ruleLabel) + '</div>' +
-      '<div class="opp-who">' + escAttr(p.client) + (p.role ? ' · ' + escAttr(p.role) : '') + '</div></div>' +
+      '<div class="opp-kind"><div class="opp-title">' + escAttr(p.title || p.ruleLabel) + '</div>' +
+      '<div class="opp-who">' + escAttr(p.client) + (p.role ? ' · ' + escAttr(p.role) : '') + '</div>' +
+      '<div class="opp-rule">разбор: ' + escAttr(p.ruleLabel) + '</div></div>' +
       val + '</header>' +
-      '<p class="opp-why">' + escAttr(p.why) + '</p>' +
-      '<div class="opp-basis"><div class="opp-lbl">' + I('radar') + 'На чём основано</div>' + basis + '</div>' +
       '<div class="opp-plan">' +
       /* Названный объект — ссылка на его карточку. Брокер читает «Creek Rise, Unit 2703 ·
          1 880 000» и первым делом хочет посмотреть сам юнит; до сих пор это был просто текст,
@@ -10099,6 +10159,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         : '<span class="opp-t">' + escAttr(p.offer) + '</span>') + '</div>' +
       '<div class="opp-line"><span class="opp-lbl">' + I('arrowRight') + 'Первый шаг</span>' +
       '<span class="opp-t">' + escAttr(p.act) + '</span></div></div>' +
+      '<details class="opp-basis"><summary>' + I('radar') +
+      '<span>На чём основано · ' + (p.basis || []).length + ' ' +
+      plural((p.basis || []).length, 'признак', 'признака', 'признаков') + '</span>' +
+      (strongest ? '<i>' + escAttr(strongest[1]) + '</i>' : '') + I('chevDown') + '</summary>' +
+      '<p class="opp-why">' + escAttr(p.why) + '</p>' + basis + '</details>' +
       '<footer class="opp-f"><button class="btn sm primary" data-client="' + p.clientId + '">' +
       I('users') + 'Открыть контакт</button>' +
       '<button class="btn sm" data-cgask="' + escAttr(p.ask || p.act) + '">' + I('sparkle') + 'Поручить Консьержу</button>' +
@@ -19622,7 +19687,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
