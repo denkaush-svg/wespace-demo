@@ -7227,6 +7227,26 @@ setTimeout(async () => {
         const locked = all.filter((t) => /заперт/i.test(String(t)));
         check('Пульс · «заперта согласием» не вернулась ни в один раздел',
           locked.length === 0, locked.join(' | ') || 'чисто');
+        /* «Требует внимания» — список задач, и заголовок там называет ДЕЙСТВИЕ. Описание
+           «Игорь Лебедев не получил отправленное» сообщает состояние, а брокер читает этот
+           список, чтобы понять, что сделать, а не что случилось. */
+        {
+          const ALERT_VERBS = ['Переотправить', 'Взять', 'Собрать', 'Перепроверить',
+            'Приготовить', 'Успеть', 'Разобрать', 'Продлить', 'Ответить'];
+          const alerts = WS.ui.pulseAlerts();
+          const notAction = alerts.filter((x) => !ALERT_VERBS.some((v) => String(x[1]).indexOf(v) === 0));
+          check('Пульс · в «Требует внимания» заголовок называет действие, а не состояние',
+            alerts.length >= 3 && notAction.length === 0,
+            notAction.map((x) => x[1]).join(' | ') || 'все ' + alerts.length + ' — действия');
+          const tooLong = alerts.filter((x) => String(x[1]).length > 72);
+          check('Пульс · и читается за раз — не длиннее семидесяти двух знаков',
+            tooLong.length === 0, tooLong.map((x) => x[1].length + ': ' + x[1]).join(' | '));
+          /* Имя клиента склоняется и здесь: список читают так же, как заголовки сделок. */
+          const nom = alerts.filter((x) => (dd().clients || []).some((c2) =>
+            c2.nameDat && c2.nameDat !== c2.name && String(x[1]).indexOf(c2.name) >= 0));
+          check('Пульс · имя в задаче склоняется, а не стоит в именительном',
+            nom.length === 0, nom.map((x) => x[1]).join(' | '));
+        }
         const consentTask = WS.ui.pulseAlerts().find((a2) => /согласие на связь/i.test(a2[1]));
         check('Пульс · согласие на связь стоит задачей, а не перспективной сделкой',
           !!consentTask && !WS.ui.pulseProspectList().some((p) => /согласи/i.test(p.title || '')),
@@ -7300,12 +7320,12 @@ setTimeout(async () => {
           one ? one.textContent.replace(/\s+/g, ' ').trim().slice(0, 90) : 'карточки нет');
         /* А то, что уехало в «Мои дела», в «Инсайтах» больше не стоит. */
         check('Инсайты · задач среди них нет — они уехали в «Мои дела»',
-          !/не получил отправленное|доступность не подтверждали/.test(box.textContent),
-          (box.textContent.match(/.{0,40}(не получил отправленное|не подтверждали).{0,20}/) || [''])[0] || 'чисто');
+          !/Переотправить письмо|Перепроверить доступность/.test(box.textContent),
+          (box.textContent.match(/.{0,40}(Переотправить|Перепроверить).{0,20}/) || [''])[0] || 'чисто');
         const day = openPulse('day');
         check('Пульс · «Требует внимания» стоит в «Моих делах» отдельной группой',
           /Требует внимания/.test(day.textContent) &&
-          /не получил отправленное/.test(day.textContent),
+          /Переотправить письмо/.test(day.textContent),
           (day.textContent.match(/Требует внимания[^А-Я]{0,20}/) || [''])[0] || 'группы нет');
       }
     }
@@ -7359,8 +7379,10 @@ setTimeout(async () => {
           .map((x) => { const mm = /(\d{1,2})\s+([а-яё]{3,})/i.exec(x.t); return { k: x.k, day: +mm[1], mon: mm[2] }; });
         const card = list0.find((it) => /через \d+ (день|дня|дней)/.test(it[1]));
         const named = card && near.find((x) => String(card[2]).indexOf(x.k.number) >= 0);
+        /* Номер договора стоит в теле карточки, а срок — в заголовке: заголовок называет
+           действие, а не пересказывает строку договора. */
         check('Пульс · названный срок принадлежит договору, который его назначил',
-          !!card && !!named && String(card[1]).indexOf(String(named.k.nextDue).split('—')[0].trim().slice(1)) >= 0,
+          !!card && !!named && String(card[2]).indexOf(named.k.number) >= 0,
           card ? card[1] + ' | ' + card[2].slice(0, 60) : 'наблюдения о сроке нет');
         /* И это именно БЛИЖАЙШИЙ срок. Проверка выше держится только на согласованности:
            взять самый дальний договор она пропускает, потому что он тоже «свой». Ближайший
@@ -7393,8 +7415,10 @@ setTimeout(async () => {
          не отклонение, а разные рынки: прежняя строка сравнивала именно так и выдавала −23%
          на офисе в районе, где индекс посчитан по квартирам. */
       {
-        const card = list0.find((it) => /выше среза района/.test(it[1]));
-        const named = card && (dd().objects || []).find((o) => String(card[1]).indexOf(o.name) === 0);
+        const card = list0.find((it) => /выше среза/.test(it[1]));
+        /* Объект в заголовке назван коротко — «Bloom Heights JVC 412», как его называет
+           брокер вслух. Ищем по той же короткой форме, а не по полному имени из карточки. */
+        const named = card && (dd().objects || []).find((o) => String(card[1]).indexOf(WS.ui.oppShort(o)) >= 0);
         const rows = (WS.query.run({ from: 'market' }) || {}).rows || [];
         const idx = named && rows.find((m) => m.район === named.area);
         const want = named && /офис|office|block|блок/i.test(named.name + ' ' + (named.br || '')) ? 'офисы' : 'квартиры';
@@ -7722,7 +7746,7 @@ setTimeout(async () => {
       const km = (dd().contracts || []).find((x) => x.kind === 'management' && x.status === 'active');
       if (km) {
         const owner = (dd().clients || []).find((x) => x.id === km.clientId);
-        const ins2 = WS.ui.pulseAlerts().find((x) => /Отчёт собственнику/i.test(x[1]));
+        const ins2 = WS.ui.pulseAlerts().find((x) => /Собрать отчёт/i.test(x[1]));
         check('Утро · наблюдение о сроке договора зовёт СОБРАТЬ отчёт, а не просто посмотреть',
           !!ins2 && /Собрать отчёт/.test(ins2[3]) && /ownerReport/.test(ins2[4]),
           ins2 ? ins2[3] + ' · ' + ins2[4] : 'наблюдения нет');

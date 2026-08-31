@@ -735,7 +735,8 @@
       const c = i.clientId ? oppClient(i.clientId) : null;
       const hot = c && (D().requests || []).find((r) => r.clientId === c.id && r.temperature === 'hot');
       const late = c && (D().tasks || []).find((t) => t.clientId === c.id && t.when === 'overdue' && t.status !== 'done');
-      out.push(['warn', (c ? c.name : 'Адресат') + ' не получил отправленное',
+      out.push(['warn', c ? 'Переотправить письмо ' + cDat(c) + ' — адрес его отклонил'
+        : 'Разобрать недоставленное письмо во «Входящих»',
         String(i.text || 'Отправка отклонена адресом.') +
         (hot ? ' У клиента горячая заявка «' + hot.title + '».' : '') +
         (late ? ' И просроченная задача: «' + late.title + '».' : '') +
@@ -772,7 +773,10 @@
       const k = due.k;
       const what = String(k.nextDue).split('—')[0].trim();
       const c = oppClient(k.clientId);
-      out.push(['clock', what.charAt(0).toUpperCase() + what.slice(1) + ' — через ' + oppDays(due.left),
+      out.push(['clock',
+        k.kind === 'management' && c
+          ? 'Собрать отчёт ' + cDat(c) + ' — срок через ' + oppDays(due.left)
+          : 'Успеть к сроку по договору ' + k.number + ' — ' + what + ' через ' + oppDays(due.left),
         contractKind(k).label + ' ' + k.number +
         (k.amount ? ' · ' + WS.AED(k.amount) + ' в год' : '') + (c ? ' · ' + c.name : '') +
         '. Срок назван в самом договоре — передоговариваться о нём не с кем.',
@@ -790,7 +794,7 @@
       const o = stale.o;
       const inDeal = (D().deals || []).find((d) => !dealClosed(d) && !dealArchived(d) &&
         (d.objectId === o.id || (d.lots || []).indexOf(o.id) >= 0));
-      out.push(['shield', o.name + ' — доступность не подтверждали ' + oppDays(stale.age),
+      out.push(['shield', 'Перепроверить доступность ' + oppShort(o) + ' — ' + oppDays(stale.age) + ' без проверки',
         'Проверено ' + o.checkedAt + (o.availability === 'stale' ? ', статус «под вопросом»' : '') + '. ' +
         (inDeal ? 'По объекту уже идёт сделка «' + inDeal.title + '» — если он ушёл, это узнается на подписании.'
           : 'Предложение по неподтверждённому объекту разваливается на первом звонке владельцу.'),
@@ -804,7 +808,8 @@
       .sort((a, b) => (a.st.days || 0) - (b.st.days || 0))[0];
     if (soon) {
       const c = soon.c, expired = soon.st.state === 'expired';
-      out.push(['lock', c.name + (expired ? ' — срок согласия истёк' : ' — согласие истекает через ' + oppDays(soon.st.days)),
+      out.push(['lock', 'Взять новое согласие у ' + cGen(c) +
+        (expired ? ' — срок истёк' : ' — истекает через ' + oppDays(soon.st.days)),
         'Согласие от ' + (c.consentAt || '—') + ', действует до ' + (c.consentUntil || '—') + '. ' +
         (expired
           ? 'Адресные отправки этому клиенту уже заблокированы — и это не отказ, а истёкший срок.'
@@ -817,7 +822,7 @@
       .sort((a, b) => b.dv.pct - a.dv.pct)[0];
     if (over) {
       const o = over.o, dv = over.dv;
-      out.push(['trend', o.name + ' — на ' + dv.pct + '% выше среза района',
+      out.push(['trend', 'Приготовить ответ по цене ' + oppShort(o) + ' — на ' + dv.pct + '% выше среза',
         WS.AED(dv.per) + ' за м² против ' + WS.AED(dv.idx) + ' по срезу ' + dv.area +
         '. Разницу спросят на первом же сравнении — ответ лучше иметь до отправки, а не после.',
         'Открыть объект', 'data-obj="' + o.id + '"']);
