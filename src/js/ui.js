@@ -3131,22 +3131,28 @@
     });
     const prospClients = Object.keys(prospBest).length;
     const prospSum = Object.keys(prospBest).reduce((a, k) => a + prospBest[k], 0);
+    /* Раскладка Пульса. Было: шапка 262 + строка утра 61 + цели 264 — и только с 637-го
+       пикселя начинались вкладки, при высоте окна 840. Три четверти первого экрана уходило
+       на подводку, а содержимое раздела начиналось за краем видимого.
+
+       Стало — «боковая колонка и содержимое», один из самых старых оконных паттернов: всё,
+       что должно быть видно всегда, уходит в узкую колонку слева, а не ложится сверху
+       поперёк экрана. В колонке — корешки разделов и под ними цели: место под четырьмя
+       корешками всё равно пустовало. Цели остаются на виду с любого раздела, как и просил
+       партнёр, но перестают резать экран пополам.
+
+       Строка утра уезжает в «Мои дела» первым блоком: срочное — это дело, а не подводка.
+       Сигнал наверху не теряется — на корешке «Мои дела» стоит красная точка. */
     return '<div class="start fadeup">' +
-      heroViz('pulse', 'Пульс', headline, { descBig: true }) +
-      /* Строка утра стоит ВЫШЕ строки Консьержа: она про то, что уже случилось и ждёт, а
-         Консьерж — про то, что брокер хочет поручить. Сначала долг, потом замысел. */
-      pulseMorningRow() +
-      /* Строка Консьержа с Пульса убрана: он вызывается вкладкой у правого края на широком
-         экране и стоит в нижней панели на узком. Два входа в одно место занимали сто десять
-         пикселей самого дорогого поля — первого экрана. */
-      pulseMyGoals() +
+      heroViz('pulse', 'Пульс', headline, { descBig: true, slim: true }) +
       pulseMoved() +
       (() => {
         const items = [
           { key: 'day', title: 'Мои дела', icon: 'check',
-            count: todayN + pulseAlerts().length, urgent: overdueN > 0 || pulseAlerts().length > 0,
+            count: todayN + pulseAlerts().length + inboxWaiting().length,
+            urgent: overdueN > 0 || pulseAlerts().length > 0 || inboxWaiting().length > 0,
             sub: 'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : '') + (pulseAlerts().length ? ' · требует внимания ' + pulseAlerts().length : ''),
-            body: () => pulseDay() + alertCards() + pulseNoNextStep() },
+            body: () => pulseMorningRow() + pulseDay() + alertCards() + pulseNoNextStep() },
           { key: 'prospects', title: 'Перспективные сделки', icon: 'target',
             count: prosp.length,
             sub: prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
@@ -3162,7 +3168,9 @@
             sub: 'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
             body: () => pulseAnalytics() },
         ];
-        return '<div class="psec">' + pulseNav(items) + pulseSectionBody(items) + '</div>';
+        return '<div class="psec">' +
+          '<div class="psec-side">' + pulseNav(items) + pulseMyGoals() + '</div>' +
+          pulseSectionBody(items) + '</div>';
       })() +
     '</div>';
   }
@@ -10681,11 +10689,14 @@
       '</div></div>';
   }
   // Themed vector hero visuals (offline, on-brand) for the two work surfaces.
+  /* Шапка умеет быть узкой. На Пульсе она не самостоятельная страница-обложка, а строка
+     заголовка: под ней сразу начинается работа, и 262 пикселя картинки — это четверть
+     первого экрана, отданная приветствию. На остальных экранах она прежняя. */
   function heroViz(kind, title, desc, opts) {
     opts = opts || {};
     const img = (WS.photos && (kind === 'pulse' ? WS.photos.viz_pulse : WS.photos.viz_concierge)) || '';
     const bg = img ? ' style="background-image:url(' + img + ')"' : '';
-    return '<div class="wh wh--photo"' + bg + '><div class="wh__c">' +
+    return '<div class="wh wh--photo' + (opts.slim ? ' wh--slim' : '') + '"' + bg + '><div class="wh__c">' +
       '<h1 class="wh__t">' + title + '</h1>' +
       '<div class="wh__p"' + (opts.descBig ? ' style="font-size:15px;font-weight:600;color:var(--ink);max-width:520px"' : '') + '>' + desc + '</div>' +
       '</div></div>';

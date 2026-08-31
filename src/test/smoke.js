@@ -6266,6 +6266,15 @@ setTimeout(async () => {
     check('Пульс · на корешке написано, сколько внутри',
       withN.length === 3 && !secTabs[3].querySelector('.psec-n'),
       secTabs.map((e) => e.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+    /* Раскладка: узкая шапка, затем сразу две колонки. Всё, что должно быть видно всегда,
+       ушло в левую колонку — корешки и под ними цели; сверху поперёк экрана не лежит ничего.
+       Замер в Chromium: содержимое начиналось с 637-го пикселя при окне 840, стало с 203-го. */
+    check('Пульс · цели стоят в боковой колонке, а не поперёк экрана над разделами',
+      !!pulse.querySelector('.psec-side .pgoal') && !pulse.querySelector('.start > .pgoal'),
+      pulse.querySelector('.psec-side .pgoal') ? 'в колонке' : 'полосы в колонке нет');
+    check('Пульс · шапка на этом экране узкая, а не обложка страницы',
+      !!pulse.querySelector('.wh--slim'),
+      pulse.querySelector('.wh') ? (pulse.querySelector('.wh--slim') ? 'узкая' : 'обложка') : 'шапки нет');
     check('Пульс · на экране открыт ровно один раздел',
       pulse.querySelectorAll('.psec-body').length === 1,
       String(pulse.querySelectorAll('.psec-body').length));
@@ -6288,10 +6297,15 @@ setTimeout(async () => {
       const inbox = dd().inbox || [];
       const un = inbox.filter((i) => i.stage === 'unreached');
       const row = morn();
-      const secs = doc.querySelector('#app .start .psec');
-      check('Пульс · строка утра стоит выше разделов',
-        !!row && !!secs && (row.compareDocumentPosition(secs) & 4) !== 0,
-        row ? 'строка есть' : 'строки нет при ' + un.length + ' без ответа');
+      /* Строка утра переехала ВНУТРЬ «Моих дел» и стоит там первой: срочное — это дело, а не
+         подводка к экрану. Раньше она лежала поперёк страницы над разделами и вместе с целями
+         отодвигала содержимое на 637-й пиксель при высоте окна 840. Сигнал наверху не потерян:
+         на корешке «Мои дела» горит красная точка, и её считает отдельная проверка. */
+      const dayBody = doc.querySelector('#app .start .psec-body');
+      check('Пульс · строка утра стоит первой внутри «Моих дел», а не над разделами',
+        !!row && !!dayBody && dayBody.contains(row) &&
+        dayBody.querySelector('.morn-wrap, .pd-wrap, .dayline') === row.closest('.morn-wrap'),
+        row ? (dayBody && dayBody.contains(row) ? 'внутри раздела' : 'вне раздела') : 'строки нет');
       if (row && un.length) {
         const first = un[0];
         const c0 = (dd().clients || []).find((x) => x.id === first.clientId);

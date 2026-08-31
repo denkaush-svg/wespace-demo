@@ -143,8 +143,17 @@ button { font-family: inherit; cursor: pointer; }
    на семь тем левым списком уходила бы четверть ширины экрана. */
 /* Разделы Пульса корешками слева. Это второй уровень навигации: главное меню приложения
    стоит в своей колонке и выглядит иначе — там пункты, здесь корешки с числом. */
-.psec { display: grid; grid-template-columns: minmax(0, 208px) minmax(0, 1fr); gap: 18px; margin-top: 20px; align-items: start; }
-.psec-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 12px; }
+/* Узкая шапка: на Пульсе это строка заголовка, а не обложка страницы. */
+/* Два класса в селекторе — не украшение: `.wh--photo` задаёт min-height 156 и живёт в
+   theme.css, который грузится ПОСЛЕ этого файла. Одноклассовое правило проиграло бы по
+   порядку, а `.wh--photo.wh--slim` выигрывает по весу независимо от порядка. */
+.wh--photo.wh--slim { min-height: 0; padding: 16px 22px; }
+.wh--slim .wh__t { font-size: 32px; }
+.wh--slim .wh__p { font-size: 13px !important; font-weight: 500 !important; }
+
+.psec { display: grid; grid-template-columns: minmax(0, 224px) minmax(0, 1fr); gap: 18px; margin-top: 16px; align-items: start; }
+.psec-side { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 14px; }
+.psec-nav { display: flex; flex-direction: column; gap: 4px; }
 .psec-tab { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; cursor: pointer;
   background: none; border: 1px solid transparent; border-radius: 11px; padding: 10px 12px;
   font-size: 13px; font-weight: 650; color: var(--mut); transition: .14s var(--ease); }
@@ -163,8 +172,22 @@ button { font-family: inherit; cursor: pointer; }
 .psec-sub { font-size: 12px; color: var(--mut); }
 /* На узком экране корешки ложатся горизонтально над содержимым: столбец в 208 пикселей
    на телефоне съел бы больше половины ширины. */
+/* Цели в боковой колонке: то же содержание, но набранное под 224 пикселя. Двухколоночная
+   сетка внутри полосы схлопывается в одну, крупный шрифт уходит — цель остаётся на виду, а
+   не занимает четверть экрана. */
+.psec-side .wq-head { margin: 0 0 6px; }
+.psec-side .section-label { font-size: 10px; }
+.psec-side .pgoal { margin-top: 0; }
+.psec-side .pgoal-cells { grid-template-columns: 1fr; gap: 4px; padding: 11px 13px 8px; }
+.psec-side .pgoal-k { font-size: 11px; }
+.psec-side .pgoal-v { font-size: 12px; }
+.psec-side .pgoal-foot { padding: 7px 13px 10px; font-size: 11px; }
+.psec-side .pgoal-drill { display: none; }
+.psec-side .btn.sm { display: none; }
+
 @media (max-width: 860px) {
   .psec { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .psec-side { position: static; gap: 10px; }
   .psec-nav { flex-direction: row; overflow-x: auto; position: static; padding-bottom: 4px; }
   .psec-tab { width: auto; flex: none; white-space: nowrap; border-color: var(--line); background: var(--surface); }
   .psec-body { padding: 14px 14px 18px; }

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 21:53</title>
+  <title>WESPACE · сборка 23:04</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='21:53';
+    window.WS_BUILD='23:04';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -293,8 +293,17 @@ button { font-family: inherit; cursor: pointer; }
    на семь тем левым списком уходила бы четверть ширины экрана. */
 /* Разделы Пульса корешками слева. Это второй уровень навигации: главное меню приложения
    стоит в своей колонке и выглядит иначе — там пункты, здесь корешки с числом. */
-.psec { display: grid; grid-template-columns: minmax(0, 208px) minmax(0, 1fr); gap: 18px; margin-top: 20px; align-items: start; }
-.psec-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 12px; }
+/* Узкая шапка: на Пульсе это строка заголовка, а не обложка страницы. */
+/* Два класса в селекторе — не украшение: `.wh--photo` задаёт min-height 156 и живёт в
+   theme.css, который грузится ПОСЛЕ этого файла. Одноклассовое правило проиграло бы по
+   порядку, а `.wh--photo.wh--slim` выигрывает по весу независимо от порядка. */
+.wh--photo.wh--slim { min-height: 0; padding: 16px 22px; }
+.wh--slim .wh__t { font-size: 32px; }
+.wh--slim .wh__p { font-size: 13px !important; font-weight: 500 !important; }
+
+.psec { display: grid; grid-template-columns: minmax(0, 224px) minmax(0, 1fr); gap: 18px; margin-top: 16px; align-items: start; }
+.psec-side { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 14px; }
+.psec-nav { display: flex; flex-direction: column; gap: 4px; }
 .psec-tab { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; cursor: pointer;
   background: none; border: 1px solid transparent; border-radius: 11px; padding: 10px 12px;
   font-size: 13px; font-weight: 650; color: var(--mut); transition: .14s var(--ease); }
@@ -313,8 +322,22 @@ button { font-family: inherit; cursor: pointer; }
 .psec-sub { font-size: 12px; color: var(--mut); }
 /* На узком экране корешки ложатся горизонтально над содержимым: столбец в 208 пикселей
    на телефоне съел бы больше половины ширины. */
+/* Цели в боковой колонке: то же содержание, но набранное под 224 пикселя. Двухколоночная
+   сетка внутри полосы схлопывается в одну, крупный шрифт уходит — цель остаётся на виду, а
+   не занимает четверть экрана. */
+.psec-side .wq-head { margin: 0 0 6px; }
+.psec-side .section-label { font-size: 10px; }
+.psec-side .pgoal { margin-top: 0; }
+.psec-side .pgoal-cells { grid-template-columns: 1fr; gap: 4px; padding: 11px 13px 8px; }
+.psec-side .pgoal-k { font-size: 11px; }
+.psec-side .pgoal-v { font-size: 12px; }
+.psec-side .pgoal-foot { padding: 7px 13px 10px; font-size: 11px; }
+.psec-side .pgoal-drill { display: none; }
+.psec-side .btn.sm { display: none; }
+
 @media (max-width: 860px) {
   .psec { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .psec-side { position: static; gap: 10px; }
   .psec-nav { flex-direction: row; overflow-x: auto; position: static; padding-bottom: 4px; }
   .psec-tab { width: auto; flex: none; white-space: nowrap; border-color: var(--line); background: var(--surface); }
   .psec-body { padding: 14px 14px 18px; }
@@ -10767,22 +10790,28 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     });
     const prospClients = Object.keys(prospBest).length;
     const prospSum = Object.keys(prospBest).reduce((a, k) => a + prospBest[k], 0);
+    /* Раскладка Пульса. Было: шапка 262 + строка утра 61 + цели 264 — и только с 637-го
+       пикселя начинались вкладки, при высоте окна 840. Три четверти первого экрана уходило
+       на подводку, а содержимое раздела начиналось за краем видимого.
+
+       Стало — «боковая колонка и содержимое», один из самых старых оконных паттернов: всё,
+       что должно быть видно всегда, уходит в узкую колонку слева, а не ложится сверху
+       поперёк экрана. В колонке — корешки разделов и под ними цели: место под четырьмя
+       корешками всё равно пустовало. Цели остаются на виду с любого раздела, как и просил
+       партнёр, но перестают резать экран пополам.
+
+       Строка утра уезжает в «Мои дела» первым блоком: срочное — это дело, а не подводка.
+       Сигнал наверху не теряется — на корешке «Мои дела» стоит красная точка. */
     return '<div class="start fadeup">' +
-      heroViz('pulse', 'Пульс', headline, { descBig: true }) +
-      /* Строка утра стоит ВЫШЕ строки Консьержа: она про то, что уже случилось и ждёт, а
-         Консьерж — про то, что брокер хочет поручить. Сначала долг, потом замысел. */
-      pulseMorningRow() +
-      /* Строка Консьержа с Пульса убрана: он вызывается вкладкой у правого края на широком
-         экране и стоит в нижней панели на узком. Два входа в одно место занимали сто десять
-         пикселей самого дорогого поля — первого экрана. */
-      pulseMyGoals() +
+      heroViz('pulse', 'Пульс', headline, { descBig: true, slim: true }) +
       pulseMoved() +
       (() => {
         const items = [
           { key: 'day', title: 'Мои дела', icon: 'check',
-            count: todayN + pulseAlerts().length, urgent: overdueN > 0 || pulseAlerts().length > 0,
+            count: todayN + pulseAlerts().length + inboxWaiting().length,
+            urgent: overdueN > 0 || pulseAlerts().length > 0 || inboxWaiting().length > 0,
             sub: 'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : '') + (pulseAlerts().length ? ' · требует внимания ' + pulseAlerts().length : ''),
-            body: () => pulseDay() + alertCards() + pulseNoNextStep() },
+            body: () => pulseMorningRow() + pulseDay() + alertCards() + pulseNoNextStep() },
           { key: 'prospects', title: 'Перспективные сделки', icon: 'target',
             count: prosp.length,
             sub: prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
@@ -10798,7 +10827,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             sub: 'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
             body: () => pulseAnalytics() },
         ];
-        return '<div class="psec">' + pulseNav(items) + pulseSectionBody(items) + '</div>';
+        return '<div class="psec">' +
+          '<div class="psec-side">' + pulseNav(items) + pulseMyGoals() + '</div>' +
+          pulseSectionBody(items) + '</div>';
       })() +
     '</div>';
   }
@@ -18317,11 +18348,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '</div></div>';
   }
   // Themed vector hero visuals (offline, on-brand) for the two work surfaces.
+  /* Шапка умеет быть узкой. На Пульсе она не самостоятельная страница-обложка, а строка
+     заголовка: под ней сразу начинается работа, и 262 пикселя картинки — это четверть
+     первого экрана, отданная приветствию. На остальных экранах она прежняя. */
   function heroViz(kind, title, desc, opts) {
     opts = opts || {};
     const img = (WS.photos && (kind === 'pulse' ? WS.photos.viz_pulse : WS.photos.viz_concierge)) || '';
     const bg = img ? ' style="background-image:url(' + img + ')"' : '';
-    return '<div class="wh wh--photo"' + bg + '><div class="wh__c">' +
+    return '<div class="wh wh--photo' + (opts.slim ? ' wh--slim' : '') + '"' + bg + '><div class="wh__c">' +
       '<h1 class="wh__t">' + title + '</h1>' +
       '<div class="wh__p"' + (opts.descBig ? ' style="font-size:15px;font-weight:600;color:var(--ink);max-width:520px"' : '') + '>' + desc + '</div>' +
       '</div></div>';
