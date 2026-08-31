@@ -720,7 +720,15 @@
     if (st.state === 'soon') return 'согласие до ' + escAttr(c.consentUntil) + ' — истекает через ' + oppDays(st.days);
     return 'согласие от ' + escAttr(c.consentAt || '—') + ', действует до ' + escAttr(c.consentUntil || '—');
   }
-  function pulseInsights() {
+  /* ==== Требует внимания — это ЗАДАЧИ, а не инсайты ======================================
+     Пять карточек стояли в «Инсайтах»: недоставленное письмо, срок отчёта, непроверенная
+     доступность, истекающее согласие, цена выше среза. Принципал назвал их тем, что они
+     есть: «это просто задача на агенте, которую нужно сделать». Инсайт — другой жанр:
+     результат аналитики о рынке, гипотеза применимости, без адресата.
+
+     Поэтому они уезжают в «Мои дела» отдельной группой срочного, а «Инсайты» наполняются
+     заново. Функция та же — сменилось только имя и место. */
+  function pulseAlerts() {
     const out = [];
     // 1. Отправленное не дошло. Клиент считает, что мы молчим, — и это худший вид молчания.
     (D().inbox || []).filter((i) => i.stage === 'rejected').forEach((i) => {
@@ -796,14 +804,213 @@
     }
     return out;
   }
+  function alertCards() {
+    const list = pulseAlerts();
+    if (!list.length) return '';
+    return '<div class="wq-head" style="margin-top:24px"><div class="section-label" style="margin:0">' +
+      'Требует внимания · ' + list.length + '</div></div>' +
+      '<div class="insights">' + list.map((it) => '<div class="insight"><div class="insight-h"><span class="insight-ic">' + I(it[0]) + '</span><div class="insight-t">' + escAttr(it[1]) + '</div></div>' +
+      '<div class="insight-w">' + escAttr(it[2]) + '</div>' +
+      '<div class="insight-a"><button class="btn sm" ' + it[4] + '>' + I('arrowRight') + it[3] + '</button></div></div>').join('') + '</div>';
+  }
+
+  /* ==== Инсайты — знание о рынке, а не работа с клиентом =================================
+     Определение принципала: инсайт — это результат аналитики, проведённой вне работы с
+     конкретным клиентом, плюс гипотеза, кому и в каком разговоре это пригодится. У инсайта
+     НЕТ адресата — у него есть применимость.
+
+     Отсюда анатомия карточки. Заголовок — изменение с НАЗВАННЫМ деятелем: действуют
+     регулятор, банк, застройщик, районы, наши объекты; не действуют «рассрочка», «волна»,
+     «подписание». Отсылка со ссылкой обязательна — без неё карточка неотличима от
+     правдоподобного текста, на чём мы уже обожглись. «Что мы видим у себя» СЧИТАЕТСЯ по
+     нашей базе и пересчитывается каждый раз: это единственное, чего не даст ни один внешний
+     источник, и ради чего инсайт вообще стоит в CRM, а не в новостях.
+
+     Если применимость ничего не нашла — карточки нет. Инсайт не устаревает по календарю,
+     он перестаёт быть применимым.
+
+     Отношение к перспективным сделкам одностороннее: как только у гипотезы появляется один
+     адресат и одно предложение, она порождает перспективную сделку. Обратно — никогда. */
+  const VISA_THRESHOLD = 2000000;
+  const MARKET_YIELD_AVG = 6.58;          // средняя по рынку, H1 2026
+  function insClients() { return D().clients || []; }
+  const INSIGHTS = [
+    { id: 'ins_visa_rule',
+      title: 'DLD считает визовый порог по оценке объекта, а не по оплаченной доле',
+      kind: 'факт',
+      src: 'С 20 февраля 2026 право на десятилетнюю визу определяет оценка Земельного департамента, а не доля, которую покупатель успел оплатить. До этого требовалось внести не меньше половины цены.',
+      url: 'https://www.visahq.news/2026-05-12/ae/property-route-to-uae-golden-visa-clarified-as-aed-2-million-threshold-survives-april-rule-changes/',
+      until: 'до следующего циркуляра DLD',
+      move: 'Тем, кто покупает в рассрочку или с ипотекой, виза доступна сразу после регистрации — раньше её ждали годами платежей.',
+      see() {
+        const near = insClients().filter((c) => c.visaGoal && c.budget &&
+          c.budget < VISA_THRESHOLD && c.budget >= VISA_THRESHOLD * 0.9);
+        const over = insClients().filter((c) => c.visaGoal && (c.budget || 0) >= VISA_THRESHOLD);
+        if (!near.length && !over.length) return null;
+        return near.map((c) => c.name + ': ' + WS.AED(c.budget) + ' — до порога не хватает ' +
+            WS.AED(VISA_THRESHOLD - c.budget)).concat(
+          over.length ? [over.length + ' ' + plural(over.length, 'клиент стоит', 'клиента стоят', 'клиентов стоят') +
+            ' выше порога и, возможно, ' + plural(over.length, 'не знает', 'не знают', 'не знают') +
+            ', что путь стал короче'] : []).join('. ') + '.';
+      } },
+
+    { id: 'ins_visa_stock',
+      /* Заголовок с числом обязан СЧИТАТЬСЯ. Написанный руками, он расходится с расчётом
+         в первый же день, когда данные изменятся: «Пять районов из шести» стояло над строкой
+         «7 из 9». Поэтому заголовок здесь — функция. */
+      title() {
+        const all = (D().objects || []).filter((o) => o.availability === 'available');
+        const pass = all.filter((o) => (o.price || 0) >= VISA_THRESHOLD);
+        const flats = pass.filter((o) => oppTypeOf(o) !== 'office');
+        return flats.length
+          ? 'Визовый порог из нашего инвентаря проходят ' + pass.length + ' ' +
+            plural(pass.length, 'объект', 'объекта', 'объектов') + ', из них ' + flats.length + ' — квартиры'
+          : 'Визовый порог из нашего инвентаря проходят только офисы';
+      },
+      kind: 'наш срез',
+      src: 'Порог для десятилетней визы — 2 млн дирхам оценки; допускается сложить до трёх объектов.',
+      url: 'https://www.visahq.news/2026-05-12/ae/property-route-to-uae-golden-visa-clarified-as-aed-2-million-threshold-survives-april-rule-changes/',
+      until: 'пока не изменится инвентарь',
+      move: 'Клиенту, которому важна виза, придётся комбинировать объекты или искать вне инвентаря. Это же — довод завести квартиры чуть выше порога.',
+      see() {
+        const all = (D().objects || []).filter((o) => o.availability === 'available');
+        const pass = all.filter((o) => (o.price || 0) >= VISA_THRESHOLD);
+        const flats = pass.filter((o) => oppTypeOf(o) !== 'office');
+        if (!all.length) return null;
+        const top = all.filter((o) => oppTypeOf(o) !== 'office').sort((a, b) => (b.price || 0) - (a.price || 0))[0];
+        return pass.length + ' из ' + all.length + ' свободных объектов дороже порога, и ' +
+          (flats.length ? flats.length + ' из них — квартиры' : 'все они офисы') +
+          (top ? '. Самая дорогая квартира — ' + oppShort(top) + ', ' + WS.AED(top.price) +
+            ' (не хватает ' + WS.AED(VISA_THRESHOLD - top.price) + ')' : '') + '.';
+      } },
+
+    { id: 'ins_bb_supply',
+      title: 'Аналитики относят Business Bay к районам плотной сдачи в 2026 году',
+      kind: 'гипотеза',
+      src: 'В 2026 году в Дубае к сдаче около 120 тысяч юнитов; прогнозы по ценам расходятся от +3–5% до +16%, а фактически апрель дал −1,76% к марту при +6,09% за год. Кластеры сдачи называют по районам, Business Bay среди них.',
+      url: 'https://www.propertyfinder.ae/blog/dubai-sale-property-price-forecast/',
+      until: 'до конца 2026 года',
+      move: 'В районах плотной сдачи у покупателя появляется выбор. Довод «цена уйдёт вверх, не тяните» там слабее — и на него нужен ответ заранее.',
+      see() {
+        const objs = (D().objects || []).filter((o) => o.area === 'Business Bay');
+        const cls = insClients().filter((c) => (c.areas || []).indexOf('Business Bay') >= 0);
+        if (!objs.length && !cls.length) return null;
+        return 'В Business Bay у нас ' + objs.length + ' ' +
+          plural(objs.length, 'объект', 'объекта', 'объектов') + ' и ' + cls.length + ' ' +
+          plural(cls.length, 'клиент', 'клиента', 'клиентов') + ': ' +
+          cls.map((c) => c.name).join(', ') + '.';
+      } },
+
+    { id: 'ins_yield_gap',
+      title() {
+        const rows = oppMarket();
+        const below = rows.filter((m) => m.доходностьПроцент < MARKET_YIELD_AVG).length;
+        return below + ' ' + plural(below, 'район', 'района', 'районов') + ' из ' + rows.length +
+          ' в нашем срезе дают доходность ниже средней по рынку';
+      },
+      kind: 'наш срез',
+      src: 'Средняя доходность по Дубаю в первом полугодии 2026 — около ' + MARKET_YIELD_AVG + '%.',
+      url: 'https://www.bhomes.com/en/blog/definitive-guides/will-property-prices-rise-or-fall-in-2026-best-case-base-case-and-worst-case-forecasts-dubai-market',
+      until: 'до следующего среза',
+      move: 'Инвестору, для которого доходность и есть цель, наш инвентарь стоит подавать через рост и ликвидность, а не через поток. Либо расширять географию.',
+      see() {
+        const rows = oppMarket();
+        if (!rows.length) return null;
+        const below = rows.filter((m) => m.доходностьПроцент < MARKET_YIELD_AVG);
+        const above = rows.filter((m) => m.доходностьПроцент >= MARKET_YIELD_AVG);
+        const best = rows.slice().sort((a, b) => b.доходностьПроцент - a.доходностьПроцент)[0];
+        const eyes = insClients().filter((c) => c.interest === 'invest').length;
+        return below.length + ' из ' + rows.length + ' районов ниже рынка' +
+          (above.length ? '; выше — ' + above.map((m) => m.район).join(', ') : '; выше нет ни одного') +
+          '. Лучший в срезе — ' + best.район + ', ' + best.доходностьПроцент + '%' +
+          (insClients().some((c) => (c.areas || []).indexOf(best.район) >= 0) ? '' : ', и туда не смотрит ни один клиент') +
+          '. Инвесторов в базе — ' + eyes + '.';
+      } },
+
+    { id: 'ins_ltv',
+      title: 'Центробанк ограничивает кредит нерезиденту 65%, строящееся — половиной',
+      kind: 'факт',
+      src: 'Потолки кредита задаёт Центробанк ОАЭ: резидент-экспат до 80% на жильё дешевле 5 млн, нерезидент — 50–65%; строящееся большинство банков кредитует не более чем наполовину.',
+      url: 'https://www.engelvoelkers.com/ae/en/resources/dubai-mortgage-for-non-residents',
+      until: 'до изменения правил Центробанка',
+      move: 'Спрашивать про финансирование ДО подборки: клиент с наличными смотрит объекты вдвое дешевле того, что ему доступно с кредитом.',
+      see() {
+        const cash = insClients().filter((c) => c.residency === 'non-resident' && c.payment === 'cash' && c.budget);
+        if (!cash.length) return null;
+        return cash.map((c) => c.name + ': ' + WS.AED(c.budget) + ' своими — с плечом потолок около ' +
+          WS.AED(c.budget * 2)).join('; ') + '.';
+      } },
+
+    { id: 'ins_three_brokers',
+      title: 'Собственник может подписать Form A максимум с тремя агентствами',
+      kind: 'факт',
+      src: 'Собственник может выставить объект не более чем через три зарегистрированных агентства, и у каждого должен быть подписанный Form A. Реклама без действующего разрешения — штраф до 50 тысяч дирхам за нарушение.',
+      url: 'https://joinoliva.com/en/learn/blog/dubai-real-estate-brokerage-regulations-2026',
+      until: 'до следующего циркуляра RERA',
+      move: 'В разговоре с собственником это довод в пользу эксклюзива: право продавать — ограниченный ресурс, а не формальность.',
+      see() {
+        const mandates = (D().deals || []).filter((d) => /мандат|эксклюзив/i.test(String(d.title) + ' ' + String(d.sub || '')));
+        const owners = insClients().filter((c) => c.ctype === 'owner');
+        if (!mandates.length && !owners.length) return null;
+        return 'У нас ' + mandates.length + ' ' + plural(mandates.length, 'мандат', 'мандата', 'мандатов') +
+          ' и ' + owners.length + ' ' + plural(owners.length, 'собственник', 'собственника', 'собственников') +
+          ' в работе: ' + owners.map((c) => c.name).join(', ') + '.';
+      } },
+
+    { id: 'ins_form_f',
+      title: 'RERA принимает Form F в электронном виде с января 2026',
+      kind: 'факт',
+      src: 'Договор между покупателем и продавцом подписывается электронно через смарт-сервисы Земельного департамента.',
+      url: 'https://nexconsultants.com/dubai-real-estate-laws-latest-dld-rera-updates/',
+      until: 'до следующего циркуляра RERA',
+      move: 'Снимает возражение «это долго и муторно»: между «договорились» и «зарегистрировали» стало меньше шагов и поездок.',
+      see() {
+        const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d) &&
+          ['prep', 'book', 'sign'].indexOf(d.stage) >= 0);
+        if (!live.length) return null;
+        return live.length + ' ' + plural(live.length, 'сделка идёт', 'сделки идут', 'сделок идут') +
+          ' на стадиях до регистрации — их всех это касается.';
+      } },
+
+    { id: 'ins_escrow',
+      title: 'Застройщик снимает деньги с эскроу только по подтверждённым вехам',
+      kind: 'факт',
+      src: 'Правила эскроу ужесточены: доступ застройщика к деньгам покупателя привязан к проверенным вехам строительства, за задержку сдачи предусмотрены договорные санкции.',
+      url: 'https://www.kaizenams.com/dubais-off-plan-buyer-protections-in-2026-what-the-tightened-escrow-rules-mean-for-residents-buying-new-homes/',
+      until: 'до изменения правил эскроу',
+      move: 'Готовый ответ на «а вдруг не достроят»: деньги не уходят застройщику разом, и это можно показать по графику.',
+      see() {
+        const off = (D().objects || []).filter((o) => o.segment === 'off-plan' && o.handover);
+        if (!off.length) return null;
+        return off.length + ' ' + plural(off.length, 'наш объект', 'наших объекта', 'наших объектов') +
+          ' строятся: ' + off.map((o) => oppShort(o) + ' — сдача ' + o.handover).join('; ') + '.';
+      } },
+  ];
+  function pulseInsights() {
+    return INSIGHTS.map((x) => {
+      let see = null, title = x.title;
+      try { see = x.see(); } catch (e) { see = null; }
+      try { if (typeof title === 'function') title = title.call(x); } catch (e) { title = ''; }
+      return (see && title) ? Object.assign({}, x, { seen: see, title: title }) : null;
+    }).filter(Boolean);
+  }
   function insightCards() {
     const list = pulseInsights();
     if (!list.length) {
-      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Наблюдений сейчас нет: ничего не сгорает, сроки не близко, доступность подтверждена.</div>';
+      return '<div class="card" style="padding:16px;font-size:12.5px;color:var(--mut)">Инсайтов сейчас нет: ни одна гипотеза не нашла применения в базе. Как только появится клиент или объект, к которому она относится, карточка встанет сюда.</div>';
     }
-    return '<div class="insights">' + list.map((it) => '<div class="insight"><div class="insight-h"><span class="insight-ic">' + I(it[0]) + '</span><div class="insight-t">' + escAttr(it[1]) + '</div></div>' +
-      '<div class="insight-w">' + escAttr(it[2]) + '</div>' +
-      '<div class="insight-a"><button class="btn sm" ' + it[4] + '>' + I('arrowRight') + it[3] + '</button></div></div>').join('') + '</div>';
+    return '<div class="ins-list">' + list.map((x) =>
+      '<article class="ins"><header class="ins-h">' +
+      '<span class="ins-kind">' + escAttr(x.kind) + '</span>' +
+      '<span class="ins-until">' + escAttr(x.until) + '</span></header>' +
+      '<h4 class="ins-t">' + escAttr(x.title) + '</h4>' +
+      '<div class="ins-row"><span class="opp-lbl">' + I('radar') + 'Откуда</span>' +
+      '<p>' + escAttr(x.src) + ' <a href="' + escAttr(x.url) + '" target="_blank" rel="noopener">источник' + I('arrowRight') + '</a></p></div>' +
+      '<div class="ins-row is-ours"><span class="opp-lbl">' + I('users') + 'У нас</span>' +
+      '<p>' + escAttr(x.seen) + '</p></div>' +
+      '<div class="ins-row"><span class="opp-lbl">' + I('target') + 'Ход</span>' +
+      '<p>' + escAttr(x.move) + '</p></div>' +
+      '</article>').join('') + '</div>';
   }
   function insightsBlock() {
     return '<div class="wq-head" style="margin-top:28px"><div class="section-label" style="margin:0;display:flex;align-items:center;gap:8px">Инсайты <span class="badge ai-b">' + I('sparkle') + 'собрано AI</span></div>' +
@@ -2950,9 +3157,9 @@
       (() => {
         const items = [
           { key: 'day', title: 'Мои дела', icon: 'check',
-            count: todayN, urgent: overdueN > 0,
-            sub: 'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
-            body: () => pulseDay() + pulseNoNextStep() },
+            count: todayN + pulseAlerts().length, urgent: overdueN > 0 || pulseAlerts().length > 0,
+            sub: 'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : '') + (pulseAlerts().length ? ' · требует внимания ' + pulseAlerts().length : ''),
+            body: () => pulseDay() + alertCards() + pulseNoNextStep() },
           { key: 'prospects', title: 'Перспективные сделки', icon: 'target',
             count: prosp.length,
             sub: prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
@@ -2961,7 +3168,7 @@
             body: () => pulseProspects() },
           { key: 'insights', title: 'Инсайты', icon: 'radar',
             count: insN,
-            sub: insN + ' ' + plural(insN, 'наблюдение', 'наблюдения', 'наблюдений'),
+            sub: insN + ' ' + plural(insN, 'инсайт', 'инсайта', 'инсайтов'),
             body: () => dayHint + insightCards() },
           { key: 'analytics', title: 'Аналитика', icon: 'trend',
             count: null,
@@ -12069,7 +12276,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

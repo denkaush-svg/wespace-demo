@@ -845,6 +845,24 @@ button { font-family: inherit; cursor: pointer; }
    получение права предлагать. Она и подписана иначе. */
 .opp.t-stop .opp-ic { background: var(--stop-soft, var(--acc-soft)); color: var(--stop); }
 .opp.t-stop { border-color: var(--stop); }
+/* Карточка инсайта. Она не про клиента, а про рынок, поэтому выглядит иначе, чем карточка
+   возможности: сверху жанр и срок годности, дальше заголовок-изменение, потом три полосы —
+   откуда, что у нас, ход. «У нас» подсвечено: это единственная считаемая часть. */
+.ins-list { display: grid; gap: 12px; }
+.ins { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 15px; background: var(--surface); }
+.ins-h { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.ins-kind { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--acc-ink); background: var(--acc-soft); border-radius: 999px; padding: 2px 9px; }
+.ins-until { font-size: 10.5px; color: var(--faint); margin-left: auto; }
+.ins-t { margin: 0 0 11px; font-size: 14px; font-weight: 750; color: var(--ink); line-height: 1.35; }
+.ins-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding: 7px 0;
+  border-top: 1px solid var(--line); }
+.ins-row p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink); }
+.ins-row.is-ours { background: var(--surface-2); border-radius: 9px; padding: 9px 11px; margin: 2px -11px; border-top: 0; }
+.ins-row a { color: var(--acc-ink); font-weight: 650; white-space: nowrap; }
+.ins-row a svg { width: 11px; height: 11px; vertical-align: -1px; }
+@media (max-width: 620px) { .ins-row { grid-template-columns: minmax(0, 1fr); gap: 3px; } }
+
 .opp-bar { margin-bottom: 12px; }
 /* Хвост списка возможностей. Свёрнутый — одна строка, которая называет, сколько за ней. */
 .opp-more { margin-top: 12px; }
