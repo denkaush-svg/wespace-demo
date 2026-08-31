@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 18:52</title>
+  <title>WESPACE · сборка 14:18</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='18:52';
+    window.WS_BUILD='14:18';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -291,6 +291,35 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Пульс: разделы блоками. Свёрнутый занимает одну строку и говорит, сколько внутри, —
    на семь тем левым списком уходила бы четверть ширины экрана. */
+/* Разделы Пульса корешками слева. Это второй уровень навигации: главное меню приложения
+   стоит в своей колонке и выглядит иначе — там пункты, здесь корешки с числом. */
+.psec { display: grid; grid-template-columns: minmax(0, 208px) minmax(0, 1fr); gap: 18px; margin-top: 20px; align-items: start; }
+.psec-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 12px; }
+.psec-tab { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 1px solid transparent; border-radius: 11px; padding: 10px 12px;
+  font-size: 13px; font-weight: 650; color: var(--mut); transition: .14s var(--ease); }
+.psec-tab svg { width: 16px; height: 16px; flex: none; }
+.psec-tab:hover { background: var(--surface-2); color: var(--ink); }
+.psec-tab.on { background: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--shadow-sm); }
+.psec-t { flex: 1 1 auto; min-width: 0; }
+.psec-n { flex: none; font-size: 11.5px; font-weight: 700; color: var(--mut);
+  background: var(--surface-2); border-radius: 999px; padding: 1px 7px; }
+.psec-tab.on .psec-n { background: var(--acc-soft); color: var(--acc-ink); }
+.psec-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--stop); }
+.psec-body { min-width: 0; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px 20px; box-shadow: var(--shadow-sm); }
+.psec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.psec-h h2 { margin: 0; font-size: 15.5px; font-weight: 800; color: var(--ink); }
+.psec-sub { font-size: 12px; color: var(--mut); }
+/* На узком экране корешки ложатся горизонтально над содержимым: столбец в 208 пикселей
+   на телефоне съел бы больше половины ширины. */
+@media (max-width: 860px) {
+  .psec { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .psec-nav { flex-direction: row; overflow-x: auto; position: static; padding-bottom: 4px; }
+  .psec-tab { width: auto; flex: none; white-space: nowrap; border-color: var(--line); background: var(--surface); }
+  .psec-body { padding: 14px 14px 18px; }
+}
+
 .pblocks { display: grid; gap: 12px; margin-top: 20px; }
 .pblock { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: var(--shadow-sm); overflow: hidden; }
@@ -5039,7 +5068,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', dayView: 'table', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', pulseSection: 'day', dayView: 'table', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -5193,7 +5222,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.cgGroupCollapse = {};
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
-    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.dayView = 'table'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
+    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.pulseSection = 'day'; store.dayView = 'table'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.cgLang = 'ru'; store.cgDocLang = 'auto';
     store.dealArchivedOnly = false; store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
@@ -8503,6 +8532,41 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      возврат. Раньше `<details>` перерисовывался с нуля, и «Аналитика», открытая минуту
      назад, встречала закрытой. Состояние хранится по ключу раздела; умолчание остаётся
      умолчанием только до первого касания. */
+  /* ==== Разделы Пульса — корешки, а не лента ==============================================
+     Четыре раздела стояли друг под другом свёртками: чтобы дойти до аналитики, надо было
+     проехать четыре с половиной тысячи пикселей мимо двенадцати возможностей. Принципал
+     сказал переключать их вкладками — и это отменяет прежнее решение «блоками, а не левым
+     списком»: тогда разделов было семь и левый список съедал четверть ширины, сейчас их
+     четыре и они помещаются в узкий столбец.
+
+     На корешке стоит ЧИСЛО. Пасечник не читает улей целиком — он вынимает одну рамку; но
+     выбрать рамку вслепую нельзя, поэтому на каждой написано, что внутри. Красная точка —
+     есть просроченное или горящее: она решает, какую рамку вынуть первой.
+
+     У «Аналитики» числа нет намеренно: там нечего считать штуками, и «4» рядом с ней
+     означало бы четыре чего-то, чего не существует. */
+  const PULSE_SECTIONS = ['day', 'prospects', 'insights', 'analytics'];
+  function pulseSection() {
+    const k = S().pulseSection;
+    return PULSE_SECTIONS.indexOf(k) >= 0 ? k : 'day';
+  }
+  function pulseNav(items) {
+    return '<nav class="psec-nav" aria-label="Разделы Пульса">' + items.map((it) =>
+      '<button class="psec-tab' + (pulseSection() === it.key ? ' on' : '') +
+      '" data-act="pulseSection" data-section="' + it.key + '"' +
+      (pulseSection() === it.key ? ' aria-current="page"' : '') + '>' +
+      I(it.icon) + '<span class="psec-t">' + escAttr(it.title) + '</span>' +
+      (it.count != null ? '<span class="psec-n">' + it.count + '</span>' : '') +
+      (it.urgent ? '<span class="psec-dot" title="есть срочное"></span>' : '') +
+      '</button>').join('') + '</nav>';
+  }
+  function pulseSectionBody(items) {
+    const cur = items.find((x) => x.key === pulseSection()) || items[0];
+    return '<section class="psec-body">' +
+      '<header class="psec-h"><h2>' + escAttr(cur.title) + '</h2>' +
+      (cur.sub ? '<span class="psec-sub">' + cur.sub + '</span>' : '') + '</header>' +
+      cur.body() + '</section>';
+  }
   function pulseBlock(key, title, sub, body, openByDefault) {
     const kept = (S().pulseOpen || {})[key];
     const isOpen = kept === undefined ? openByDefault : kept;
@@ -10431,26 +10495,34 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       /* Строка утра стоит ВЫШЕ строки Консьержа: она про то, что уже случилось и ждёт, а
          Консьерж — про то, что брокер хочет поручить. Сначала долг, потом замысел. */
       pulseMorningRow() +
-      cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
+      /* Строка Консьержа с Пульса убрана: он вызывается вкладкой у правого края на широком
+         экране и стоит в нижней панели на узком. Два входа в одно место занимали сто десять
+         пикселей самого дорогого поля — первого экрана. */
       pulseMyGoals() +
       pulseMoved() +
-      '<div class="pblocks">' +
-      pulseBlock('day', 'Мои дела',
-        'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
-        pulseDay() + pulseNoNextStep(), true) +
-      pulseBlock('prospects', 'Перспективные сделки',
-        prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
-          ' у ' + prospClients + ' ' + plural(prospClients, 'клиента', 'клиентов', 'клиентов') +
-          ' · ' + WS.AED(prospSum) + ', если по одной сделке на каждого' : '',
-        pulseProspects(), true) +
-      pulseBlock('insights', 'Инсайты и сюжет дня',
-        insN + ' ' + plural(insN, 'наблюдение', 'наблюдения', 'наблюдений') +
-        ' · сюжет дня ' + (eventsPlayed ? eventsPlayed + ' из 5' : 'не запускался'),
-        dayHint + insightCards(), false) +
-      pulseBlock('analytics', 'Аналитика',
-        'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
-        pulseAnalytics(), false) +
-      '</div>' +
+      (() => {
+        const items = [
+          { key: 'day', title: 'Мои дела', icon: 'check',
+            count: todayN, urgent: overdueN > 0,
+            sub: 'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
+            body: () => pulseDay() + pulseNoNextStep() },
+          { key: 'prospects', title: 'Перспективные сделки', icon: 'target',
+            count: prosp.length,
+            sub: prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
+              ' у ' + prospClients + ' ' + plural(prospClients, 'клиента', 'клиентов', 'клиентов') +
+              ' · ' + WS.AED(prospSum) + ', если по одной сделке на каждого' : '',
+            body: () => pulseProspects() },
+          { key: 'insights', title: 'Инсайты', icon: 'radar',
+            count: insN,
+            sub: insN + ' ' + plural(insN, 'наблюдение', 'наблюдения', 'наблюдений'),
+            body: () => dayHint + insightCards() },
+          { key: 'analytics', title: 'Аналитика', icon: 'trend',
+            count: null,
+            sub: 'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
+            body: () => pulseAnalytics() },
+        ];
+        return '<div class="psec">' + pulseNav(items) + pulseSectionBody(items) + '</div>';
+      })() +
     '</div>';
   }
 
@@ -19550,7 +19622,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -22344,6 +22416,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'sendReply': WS.ui.sendReply(t.dataset.inbox); break;
       case 'openSelection': WS.ui.openSelection(t.dataset.inbox); break;
       case 'showForm': WS.ui.openShowForm(t.dataset.inbox); break;
+      case 'pulseSection': store.pulseSection = t.dataset.section; api.emit(); break;
       case 'dayTable': store.dayView = 'table'; api.emit(); break;
       case 'createShow': WS.ui.createShow(t.dataset.inbox); break;
       case 'showOutcome': WS.ui.openShowOutcome(t.dataset.ev); break;

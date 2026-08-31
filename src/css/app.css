@@ -141,6 +141,35 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Пульс: разделы блоками. Свёрнутый занимает одну строку и говорит, сколько внутри, —
    на семь тем левым списком уходила бы четверть ширины экрана. */
+/* Разделы Пульса корешками слева. Это второй уровень навигации: главное меню приложения
+   стоит в своей колонке и выглядит иначе — там пункты, здесь корешки с числом. */
+.psec { display: grid; grid-template-columns: minmax(0, 208px) minmax(0, 1fr); gap: 18px; margin-top: 20px; align-items: start; }
+.psec-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 12px; }
+.psec-tab { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 1px solid transparent; border-radius: 11px; padding: 10px 12px;
+  font-size: 13px; font-weight: 650; color: var(--mut); transition: .14s var(--ease); }
+.psec-tab svg { width: 16px; height: 16px; flex: none; }
+.psec-tab:hover { background: var(--surface-2); color: var(--ink); }
+.psec-tab.on { background: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--shadow-sm); }
+.psec-t { flex: 1 1 auto; min-width: 0; }
+.psec-n { flex: none; font-size: 11.5px; font-weight: 700; color: var(--mut);
+  background: var(--surface-2); border-radius: 999px; padding: 1px 7px; }
+.psec-tab.on .psec-n { background: var(--acc-soft); color: var(--acc-ink); }
+.psec-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--stop); }
+.psec-body { min-width: 0; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px 20px; box-shadow: var(--shadow-sm); }
+.psec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.psec-h h2 { margin: 0; font-size: 15.5px; font-weight: 800; color: var(--ink); }
+.psec-sub { font-size: 12px; color: var(--mut); }
+/* На узком экране корешки ложатся горизонтально над содержимым: столбец в 208 пикселей
+   на телефоне съел бы больше половины ширины. */
+@media (max-width: 860px) {
+  .psec { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .psec-nav { flex-direction: row; overflow-x: auto; position: static; padding-bottom: 4px; }
+  .psec-tab { width: auto; flex: none; white-space: nowrap; border-color: var(--line); background: var(--surface); }
+  .psec-body { padding: 14px 14px 18px; }
+}
+
 .pblocks { display: grid; gap: 12px; margin-top: 20px; }
 .pblock { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: var(--shadow-sm); overflow: hidden; }

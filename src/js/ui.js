@@ -932,6 +932,41 @@
      возврат. Раньше `<details>` перерисовывался с нуля, и «Аналитика», открытая минуту
      назад, встречала закрытой. Состояние хранится по ключу раздела; умолчание остаётся
      умолчанием только до первого касания. */
+  /* ==== Разделы Пульса — корешки, а не лента ==============================================
+     Четыре раздела стояли друг под другом свёртками: чтобы дойти до аналитики, надо было
+     проехать четыре с половиной тысячи пикселей мимо двенадцати возможностей. Принципал
+     сказал переключать их вкладками — и это отменяет прежнее решение «блоками, а не левым
+     списком»: тогда разделов было семь и левый список съедал четверть ширины, сейчас их
+     четыре и они помещаются в узкий столбец.
+
+     На корешке стоит ЧИСЛО. Пасечник не читает улей целиком — он вынимает одну рамку; но
+     выбрать рамку вслепую нельзя, поэтому на каждой написано, что внутри. Красная точка —
+     есть просроченное или горящее: она решает, какую рамку вынуть первой.
+
+     У «Аналитики» числа нет намеренно: там нечего считать штуками, и «4» рядом с ней
+     означало бы четыре чего-то, чего не существует. */
+  const PULSE_SECTIONS = ['day', 'prospects', 'insights', 'analytics'];
+  function pulseSection() {
+    const k = S().pulseSection;
+    return PULSE_SECTIONS.indexOf(k) >= 0 ? k : 'day';
+  }
+  function pulseNav(items) {
+    return '<nav class="psec-nav" aria-label="Разделы Пульса">' + items.map((it) =>
+      '<button class="psec-tab' + (pulseSection() === it.key ? ' on' : '') +
+      '" data-act="pulseSection" data-section="' + it.key + '"' +
+      (pulseSection() === it.key ? ' aria-current="page"' : '') + '>' +
+      I(it.icon) + '<span class="psec-t">' + escAttr(it.title) + '</span>' +
+      (it.count != null ? '<span class="psec-n">' + it.count + '</span>' : '') +
+      (it.urgent ? '<span class="psec-dot" title="есть срочное"></span>' : '') +
+      '</button>').join('') + '</nav>';
+  }
+  function pulseSectionBody(items) {
+    const cur = items.find((x) => x.key === pulseSection()) || items[0];
+    return '<section class="psec-body">' +
+      '<header class="psec-h"><h2>' + escAttr(cur.title) + '</h2>' +
+      (cur.sub ? '<span class="psec-sub">' + cur.sub + '</span>' : '') + '</header>' +
+      cur.body() + '</section>';
+  }
   function pulseBlock(key, title, sub, body, openByDefault) {
     const kept = (S().pulseOpen || {})[key];
     const isOpen = kept === undefined ? openByDefault : kept;
@@ -2860,26 +2895,34 @@
       /* Строка утра стоит ВЫШЕ строки Консьержа: она про то, что уже случилось и ждёт, а
          Консьерж — про то, что брокер хочет поручить. Сначала долг, потом замысел. */
       pulseMorningRow() +
-      cgComposer('startPrompt', 'Поручите Консьержу — «подобрать Анне 3 объекта до 2 млн», «подготовить к встрече», «что просрочено»…', 'startSend', 'prompt-lead') +
+      /* Строка Консьержа с Пульса убрана: он вызывается вкладкой у правого края на широком
+         экране и стоит в нижней панели на узком. Два входа в одно место занимали сто десять
+         пикселей самого дорогого поля — первого экрана. */
       pulseMyGoals() +
       pulseMoved() +
-      '<div class="pblocks">' +
-      pulseBlock('day', 'Мои дела',
-        'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
-        pulseDay() + pulseNoNextStep(), true) +
-      pulseBlock('prospects', 'Перспективные сделки',
-        prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
-          ' у ' + prospClients + ' ' + plural(prospClients, 'клиента', 'клиентов', 'клиентов') +
-          ' · ' + WS.AED(prospSum) + ', если по одной сделке на каждого' : '',
-        pulseProspects(), true) +
-      pulseBlock('insights', 'Инсайты и сюжет дня',
-        insN + ' ' + plural(insN, 'наблюдение', 'наблюдения', 'наблюдений') +
-        ' · сюжет дня ' + (eventsPlayed ? eventsPlayed + ' из 5' : 'не запускался'),
-        dayHint + insightCards(), false) +
-      pulseBlock('analytics', 'Аналитика',
-        'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
-        pulseAnalytics(), false) +
-      '</div>' +
+      (() => {
+        const items = [
+          { key: 'day', title: 'Мои дела', icon: 'check',
+            count: todayN, urgent: overdueN > 0,
+            sub: 'сегодня ' + todayN + (overdueN ? ' · просрочено ' + overdueN : ''),
+            body: () => pulseDay() + pulseNoNextStep() },
+          { key: 'prospects', title: 'Перспективные сделки', icon: 'target',
+            count: prosp.length,
+            sub: prosp.length ? prosp.length + ' ' + plural(prosp.length, 'возможность', 'возможности', 'возможностей') +
+              ' у ' + prospClients + ' ' + plural(prospClients, 'клиента', 'клиентов', 'клиентов') +
+              ' · ' + WS.AED(prospSum) + ', если по одной сделке на каждого' : '',
+            body: () => pulseProspects() },
+          { key: 'insights', title: 'Инсайты', icon: 'radar',
+            count: insN,
+            sub: insN + ' ' + plural(insN, 'наблюдение', 'наблюдения', 'наблюдений'),
+            body: () => dayHint + insightCards() },
+          { key: 'analytics', title: 'Аналитика', icon: 'trend',
+            count: null,
+            sub: 'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
+            body: () => pulseAnalytics() },
+        ];
+        return '<div class="psec">' + pulseNav(items) + pulseSectionBody(items) + '</div>';
+      })() +
     '</div>';
   }
 
@@ -11979,7 +12022,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

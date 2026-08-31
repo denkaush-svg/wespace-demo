@@ -371,6 +371,15 @@ setTimeout(async () => {
   const sapi = WS.storeApi;
   const QRY = WS.query;
   const dd = () => WS.store.data;
+  /* Разделы Пульса стали корешками, и на экране живёт РОВНО ОДИН. Проверка, которая смотрит
+     в раздел, обязана его сначала открыть — иначе она проверяет пустоту и краснеет не потому,
+     что сломано, а потому, что смотрит не туда. */
+  const openPulse = (key) => {
+    WS.store.pulseSection = key;
+    WS.router.go('start');
+    WS.ui.render();
+    return doc.querySelector('#app .start') || doc.getElementById('app');
+  };
   /* Which step a deal may be moved to. The board is no longer four columns for
      everyone: the steps follow from the contract the deal ends in, so a stage
      spelled out in a test is a stage that stops existing the next time the
@@ -6239,23 +6248,32 @@ setTimeout(async () => {
     WS.store.pulseTab = 'deals';
     WS.router.go('start');
     const pulse = doc.querySelector('#app .start') || doc.getElementById('app');
-    const labels = [].slice.call(pulse.querySelectorAll('.section-label, .pb-t')).map((e) => e.textContent.trim());
-    const order = ['Мои цели', 'Мои дела', 'Перспективные сделки', 'Аналитика'];
-    const idx = order.map((t) => labels.findIndex((l) => l.indexOf(t) === 0));
-    check('Пульс · все четыре раздела на экране', idx.every((i) => i >= 0),
-      order.filter((t, i) => idx[i] < 0).join(', ') + ' | есть: ' + labels.join(' / '));
-    check('Пульс · разделы идут в порядке схемы партнёра',
-      idx.every((v, i) => i === 0 || (v > idx[i - 1])), idx.join(','));
-    // Каждый раздел сворачивается, и сворачивается без скрипта — как левая колонка карточки.
-    const blocks = [].slice.call(pulse.querySelectorAll('.pblock'));
-    check('Пульс · разделы блоками, а не левым списком', blocks.length >= 3, 'блоков: ' + blocks.length);
-    check('Пульс · и каждый сворачивается без скриптов',
-      blocks.every((b) => b.tagName === 'DETAILS' && !!b.querySelector('summary')));
-    // Предложения идут раньше аналитики: их читают каждый день, аналитику — раз в неделю.
-    const iIns = labels.findIndex((l) => l.indexOf('Инсайты') === 0);
-    const iAn = labels.findIndex((l) => l.indexOf('Аналитика') === 0);
-    check('Пульс · предложения и инсайты стоят раньше аналитики', iIns >= 0 && iAn > iIns,
-      'инсайты ' + iIns + ', аналитика ' + iAn);
+    /* Разделы переключаются корешками слева, а не листаются свёртками. Прежняя проверка
+       требовала обратного — «разделы блоками, а не левым списком»: тогда разделов было семь
+       и левый список съедал четверть ширины. Их четыре, и принципал решил иначе. Проверка
+       следует за решением, а не за своей прошлой формулировкой. */
+    const tabsOrder = ['Мои дела', 'Перспективные сделки', 'Инсайты', 'Аналитика'];
+    const secTabs = [].slice.call(pulse.querySelectorAll('.psec-tab'));
+    const secNames = secTabs.map((e) => (e.querySelector('.psec-t') || {}).textContent.trim());
+    check('Пульс · четыре раздела стоят корешками, а не лентой',
+      secTabs.length === 4 && !pulse.querySelector('.pblock'),
+      'корешков ' + secTabs.length + ' | ' + secNames.join(' / '));
+    check('Пульс · и порядок разделов прежний — дела, сделки, инсайты, аналитика',
+      secNames.join('|') === tabsOrder.join('|'), secNames.join(' / '));
+    /* На корешке стоит число, иначе выбирать раздел приходится вслепую. У «Аналитики» его
+       нет намеренно: там нечего считать штуками. */
+    const withN = secTabs.filter((e) => !!e.querySelector('.psec-n'));
+    check('Пульс · на корешке написано, сколько внутри',
+      withN.length === 3 && !secTabs[3].querySelector('.psec-n'),
+      secTabs.map((e) => e.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+    check('Пульс · на экране открыт ровно один раздел',
+      pulse.querySelectorAll('.psec-body').length === 1,
+      String(pulse.querySelectorAll('.psec-body').length));
+    /* Красная точка на корешке — есть просроченное: она решает, какой раздел открыть первым. */
+    const odNow = WS.ui.pulseDayItems().filter((x) => x.when === 'overdue').length;
+    check('Пульс · просроченное помечено точкой на самом корешке',
+      (odNow > 0) === !!secTabs[0].querySelector('.psec-dot'),
+      'просрочено ' + odNow + ', точка ' + !!secTabs[0].querySelector('.psec-dot'));
 
     /* ---- Цель полосой над рабочей областью -------------------------------------------------
        На каждом листе макета партнёра сверху стоит одна и та же полоса: срок · что заработать ·
@@ -6270,9 +6288,9 @@ setTimeout(async () => {
       const inbox = dd().inbox || [];
       const un = inbox.filter((i) => i.stage === 'unreached');
       const row = morn();
-      check('Пульс · строка утра стоит выше строки Консьержа',
-        !!row && !!doc.getElementById('startPrompt') &&
-        (row.compareDocumentPosition(doc.getElementById('startPrompt')) & 4) !== 0,
+      const secs = doc.querySelector('#app .start .psec');
+      check('Пульс · строка утра стоит выше разделов',
+        !!row && !!secs && (row.compareDocumentPosition(secs) & 4) !== 0,
         row ? 'строка есть' : 'строки нет при ' + un.length + ' без ответа');
       if (row && un.length) {
         const first = un[0];
@@ -6642,10 +6660,9 @@ setTimeout(async () => {
         });
         const honest = Object.keys(best).reduce((a2, k) => a2 + best[k], 0);
         const raw = opps.reduce((a2, p) => a2 + (p.value || 0), 0);
-        WS.router.go('start'); WS.ui.render();
-        const sub = [].slice.call(doc.querySelectorAll('#app .start .pblock'))
-          .filter((b) => /Перспективные сделки/.test((b.querySelector('.pb-t') || {}).textContent || ''))
-          .map((b) => (b.querySelector('.pb-m') || {}).textContent || '')[0] || '';
+        const ps = openPulse('prospects');
+        const sub = ((ps.querySelector('.psec-h h2') || {}).textContent || '').indexOf('Перспективные') === 0
+          ? ((ps.querySelector('.psec-sub') || {}).textContent || '') : '';
         const digits = (x) => String(x).replace(/[^\d]/g, '');
         check('Пульс · итог раздела посчитан по одной сделке на клиента, а не сложением всего',
           sub.indexOf(digits(honest)) >= 0 || sub.replace(/[^\d]/g, '').indexOf(digits(honest)) >= 0,
@@ -6661,6 +6678,7 @@ setTimeout(async () => {
          них. Список обрезан до шести, и обрезка не молчит: она называет, сколько за ней, и
          разворачивается без скриптов. */
       {
+        openPulse('prospects');
         const grid = doc.querySelector('#app .start .opps');
         const more = doc.querySelector('#app .start .opp-more');
         check('Пульс · в сетке сразу видны шесть возможностей, а не все тринадцать',
@@ -6900,7 +6918,7 @@ setTimeout(async () => {
         opps.every((p, i) => i === 0 || (p.value || 0) <= (opps[i - 1].value || 0)),
         opps.map((p) => p.value || 0).join(' > '));
       // И то же самое — на экране: по умолчанию сетка, потому что возможностей много.
-      const cards = pulse.querySelectorAll('.opps .opp');
+      const cards = openPulse('prospects').querySelectorAll('.opps .opp');
       check('Пульс · возможности показаны сеткой карточек, а их много',
         cards.length === opps.length, cards.length + ' из ' + opps.length);
       const first = cards[0];
@@ -6977,15 +6995,20 @@ setTimeout(async () => {
       check('Пульс · «назад» просит вернуть это место, а не начало страницы',
         asked.length === 1 && !!asked[0] && typeof asked[0].main === 'number', JSON.stringify(asked));
 
-      /* Раскрытый раздел — выбор пользователя, и он обязан пережить перерисовку. */
-      WS.store.pulseOpen = { analytics: true, day: false };
+      /* Выбранный раздел — выбор пользователя, и он обязан пережить перерисовку. */
+      openPulse('analytics');
+      const onTab = doc.querySelector('#app .start .psec-tab.on .psec-t');
+      check('Пульс · выбранный раздел переживает перерисовку',
+        !!onTab && onTab.textContent.trim() === 'Аналитика' &&
+        /конверсия/.test((doc.querySelector('#app .start .psec-sub') || {}).textContent || ''),
+        onTab ? onTab.textContent.trim() : 'корешка нет');
+      /* Незнакомый ключ не оставляет экран пустым — открывается раздел по умолчанию. */
+      WS.store.pulseSection = 'нет-такого';
       WS.router.go('start'); WS.ui.render();
-      const an = doc.querySelector('#app .start [data-pblock="analytics"]');
-      const dayB = doc.querySelector('#app .start [data-pblock="day"]');
-      check('Пульс · раскрытый раздел переживает перерисовку',
-        !!an && an.hasAttribute('open') && !!dayB && !dayB.hasAttribute('open'),
-        'analytics open=' + (an && an.hasAttribute('open')) + ' day open=' + (dayB && dayB.hasAttribute('open')));
-      WS.store.pulseOpen = {}; WS.ui.render();
+      const back = doc.querySelector('#app .start .psec-tab.on .psec-t');
+      check('Пульс · неизвестный раздел открывает «Мои дела», а не пустоту',
+        !!back && back.textContent.trim() === 'Мои дела', back ? back.textContent.trim() : 'корешка нет');
+      openPulse('day');
 
       /* Цель — самое крупное число на экране, и до сих пор оно никуда не вело. Теперь строка
          ведёт к записям, из которых число сложилось, и НАЗЫВАЕТ перенесённый остаток, за
@@ -7008,7 +7031,7 @@ setTimeout(async () => {
       /* Четыре плитки ряда открывали окно с записями, а «Проиграно» и «Средний цикл» уводили
          на другой экран — в его начало, мимо обещанных причин. Одинаковые на вид плитки
          обязаны вести себя одинаково. */
-      WS.router.go('start'); WS.ui.render();
+      openPulse('analytics');
       doc.querySelectorAll('#app .start details').forEach((d2) => { d2.setAttribute('open', ''); });
       ['lost', 'cycle'].forEach((k) => {
         const t2 = doc.querySelector('#app .start [data-analytics="' + k + '"]');
@@ -7026,14 +7049,14 @@ setTimeout(async () => {
 
       /* Объект, названный в возможности, открывается: до сих пор путь к юниту шёл через
          «Объекты» и поиск по названию. */
-      WS.router.go('start'); WS.ui.render();
+      openPulse('prospects');
       const link = doc.querySelector('#app .start .opps .opp-link[data-obj]');
       check('Пульс · названный в возможности объект открывается с карточки', !!link,
         'ссылки на объект нет');
 
       /* Номера в стенде намеренно замаскированы. Ссылка «позвонить» на маску набрала бы не
          того: из «+971 55 0•• ••34 (DEMO)» вычищается «+97155034». */
-      const ph = doc.querySelector('#app .start .pd-ph');
+      const ph = openPulse('day').querySelector('.pd-ph');
       check('Пульс · замаскированный номер не притворяется набираемым',
         !!ph && (ph.tagName === 'A' ? !/[•(]/.test(ph.textContent) : true),
         ph ? ph.tagName + ' ' + ph.textContent.trim().slice(0, 30) : 'телефона нет');
@@ -7092,10 +7115,19 @@ setTimeout(async () => {
         (both.join(' ').match(/.{0,40}айплайн.{0,30}/i) || [''])[0]);
     }
 
-    // То, что уже было выверено, перестройка сносить не имеет права.
-    check('Пульс · строка Консьержа осталась первой', !!doc.getElementById('startPrompt'));
-    check('Пульс · вход в «Сюжет дня» не потерян', !!pulse.querySelector('[data-act="presenter"]'));
-    check('Пульс · «Инсайты» на месте', /Инсайты/.test(pulse.textContent));
+    /* Строка Консьержа с Пульса убрана по решению принципала: он вызывается вкладкой у
+       правого края и стоит в нижней панели на узком экране. Два входа в одно место занимали
+       сто десять пикселей первого экрана. Прежняя проверка требовала обратного. */
+    check('Пульс · строки Консьержа на экране нет — он вызывается сбоку',
+      !doc.getElementById('startPrompt'), doc.getElementById('startPrompt') ? 'строка на месте' : 'убрана');
+    check('Пульс · но сам Консьерж остаётся доступен с экрана',
+      !!doc.querySelector('.cg-tab') || !!doc.querySelector('[data-nav="concierge"]'),
+      doc.querySelector('.cg-tab') ? 'вкладка сбоку' : 'пункт меню');
+    {
+      const ins = openPulse('insights');
+      check('Пульс · вход в «Сюжет дня» не потерян', !!ins.querySelector('[data-act="presenter"]'));
+      check('Пульс · «Инсайты» на месте', /Инсайты/.test(ins.textContent));
+    }
     /* ---- Наблюдения считаются, а не написаны ----------------------------------------
        Раздел под значком «собрано AI» держал четыре строки текста, и ни одна не сходилась
        с данными стенда: «Анна — 3 дня без связи» при звонке ей сегодня в 16:00, отклонение
@@ -7280,6 +7312,7 @@ setTimeout(async () => {
     // обязан остаться — иначе список просроченных с Пульса больше не открыть.
     const odN = (dd().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
     if (odN) {
+      openPulse('day');
       // Просроченное открывается прямо из ежедневника: строка называет сделку и она кликается.
       const b = doc.querySelector('#app [data-dayfilter="overdue"]');
       if (b) b.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
@@ -7298,6 +7331,7 @@ setTimeout(async () => {
        отношения сравнивала между собой. Сошлось только потому, что чисел оказалось 10 и 11. */
     {
       const openTab = (key) => {
+        openPulse('analytics');
         const b = doc.querySelector('#app [data-pulsetab="' + key + '"]');
         if (b) b.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
         return [].slice.call(doc.querySelectorAll('#app .start .tile')).map((x) => ({
@@ -7373,6 +7407,7 @@ setTimeout(async () => {
        Таблица отвечает «что у меня есть», лента — «куда я сейчас еду». Таблица остаётся видом
        по умолчанию: её состав и порядок колонок задал партнёр. */
     {
+      openPulse('day');
       const wasView = WS.store.dayView, wasDay = WS.store.pulseDay;
       check('Пульс · таблица осталась видом по умолчанию',
         wasView === 'table' && !!doc.querySelector('#app .pd-table'), String(wasView));
@@ -7643,13 +7678,14 @@ setTimeout(async () => {
       }
       WS.router.go('start'); WS.ui.render();
     }
-    // Кнопка «Работать через AI-консьержа» из схемы не повторена: ввод уже стоит наверху.
-    check('Пульс · ввод Консьержа один, а не задвоен',
-      pulse.querySelectorAll('.prompt input').length === 1,
+    // Ввода Консьержа на Пульсе больше нет вовсе — ни одного, ни задвоенного.
+    check('Пульс · ввода Консьержа на экране не осталось',
+      pulse.querySelectorAll('.prompt input').length === 0,
       String(pulse.querySelectorAll('.prompt input').length));
 
     // Пять тем аналитики — по схеме партнёра.
-    const tabs = [].slice.call(pulse.querySelectorAll('[data-pulsetab]'));
+    const anPanel = openPulse('analytics');
+    const tabs = [].slice.call(anPanel.querySelectorAll('[data-pulsetab]'));
     check('Пульс · пять тем аналитики', tabs.length === 5, tabs.map((b) => b.textContent.trim()).join(' | '));
     const want = ['Сделки', 'Заявки', 'Клиенты', 'Партнёры', 'Стоимость'];
     check('Пульс · темы названы как у партнёра',
@@ -7706,6 +7742,7 @@ setTimeout(async () => {
        раздела. И каждый названный клиент существует: карточку читают перед звонком. */
     clickTab('deals');
     {
+      openPulse('prospects');
       const opps = WS.ui.pulseProspectList();
       const ghosts = opps.filter((p) => !(dd().clients || []).some((c) => c.id === p.clientId));
       check('Пульс · каждая возможность названа на существующем контакте', ghosts.length === 0,
@@ -7982,7 +8019,7 @@ setTimeout(async () => {
     // «Заявок в работе» — по стадии заявки. Проигранная заявка в работе не находится.
     WS.store.pulseTab = 'requests';
     WS.store.clientsTab = 'deals';
-    WS.router.go('start');
+    openPulse('analytics');
     const reqPanel = (doc.querySelector('#app .pulse-panel') || {}).textContent || '';
     const tileVal = (label) => {
       const t = [].slice.call(doc.querySelectorAll('#app .pulse-panel .tile'))
