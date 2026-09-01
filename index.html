@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 16:07</title>
+  <title>WESPACE · сборка 23:26</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='16:07';
+    window.WS_BUILD='23:26';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -89,7 +89,7 @@
      кириллицы, ни строчных: «Karim Aziz» он печатал капителью, «Анна Петрова» проваливалась в
      запасной шрифт, и рядом это читалось как две разные вёрстки. Bebas остаётся на цифрах.
      Через var(--font) токен следует за темой, если та переопределит текстовый шрифт. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): имена людей набираются текстовым шрифтом, не дисплейным — на именах дисплейный читается плохо.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): имена людей набираются текстовым шрифтом, не дисплейным — на именах дисплейный читается плохо.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
   --font-name: var(--font);
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, monospace;
@@ -235,7 +235,7 @@ button { font-family: inherit; cursor: pointer; }
    узнаваемым — на широкой карточке сделки это целая колонка. Подпись уходит в подсказку,
    счётчик — в точку над значком, иначе он вылезает за 64 пикселя ширины. */
 .nav-rail-t { flex: none; }
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): ширина свёрнутого бокового меню.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): ширина свёрнутого бокового меню.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 .app.nav-railed { grid-template-columns: 64px minmax(0, 1fr); }
 .app.nav-railed .brand { padding: 0 10px; gap: 0; }
@@ -254,7 +254,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* main scroll region */
 .main { grid-area: main; overflow-y: auto; overflow-x: hidden; position: relative; }
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): рабочая ширина экранов. Должна совпадать с `.start` — Пульс и остальные экраны разъезжались.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): рабочая ширина экранов. Должна совпадать с `.start` — Пульс и остальные экраны разъезжались.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 .view { max-width: 1180px; margin: 0 auto; padding: 26px 30px 80px; }
 .view-head { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 20px; }
@@ -497,7 +497,7 @@ button { font-family: inherit; cursor: pointer; }
 /* Та же рабочая ширина, что у всех остальных экранов. Было 1120 против 1180 и 30 против 26
    сверху: при переходе со «Сделок» на «Пульс» вся страница уезжала на 30 пикселей вбок и
    меняла ширину колонки. Замерено: start ширина=1120 слева=278, все прочие 1180 и 248. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): рабочая ширина Пульса. Должна совпадать с `.view` — они разъезжались.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): рабочая ширина Пульса. Должна совпадать с `.view` — они разъезжались.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 .start { max-width: 1180px; margin: 0 auto; padding: 26px 30px 80px; }
 /* Один шаг между разделами Пульса. Замерено до правки: 18 · 24 · 10 · 20 — четыре разных
@@ -886,7 +886,7 @@ button { font-family: inherit; cursor: pointer; }
 .lf-inline { min-width: 0; flex: 0 1 190px; }
 /* Порог доски. Тот же, что BOARD_MIN в ui.js: если они разъедутся, появится полоса ширины,
    где доска отрисована, но не видна, — и агент решит, что сделки пропали. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): доска сделок прячется на узком экране. Тот же порог продублирован в src/js/ui.js — менять оба.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): доска сделок прячется на узком экране. Тот же порог продублирован в src/js/ui.js — менять оба.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 @media (max-width: 899.98px) { .kanban { display: none; } }
 /* Две конверсии рядом, каждая со своим знаменателем. */
@@ -1071,7 +1071,7 @@ button { font-family: inherit; cursor: pointer; }
    «Тип» уезжали за правый край, а телефон переносился по цифрам на четыре строки. Боковая
    прокрутка прячет самое нужное поле: до него доходит тот, кто догадался потянуть вбок.
    Колонки и их порядок остаются партнёрскими — меняется форма, а не состав. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): строка дня на телефоне становится карточкой, а не полосой прокрутки вбок.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): строка дня на телефоне становится карточкой, а не полосой прокрутки вбок.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 @media (max-width: 760px) {
   .pd-wrap { overflow-x: visible; border: 0; background: none; border-radius: 0; }
@@ -1153,7 +1153,7 @@ button { font-family: inherit; cursor: pointer; }
 .deal:hover { border-color: var(--acc-line); transform: translateY(-1px); box-shadow: var(--shadow); }
 .deal .dt { font-weight: 650; color: var(--ink); font-size: 13px; }
 .deal .dm { font-size: 12px; color: var(--mut); margin-top: 3px; }
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): строка задачи на карточке сделки и обрезка её заголовка.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): строка задачи на карточке сделки и обрезка её заголовка.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 .deal .dtask { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; }
 .deal .dtask-t { color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2866,7 +2866,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 /* Ровно одинаковые: одна высота на обе карточки и один уровень заголовков. Раньше это был
    grid с align-items:start — карточки садились по своему содержимому, заголовок «Последние
    события» переносился на две строки из-за кнопки справа, и ряд читался кривым. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): две карточки в ряду одной высоты.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): две карточки в ряду одной высоты.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 @media (min-width: 1100px) { .dcard-pair { grid-template-columns: 1fr 1fr; align-items: stretch; } }
 .dcard-pair > * { min-width: 0; }
@@ -2983,7 +2983,7 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .dcard-chat-h .btn { margin-left: auto; flex: none; }
 /* Собственная высота, а не «сколько получится»: без предела лента выталкивает работу за экран,
    а это и есть та потеря контекста, из-за которой переход в раздел был плох. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): у ленты внутри карточки свой предел высоты и своя прокрутка.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): у ленты внутри карточки свой предел высоты и своя прокрутка.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 .dcard-chat .chat { max-height: 46vh; min-height: 180px; overflow-y: auto; padding: 12px; }
 @media (max-width: 899.98px) { .dcard-chat .chat { max-height: 52vh; } }
@@ -3299,7 +3299,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
    телефоне. На широком экране под неё резервируется жёлоб. На узком её просто нет:
    «Консьерж» уже стоит в нижней панели, и второй вход в то же место не стоит тридцати
    одного пикселя ширины телефона. */
-/* ЗАКРЕПЛЕНО (docs/DESIGN.md §5): вкладка Консьержа у правого края не ложится на содержимое; ниже 861 её нет. Пара правил, менять вместе.
+/* ЗАКРЕПЛЕНО (docs/DESIGN.md, раздел «Что закреплено проверками»): вкладка Консьержа у правого края не ложится на содержимое; ниже 861 её нет. Пара правил, менять вместе.
    Правило сверяется по ТЕКСТУ — даже перенос на другую строку роняет проверку. Менять вместе с ней. */
 @media (min-width:861px){ #main{ padding-right:34px; } }
 @media (max-width:860px){ .cg-tab{ display:none; } }
