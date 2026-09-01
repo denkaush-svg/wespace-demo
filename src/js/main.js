@@ -313,6 +313,7 @@
       case 'openSelection': WS.ui.openSelection(t.dataset.inbox); break;
       case 'showForm': WS.ui.openShowForm(t.dataset.inbox); break;
       case 'pulseSection': store.pulseSection = t.dataset.section; api.emit(); break;
+      case 'contactsScope': store.contactsScope = t.dataset.scope; store.contactsSearch = ''; api.emit(); break;
       case 'dayTable': store.dayView = 'table'; api.emit(); break;
       case 'createShow': WS.ui.createShow(t.dataset.inbox); break;
       case 'showOutcome': WS.ui.openShowOutcome(t.dataset.ev); break;

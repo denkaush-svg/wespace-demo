@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 11:14</title>
+  <title>WESPACE · сборка 12:51</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='11:14';
+    window.WS_BUILD='12:51';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1035,6 +1035,11 @@ button { font-family: inherit; cursor: pointer; }
 .ins-row a { color: var(--acc-ink); font-weight: 650; white-space: nowrap; }
 .ins-row a svg { width: 11px; height: 11px; vertical-align: -1px; }
 @media (max-width: 620px) { .ins-row { grid-template-columns: minmax(0, 1fr); gap: 3px; } }
+
+/* Переключатель «Люди / Организации» — сегмент, а не чипы: это выбор из двух взаимоисключающих
+   списков, а рядом стоят чипы-фильтры, которые складываются. Разная механика — разный вид. */
+.ct-scope { flex: none; }
+.ct-scope .ct-n { margin-left: 6px; font-size: 11px; font-weight: 700; opacity: .65; }
 
 .opp-bar { margin-bottom: 12px; }
 /* Хвост списка возможностей. Свёрнутый — одна строка, которая называет, сколько за ней. */
@@ -5181,7 +5186,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', pulseSection: 'day', dayView: 'table', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', pulseSection: 'day', contactsScope: 'people', dayView: 'table', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -5335,7 +5340,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.cgGroupCollapse = {};
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
-    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.pulseSection = 'day'; store.dayView = 'table'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
+    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.pulseSection = 'day'; store.contactsScope = 'people'; store.dayView = 'table'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.cgLang = 'ru'; store.cgDocLang = 'auto';
     store.dealArchivedOnly = false; store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;
@@ -10875,7 +10880,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
           { key: 'insights', title: 'Инсайты', icon: 'radar',
             count: insN,
             sub: insN + ' ' + plural(insN, 'инсайт', 'инсайта', 'инсайтов'),
-            body: () => dayHint + insightCards() },
+            /* «Сюжет дня» из инсайтов убран: это демонстрационный проигрыватель сценариев,
+               а раздел — про знание о рынке. Проигрыватель остался доступен из демо-меню. */
+            body: () => insightCards() },
           { key: 'analytics', title: 'Аналитика', icon: 'trend',
             count: null,
             sub: 'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
@@ -11579,14 +11586,29 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function companyHaystack(co) {
     return [co.name, co.kind, co.phone, co.email, co.address, co.contactPerson].filter(Boolean).join(' ').toLowerCase();
   }
+  /* Две вкладки: люди и организации. Раздел остался один — партнёр просил не гонять брокера
+     между «Клиентами» и «Компаниями», — но искать в одном списке человека и юрлицо неудобно:
+     поиск по названию организации выдавал вперемешку и людей, у которых это название стоит
+     в строке компании. Вкладка сужает population, фильтры и поиск работают внутри неё.
+     Карточки по-прежнему разные: у юрлица есть KYC и контактные лица, которым в строке
+     человека места нет. */
+  const CONTACT_SCOPES = [['people', 'Люди'], ['companies', 'Организации']];
+  function contactsScope() {
+    const k = S().contactsScope;
+    return CONTACT_SCOPES.some((x) => x[0] === k) ? k : 'people';
+  }
   function contactsSearchList() {
     const cur = S().contactType || 'all';
+    const scope = contactsScope();
     const q = (S().contactsSearch || '').trim().toLowerCase();
     const cl = D().clients || [];
-    let list = cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
+    let list = scope === 'companies' ? []
+      : cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
     // Замещение — про переданных клиентов, компании в него не попадают.
     if (cur !== 'transferred') {
-      list = list.concat((D().companies || []).map((co) => ({ id: co.id, name: co.name, co: co })));
+      if (scope === 'companies') {
+        list = (D().companies || []).map((co) => ({ id: co.id, name: co.name, co: co }));
+      }
     } else {
       list = list.filter((p) => p.transferred);
     }
@@ -11739,7 +11761,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return '<div class="feed" style="padding:0 16px 8px">' + list.map((p) => (p.co ? contactCompanyRow(p) : contactRow(p))).join('') + '</div>';
   }
   function contactsCountLabel() {
-    return ((S().contactType === 'transferred') ? 'Замещение' : 'Контакты') + ' · ' + contactsSearchList().length;
+    const n = contactsSearchList().length;
+    if (S().contactType === 'transferred') return 'Замещение · ' + n;
+    return (contactsScope() === 'companies'
+      ? n + ' ' + plural(n, 'организация', 'организации', 'организаций')
+      : n + ' ' + plural(n, 'человек', 'человека', 'человек'));
   }
   function contactsPeople() {
     const cur = S().contactType || 'all';
@@ -11807,8 +11833,16 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const note = cur === 'transferred'
       ? '<div class="ws-flag" style="margin:0 0 12px">' + I('users') + ' Клиенты, переданные вам от коллеги на время его отсутствия. Режим замещения включается в Настройках.</div>' : '';
 
-    return selBar + '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
-      searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
+    const scope = contactsScope();
+    const scopeTabs = '<div class="seg ct-scope">' + CONTACT_SCOPES.map((sc) =>
+      '<button class="' + (scope === sc[0] ? 'on' : '') + '" data-act="contactsScope" data-scope="' + sc[0] + '">' +
+      I(sc[0] === 'people' ? 'users' : 'building') + sc[1] +
+      '<span class="ct-n">' + (sc[0] === 'people' ? (D().clients || []).length : (D().companies || []).length) +
+      '</span></button>').join('') + '</div>';
+    return selBar + '<div class="qa-row" style="margin-bottom:12px">' + scopeTabs + typeChips + '</div>' + note +
+      searchBox('contactsSearch', scope === 'companies'
+        ? 'Поиск по организациям: название, вид, TRN, контактное лицо…'
+        : 'Поиск: имя, телефон, email, цель, район, компания…', q) +
       '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + cgBtn + '</div>' + panel +
       '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
       '<div class="contacts-list">' + contactsListInner() + '</div></div>';
@@ -18558,12 +18592,20 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // ---------------- NAVIGATOR DRAWER ----------------
   function drawer() {
     const st = S();
+    /* «Сюжет дня» переехал сюда из «Инсайтов». Это демонстрационный проигрыватель — он
+       показывает, что система делает сама, — и место ему рядом со сценариями, а не в разделе
+       про знание о рынке. Вход был ровно один, и убрать его совсем значило бы оставить
+       работающую функцию без двери. */
+    const dayStory = '<div class="grp">' + I('play') + 'Сюжет дня</div>' +
+      '<div class="scn"><div class="name">Что система делает сама, без вас</div>' +
+      '<div class="val">Ночной лид · входящий звонок · ответ на КП · проверка · развилка</div>' +
+      '<div class="run"><button class="btn sm primary" data-act="presenter">' + I('play') + 'Запустить</button></div></div>';
     const groups = [
       { key: 'golden', label: 'Ключевые цепочки', icon: 'star' },
       { key: 'support', label: 'Поддерживающие сценарии', icon: 'layers' },
       { key: 'beta', label: 'Beta', icon: 'flame' },
     ];
-    let body = '';
+    let body = dayStory;
     groups.forEach((g) => {
       const items = WS.scenarioList.filter((s) => s.group === g.key);
       body += '<div class="grp">' + I(g.icon) + g.label + '</div>';
@@ -22790,6 +22832,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'openSelection': WS.ui.openSelection(t.dataset.inbox); break;
       case 'showForm': WS.ui.openShowForm(t.dataset.inbox); break;
       case 'pulseSection': store.pulseSection = t.dataset.section; api.emit(); break;
+      case 'contactsScope': store.contactsScope = t.dataset.scope; store.contactsSearch = ''; api.emit(); break;
       case 'dayTable': store.dayView = 'table'; api.emit(); break;
       case 'createShow': WS.ui.createShow(t.dataset.inbox); break;
       case 'showOutcome': WS.ui.openShowOutcome(t.dataset.ev); break;

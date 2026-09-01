@@ -33,7 +33,7 @@
     dealObjType: 'all', dealReadiness: 'all', dealAgent: 'all', dealStage: 'all', dealFunnelAll: true, dealArchivedOnly: false,
     companiesFilters: { client: 'all' },
     calcModel: null, finModel: null, finObjId: 'o_creekline',
-    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', pulseSection: 'day', dayView: 'table', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
+    clientsTab: 'deals', rightPane: null, pulseTab: 'deals', pulseDay: 'today', pulseSection: 'day', contactsScope: 'people', dayView: 'table', prospIdx: 0, prospDeck: false, pulseOpen: {}, contactsChat: false, navRail: false, dealsView: null, navOpen: false, cgRailOpen: false, cgCtx: [], cgMenu: null, cgMode: 'auto', cgDepth: 'think',
     // Chat and documents are two settings because they are two decisions: the
     // broker reads the chat, the client reads the document. `auto` on the
     // document means «follow whoever it is for», which is the usual answer.
@@ -187,7 +187,7 @@
     store.cgGroupCollapse = {};
     store.companiesFilters = { client: 'all' };
     store.eventsPlayed = []; store.feedback = []; store.signals = []; store.dayStep = 0;
-    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.pulseSection = 'day'; store.dayView = 'table'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
+    store.clientsTab = 'deals'; store.pulseTab = 'deals'; store.contactsChat = false; store.navRail = false; store.pulseDay = 'today'; store.pulseSection = 'day'; store.contactsScope = 'people'; store.dayView = 'table'; store.prospIdx = 0; store.prospDeck = false; store.pulseOpen = {}; store.dealsView = null; store.cgCtx = []; store.cgMenu = null; store.cgMode = 'auto'; store.cgDepth = 'think';
     store.cgLang = 'ru'; store.cgDocLang = 'auto';
     store.dealArchivedOnly = false; store.capture = {}; store.dealFunnel = 'sale'; store.dealsFilter = {}; store.savedView = null;
     store.navOpen = false;

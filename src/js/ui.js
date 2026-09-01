@@ -3162,7 +3162,9 @@
           { key: 'insights', title: 'Инсайты', icon: 'radar',
             count: insN,
             sub: insN + ' ' + plural(insN, 'инсайт', 'инсайта', 'инсайтов'),
-            body: () => dayHint + insightCards() },
+            /* «Сюжет дня» из инсайтов убран: это демонстрационный проигрыватель сценариев,
+               а раздел — про знание о рынке. Проигрыватель остался доступен из демо-меню. */
+            body: () => insightCards() },
           { key: 'analytics', title: 'Аналитика', icon: 'trend',
             count: null,
             sub: 'конверсия ' + computeMetrics().conv + '% · ожидаемая комиссия ' + WS.AED(computeMetrics().expectedComm),
@@ -3866,14 +3868,29 @@
   function companyHaystack(co) {
     return [co.name, co.kind, co.phone, co.email, co.address, co.contactPerson].filter(Boolean).join(' ').toLowerCase();
   }
+  /* Две вкладки: люди и организации. Раздел остался один — партнёр просил не гонять брокера
+     между «Клиентами» и «Компаниями», — но искать в одном списке человека и юрлицо неудобно:
+     поиск по названию организации выдавал вперемешку и людей, у которых это название стоит
+     в строке компании. Вкладка сужает population, фильтры и поиск работают внутри неё.
+     Карточки по-прежнему разные: у юрлица есть KYC и контактные лица, которым в строке
+     человека места нет. */
+  const CONTACT_SCOPES = [['people', 'Люди'], ['companies', 'Организации']];
+  function contactsScope() {
+    const k = S().contactsScope;
+    return CONTACT_SCOPES.some((x) => x[0] === k) ? k : 'people';
+  }
   function contactsSearchList() {
     const cur = S().contactType || 'all';
+    const scope = contactsScope();
     const q = (S().contactsSearch || '').trim().toLowerCase();
     const cl = D().clients || [];
-    let list = cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
+    let list = scope === 'companies' ? []
+      : cl.map((c, i) => ({ id: c.id, name: c.name, c: c, transferred: i >= cl.length - 2 }));
     // Замещение — про переданных клиентов, компании в него не попадают.
     if (cur !== 'transferred') {
-      list = list.concat((D().companies || []).map((co) => ({ id: co.id, name: co.name, co: co })));
+      if (scope === 'companies') {
+        list = (D().companies || []).map((co) => ({ id: co.id, name: co.name, co: co }));
+      }
     } else {
       list = list.filter((p) => p.transferred);
     }
@@ -4026,7 +4043,11 @@
     return '<div class="feed" style="padding:0 16px 8px">' + list.map((p) => (p.co ? contactCompanyRow(p) : contactRow(p))).join('') + '</div>';
   }
   function contactsCountLabel() {
-    return ((S().contactType === 'transferred') ? 'Замещение' : 'Контакты') + ' · ' + contactsSearchList().length;
+    const n = contactsSearchList().length;
+    if (S().contactType === 'transferred') return 'Замещение · ' + n;
+    return (contactsScope() === 'companies'
+      ? n + ' ' + plural(n, 'организация', 'организации', 'организаций')
+      : n + ' ' + plural(n, 'человек', 'человека', 'человек'));
   }
   function contactsPeople() {
     const cur = S().contactType || 'all';
@@ -4094,8 +4115,16 @@
     const note = cur === 'transferred'
       ? '<div class="ws-flag" style="margin:0 0 12px">' + I('users') + ' Клиенты, переданные вам от коллеги на время его отсутствия. Режим замещения включается в Настройках.</div>' : '';
 
-    return selBar + '<div class="qa-row" style="margin-bottom:12px">' + typeChips + '</div>' + note +
-      searchBox('contactsSearch', 'Поиск: имя, телефон, email, цель, район, компания…', q) +
+    const scope = contactsScope();
+    const scopeTabs = '<div class="seg ct-scope">' + CONTACT_SCOPES.map((sc) =>
+      '<button class="' + (scope === sc[0] ? 'on' : '') + '" data-act="contactsScope" data-scope="' + sc[0] + '">' +
+      I(sc[0] === 'people' ? 'users' : 'building') + sc[1] +
+      '<span class="ct-n">' + (sc[0] === 'people' ? (D().clients || []).length : (D().companies || []).length) +
+      '</span></button>').join('') + '</div>';
+    return selBar + '<div class="qa-row" style="margin-bottom:12px">' + scopeTabs + typeChips + '</div>' + note +
+      searchBox('contactsSearch', scope === 'companies'
+        ? 'Поиск по организациям: название, вид, TRN, контактное лицо…'
+        : 'Поиск: имя, телефон, email, цель, район, компания…', q) +
       '<div class="qa-row" style="margin:10px 0 0;align-items:center">' + prio + '<span class="df-sep"></span>' + toggle + clear + cgBtn + '</div>' + panel +
       '<div class="card" style="margin-top:12px"><div class="section-label contacts-count" style="padding:12px 16px 4px">' + contactsCountLabel() + '</div>' +
       '<div class="contacts-list">' + contactsListInner() + '</div></div>';
@@ -10845,12 +10874,20 @@
   // ---------------- NAVIGATOR DRAWER ----------------
   function drawer() {
     const st = S();
+    /* «Сюжет дня» переехал сюда из «Инсайтов». Это демонстрационный проигрыватель — он
+       показывает, что система делает сама, — и место ему рядом со сценариями, а не в разделе
+       про знание о рынке. Вход был ровно один, и убрать его совсем значило бы оставить
+       работающую функцию без двери. */
+    const dayStory = '<div class="grp">' + I('play') + 'Сюжет дня</div>' +
+      '<div class="scn"><div class="name">Что система делает сама, без вас</div>' +
+      '<div class="val">Ночной лид · входящий звонок · ответ на КП · проверка · развилка</div>' +
+      '<div class="run"><button class="btn sm primary" data-act="presenter">' + I('play') + 'Запустить</button></div></div>';
     const groups = [
       { key: 'golden', label: 'Ключевые цепочки', icon: 'star' },
       { key: 'support', label: 'Поддерживающие сценарии', icon: 'layers' },
       { key: 'beta', label: 'Beta', icon: 'flame' },
     ];
-    let body = '';
+    let body = dayStory;
     groups.forEach((g) => {
       const items = WS.scenarioList.filter((s) => s.group === g.key);
       body += '<div class="grp">' + I(g.icon) + g.label + '</div>';

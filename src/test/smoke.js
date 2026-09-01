@@ -1447,7 +1447,23 @@ setTimeout(async () => {
       lo.every((p) => (p.c.budget || 0) < 1500000), lo.map((p) => p.c.budget).join(' '));
     WS.store.contactsFilters = Object.assign({}, WS.store.contactsFilters, { budget: 'all', state: 'open' });
     const open = WS.ui.contactsSearchList();
-    check('фильтры клиентов · состояние работы сужает список', open.length > 0 && open.length < all, open.length + ' из ' + all);
+    /* Проверяется СОСТАВ, а не то, что список стал короче. «Сужает» держалось на том, что у
+       части клиентов заявок не было вовсе; стоило завести заявки всем — и проверка покраснела,
+       хотя фильтр работает верно. Ожидаемый набор считается из данных заново. */
+    {
+      const liveReqOf = (id) => (dd().requests || []).some((r) => r.clientId === id &&
+        ['closed', 'lost'].indexOf(WS.ui.reqStage(r)) < 0);
+      const want = (dd().clients || []).filter((c) => liveReqOf(c.id)).map((c) => c.id);
+      check('фильтры клиентов · «есть открытый запрос» отбирает ровно тех, у кого он есть',
+        open.length === want.length && open.every((p) => want.indexOf(p.id) >= 0),
+        open.length + ' против ' + want.length);
+      WS.store.contactsFilters = Object.assign({}, WS.store.contactsFilters, { state: 'none' });
+      const none = WS.ui.contactsSearchList();
+      const wantNone = (dd().clients || []).filter((c) => !(dd().requests || []).some((r) => r.clientId === c.id));
+      check('фильтры клиентов · «заявок ещё не было» отбирает ровно тех, у кого их нет',
+        none.length === wantNone.length && none.every((p) => wantNone.some((c) => c.id === p.id)),
+        none.length + ' против ' + wantNone.length);
+    }
     WS.store.contactsFilters = { priority: 'all', psych: 'all', object: 'all', area: 'all', budget: 'all', state: 'all', consent: 'all' };
 
     // «Что предложить» наполнено у каждого клиента, у кого есть свободный подходящий инвентарь.
@@ -7230,7 +7246,15 @@ setTimeout(async () => {
       doc.querySelector('.cg-tab') ? 'вкладка сбоку' : 'пункт меню');
     {
       const ins = openPulse('insights');
-      check('Пульс · вход в «Сюжет дня» не потерян', !!ins.querySelector('[data-act="presenter"]'));
+      /* «Сюжет дня» ушёл из «Инсайтов»: это демонстрационный проигрыватель, а раздел — про
+         знание о рынке. Но вход в него был ровно один, поэтому он переехал в демо-навигатор,
+         а не исчез: работающая функция без двери — это мёртвый код, а не убранный элемент. */
+      check('Пульс · «Сюжета дня» в инсайтах больше нет',
+        !ins.querySelector('[data-act="presenter"]'),
+        ins.querySelector('[data-act="presenter"]') ? 'остался' : 'убран');
+      check('Пульс · но вход в «Сюжет дня» не потерян — он в демо-навигаторе',
+        /data-act="presenter"/.test(WS.ui.drawer()),
+        /Сюжет дня/.test(WS.ui.drawer()) ? 'в навигаторе' : 'входа нет нигде');
       check('Пульс · «Инсайты» на месте', /Инсайты/.test(ins.textContent));
     }
     /* ---- Инсайты — знание о рынке, а не работа с клиентом ---------------------------
@@ -8012,9 +8036,30 @@ setTimeout(async () => {
       !navLabels.some((t) => /^Компании/.test(t)), navLabels.join(' | '));
 
     // 2. Компании в том же списке, но ведут на свою карточку: у юрлица есть KYC и контактные лица.
+    /* Раздел один, но списка два: искать человека и юрлицо в одной ленте неудобно — поиск по
+       названию организации выдавал вперемешку и людей, у которых это название стоит в строке
+       компании. Вкладка сужает совокупность; карточки остаются разными. */
+    const scopeTabs = [].slice.call(doc.querySelectorAll('#app [data-act="contactsScope"]'));
+    check('контакты · две вкладки — люди и организации',
+      scopeTabs.length === 2 && /Люди/.test(scopeTabs[0].textContent) && /Организац/.test(scopeTabs[1].textContent),
+      scopeTabs.map((b) => b.textContent.replace(/\s+/g, ' ').trim()).join(' | '));
+    check('контакты · по умолчанию открыты люди, и организаций в их списке нет',
+      WS.ui.contactsSearchList().every((p) => !p.co) &&
+      WS.ui.contactsSearchList().length === (dd().clients || []).length,
+      WS.ui.contactsSearchList().length + ' из ' + (dd().clients || []).length);
+    WS.store.contactsScope = 'companies';
+    WS.router.go('clients'); WS.ui.render();
+    const onlyCo = WS.ui.contactsSearchList();
+    check('контакты · во вкладке организаций — только они, и все',
+      onlyCo.length === (dd().companies || []).length && onlyCo.every((p) => !!p.co),
+      onlyCo.length + ' из ' + (dd().companies || []).length);
     const coRows = [].slice.call(doc.querySelectorAll('#app .contacts-list [data-company]'));
+    check('контакты · строка организации ведёт на её карточку',
+      coRows.length === (dd().companies || []).length, String(coRows.length));
+    WS.store.contactsScope = 'people';
+    WS.router.go('clients'); WS.ui.render();
     const peopleRows = [].slice.call(doc.querySelectorAll('#app .contacts-list [data-client]'));
-    check('контакты · компании стоят в том же списке, что и люди',
+    check('контакты · раздел остался один — отдельного пункта меню для организаций нет',
       coRows.length === (dd().companies || []).length && peopleRows.length > 0,
       'компаний в списке ' + coRows.length + ' из ' + (dd().companies || []).length);
     check('контакты · строка компании ведёт на карточку компании, а не на карточку человека',
