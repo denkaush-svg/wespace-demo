@@ -682,7 +682,15 @@
         : ''),
       blocks: blocks, evidence: evidence, next: next,
       speak: normSay(plan.say_aloud),
-      report: made ? { id: made.id, title: made.title, name: made.name, count: report.blocks.length } : null,
+      /* A document in a language other than the conversation's is marked with
+         it, and with whose account it is on. Only then: the mark exists so the
+         broker notices a КП going out in English before they forward it, and a
+         label on every Russian note would be the noise that hides it. */
+      report: made ? {
+        id: made.id, title: made.title, name: made.name, count: report.blocks.length,
+        lang: (want && ran && ran.chat && want !== ran.chat) ? want : null,
+        why: (ran && ran.docWhy) || null,
+      } : null,
     };
   }
 
@@ -959,7 +967,8 @@
     }
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
-    const ran = { mode: done.mode || null, depth: done.depth || null, doc: done.doc || null };
+    const ran = { mode: done.mode || null, depth: done.depth || null,
+      doc: done.doc || null, chat: done.chat || null, docWhy: done.docWhy || null };
     const reply = toReply(done.say, done.plan || {}, ran);
     if (!reply) throw new Error('empty reply');
     reply.mode = ran.mode;

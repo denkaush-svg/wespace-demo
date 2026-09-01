@@ -597,13 +597,32 @@
     // Шаг принадлежит договору, а не разговору. Проверка стоит на ОБОИХ путях записи: своя
     // операция `dealStage` и поле `stage` внутри `updateDeal` — иначе достаточно назвать её
     // патчем, чтобы поставить сделку на шаг, которого в её договоре нет, и доска потеряет карточку.
+    /* Проверялось членство, а не порядок, и «Успех» ставился прямо из
+       «Подготовки»: на доске появлялась закрытая сделка, которую никто не
+       подписывал и нигде не регистрировал. Это не про отрисовку — это сделка,
+       заявляющая комиссию по договору, которого нет.
+
+       Упорядочен только последний шаг, и намеренно только он. Середину пути
+       пропускают в жизни — оффплан с полной оплатой идёт мимо брони, — и
+       запрет на это был бы правилом, выдумывающим работу. Но конец пути не
+       шаг, а утверждение, что всё предыдущее случилось, и шаг прямо перед ним —
+       это ровно подпись и реестр. «Отказ» остаётся доступен отовсюду: сделка
+       действительно разваливается на любом шаге. */
     function stageRefusal(stage) {
       const kind = WS.contractKindFor ? WS.contractKindFor(rec.funnel || 'sale', rec.readiness) : '';
       const allowed = (WS.DEAL_STEPS || {})[kind] || [];
-      if (!allowed.length || allowed.indexOf(stage) >= 0) return null;
-      const label = ((WS.fixtures.CONTRACT_KINDS || {})[kind] || {}).label || kind;
-      return fail('bad_value', at + 'в договоре «' + label + '» нет такого шага',
-        { stage: stage, available: allowed });
+      if (!allowed.length) return null;
+      if (allowed.indexOf(stage) < 0) {
+        const label = ((WS.fixtures.CONTRACT_KINDS || {})[kind] || {}).label || kind;
+        return fail('bad_value', at + 'в договоре «' + label + '» нет такого шага',
+          { stage: stage, available: allowed });
+      }
+      if (stage !== 'won' || rec.stage === 'won') return null;
+      const path = allowed.filter((k) => k !== 'won' && k !== 'lost');
+      const need = path[path.length - 1];
+      if (!need || rec.stage === need) return null;
+      return fail('bad_value', at + '«' + stageRu('won') + '» ставится только после шага «' + stageRu(need) + '»',
+        { stage: stage, from: rec.stage, need: need });
     }
     if (spec.kind === 'stage') {
       if (!o.stage) return fail('bad_value', at + 'не указана стадия');
@@ -720,9 +739,16 @@
   }
 
   // Manual kanban move (batch 4). Stage is restored by resetAll/resetScene.
+  /* Интерфейс ходит к тому же полю своей дверью: степпер на карточке сделки —
+     ряд кнопок, и «Успех» одна из них. Дверь писала напрямую, поэтому правило
+     «сделка не закрывается раньше подписи» держалось для Консьержа и не
+     держалось для человека, который просто нажал на последний кружок.
+     Правило одно и живёт в слое записи — спрашивают его оба пути. */
   function setDealStage(id, stage) {
     const dl = store.data.deals.find((x) => x.id === id);
     if (!dl || dl.stage === stage) return;
+    const check = preview([{ op: 'dealStage', id: id, stage: stage }]);
+    if (!check || check.ok === false) { toast((check && check.error) || 'такой шаг поставить нельзя', 'warn'); return; }
     dl.stage = stage;
     afterDealStage(dl);
     store.dataRevision++; save(); emit();

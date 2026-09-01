@@ -1300,9 +1300,74 @@ setTimeout(async () => {
     check('stage · отказ называет договор, а не воронку',
       pre && /договор/.test(pre.error || ''), (pre || {}).error);
 
-    // Доска переложена на четыре укрупнённых отсека. Прежняя проверка требовала ОТСУТСТВИЯ
-    // пресейла в колонках — теперь он там есть намеренно, пройденным участком сквозного пути,
-    // и требование заменено на то, ради чего перекладка делалась.
+    /* Проверялось членство, а не порядок: «Успех» ставился прямо из
+       «Подготовки». На доске появлялась закрытая сделка, которую никто не
+       подписывал и нигде не регистрировал — это не про отрисовку, это сделка,
+       заявляющая комиссию по договору, которого нет.
+
+       Упорядочен только последний шаг, и намеренно только он. Середину пути
+       пропускают в жизни — оффплан с полной оплатой идёт мимо брони, — и
+       запрет на это был бы правилом, выдумывающим работу. Но конец пути не
+       шаг, а утверждение, что всё предыдущее случилось, и шаг прямо перед ним —
+       это ровно подпись и реестр. «Отказ» остаётся доступен отовсюду: сделка
+       действительно разваливается на любом шаге. */
+    {
+      const path = (x) => ((WS.DEAL_STEPS || {})[WS.contractKindFor(x.funnel || 'sale', x.readiness)] || [])
+        .filter((k) => k !== 'won' && k !== 'lost');
+      const early = (dd().deals || []).find((x) => {
+        const p = path(x);
+        return p.indexOf(x.stage) >= 0 && x.stage !== p[p.length - 1];
+      });
+      check('шаги · в стенде есть сделка, которой до конца ещё далеко', !!early,
+        early && early.id + ':' + early.stage);
+      if (early) {
+        const wasStage = early.stage;
+        const last = path(early)[path(early).length - 1];
+        const jump = sapi.apply([{ op: 'dealStage', id: early.id, stage: 'won' }], { confirmed: true });
+        check('шаги · «Успех» мимо подписания и регистрации не ставится',
+          !jump || jump.ok === false, JSON.stringify(jump));
+        check('шаги · и сделка осталась на своём шаге', dealBy(early.id).stage === wasStage);
+        check('шаги · отказ называет шаг, которого не хватает',
+          jump && jump.error && jump.error.indexOf(WS.ui.stageLabel(last)) >= 0, (jump || {}).error);
+
+        const lost = sapi.preview([{ op: 'dealStage', id: early.id, stage: 'lost' }]);
+        check('шаги · «Отказ» остаётся доступен с любого шага',
+          !!lost && lost.ok !== false, JSON.stringify(lost && lost.error));
+
+        const ahead = sapi.preview([{ op: 'dealStage', id: early.id, stage: last }]);
+        check('шаги · пропуск середины пути не запрещён — запрещён прыжок в конец',
+          !!ahead && ahead.ok !== false, JSON.stringify(ahead && ahead.error));
+
+        // С последнего шага «Успех» ставится. Шаг подменяется прямо в записи и
+        // возвращается назад: проверяется правило, а не путь до него.
+        early.stage = last;
+        const closeable = sapi.preview([{ op: 'dealStage', id: early.id, stage: 'won' }]);
+        early.stage = wasStage;
+        check('шаги · с последнего шага договора «Успех» ставится',
+          !!closeable && closeable.ok !== false, JSON.stringify(closeable && closeable.error));
+
+        /* И вторая дверь к тому же полю. Степпер на карточке сделки — это ряд
+           кнопок, и «Успех» одна из них; он писал напрямую, мимо всех правил.
+           Правило одно, значит и спрашивают его оба пути. */
+        const before = dealBy(early.id).stage;
+        sapi.setDealStage(early.id, 'won');
+        check('шаги · кнопка «Успех» на карточке подчиняется тому же правилу',
+          dealBy(early.id).stage === before, dealBy(early.id).stage);
+        /* Разрешённый шаг та же кнопка ставит как раньше — иначе «дверь
+           спрашивает правило» незаметно стало бы «дверь заперта». Проверяется
+           «Отказом», а не подписью: шаги подписи, реестра и исполнения — это
+           те, на которых у сделки заводится договор, и тест, прогоняющий её
+           через них туда-обратно, оставляет за собой запись, которую
+           следующий тест справедливо считает лишней. Проверка правила не
+           должна оставлять следов работы. */
+        sapi.setDealStage(early.id, 'lost');
+        check('шаги · а разрешённый шаг та же кнопка ставит как раньше',
+          dealBy(early.id).stage === 'lost', dealBy(early.id).stage);
+        sapi.setDealStage(early.id, wasStage);
+      }
+    }
+
+    // Доска стоит на тех же шагах: колонки услуги — объединение её видов договора.
     WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
     const cols = [].slice.call(doc.querySelectorAll('#app .kanban .kcol .kh span:first-child')).map((e) => e.textContent.trim());
     /* Отсеков пять: к четырём укрупнённым добавились «Квалифицированы». Прежде эта стадия на
@@ -4000,6 +4065,60 @@ setTimeout(async () => {
       const out = L.toReply('Собрал КП.', { report: mixed }, { doc: 'en' });
       check('язык · Russian cells from our own data do not make an English document Russian',
         !!out && !!out.report && out.report.count === 2, JSON.stringify(out && out.report));
+    }
+
+    /* ---- and the settings row is a control, not a picture of one ----
+
+       It offered «Русский · English · Авто» and every button was wired to the
+       same feature stub: a person could set it, see it take, and change
+       nothing. A promise the interface does not keep is worse than an absent
+       control, because it is the one the presenter points at. */
+    {
+      const was = { chat: st.cgLang, doc: st.cgDocLang, view: st.view };
+      // Found, not assumed: a missing control is a failed check, never an
+      // exception that takes the two hundred checks after it down with it.
+      const press = (sel) => {
+        const el = doc.querySelector(sel);
+        if (el) el.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+        return !!el;
+      };
+      WS.router.go('settings');
+      check('язык · the row writes to the workspace, not to a stub',
+        !!doc.querySelector('[data-cglang="en"]') && !!doc.querySelector('[data-cgdoclang="auto"]'));
+      check('язык · and the document language is a row of its own',
+        !!doc.querySelector('[data-cgdoclang="en"]') && !!doc.querySelector('[data-cgdoclang="ru"]'));
+      const auto = doc.querySelector('[data-cgdoclang="auto"]');
+      check('язык · what is set shows as set',
+        !!auto && (auto.className || '').indexOf('on') >= 0, auto && auto.className);
+
+      check('язык · pressing it changes what the Concierge is actually asked for',
+        press('[data-cglang="en"]') && st.cgLang === 'en' && L.langs('сколько сделок в работе').chat === 'en',
+        st.cgLang + ' / ' + L.langs('сколько сделок в работе').chat);
+
+      WS.router.go('settings');
+      check('язык · and the document row overrides the recipient’s card',
+        press('[data-cgdoclang="ar"]') && st.cgDocLang === 'ar' && L.langs('собери КП для Игоря Лебедева').doc === 'ar',
+        st.cgDocLang + ' / ' + L.langs('собери КП для Игоря Лебедева').doc);
+
+      st.cgLang = was.chat; st.cgDocLang = was.doc;
+      WS.router.go(was.view || 'start');
+    }
+
+    // ---- and a document not in the language of the conversation says so ----
+    {
+      const english = { title: 'Commercial proposal', blocks: [{ t: 'p', text: 'The proposal below covers the office space in Business Bay with the rent and the service charge for the first year.' }] };
+      const other = L.toReply('Собрал КП.', { report: english }, { doc: 'en', chat: 'ru', docWhy: 'contact' });
+      check('язык · a document not in the chat’s language is marked with its own',
+        !!other && !!other.report && other.report.lang === 'en' && other.report.why === 'contact',
+        JSON.stringify(other && other.report));
+      const card = WS.engine.agentCard(other, 'm_lang_test');
+      check('язык · and the card says which language and on whose account',
+        /английск/i.test(card) && /получател/i.test(card), card.slice(card.indexOf('rp-t'), card.indexOf('rp-t') + 220));
+
+      const russian = { title: 'Записка', blocks: [{ t: 'p', text: 'Ниже разбор по сделкам в работе: сумма портфеля, стадии и что мешает закрыть ближайшие.' }] };
+      const same = L.toReply('Собрал записку.', { report: russian }, { doc: 'ru', chat: 'ru', docWhy: 'broker' });
+      check('язык · a document in the language of the conversation is not marked at all',
+        !!same && !!same.report && !same.report.lang, JSON.stringify(same && same.report));
     }
   } else {
     check('live · language module present', false);

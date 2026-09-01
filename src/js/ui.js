@@ -11497,6 +11497,11 @@
     const sw = (on) => '<button class="switch' + (on ? ' on' : '') + '" data-act="cgFeatureStub"><i></i></button>';
     const rowc = (ic, t, d, ctl) => '<div class="cap-toggle" style="margin-bottom:8px"><span>' + I(ic) + '<span><b style="color:var(--ink)">' + t + '</b><div style="font-size:11.5px;color:var(--mut);font-weight:400">' + d + '</div></span></span>' + ctl + '</div>';
     const seg = (opts, sel) => '<div class="seg" style="display:inline-flex">' + opts.map((o) => '<button class="' + (o === sel ? 'on' : '') + '" data-act="cgFeatureStub">' + o + '</button>').join('') + '</div>';
+    // The same control, wired. The row beside it is a picture of a setting; a
+    // language row that is a picture is how a КП left for a client in a
+    // language nobody had asked for.
+    const segLive = (attr, opts, cur) => '<div class="seg" style="display:inline-flex">' +
+      opts.map((o) => '<button class="' + (o[0] === cur ? 'on' : '') + '" data-' + attr + '="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
     const card = (title, inner) => '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 12px">' + title + '</div>' + inner + '</div>';
 
     const account = card('Аккаунт',
@@ -11519,7 +11524,11 @@
     const cgStyle = card('Стиль общения с Консьержем',
       '<div class="settings-row"><div class="dk">Тон</div>' + seg(['Деловой', 'Дружелюбный', 'Краткий'], 'Деловой') + '</div>' +
       '<div class="settings-row"><div class="dk">Длина ответов</div>' + seg(['Кратко', 'Обычно', 'Подробно'], 'Обычно') + '</div>' +
-      '<div class="settings-row"><div class="dk">Язык общения</div>' + seg(['Русский', 'English', 'Авто'], 'Русский') + '</div>' +
+      '<div class="settings-row"><div class="dk">Язык общения</div>' +
+        segLive('cglang', [['ru', 'Русский'], ['en', 'English'], ['auto', 'Авто']], S().cgLang || 'ru') + '</div>' +
+      '<div class="settings-row"><div class="dk">Язык документов</div>' +
+        segLive('cgdoclang', [['auto', 'По получателю'], ['ru', 'Русский'], ['en', 'English'], ['ar', 'العربية']], S().cgDocLang || 'auto') + '</div>' +
+      '<div style="font-size:11.5px;color:var(--mut);margin:-2px 0 4px;line-height:1.5">Язык КП, досье и отчётов — отдельно от языка чата: читает их клиент, а не вы. <b style="color:var(--ink)">По получателю</b> — как записано в его карточке; языка там нет — английский, рабочий язык рынка. Записка «для себя» пишется на языке разговора. Разово язык можно назвать прямо в запросе: «собери КП по-английски».</div>' +
       '<div class="settings-row"><div class="dk">Стартовый режим Консьержа</div>' + seg(['Авто', 'Инвест-анализ', 'Подбор'], 'Авто') + '</div>' +
       '<div style="font-size:11.5px;color:var(--mut);margin:-2px 0 4px;line-height:1.5">С какого режима Консьерж начинает новый диалог — режим можно сменить прямо в чате перед запросом. <b style="color:var(--ink)">Авто</b> — определит задачу сам по формулировке · <b style="color:var(--ink)">Инвест-анализ</b> — доходность, payment plan, ROI и сценарии выхода · <b style="color:var(--ink)">Подбор</b> — матчинг объектов под клиента с обоснованием «почему этот».</div>' +
       '<div style="margin-top:6px">' +
