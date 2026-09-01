@@ -6341,8 +6341,13 @@ setTimeout(async () => {
     // Читаем стартовое состояние из самого store.js: живой store к этому месту уже исхожен
     // предыдущими блоками, и проверка «что видит агент при первом запуске» по нему солгала бы.
     const st = read('js/store.js');
+    /* Раньше проверка искала в тексте `view: 'concierge'`. Написание переехало в константу
+       START_VIEW — не косметика: сброс уводил на Пульс, потому что рядом была набрана
+       строка 'start' (идентификатор экрана Пульса, читающийся как «стартовый»). Теперь
+       проверяется и значение константы, и то, что умолчание берётся из неё. */
     check('вход · приложение открывается Консьержем, а не сводкой',
-      /view: 'concierge'/.test(st), (st.match(/view: '[a-z]+'/) || [])[0]);
+      /const START_VIEW = 'concierge';/.test(st) && /view: START_VIEW,/.test(st),
+      (st.match(/START_VIEW = '[a-z]+'/) || [])[0] + ' | ' + (st.match(/view: [A-Za-z_']+/) || [])[0]);
     check('вход · список диалогов при этом скрыт, как у привычной нейросети',
       /cgRailOpen: false/.test(st), (st.match(/cgRailOpen: \w+/) || [])[0]);
     const uiSrc = read('js/ui.js');
@@ -8537,6 +8542,25 @@ setTimeout(async () => {
     check('каркас · внизу заявки одна строка ввода',
       doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1,
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
+  }
+
+  /* ---- Стенд начинается с Консьержа, и «Сброс» возвращает туда же ----
+     Ловушка в названиях: идентификатор экрана Пульса — `start`, и он читается как
+     «стартовый», хотя стартовый экран у нас Консьерж. На этом уже поймались: «Сброс»
+     уводил на Пульс. Проверка держит обе стороны — и то, что вход именно Консьерж, и то,
+     что сброс идёт по этой же константе, а не по строке, набранной рядом.
+     Блок стоит последним намеренно: он сбрасывает стенд и портит состояние для соседей. */
+  {
+    check('вход · стартовый экран стенда — Консьерж',
+      WS.START_VIEW === 'concierge' && WS.store.view !== undefined, String(WS.START_VIEW));
+    WS.router.go('clients');           // уйти подальше, чтобы совпадение не было случайным
+    const rb = doc.querySelector('.tb-btn[data-act="reset"]');
+    if (rb) rb.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const cb = doc.querySelector('[data-act="doReset"]');
+    if (cb) cb.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('вход · «Сброс» возвращает на Консьержа, а не на Пульс',
+      !!rb && !!cb && WS.store.view === 'concierge',
+      'кнопка ' + !!rb + ', подтверждение ' + !!cb + ', экран ' + WS.store.view);
   }
 
   check('no window errors after run', errors.length === 0, errors.join('; '));

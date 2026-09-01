@@ -10,12 +10,19 @@
   WS.CONTACT_FILTERS_DEFAULT = CONTACT_FILTERS_DEFAULT;
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
+  /* Экран, с которого стенд начинается. Вынесен в одну константу намеренно: идентификатор
+     экрана Пульса — `start`, и это название читается как «стартовый», хотя стартовый у нас
+     Консьерж. На этом уже поймались: сброс уводил на `start`, то есть на Пульс, вместо
+     входного экрана. Теперь и умолчание, и сброс берут значение отсюда. */
+  const START_VIEW = 'concierge';
+  WS.START_VIEW = START_VIEW;
+
   const subs = [];
   const store = {
     schema: SCHEMA,
     theme: null,          // null = follow system
     role: 'agent',
-    view: 'concierge',
+    view: START_VIEW,
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
@@ -171,6 +178,7 @@
   }
 
   function resetAll() {
+    store.view = START_VIEW;
     store.data = freshData();
     store.scenarioStatus = initStatuses();
     store.role = 'agent';

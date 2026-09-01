@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:58</title>
+  <title>WESPACE · сборка 14:25</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:58';
+    window.WS_BUILD='14:25';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5163,12 +5163,19 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   WS.CONTACT_FILTERS_DEFAULT = CONTACT_FILTERS_DEFAULT;
   const clone = (o) => (window.structuredClone ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
 
+  /* Экран, с которого стенд начинается. Вынесен в одну константу намеренно: идентификатор
+     экрана Пульса — `start`, и это название читается как «стартовый», хотя стартовый у нас
+     Консьерж. На этом уже поймались: сброс уводил на `start`, то есть на Пульс, вместо
+     входного экрана. Теперь и умолчание, и сброс берут значение отсюда. */
+  const START_VIEW = 'concierge';
+  WS.START_VIEW = START_VIEW;
+
   const subs = [];
   const store = {
     schema: SCHEMA,
     theme: null,          // null = follow system
     role: 'agent',
-    view: 'concierge',
+    view: START_VIEW,
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
@@ -5324,6 +5331,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   }
 
   function resetAll() {
+    store.view = START_VIEW;
     store.data = freshData();
     store.scenarioStatus = initStatuses();
     store.role = 'agent';
@@ -22916,7 +22924,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
           '<p>Все результаты сценариев, события и изменения вернутся к исходному демонстрационному состоянию. Действие не требует перезагрузки страницы.</p>',
           '<button class="btn" data-act="closeModal">Отмена</button><button class="btn danger" data-act="doReset">' + WS.icon('reset') + 'Сбросить всё</button>');
         break;
-      case 'doReset': api.resetAll(); WS.ui.closeModal(); api.toast('Стенд сброшен к исходному состоянию', 'ok'); WS.router.go('start'); break;
+      case 'doReset': api.resetAll(); WS.ui.closeModal(); api.toast('Стенд сброшен к исходному состоянию', 'ok'); WS.router.go(WS.START_VIEW); break;
       case 'navigator': store.navOpen = !store.navOpen; api.emit(); break;
       case 'sections': WS.ui.openSections(); break;
       case 'help': WS.ui.openHelp(); break;

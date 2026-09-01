@@ -338,7 +338,7 @@
           '<p>Все результаты сценариев, события и изменения вернутся к исходному демонстрационному состоянию. Действие не требует перезагрузки страницы.</p>',
           '<button class="btn" data-act="closeModal">Отмена</button><button class="btn danger" data-act="doReset">' + WS.icon('reset') + 'Сбросить всё</button>');
         break;
-      case 'doReset': api.resetAll(); WS.ui.closeModal(); api.toast('Стенд сброшен к исходному состоянию', 'ok'); WS.router.go('start'); break;
+      case 'doReset': api.resetAll(); WS.ui.closeModal(); api.toast('Стенд сброшен к исходному состоянию', 'ok'); WS.router.go(WS.START_VIEW); break;
       case 'navigator': store.navOpen = !store.navOpen; api.emit(); break;
       case 'sections': WS.ui.openSections(); break;
       case 'help': WS.ui.openHelp(); break;
