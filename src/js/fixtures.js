@@ -551,6 +551,43 @@
       offered: [{ id: 'o_palmcourt', state: 'selected' }],
       kp: { formed: true, at: '12 апреля', objectIds: ['o_palmcourt'] },
       note: 'Первая покупка Анны: Palm Court 704, закрыта 6 мая. С неё началась вторая заявка — на инвест-квартиру до 2 млн.' },
+    /* Заявки на ранних стадиях доски. Механизм показа заявок в канбане был, а данных под него
+       не было: на воронке «Продажа» не оказалось ни одной заявки на подборе и на показе, и два
+       первых отсека стояли пустыми. Стадия заявки не хранится, а считается: `offer` — есть
+       предложенные объекты, `meet` — в ленте заявки записана встреча. */
+    { id: 'r_dmitry_sale', clientId: 'c_lead15', title: 'Инвест-студия в JVC до 1,5 млн', createdAt: '11 мая',
+      channel: 'telegram', interest: 'Покупка', paymentForm: 'Наличные', vat: false, source: 'Реферал',
+      partnerAgent: null, funnel: 'sale', dealType: 'Продажа · вторичка', objectType: 'Квартира',
+      bedrooms: 'Studio–1 BR', goal: 'Инвестиция под аренду', budget: 1500000, areas: ['JVC'],
+      horizon: '1–3 месяца', assignee: 'u_marina', leadStatus: 'Направлен подбор', temperature: 'warm',
+      nextContact: '16 мая', funding: 'Подтв. средств ✓',
+      offered: [{ id: 'o_jvcstudio', state: 'offered' }],
+      note: 'Смотрит JVC как вход по нижней границе бюджета.' },
+    { id: 'r_karim_sale', clientId: 'c_partner', title: 'Апартаменты в Downtown до 2,6 млн', createdAt: '12 мая',
+      channel: 'whatsapp', interest: 'Покупка', paymentForm: 'Наличные', vat: false, source: 'Клуб',
+      partnerAgent: null, funnel: 'sale', dealType: 'Продажа · вторичка', objectType: 'Квартира',
+      bedrooms: '2 BR', goal: 'Проживание', budget: 2600000, areas: ['Downtown'],
+      horizon: '1–2 месяца', assignee: 'u_omar', leadStatus: 'Показ назначен', temperature: 'hot',
+      nextContact: '15 мая', funding: 'Подтв. средств ✓', offered: [],
+      note: 'Показ назначен через партнёра — своего инвентаря в Downtown нет.' },
+    { id: 'r_marat_sale', clientId: 'c_noconsent', title: 'Квартира для семьи в Dubai Creek Harbour', createdAt: '10 мая',
+      channel: 'whatsapp', interest: 'Покупка', paymentForm: 'Рассрочка от застройщика', vat: false,
+      source: 'Property Finder', partnerAgent: null, funnel: 'sale', dealType: 'Продажа · off-plan',
+      objectType: 'Квартира', bedrooms: '2 BR', goal: 'Проживание', budget: 1800000,
+      areas: ['Dubai Creek Harbour'], horizon: '3–6 месяцев', assignee: 'u_marina',
+      leadStatus: 'Направлен подбор', temperature: 'warm', nextContact: '18 мая',
+      funding: 'Ипотека — предодобрение не получено',
+      offered: [{ id: 'o_creek2', state: 'offered' }],
+      note: 'Согласия на связь нет — подборка собрана, но не отправлена.' },
+    { id: 'r_viktor_rent', clientId: 'c_docs', title: 'Аренда офиса в DIFC на год', createdAt: '12 мая',
+      channel: 'email', interest: 'Аренда', paymentForm: 'Годовой чек', vat: true, source: 'Реферал',
+      partnerAgent: null, funnel: 'rent', dealType: 'Аренда · офис', objectType: 'Офис',
+      bedrooms: '—', goal: 'Размещение компании', budget: 180000, areas: ['DIFC'],
+      horizon: '1–3 месяца', assignee: 'u_omar', leadStatus: 'Направлено предложение', temperature: 'warm',
+      nextContact: '17 мая', funding: 'Годовой чек', offered: [],
+      kp: { formed: true, at: '13 мая', objectIds: [] },
+      note: 'КП по аренде отправлено; свободных офисов в DIFC в инвентаре нет — подбор через партнёров.' },
+
   ];
 
   // Funnels (R2) — each is the same 4-column board; columns = milestone projection of that funnel.
@@ -1025,6 +1062,23 @@
   // Request-level channel history (pre-deal correspondence). Anchored to the request; the merged
   // client comms view unions this with the client's deal timelines + contact timeline.
   const requestTimeline = {
+    r_dmitry_sale: [
+      { at: '11 мая · 12:05', ord: 111205, ch: 'telegram', kind: 'raw', by: 'Клиент', text: 'Ищу студию в JVC под сдачу, до 1,5 млн.', capture: true },
+      { at: '13 мая · 15:30', ord: 131530, ch: 'whatsapp', kind: 'raw', by: 'Агент', text: 'Отправил Bloom Heights 412 — 58 м², свободна.' },
+    ],
+    r_marat_sale: [
+      { at: '10 мая · 09:15', ord: 100915, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Нужна двушка в Dubai Creek Harbour для семьи, до 1,8 млн.', capture: true },
+      { at: '12 мая · 11:40', ord: 121140, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Подборка собрана, но не отправлена: согласия на связь нет.' },
+    ],
+    r_viktor_rent: [
+      { at: '12 мая · 16:10', ord: 121610, ch: 'email', kind: 'raw', by: 'Клиент', text: 'Нужен второй офис в DIFC под расширение, годовой чек.', capture: true },
+      { at: '13 мая · 10:00', ord: 131000, ch: 'email', kind: 'raw', by: 'Агент', text: 'КП по аренде отправлено; свободных офисов в DIFC сейчас нет.' },
+    ],
+    r_karim_sale: [
+      { at: '12 мая · 10:20', ord: 121020, ch: 'whatsapp', kind: 'raw', by: 'Клиент', text: 'Интересует Downtown, до 2,6 млн, две спальни.', capture: true },
+      { at: '14 мая · 09:40', ord: 140940, ch: 'meet', kind: 'raw', by: 'Агент', text: 'Показ назначен на 15 мая, партнёр подтвердил доступ.' },
+    ],
+
     r_igor: [
       { at: '10 мая · 11:00', ord: 101100, ch: 'call', kind: 'raw', by: 'Агент', text: 'Звонок 4:12 — обсудили перепродажу Bayline.', capture: true },
       { at: '12 мая', ord: 120000, ch: 'system', kind: 'ai', by: 'Консьерж', text: 'Обещано КП 12 мая — не отправлено. Касание просрочено.' },

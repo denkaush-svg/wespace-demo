@@ -1305,10 +1305,28 @@ setTimeout(async () => {
     // и требование заменено на то, ради чего перекладка делалась.
     WS.store.clientsTab = 'deals'; WS.store.dealsView = 'kanban'; WS.router.go('clients');
     const cols = [].slice.call(doc.querySelectorAll('#app .kanban .kcol .kh span:first-child')).map((e) => e.textContent.trim());
-    check('доска · ровно четыре отсека вместо десяти колонок', cols.length === 4, cols.join(' | '));
-    check('доска · первые два отсека — пресейл, последние два — договор',
-      cols[0] === 'Подбор и показы' && cols[1] === 'Переговоры' &&
-      cols[2] === 'Договор и деньги' && cols[3] === 'Исход', cols.join(' | '));
+    /* Отсеков пять: к четырём укрупнённым добавились «Квалифицированы». Прежде эта стадия на
+       доску не попадала «потому что разбирается во Входящих», и первый отсек стоял пустым при
+       пяти квалифицированных заявках из семнадцати. Двойного счёта нет: у квалифицированной
+       заявки сделки ещё нет. Не разобранное — стадия `new` — по-прежнему на доску не идёт. */
+    check('доска · пять отсеков вместо десяти колонок', cols.length === 5, cols.join(' | '));
+    check('доска · заявки в начале пути, договор и исход в конце',
+      cols[0] === 'Квалифицированы' && cols[1] === 'Подбор и показы' && cols[2] === 'Переговоры' &&
+      cols[3] === 'Договор и деньги' && cols[4] === 'Исход', cols.join(' | '));
+    /* И на доске действительно ВИДНЫ заявки, а не только сделки: механизм показа заявок был,
+       а данных под него не было — на воронке «Продажа» не оказалось ни одной заявки на подборе
+       и на показе, и два первых отсека стояли пустыми. */
+    {
+      const reqCards = doc.querySelectorAll('#app .kanban .deal[data-request]').length;
+      const dealCards = doc.querySelectorAll('#app .kanban .deal[data-deal]').length;
+      check('доска · на ней видны и заявки, и сделки',
+        reqCards >= 3 && dealCards >= 3, 'заявок ' + reqCards + ', сделок ' + dealCards);
+      const early = [].slice.call(doc.querySelectorAll('#app .kanban .kcol')).slice(0, 2);
+      check('доска · первые два отсека не пустые',
+        early.every((c) => c.querySelectorAll('.deal').length > 0),
+        early.map((c) => (c.querySelector('.kh span') || {}).textContent + ':' +
+          c.querySelectorAll('.deal').length).join(' | '));
+    }
     // Инвариант отсеков: каждая допустимая стадия принадлежит ровно одному, неизвестная — ни одному.
     {
       const B = WS.ui.DEAL_BANDS;
