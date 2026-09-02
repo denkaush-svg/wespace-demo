@@ -2963,7 +2963,7 @@
       tile('trend', 'Инвесторы', byType('investor'), '', 'span 4', 'покупают ради доходности', '', '', 'data-nav="clients" data-tab="contacts"') +
       tile('home', 'Для себя', byType('enduser'), '', 'span 4', 'покупают для проживания', '', '', 'data-nav="clients" data-tab="contacts"') +
       tile('building', 'Собственники', byType('owner'), '', 'span 6', 'сдают или продают свой объект', '', '', 'data-nav="clients" data-tab="contacts"') +
-      tile('clock', 'Без единого касания', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="clients" data-tab="contacts"') +
+      tile('clock', 'Ни разу не связывались', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="clients" data-tab="contacts"') +
       '</div>' + pulseSummary(clientsSummaryLines(cl, silent));
   }
   function clientsSummaryLines(cl, silent) {
@@ -2973,7 +2973,7 @@
       '. Повторных — ' + repeat + ': у них больше одной сделки.');
     const won = cl.filter((c) => hasWonDeal(c.id)).length;
     out.push('С закрытой успехом сделкой ' + won + '. Это та часть базы, к которой возвращаются, а не ищут заново.');
-    if (silent) out.push('Без единого касания ' + silent + ' — с них не начиналась работа вовсе; они первыми выпадают из выборок на рассылку.');
+    if (silent) out.push('Ни разу не связывались с ' + silent + ' — с них не начиналась работа вовсе; они первыми выпадают из выборок на рассылку.');
     const noConsent = cl.filter((c) => !c.consent).length;
     if (noConsent) out.push('Без согласия на связь ' + noConsent + ' — они исключаются из любой адресной отправки автоматически.');
     return out;
@@ -3570,7 +3570,7 @@
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём диалог? Выберите сущность — тред будет привязан к ней и виден из её карточки.</p>' +
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём разговор? Выберите запись — он будет привязан к ней и виден из её карточки.</p>' +
       '<div class="section-label">Сделки</div>' + dealOpts +
       '<div class="section-label" style="margin-top:10px">Объекты</div>' + objOpts +
       '<div class="section-label" style="margin-top:10px">Лиды и общее</div>' + leadOpts;
@@ -3646,7 +3646,7 @@
   }
   function conciergeThreadEmpty() {
     return '<div class="empty">' + I('sparkle') + '<div style="font-weight:700;color:var(--ink)">Начните диалог</div>' +
-      '<div style="margin-top:6px">Поручите задачу по этой сущности голосом или текстом.</div></div>';
+      '<div style="margin-top:6px">Поручите задачу по этой записи голосом или текстом.</div></div>';
   }
 
   // ---------------- CLIENTS & DEALS ----------------
@@ -3923,7 +3923,7 @@
     // Компания в строке — прямая просьба партнёра: имя, телефон, компания, способ связи.
     const co = contactCompany(c);
     const sub = [c.phone || '', co ? co.name : '', chanMeta(prefChannel(c))[1],
-      last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
+      last ? 'контакт ' + last : ''].filter(Boolean).join(' · ');
     const kindB = c.contactKind ? '<span class="badge">' + CONTACT_KIND_LABEL[c.contactKind] + '</span>' : '';
     const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') + kindB +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
@@ -4605,7 +4605,7 @@
       const last = lastTouchOf(c.id);
       return '<div class="feed-row' + (c._new ? ' is-new' : '') + '" data-client="' + c.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
         '<div class="ft"><div class="t">' + priorityChip(c.id) + c.name + '</div><div class="m">' +
-        [c.goal, (c.areas || []).slice(0, 2).join(' · '), c.budget ? 'до ' + WS.AED(c.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ') + '</div></div>' +
+        [c.goal, (c.areas || []).slice(0, 2).join(' · '), c.budget ? 'до ' + WS.AED(c.budget) : '', last ? 'контакт ' + last : ''].filter(Boolean).join(' · ') + '</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center">' + isNew + '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' + consent + I('arrowRight') + '</div></div>';
     }).join('');
     return '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Контакты · ' + D().clients.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' + companiesBlock();
@@ -4951,8 +4951,13 @@
     return '<div class="cd-list">' + CONTACT_ORDER.map((ch) => {
       const m = chanMeta(ch);
       const on = ch === pref;
+      /* Подпись над значением, а не слева от него. Рядом они делили ширину ячейки: телефон
+         «+971 50 123 4417» не помещался в остаток и ломался на две строки, а почта рвалась
+         посреди слова — «marina@ha rbourkey.ae». Столбиком каждой ячейке хватает того, что
+         занимает более длинная из двух строк, и переносов не остаётся вовсе. */
       return '<div class="cd-row' + (on ? ' on' : '') + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
-        '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
+        '<span class="cd-body"><span class="cd-label">' + m[1] + '</span>' +
+        '<span class="cd-val">' + (vals[ch] || '—') + '</span></span>' +
         (on ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
     }).join('') + '</div>';
   }
@@ -5166,7 +5171,7 @@
       ['briefcase', 'Создать сделку', 'data-act="newDeal" data-cid="' + c.id + '"', 'primary'],
       ['building', 'Подобрать объекты', 'data-scn="G2"', ''],
       ['chat', 'Написать', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users"', ''],
-      ['clock', 'Запланировать касание', 'data-act="newTask"', ''],
+      ['clock', 'Запланировать контакт', 'data-act="newTask"', ''],
       ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
       // Was data-scn="S8" — a scripted demo run hard-wired to Анна's deal, which ran unchanged
       // whichever client's card you opened. A bar that claims to act on THIS card must.
@@ -6628,7 +6633,7 @@
   function contactMeta(c) {
     const last = lastTouchOf(c.id);
     return [c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
-      last ? 'последнее касание — ' + last : ''].filter(Boolean).join(' · ');
+      last ? 'последний контакт — ' + last : ''].filter(Boolean).join(' · ');
   }
   // Последнее касание по всем лентам клиента — заявкам, сделкам и его собственной.
   function lastTouchOf(cid) {
@@ -7132,7 +7137,7 @@
       // не добавляя смысла.
       const dueTxt = (!/просроч/i.test(d.nextDue || '') && d.nextDue) ? d.nextDue : '';
       if (drafts.length) out.push(drafts[0].title.split('—')[0].trim() + ' у клиента — ждём подписания' +
-        (dueTxt ? ', следующее касание ' + dueTxt : '') + '.');
+        (dueTxt ? ', следующий контакт ' + dueTxt : '') + '.');
       const mv = dealLastClientMove(d);
       if (mv && mv.at) {
         // Реплика клиента приводится как есть, но без служебного префикса и без своей точки:
@@ -8478,7 +8483,7 @@
      «подтверждён»: его написал человек, а не модель, и подтверждать нечего. */
   function taskDoneForm(taskId) {
     const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
-    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующее касание');
+    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующий контакт');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Закрыть можно и без комментария — тогда останется только факт выполнения. Что напишете здесь, ляжет в ленту как итог от вас.</p>' +
       '<div class="match-grid"><label class="fld"><span>Что вышло</span><input id="td_out" type="text" placeholder="Напр.: договорились о брони до пятницы"></label>' +
       '<label class="fld"><span>Следующий шаг</span><input id="td_next" type="text" value="' + escAttr(next) + '"></label></div>' +
@@ -9982,7 +9987,7 @@
           f[1].map((x) => '<div class="feed-row"><div class="fi i-mut">' + I(fIco[x[1]] || 'doc') + '</div><div class="ft"><div class="t">' + x[0] + '</div><div class="m">' + x[2] + ' · ' + x[3] + '</div></div><button class="btn sm" data-act="cgFeatureStub" title="Скачать">' + I('download') + '</button></div>').join('') +
         '</div>').join('') +
         '<button class="btn sm" data-act="cgFeatureStub" style="margin-top:10px">' + I('upload') + 'Загрузить файл</button></div></div>' : '';
-    return head('Документы', 'Два слоя: документы конкретных сделок (заполненные экземпляры) и библиотека шаблонов (RERA A/B/F/I, Oqood, КП, досье, аренда). Каждый документ привязан к своим сущностям — <b>сделка · объект · контакт</b> — это раздельные множества вокруг записи, не смешанные; при этом один документ переиспользуется в разных сценариях (виден в карточке каждой связанной сущности). Поиск по названию, клиенту или форме.',
+    return head('Документы', 'Два слоя: документы конкретных сделок (заполненные экземпляры) и библиотека шаблонов (RERA A/B/F/I, Oqood, КП, досье, аренда). Каждый документ привязан к своим записям — <b>сделка · объект · контакт</b> — это раздельные множества вокруг записи, не смешанные; при этом один документ переиспользуется в разных сценариях (виден в карточке каждой связанной записи). Поиск по названию, клиенту или форме.',
       '<button class="btn sm primary" data-scn="S4">' + I('plus') + 'Подготовить документ (S4)</button>') +
       searchBox + seg +
       '<div class="fin"><div>' + dealsSection + tplSection + storageSection + '</div>' +
@@ -10068,7 +10073,7 @@
     s15_proposal: { title: 'Ответ холодному лиду', rows: [
       { k: 'Запрос', v: 'инвест. квартира до 1,5 млн' }, { h: 'Три варианта (3 источника)' },
       { k: 'Доступность', v: 'неподтверждённая — помечена, сомнительный → S9' },
-      { k: 'Расчёт', v: 'короткий, допущения видны' }, { k: 'Итог', v: 'создан запрос + следующее касание' },
+      { k: 'Расчёт', v: 'короткий, допущения видны' }, { k: 'Итог', v: 'создан запрос + следующий контакт' },
     ] },
     s6_handover: { title: 'Передача партнёру · история', rows: [
       { k: 'Партнёр', v: 'клубный партнёр (принял)' }, { k: 'Формат', v: 'совместный показ' },
@@ -11012,7 +11017,7 @@
       '<span class="badge">' + I('replay') + 'у сценария в навигаторе «Заново» — только его данные</span></div>' +
       '<div class="section-label" style="margin-top:14px">Управление</div>' +
       '<div class="prov"><span class="badge">' + I('users') + 'Агент ↔ Руководитель (шапка)</span><span class="badge">' + I('moon') + 'Свет / тьма</span>' +
-      '<span class="badge">' + I('chat') + 'Консьерж — диалоги по сущностям; из карточки сделки/объекта «Чат по …»</span>' +
+      '<span class="badge">' + I('chat') + 'Консьерж — разговоры по записям; из карточки сделки/объекта «Чат по …»</span>' +
       '<span class="badge">' + I('clock') + 'Демо-часы фиксированы (14 мая) — «сегодня/завтра» считаются от них</span></div>' +
       '<div style="margin-top:12px;font-size:11.5px;color:var(--faint)">Состояние сохраняется в браузере и переживает перезагрузку. Полный сброс — только кнопкой «Сброс». Подробнее: ИНСТРУКЦИЯ.md в папке стенда.</div>';
     openModal('Как показывать демо', body, '<button class="btn primary" data-act="closeModal">Понятно</button>');
@@ -11599,7 +11604,7 @@
       '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">Здесь настраиваются шаблоны для генерации. Библиотека документов и заполненные экземпляры сделок — в разделе <a data-nav="docs" style="color:var(--acc-ink);cursor:pointer;font-weight:600">Документы</a>.</div>');
 
     const notif = card('Уведомления',
-      rowc('bell', 'Требуют действий сегодня', 'Горячие клиенты, просроченные касания, новые запросы', sw(true)) +
+      rowc('bell', 'Требуют действий сегодня', 'Горячие клиенты, просроченные контакты, новые запросы', sw(true)) +
       rowc('doc', 'Сроки по документам', 'Escrow / Oqood / title deed — напоминания заранее', sw(true)) +
       rowc('flame', 'Ночные лиды', 'Входящие вне рабочих часов — сводка утром', sw(true)));
 

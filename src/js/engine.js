@@ -122,7 +122,7 @@
     ] },
     { id: 'general', at: 'сегодня', items: [
       ['user', 'Марина Волкова · сегодня', 'Что просрочено на этой неделе?'],
-      ['ai', 'Консьерж · сегодня', 'Одно касание просрочено: КП Игорю Лебедеву обещали 12 мая и не отправили. ' +
+      ['ai', 'Консьерж · сегодня', 'Один контакт просрочен: КП Игорю Лебедеву обещали 12 мая и не отправили. ' +
         'По остальным сделкам сроки в пределах; ближайший — показ Creekline сегодня в 16:00.'],
     ] },
   ];
@@ -374,7 +374,7 @@
       return '<div class="field"><div class="k">' + r.name + '</div><div class="v"><span class="badge ' + cls + '">' + I(ic) + lbl + '</span>' +
         '<div class="prov" style="margin-top:3px"><span class="src">' + I('source') + r.src + ' · ' + r.at + '</span></div></div></div>';
     }).join('');
-    const act = '<button class="btn" disabled title="Повторное касание в тот же день заблокировано">' + I('lock') + 'Повторить сегодня</button>' +
+    const act = '<button class="btn" disabled title="Повторно связываться в тот же день нельзя">' + I('lock') + 'Повторить сегодня</button>' +
       '<button class="btn primary cta-hint" data-eng="panelPrimary">' + I('check') + 'Пересобрать подборку</button>';
     return panelShell(step, rows, act, step.branch);
   }

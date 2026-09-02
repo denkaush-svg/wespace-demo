@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 10:49</title>
+  <title>WESPACE · сборка 11:23</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='10:49';
+    window.WS_BUILD='11:23';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -2230,15 +2230,21 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .cb-num { font-size: 21px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); }
 .cb-badges { margin-top: 11px; }
 .cb-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-.cd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 2px 10px; }
-.cd-row { display: flex; align-items: center; gap: 9px; padding: 5px 8px; border-radius: 9px; min-width: 0; }
+/* Ширина ячейки и предел числа колонок. `auto-fit` без предела нарезал блок на широком
+   экране на восемь колонок по 196 пикселей — в каждую не помещался даже телефон, и значения
+   ломались посреди слова. Предел по ширине списка держит три колонки максимум: пять каналов
+   читаются как визитка, а не как таблица. */
+.cd-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); gap: 6px 12px; max-width: 780px; }
+.cd-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 10px; min-width: 0; }
 .cd-row.on { background: var(--acc-soft); }
-.cd-row.on { grid-column: 1 / -1; }
+.cd-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .cd-ic { display: inline-flex; width: 26px; height: 26px; border-radius: 8px; background: var(--bg); color: var(--mut); align-items: center; justify-content: center; flex: none; }
 .cd-row.on .cd-ic { background: #fff; color: var(--acc-deep); }
 .cd-ic svg { width: 15px; height: 15px; }
-.cd-label { font-size: 12.5px; color: var(--mut); width: 74px; flex: none; }
-.cd-val { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cd-label { font-size: 11px; color: var(--mut); font-weight: 600; letter-spacing: .01em; }
+/* `anywhere` рвало адрес посреди слова даже когда до края оставалось место. `break-word`
+   переносит только тогда, когда строка иначе не помещается, и предпочитает границу слова. */
+.cd-val { font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; flex: 1; min-width: 0; overflow-wrap: break-word; }
 .cd-row.on .cd-val { color: var(--acc-deep); }
 .cd-primary { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: var(--acc-ink); background: #fff; border: 1px solid var(--acc-line); padding: 2px 7px; border-radius: 999px; flex: none; white-space: nowrap; }
 .cd-primary svg { width: 11px; height: 11px; }
@@ -3585,12 +3591,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     { id: 'c_overdue', name: 'Игорь Лебедев', residency: 'resident', visaGoal: false, payment: 'cash', nameDat: 'Игорю Лебедеву', nameGen: 'Игоря Лебедева', tag: 's5', lang: 'RU', channel: 'whatsapp', consent: true, consentAt: '02 мая 2026', consentUntil: '02 мая 2027', ctype: 'investor',
       contactKind: 'buyer', interest: 'invest', objTypes: ['apart'],
       goal: 'Апартаменты под перепродажу', budget: 2400000, areas: ['Business Bay'], horizon: '1–2 месяца',
-      note: 'Просроченное касание (обещали КП 12 мая).', phone: '+971 55 •••• ••02 (DEMO)',
+      note: 'Просрочен контакт (обещали КП 12 мая).', phone: '+971 55 •••• ••02 (DEMO)',
       psych: { filled: true, decision: 'Статусный — важны престиж и «первым узнать»', values: ['Статус/престиж', 'Скорость'],
         pace: 'Быстрый — решает на эмоциях и эксклюзиве', risk: 'Готов к риску ради выгоды',
         channel: 'WhatsApp + звонок; любит голосовые', tone: 'Коротко, с эксклюзивом и срочностью',
         triggers: ['Эксклюзив/закрытый доступ', 'Ограниченность предложения'], bestTime: 'Утро',
-        source: 'выведено из истории касаний (сигналы стиля)' } },
+        source: 'выведено из истории общения (сигналы стиля)' } },
     { id: 'c_noconsent', name: 'Марат Ибрагимов', residency: 'non-resident', visaGoal: true, payment: 'mortgage', nameDat: 'Марату Ибрагимову', nameGen: 'Марата Ибрагимова', tag: 's13', lang: 'RU', channel: 'whatsapp', consent: false, ctype: 'enduser',
       contactKind: 'buyer', interest: 'live', objTypes: ['apart'],
       goal: 'Квартира у воды', budget: 1800000, areas: ['Dubai Creek Harbour'], horizon: '3–6 месяцев',
@@ -3937,7 +3943,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       assignee: 'u_ahmed', leadStatus: 'Квалифицирован', temperature: 'hot', nextContact: 'просрочено — КП обещали 12 мая',
       funding: 'Cash 100% · подтв. средств ✓',
       offered: [], kp: { formed: false },
-      note: 'Обсуждали перепродажу в Bayline Terraces. КП обещали 12 мая и не отправили — касание просрочено.' },
+      note: 'Обсуждали перепродажу в Bayline Terraces. КП обещали 12 мая и не отправили — контакт просрочен.' },
     { id: 'r_karim', clientId: 'c_partner', title: 'Резиденция в Downtown через партнёра', createdAt: '14 мая', channel: 'whatsapp',
       funnel: 'cross', interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: 'u_yusef',
       dealType: 'Кросс-продажи', objectType: 'Квартира', bedrooms: '2BR', goal: 'Покупка резиденции', budget: 2600000,
@@ -4522,7 +4528,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   const tasks = [
     // Область задачи: сделка → заявка → контакт, первое непустое. Касание относится к человеку,
     // а не к сделке, поэтому у него области нет — и это законно, а не пропуск.
-    { id: 't_anna_touch', clientId: 'c_anna', title: 'Следующее касание — Анна Петрова', due: 'сегодня', when: 'today', kind: 'touch' },
+    { id: 't_anna_touch', clientId: 'c_anna', title: 'Связаться — Анна Петрова', due: 'сегодня', when: 'today', kind: 'touch' },
     { id: 't_anna_call', clientId: 'c_anna', dealId: 'd_anna', title: 'Позвонить Анне — уточнить дату подписания', due: 'сегодня', when: 'today', kind: 'call' },
     { id: 't_igor_kp', clientId: 'c_overdue', requestId: 'r_igor', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
     { id: 't_viktor_doc', clientId: 'c_docs', dealId: 'd_viktor', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
@@ -4789,7 +4795,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             { k: 'Бюджет', now: 'до 2 000 000 AED', src: 'голос' },
             { k: 'Районы', now: 'Business Bay, Dubai Creek Harbour', src: 'голос' },
             { k: 'Срок покупки', now: '', missing: true, hint: 'уточните — в сообщении неоднозначно', fill: '1–3 месяца', src: 'голос' },
-            { k: 'Следующее касание', now: 'Подбор объектов, сегодня', src: 'правило' },
+            { k: 'Следующий контакт', now: 'Подбор объектов, сегодня', src: 'правило' },
           ],
           branch: { label: 'Возможный дубль не выбран', text: 'Если не выбрать клиента из двух похожих — запись блокируется (спец. ветка).' } },
         { type: 'ai', text: 'Готов ответ Анне в WhatsApp: «Приняла ваш запрос, сегодня пришлю 3 варианта под инвестицию до 2 млн». Отправка — внешнее действие A2, нужно ваше подтверждение.' },
@@ -4839,7 +4845,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             'Подборка сохранена в запросе',
             'PDF и Excel доступны для просмотра/скачивания',
             'Сообщение: delivered',
-            'Создано напоминание о следующем касании',
+            'Создано напоминание о следующем контакте',
           ],
           effects: [
             { op: 'updateRequest', id: 'r_anna', patch: { leadStatus: 'КП отправлено',
@@ -5079,7 +5085,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         { type: 'ai', text: 'Три объяснимых варианта из разных источников. Неподтверждённая доступность помечена. Короткий расчёт с допущениями готов.' },
         { type: 'preview', title: 'Ответ лиду', level: 'A2', confirm: 'Подтвердить и создать запрос', note: 'Неподтверждённые цифры и доступность маркируются.',
           fields: [ { k: 'Сообщение', now: '3 варианта под инвестицию до 1,5 млн…', src: 'черновик' }, { k: 'Сомнительный объект', now: 'Отправить в проверку S9', src: 'правило' } ] },
-        { type: 'result', title: 'Лид сохранён как запрос', artifact: { id: 's15_proposal', label: 'Открыть ответ лиду' }, events: ['Запрос создан', 'Следующее касание', 'Сомнительный объект → S9'], next: 'G2', nextLabel: 'Стать активным клиентом (G2)' },
+        { type: 'result', title: 'Лид сохранён как запрос', artifact: { id: 's15_proposal', label: 'Открыть ответ лиду' }, events: ['Запрос создан', 'Следующий контакт', 'Сомнительный объект → S9'], next: 'G2', nextLabel: 'Стать активным клиентом (G2)' },
       ] },
 
     /* ---------------- BETA ---------------- */
@@ -5089,7 +5095,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       flow: [
         { type: 'user', text: 'Проверь доступность Bayline Terraces (проверка истекла)' },
         { type: 'process', label: 'Готовлю проверку', kind: 'search', steps: ['Доверенные источники', 'Готовлю сообщения'] },
-        { type: 'ai', text: 'Готов запустить проверку по ограниченному списку доверенных источников. «Нет ответа» не станет доступностью; повторное касание в тот же день заблокировано; голосовой путь — опциональное beta-действие, неготовый звонарь заменяется ручным звонком.' },
+        { type: 'ai', text: 'Готов запустить проверку по ограниченному списку доверенных источников. «Нет ответа» не станет доступностью; повторно связываться в тот же день нельзя; голосовой путь — опциональное beta-действие, неготовый звонарь заменяется ручным звонком.' },
         { type: 'panel', kind: 'availability', title: 'Проверка доступности', who: 'проверка доступности · beta', icon: 'radar', level: 'A2',
           note: 'Проверка — имитация по доверенным источникам (DEMO).',
           sources: ['Прямой контакт застройщика', 'Партнёрский канал клуба', 'Публичный фид (кэш)'],
@@ -6402,7 +6408,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     ] },
     { id: 'general', at: 'сегодня', items: [
       ['user', 'Марина Волкова · сегодня', 'Что просрочено на этой неделе?'],
-      ['ai', 'Консьерж · сегодня', 'Одно касание просрочено: КП Игорю Лебедеву обещали 12 мая и не отправили. ' +
+      ['ai', 'Консьерж · сегодня', 'Один контакт просрочен: КП Игорю Лебедеву обещали 12 мая и не отправили. ' +
         'По остальным сделкам сроки в пределах; ближайший — показ Creekline сегодня в 16:00.'],
     ] },
   ];
@@ -6654,7 +6660,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       return '<div class="field"><div class="k">' + r.name + '</div><div class="v"><span class="badge ' + cls + '">' + I(ic) + lbl + '</span>' +
         '<div class="prov" style="margin-top:3px"><span class="src">' + I('source') + r.src + ' · ' + r.at + '</span></div></div></div>';
     }).join('');
-    const act = '<button class="btn" disabled title="Повторное касание в тот же день заблокировано">' + I('lock') + 'Повторить сегодня</button>' +
+    const act = '<button class="btn" disabled title="Повторно связываться в тот же день нельзя">' + I('lock') + 'Повторить сегодня</button>' +
       '<button class="btn primary cta-hint" data-eng="panelPrimary">' + I('check') + 'Пересобрать подборку</button>';
     return panelShell(step, rows, act, step.branch);
   }
@@ -10762,7 +10768,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       tile('trend', 'Инвесторы', byType('investor'), '', 'span 4', 'покупают ради доходности', '', '', 'data-nav="clients" data-tab="contacts"') +
       tile('home', 'Для себя', byType('enduser'), '', 'span 4', 'покупают для проживания', '', '', 'data-nav="clients" data-tab="contacts"') +
       tile('building', 'Собственники', byType('owner'), '', 'span 6', 'сдают или продают свой объект', '', '', 'data-nav="clients" data-tab="contacts"') +
-      tile('clock', 'Без единого касания', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="clients" data-tab="contacts"') +
+      tile('clock', 'Ни разу не связывались', silent, '', 'span 6', silent ? 'ни одного контакта в истории' : 'все хотя бы раз на связи', '', '', 'data-nav="clients" data-tab="contacts"') +
       '</div>' + pulseSummary(clientsSummaryLines(cl, silent));
   }
   function clientsSummaryLines(cl, silent) {
@@ -10772,7 +10778,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '. Повторных — ' + repeat + ': у них больше одной сделки.');
     const won = cl.filter((c) => hasWonDeal(c.id)).length;
     out.push('С закрытой успехом сделкой ' + won + '. Это та часть базы, к которой возвращаются, а не ищут заново.');
-    if (silent) out.push('Без единого касания ' + silent + ' — с них не начиналась работа вовсе; они первыми выпадают из выборок на рассылку.');
+    if (silent) out.push('Ни разу не связывались с ' + silent + ' — с них не начиналась работа вовсе; они первыми выпадают из выборок на рассылку.');
     const noConsent = cl.filter((c) => !c.consent).length;
     if (noConsent) out.push('Без согласия на связь ' + noConsent + ' — они исключаются из любой адресной отправки автоматически.');
     return out;
@@ -11369,7 +11375,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём диалог? Выберите сущность — тред будет привязан к ней и виден из её карточки.</p>' +
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём разговор? Выберите запись — он будет привязан к ней и виден из её карточки.</p>' +
       '<div class="section-label">Сделки</div>' + dealOpts +
       '<div class="section-label" style="margin-top:10px">Объекты</div>' + objOpts +
       '<div class="section-label" style="margin-top:10px">Лиды и общее</div>' + leadOpts;
@@ -11445,7 +11451,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   }
   function conciergeThreadEmpty() {
     return '<div class="empty">' + I('sparkle') + '<div style="font-weight:700;color:var(--ink)">Начните диалог</div>' +
-      '<div style="margin-top:6px">Поручите задачу по этой сущности голосом или текстом.</div></div>';
+      '<div style="margin-top:6px">Поручите задачу по этой записи голосом или текстом.</div></div>';
   }
 
   // ---------------- CLIENTS & DEALS ----------------
@@ -11722,7 +11728,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     // Компания в строке — прямая просьба партнёра: имя, телефон, компания, способ связи.
     const co = contactCompany(c);
     const sub = [c.phone || '', co ? co.name : '', chanMeta(prefChannel(c))[1],
-      last ? 'касание ' + last : ''].filter(Boolean).join(' · ');
+      last ? 'контакт ' + last : ''].filter(Boolean).join(' · ');
     const kindB = c.contactKind ? '<span class="badge">' + CONTACT_KIND_LABEL[c.contactKind] + '</span>' : '';
     const right = (p.transferred ? '<span class="badge warn">' + I('users') + 'Передан вам</span>' : '') + kindB +
       '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' +
@@ -12404,7 +12410,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       const last = lastTouchOf(c.id);
       return '<div class="feed-row' + (c._new ? ' is-new' : '') + '" data-client="' + c.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('users') + '</div>' +
         '<div class="ft"><div class="t">' + priorityChip(c.id) + c.name + '</div><div class="m">' +
-        [c.goal, (c.areas || []).slice(0, 2).join(' · '), c.budget ? 'до ' + WS.AED(c.budget) : '', last ? 'касание ' + last : ''].filter(Boolean).join(' · ') + '</div></div>' +
+        [c.goal, (c.areas || []).slice(0, 2).join(' · '), c.budget ? 'до ' + WS.AED(c.budget) : '', last ? 'контакт ' + last : ''].filter(Boolean).join(' · ') + '</div></div>' +
         '<div style="display:flex;gap:6px;align-items:center">' + isNew + '<span class="badge ' + k.st + '">' + I('shield') + k.label + '</span>' + consent + I('arrowRight') + '</div></div>';
     }).join('');
     return '<div class="card"><div class="section-label" style="padding:12px 16px 4px">Контакты · ' + D().clients.length + '</div><div class="feed" style="padding:0 16px 8px">' + rows + '</div></div>' + companiesBlock();
@@ -12750,8 +12756,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return '<div class="cd-list">' + CONTACT_ORDER.map((ch) => {
       const m = chanMeta(ch);
       const on = ch === pref;
+      /* Подпись над значением, а не слева от него. Рядом они делили ширину ячейки: телефон
+         «+971 50 123 4417» не помещался в остаток и ломался на две строки, а почта рвалась
+         посреди слова — «marina@ha rbourkey.ae». Столбиком каждой ячейке хватает того, что
+         занимает более длинная из двух строк, и переносов не остаётся вовсе. */
       return '<div class="cd-row' + (on ? ' on' : '') + '"><span class="cd-ic">' + I(m[0]) + '</span>' +
-        '<span class="cd-label">' + m[1] + '</span><span class="cd-val">' + (vals[ch] || '—') + '</span>' +
+        '<span class="cd-body"><span class="cd-label">' + m[1] + '</span>' +
+        '<span class="cd-val">' + (vals[ch] || '—') + '</span></span>' +
         (on ? '<span class="cd-primary">' + I('check') + 'основной</span>' : '') + '</div>';
     }).join('') + '</div>';
   }
@@ -12965,7 +12976,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       ['briefcase', 'Создать сделку', 'data-act="newDeal" data-cid="' + c.id + '"', 'primary'],
       ['building', 'Подобрать объекты', 'data-scn="G2"', ''],
       ['chat', 'Написать', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users"', ''],
-      ['clock', 'Запланировать касание', 'data-act="newTask"', ''],
+      ['clock', 'Запланировать контакт', 'data-act="newTask"', ''],
       ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
       // Was data-scn="S8" — a scripted demo run hard-wired to Анна's deal, which ran unchanged
       // whichever client's card you opened. A bar that claims to act on THIS card must.
@@ -14427,7 +14438,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function contactMeta(c) {
     const last = lastTouchOf(c.id);
     return [c.lang ? 'язык ' + c.lang : '', chanMeta(prefChannel(c))[1],
-      last ? 'последнее касание — ' + last : ''].filter(Boolean).join(' · ');
+      last ? 'последний контакт — ' + last : ''].filter(Boolean).join(' · ');
   }
   // Последнее касание по всем лентам клиента — заявкам, сделкам и его собственной.
   function lastTouchOf(cid) {
@@ -14931,7 +14942,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       // не добавляя смысла.
       const dueTxt = (!/просроч/i.test(d.nextDue || '') && d.nextDue) ? d.nextDue : '';
       if (drafts.length) out.push(drafts[0].title.split('—')[0].trim() + ' у клиента — ждём подписания' +
-        (dueTxt ? ', следующее касание ' + dueTxt : '') + '.');
+        (dueTxt ? ', следующий контакт ' + dueTxt : '') + '.');
       const mv = dealLastClientMove(d);
       if (mv && mv.at) {
         // Реплика клиента приводится как есть, но без служебного префикса и без своей точки:
@@ -16277,7 +16288,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      «подтверждён»: его написал человек, а не модель, и подтверждать нечего. */
   function taskDoneForm(taskId) {
     const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
-    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующее касание');
+    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующий контакт');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Закрыть можно и без комментария — тогда останется только факт выполнения. Что напишете здесь, ляжет в ленту как итог от вас.</p>' +
       '<div class="match-grid"><label class="fld"><span>Что вышло</span><input id="td_out" type="text" placeholder="Напр.: договорились о брони до пятницы"></label>' +
       '<label class="fld"><span>Следующий шаг</span><input id="td_next" type="text" value="' + escAttr(next) + '"></label></div>' +
@@ -17781,7 +17792,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
           f[1].map((x) => '<div class="feed-row"><div class="fi i-mut">' + I(fIco[x[1]] || 'doc') + '</div><div class="ft"><div class="t">' + x[0] + '</div><div class="m">' + x[2] + ' · ' + x[3] + '</div></div><button class="btn sm" data-act="cgFeatureStub" title="Скачать">' + I('download') + '</button></div>').join('') +
         '</div>').join('') +
         '<button class="btn sm" data-act="cgFeatureStub" style="margin-top:10px">' + I('upload') + 'Загрузить файл</button></div></div>' : '';
-    return head('Документы', 'Два слоя: документы конкретных сделок (заполненные экземпляры) и библиотека шаблонов (RERA A/B/F/I, Oqood, КП, досье, аренда). Каждый документ привязан к своим сущностям — <b>сделка · объект · контакт</b> — это раздельные множества вокруг записи, не смешанные; при этом один документ переиспользуется в разных сценариях (виден в карточке каждой связанной сущности). Поиск по названию, клиенту или форме.',
+    return head('Документы', 'Два слоя: документы конкретных сделок (заполненные экземпляры) и библиотека шаблонов (RERA A/B/F/I, Oqood, КП, досье, аренда). Каждый документ привязан к своим записям — <b>сделка · объект · контакт</b> — это раздельные множества вокруг записи, не смешанные; при этом один документ переиспользуется в разных сценариях (виден в карточке каждой связанной записи). Поиск по названию, клиенту или форме.',
       '<button class="btn sm primary" data-scn="S4">' + I('plus') + 'Подготовить документ (S4)</button>') +
       searchBox + seg +
       '<div class="fin"><div>' + dealsSection + tplSection + storageSection + '</div>' +
@@ -17867,7 +17878,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     s15_proposal: { title: 'Ответ холодному лиду', rows: [
       { k: 'Запрос', v: 'инвест. квартира до 1,5 млн' }, { h: 'Три варианта (3 источника)' },
       { k: 'Доступность', v: 'неподтверждённая — помечена, сомнительный → S9' },
-      { k: 'Расчёт', v: 'короткий, допущения видны' }, { k: 'Итог', v: 'создан запрос + следующее касание' },
+      { k: 'Расчёт', v: 'короткий, допущения видны' }, { k: 'Итог', v: 'создан запрос + следующий контакт' },
     ] },
     s6_handover: { title: 'Передача партнёру · история', rows: [
       { k: 'Партнёр', v: 'клубный партнёр (принял)' }, { k: 'Формат', v: 'совместный показ' },
@@ -18811,7 +18822,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<span class="badge">' + I('replay') + 'у сценария в навигаторе «Заново» — только его данные</span></div>' +
       '<div class="section-label" style="margin-top:14px">Управление</div>' +
       '<div class="prov"><span class="badge">' + I('users') + 'Агент ↔ Руководитель (шапка)</span><span class="badge">' + I('moon') + 'Свет / тьма</span>' +
-      '<span class="badge">' + I('chat') + 'Консьерж — диалоги по сущностям; из карточки сделки/объекта «Чат по …»</span>' +
+      '<span class="badge">' + I('chat') + 'Консьерж — разговоры по записям; из карточки сделки/объекта «Чат по …»</span>' +
       '<span class="badge">' + I('clock') + 'Демо-часы фиксированы (14 мая) — «сегодня/завтра» считаются от них</span></div>' +
       '<div style="margin-top:12px;font-size:11.5px;color:var(--faint)">Состояние сохраняется в браузере и переживает перезагрузку. Полный сброс — только кнопкой «Сброс». Подробнее: ИНСТРУКЦИЯ.md в папке стенда.</div>';
     openModal('Как показывать демо', body, '<button class="btn primary" data-act="closeModal">Понятно</button>');
@@ -19398,7 +19409,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<div style="font-size:11.5px;color:var(--mut);margin-top:8px">Здесь настраиваются шаблоны для генерации. Библиотека документов и заполненные экземпляры сделок — в разделе <a data-nav="docs" style="color:var(--acc-ink);cursor:pointer;font-weight:600">Документы</a>.</div>');
 
     const notif = card('Уведомления',
-      rowc('bell', 'Требуют действий сегодня', 'Горячие клиенты, просроченные касания, новые запросы', sw(true)) +
+      rowc('bell', 'Требуют действий сегодня', 'Горячие клиенты, просроченные контакты, новые запросы', sw(true)) +
       rowc('doc', 'Сроки по документам', 'Escrow / Oqood / title deed — напоминания заранее', sw(true)) +
       rowc('flame', 'Ночные лиды', 'Входящие вне рабочих часов — сводка утром', sw(true)));
 
@@ -20482,7 +20493,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
             ' — помехи по ней не отслеживаются.');
         }
         return say('По ' + named + ' помех не отмечено. Проверяются пять причин — просроченное ' +
-          'касание, невнесённый задаток, расхождение по полям, незакрытый шаг договора и ' +
+          'просроченный контакт, невнесённый задаток, расхождение по полям, незакрытый шаг договора и ' +
           'просроченные задачи, — не сработала ни одна. Ближайшее дело — ' + nextPhrase(ui, rec) + '.');
       }
       if (ASK_NEXT.test(t)) {
@@ -20498,7 +20509,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         if (/клиент|заказчик/.test(t) && rec.клиент) return say('Клиент по ' + named + ' — ' + rec.клиент + '.');
         if (/шаг|стади/.test(t) && rec.шаг) return say('Сделка «' + rec.название + '» на шаге «' + rec.шаг + '».');
         if (/срок|дедлайн|касани/.test(t) && rec.срок_следующего_шага) {
-          return say('Следующее касание по ' + named + ' — ' + rec.срок_следующего_шага + '.');
+          return say('Следующий контакт по ' + named + ' — ' + rec.срок_следующего_шага + '.');
         }
       }
       if (brief.length) return say('Сделка «' + rec.название + '». ' + brief.join(' '));
@@ -20528,7 +20539,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (rec.стадия) bits.push('стадия «' + rec.стадия + '»');
     if (rec.сумма) bits.push('сумма ' + money(rec.сумма));
     if (rec.бюджет) bits.push('бюджет ' + money(rec.бюджет));
-    if (rec.срок_следующего_шага) bits.push('следующее касание ' + rec.срок_следующего_шага);
+    if (rec.срок_следующего_шага) bits.push('следующий контакт ' + rec.срок_следующего_шага);
     if (rec.срок) bits.push('срок ' + rec.срок);
     if ((rec.объекты || []).length) bits.push('объект: ' + rec.объекты.join(', '));
     return say(bits.join(', ') + '.');

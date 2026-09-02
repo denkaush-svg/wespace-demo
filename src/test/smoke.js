@@ -1592,8 +1592,10 @@ setTimeout(async () => {
     check('список клиентов · в строке нет запроса (цель, район)', briefLeak.length === 0, briefLeak.join(', '));
     // Взамен — то, чем человека находят и как к нему обращаются.
     const noReach = rowSubs.filter((t) => !/\+/.test(t) && !/WhatsApp|Telegram|Email|Телефон/.test(t));
-    check('список клиентов · показывает связь и последнее касание',
-      /касание/.test(subJoin) && noReach.length === 0,
+    /* Слово переехало с «касания» на «контакт»: калька с CRM-шного touch ушла из языка стенда,
+       и проверка следует за словарём, а не сторожит прежнее написание. */
+    check('список клиентов · показывает связь и последний контакт',
+      /контакт/.test(subJoin) && noReach.length === 0,
       noReach.length ? 'без способа связи: ' + noReach.join(' / ') : subJoin.slice(0, 120));
 
     // Блок связи внутри сделки и заявки — про связь, а не про условия страницы, на которой стоит.
@@ -1614,7 +1616,7 @@ setTimeout(async () => {
     WS.ui.dealCard('d_anna');
     const meta = (doc.querySelector('#app .view .dcli-meta') || {}).textContent || '';
     check('блок связи · говорит, как связаться и когда говорили',
-      /язык/.test(meta) && /касание/.test(meta), meta);
+      /язык/.test(meta) && /контакт/.test(meta), meta);
 
     // Корень дефекта был в самих данных: у клиента в поле «цель» стояло состояние сделки.
     const leaked = (dd().clients || []).filter((c) =>
@@ -8542,6 +8544,40 @@ setTimeout(async () => {
     check('каркас · внизу заявки одна строка ввода',
       doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1,
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
+  }
+
+  /* ---- Язык стенда: слова брокера, а не слова разработчика ----
+     «Касание» — калька с CRM-шного touch: так говорит система, а не брокер. Слово разошлось
+     по данным, подсказкам и офлайн-ответам, а живая модель просто повторяла наши формулировки —
+     поэтому чинить надо было словарь, а не промпт. «Сущность» — и вовсе слово из проектной
+     документации, которому на экране не место.
+
+     Проверка обходит экраны и читает то, что видит человек. Список запретных слов ведётся
+     здесь: новое проникает в текст постоянно, и поймать его дешевле сторожем, чем вычиткой.
+     Слова, которые брокер действительно говорит — «лид», «воронка», «конверсия», «холодный
+     клиент», — намеренно НЕ запрещены: борьба идёт с калькой, а не с отраслевым языком. */
+  {
+    const FORBIDDEN = [
+      ['касани', 'калька с touch — говорите «контакт» или «связаться»'],
+      ['коснуться', 'то же; глагол — «связаться»'],
+      ['сущност', 'слово из проектной документации — на экране «запись»'],
+      ['инстанс', 'то же'],
+      ['энтити', 'то же'],
+    ];
+    const VIEWS = ['start', 'concierge', 'requests', 'clients', 'contracts', 'tasks',
+      'objects', 'valuation', 'analytics', 'partners', 'shows', 'promotion', 'services',
+      'club', 'docs', 'settings', 'profile'];
+    const appEl = () => doc.getElementById('app');
+    let seen = '';
+    VIEWS.forEach((v) => { WS.router.go(v); seen += ' ' + (appEl().textContent || ''); });
+    const nd = (dd().deals || [])[0]; if (nd) { WS.ui.dealCard(nd.id); seen += ' ' + (appEl().textContent || ''); }
+    const nc = (dd().clients || [])[0]; if (nc) { WS.ui.clientCard(nc.id); seen += ' ' + (appEl().textContent || ''); }
+    const low = seen.toLowerCase();
+    FORBIDDEN.forEach((f) => {
+      check('язык · на экранах нет слова «' + f[0] + '» — ' + f[1],
+        low.indexOf(f[0]) < 0, 'встретилось ' + low.split(f[0]).length + ' раз(а)');
+    });
+    check('язык · обход экранов действительно что-то прочитал', seen.length > 20000, String(seen.length));
   }
 
   /* ---- Подсказки Консьержа склоняют имя ----
