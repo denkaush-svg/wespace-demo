@@ -1214,9 +1214,9 @@
   // Тип дела — не просто подпись, а свой цвет: агент читает столбец боковым зрением и должен
   // отличать звонок от встречи, не вчитываясь. Третий элемент — класс окраски.
   const DAY_KIND = {
-    touch: ['Коммуникация', 'chat', 'k-msg'], call: ['Звонок', 'phone', 'k-call'], kp: ['Задача', 'doc', 'k-task'],
+    touch: ['Сообщение', 'chat', 'k-msg'], call: ['Звонок', 'phone', 'k-call'], kp: ['Задача', 'doc', 'k-task'],
     doc: ['Задача', 'doc', 'k-task'], task: ['Задача', 'check', 'k-task'], show: ['Встреча', 'calendar', 'k-meet'],
-    meet: ['Встреча', 'calendar', 'k-meet'], visit: ['Встреча', 'calendar', 'k-meet'], mail: ['Коммуникация', 'mail', 'k-msg'],
+    meet: ['Встреча', 'calendar', 'k-meet'], visit: ['Встреча', 'calendar', 'k-meet'], mail: ['Сообщение', 'mail', 'k-msg'],
   };
   const DAY_WHEN_ORD = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
   /* Срок события записан словами и временем — «сегодня 16:00», «завтра 11:30». Разбор срока
@@ -5171,7 +5171,12 @@
       ['briefcase', 'Создать сделку', 'data-act="newDeal" data-cid="' + c.id + '"', 'primary'],
       ['building', 'Подобрать объекты', 'data-scn="G2"', ''],
       ['chat', 'Написать', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users"', ''],
-      ['clock', 'Запланировать контакт', 'data-act="newTask"', ''],
+      /* Кнопка называет конкретное дело, а не разряд дел. «Запланировать контакт» описывает
+         то, как это устроено внутри, а брокер планирует звонок или встречу — и знает заранее,
+         что именно. Тип уезжает в форму уже выбранным, так что лишнего шага не появилось.
+         Написать клиенту можно соседней кнопкой «Написать», поэтому третьей здесь нет. */
+      ['phone', 'Запланировать звонок', 'data-act="newTask" data-kind="call"', ''],
+      ['calendar', 'Запланировать встречу', 'data-act="newTask" data-kind="meet"', ''],
       ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
       // Was data-scn="S8" — a scripted demo run hard-wired to Анна's deal, which ran unchanged
       // whichever client's card you opened. A bar that claims to act on THIS card must.
@@ -10369,12 +10374,17 @@
     }
     return null;
   }
-  function openNewTask() {
+  function openNewTask(kind) {
     const sc = newTaskScope();
     S().taskScopeDraft = sc;
     const clientOpts = D().clients.map((c) => '<option value="' + c.id + '">' + c.name + '</option>').join('');
-    const kindOpts = [['manual', 'Ручная задача'], ['call', 'Звонок'], ['touch', 'Касание'], ['doc', 'Документ'], ['kp', 'КП']]
-      .map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('');
+    /* «Касание» дожило здесь до конца именно потому, что список живёт в модальном окне:
+       обход экранов внутрь окон не заходил, и сторож его не видел. Виды названы тем, что
+       человек собирается сделать. Код `touch` сохранён — на нём стоят записи в данных, —
+       но читается он теперь как «Сообщение». */
+    const kindOpts = [['call', 'Звонок'], ['meet', 'Встреча'], ['touch', 'Сообщение'],
+      ['doc', 'Документ'], ['kp', 'КП'], ['manual', 'Другое']]
+      .map(([v, l]) => '<option value="' + v + '"' + (v === kind ? ' selected' : '') + '>' + l + '</option>').join('');
     const teamOpts = TEAM.map((m) => '<option value="' + m.id + '"' + (m.id === 'u_marina' ? ' selected' : '') + '>' + m.name + (m.id === 'u_marina' ? ' (я)' : '') + '</option>').join('');
     const scopeLine = sc
       ? '<div class="note" style="margin:0 0 10px">' + I('briefcase') + ' Задача ' + escAttr(sc.label) +
@@ -10388,7 +10398,8 @@
       '<label class="fld"><span>Тип</span><select id="ntKind">' + kindOpts + '</select></label>' +
       '<label class="fld"><span>Срок</span><select id="ntWhen"><option value="today">сегодня</option><option value="tomorrow">завтра</option></select></label>' +
       '</div>';
-    openModal('Новая задача', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="taskCreate">' + I('check') + 'Создать</button>');
+    const NT_TITLE = { call: 'Запланировать звонок', meet: 'Запланировать встречу' };
+    openModal(NT_TITLE[kind] || 'Новая задача', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="taskCreate">' + I('check') + 'Создать</button>');
   }
   function createTaskFromForm() {
     const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
@@ -11007,7 +11018,7 @@
   function openHelp() {
     const step = (n, t) => '<div class="field"><div class="k" style="width:26px"><span class="badge acc" style="width:22px;justify-content:center">' + n + '</span></div><div class="v">' + t + '</div></div>';
     const body =
-      '<p style="font-size:13px;color:var(--mut);margin-top:0">Демо-стенд WESPACE: 16 сценариев на подготовленных дубайских данных, без backend. Ниже — как вести показ агенту.</p>' +
+      '<p style="font-size:13px;color:var(--mut);margin-top:0">Демо-стенд WESPACE: 16 сценариев на подготовленных дубайских данных. Консьерж отвечает живой моделью через прокси; всё остальное считается в браузере. Ниже — как вести показ агенту.</p>' +
       '<div class="section-label" style="margin-top:8px">Провести показ</div>' +
       step('1', 'На старте нажмите <b>«Золотой тур · 10 мин»</b> — пройдёт G1→G2→G3→S5 одной сессией с подсказкой следующего действия (пульсирует нужная кнопка).') +
       step('2', 'Любой из 16 сценариев — из <b>«Навигатор демо»</b> (справа вверху). Панели S2/S9 показывают безопасные отказы.') +

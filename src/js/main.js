@@ -363,7 +363,7 @@
       case 'importRun': WS.eventEngine.importRun(t.dataset.impkind); break;
       case 'importGo': WS.eventEngine.importGo(t.dataset.impkind); break;
       case 'clearShortlist': store.shortlist = []; api.toast('Подборка очищена'); api.emit(); break;
-      case 'newTask': WS.ui.openNewTask(); break;
+      case 'newTask': WS.ui.openNewTask(t.dataset.kind); break;
       case 'newThread': WS.ui.openNewThread(); break;
       case 'cgFeature': WS.ui.openCgFeature(t.dataset.feat); break;
       case 'exportDeals': api.toast('Экспорт .xlsx сформирован из фикстур (демо-скачивание)', 'ok'); break;

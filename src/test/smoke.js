@@ -8572,6 +8572,13 @@ setTimeout(async () => {
     VIEWS.forEach((v) => { WS.router.go(v); seen += ' ' + (appEl().textContent || ''); });
     const nd = (dd().deals || [])[0]; if (nd) { WS.ui.dealCard(nd.id); seen += ' ' + (appEl().textContent || ''); }
     const nc = (dd().clients || [])[0]; if (nc) { WS.ui.clientCard(nc.id); seen += ' ' + (appEl().textContent || ''); }
+    /* И ВНУТРЬ окон. «Касание» пережило первую чистку именно потому, что жило в выпадающем
+       списке модального окна: обход по экранам туда не заходит, и сторож его не видел.
+       Текст окна лежит в отдельном узле, не внутри #app. */
+    const modal = () => (doc.getElementById('modal') || { textContent: '' }).textContent || '';
+    [WS.ui.openNewTask, WS.ui.openAbout, WS.ui.openHelp].forEach((fn) => {
+      if (typeof fn === 'function') { fn(); seen += ' ' + modal(); WS.ui.closeModal(); }
+    });
     const low = seen.toLowerCase();
     FORBIDDEN.forEach((f) => {
       check('язык · на экранах нет слова «' + f[0] + '» — ' + f[1],
