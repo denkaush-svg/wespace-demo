@@ -23,6 +23,7 @@
     theme: null,          // null = follow system
     role: 'agent',
     view: START_VIEW,
+    aboutSeen: false,   // окно «О демоверсии» показывается один раз, до первого сброса
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
@@ -129,7 +130,7 @@
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        schema: SCHEMA, theme: store.theme, role: store.role,
+        schema: SCHEMA, theme: store.theme, role: store.role, aboutSeen: store.aboutSeen,
         scenarioStatus: store.scenarioStatus, data: store.data,
         events: store.events, unsaved: store.unsaved,
         shortlist: store.shortlist, podborClient: store.podborClient, docTab: store.docTab,
@@ -149,6 +150,7 @@
     if (!p || p.schema !== SCHEMA) return 'incompatible';
     store.theme = p.theme || null;
     store.role = p.role || 'agent';
+    store.aboutSeen = !!p.aboutSeen;
     store.scenarioStatus = p.scenarioStatus || initStatuses();
     store.data = p.data || freshData();
     store.events = p.events || [];
@@ -179,6 +181,7 @@
 
   function resetAll() {
     store.view = START_VIEW;
+    store.aboutSeen = false;   // сброс = исходное состояние, границы показываются снова
     store.data = freshData();
     store.scenarioStatus = initStatuses();
     store.role = 'agent';

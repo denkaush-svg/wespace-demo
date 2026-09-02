@@ -2874,3 +2874,12 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .cg-home { padding-top: 3vh; }
   .cg-greet-t { font-size: 21px; }
 }
+
+/* Ссылка «О демоверсии» на первом экране Консьержа. Не кнопка действия — приглушённая
+   строка под подсказками: она нужна один раз, в первую минуту, и не должна конкурировать
+   с полем ввода за внимание. */
+.cg-about { display: inline-flex; align-items: center; gap: 7px; margin: 14px auto 0; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--mut);
+  font-size: 12.5px; font-weight: 550; cursor: pointer; }
+.cg-about:hover { color: var(--ink); border-color: var(--ink-20, var(--line)); }
+.cg-about svg { width: 15px; height: 15px; flex: none; }

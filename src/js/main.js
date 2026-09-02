@@ -330,6 +330,7 @@
       case 'dayLine': store.dayView = 'line'; api.emit(); break;
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
+      case 'about': WS.ui.openAbout(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
@@ -768,6 +769,9 @@
     // second at load costs a retry rather than the session; and every failure
     // falls back to the offline planner, which answers the same questions.
     if (WS.live && WS.live.install) WS.live.install();
+    /* Границы демо показываются САМИ при первом открытии: человек, которому прислали ссылку,
+       занесёт палец над «Отправить» в первую минуту, а не после того, как найдёт справку. */
+    if (!store.aboutSeen) { store.aboutSeen = true; api.save(); setTimeout(() => WS.ui.openAbout(), 700); }
   } catch (e) {
     var a = document.getElementById('app');
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';

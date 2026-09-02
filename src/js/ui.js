@@ -3541,6 +3541,9 @@
       '<p class="cg-greet-m">Напишите задачу словами — «собери КП», «подготовь к звонку», «что просрочено». Консьерж видит ваши сделки, клиентов и объекты, поэтому спрашивать «по какому клиенту» не нужно.</p></div>' +
       cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос…', 'cgSend', 'cg-hero') +
       (starters ? '<div class="cg-starters">' + starters + '</div>' : '') +
+      /* Вход в границы демо стоит на первом экране: это первый вопрос человека, которому
+         прислали ссылку, и искать ответ в меню он не пойдёт. */
+      '<button class="cg-about" data-act="about">' + I('help') + 'О демоверсии: что здесь настоящее, а что показано</button>' +
       conciergeWorkshop(st) +
     '</div>';
   }
@@ -10948,6 +10951,54 @@
     } else if (m) { m.innerHTML = ''; }
   }
 
+  /* «О демоверсии» — окно для того, КОМУ стенд отправили, а не для того, кто его показывает.
+     Соседнее openHelp() написано для ведущего показ («как вести показ агенту») и человеку,
+     впервые открывшему ссылку, отвечает не на его вопросы. Здесь ровно три вопроса, которые
+     он задаёт про себя в первую минуту: что тут живое, что нарисовано и чего просто нет.
+
+     Почему это внутри стенда, а не в сопроводительном письме: письмо теряется, а границы
+     должны быть под рукой в момент, когда человек занёс палец над кнопкой «Отправить».
+     Почему сказано, что модель живая: не сказав, получаем осторожные вопросы к заготовке
+     вместо проверки на прочность. Почему отдельной строкой «наружу ничего не уходит»: пока
+     этот страх не снят, человек смотрит, а не работает, и путь остаётся непроверенным. */
+  function openAbout() {
+    const row = (ic, t) => '<div class="field"><div class="k" style="width:26px">' + I(ic) +
+      '</div><div class="v">' + t + '</div></div>';
+    const body =
+      '<p style="font-size:13px;color:var(--mut);margin-top:0">Это демонстрационная версия WESPACE — ' +
+      'рабочего места брокера. Ниже граница: что здесь работает по-настоящему, что показано, ' +
+      'а чего в этой версии ещё нет.</p>' +
+
+      '<div class="section-label" style="margin-top:12px">Работает по-настоящему</div>' +
+      row('sparkle', '<b>Консьерж — живая модель</b>, а не заготовленные ответы. Читает данные стенда и ' +
+        'видит экран, на котором вы стоите: можно спросить «а что по этой сделке?», не называя её.') +
+      row('mic', '<b>Голосовой ввод</b> — через микрофон браузера. Есть в Chrome и Safari, в Firefox нет.') +
+      row('trend', '<b>Цифры считаются из одних данных.</b> Двиньте сделку или закройте задачу — ' +
+        'сводка, доска и аналитика пересчитаются вместе.') +
+
+      '<div class="section-label" style="margin-top:14px">Показано, но имитировано</div>' +
+      row('users', '<b>Данные вымышлены целиком</b> — клиенты, объекты, сделки, суммы. ' +
+        'Их правдоподобие оценивать не нужно.') +
+      row('mail', '<b>Каналы связи</b> — WhatsApp, Telegram, почта, порталы — живут внутри стенда. ' +
+        '<b>Наружу ничего не уходит:</b> «отправлено» означает запись в ленту.') +
+      row('lock', '<b>Проверки документов и контрагентов</b> помечены значком «имитация (DEMO)» на экране.') +
+      row('clock', '<b>Часы стенда остановлены</b> на 14 мая — «сегодня» и «завтра» считаются от этой даты.') +
+
+      '<div class="section-label" style="margin-top:14px">Чего в этой версии нет</div>' +
+      '<div class="prov">' +
+      '<span class="badge">' + I('mail') + 'подключения к настоящим каналам и порталам</span>' +
+      '<span class="badge">' + I('doc') + 'подписания документов и платежей</span>' +
+      '<span class="badge">' + I('building') + 'выгрузок в государственные системы</span>' +
+      '<span class="badge">' + I('users') + 'совместной работы — одна вкладка равна одной копии</span>' +
+      '<span class="badge">' + I('grid') + 'полноценной работы с телефона: доска сделок на узком экране скрыта</span>' +
+      '</div>' +
+
+      '<div style="margin-top:14px;font-size:12px;color:var(--faint)">Всё, что вы делаете, хранится ' +
+      'только в вашем браузере — никто этого не видит. Кнопка <b>«Сброс»</b> в верхней панели ' +
+      'возвращает стенд в исходное состояние, так что сломать здесь ничего нельзя.</div>';
+    openModal('О демоверсии', body, '<button class="btn primary" data-act="closeModal">Понятно, начать</button>');
+  }
+
   function openHelp() {
     const step = (n, t) => '<div class="field"><div class="k" style="width:26px"><span class="badge acc" style="width:22px;justify-content:center">' + n + '</span></div><div class="v">' + t + '</div></div>';
     const body =
@@ -12325,7 +12376,7 @@
   }
 
   WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
-    openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+    openModal, closeModal, openSections, openHelp, openAbout, renderToasts, drawer, mountConcierge, cgContextMenu,
     docsOfDeal, docsOfRequest, docScope, tasksOfDeal, tasksOfRequest, taskScopeLabel, DEAL_BANDS, dealBandOf, bandOutliers, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,

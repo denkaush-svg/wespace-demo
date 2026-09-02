@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 10:19</title>
+  <title>WESPACE · сборка 10:49</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='10:19';
+    window.WS_BUILD='10:49';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3027,6 +3027,15 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .cg-greet-t { font-size: 21px; }
 }
 
+/* Ссылка «О демоверсии» на первом экране Консьержа. Не кнопка действия — приглушённая
+   строка под подсказками: она нужна один раз, в первую минуту, и не должна конкурировать
+   с полем ввода за внимание. */
+.cg-about { display: inline-flex; align-items: center; gap: 7px; margin: 14px auto 0; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--mut);
+  font-size: 12.5px; font-weight: 550; cursor: pointer; }
+.cg-about:hover { color: var(--ink); border-color: var(--ink-20, var(--line)); }
+.cg-about svg { width: 15px; height: 15px; flex: none; }
+
 
 /* ============================================================
    WESPACE preview theme — faithful to the OLD CRM palette,
@@ -5196,6 +5205,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     theme: null,          // null = follow system
     role: 'agent',
     view: START_VIEW,
+    aboutSeen: false,   // окно «О демоверсии» показывается один раз, до первого сброса
     tour: { active: false, scenarioId: null, stepIndex: 0 },
     scenarioStatus: {},   // id -> 'not' | 'prog' | 'done'
     data: null,           // working copy of fixtures
@@ -5302,7 +5312,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        schema: SCHEMA, theme: store.theme, role: store.role,
+        schema: SCHEMA, theme: store.theme, role: store.role, aboutSeen: store.aboutSeen,
         scenarioStatus: store.scenarioStatus, data: store.data,
         events: store.events, unsaved: store.unsaved,
         shortlist: store.shortlist, podborClient: store.podborClient, docTab: store.docTab,
@@ -5322,6 +5332,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (!p || p.schema !== SCHEMA) return 'incompatible';
     store.theme = p.theme || null;
     store.role = p.role || 'agent';
+    store.aboutSeen = !!p.aboutSeen;
     store.scenarioStatus = p.scenarioStatus || initStatuses();
     store.data = p.data || freshData();
     store.events = p.events || [];
@@ -5352,6 +5363,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
 
   function resetAll() {
     store.view = START_VIEW;
+    store.aboutSeen = false;   // сброс = исходное состояние, границы показываются снова
     store.data = freshData();
     store.scenarioStatus = initStatuses();
     store.role = 'agent';
@@ -11328,6 +11340,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '<p class="cg-greet-m">Напишите задачу словами — «собери КП», «подготовь к звонку», «что просрочено». Консьерж видит ваши сделки, клиентов и объекты, поэтому спрашивать «по какому клиенту» не нужно.</p></div>' +
       cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос…', 'cgSend', 'cg-hero') +
       (starters ? '<div class="cg-starters">' + starters + '</div>' : '') +
+      /* Вход в границы демо стоит на первом экране: это первый вопрос человека, которому
+         прислали ссылку, и искать ответ в меню он не пойдёт. */
+      '<button class="cg-about" data-act="about">' + I('help') + 'О демоверсии: что здесь настоящее, а что показано</button>' +
       conciergeWorkshop(st) +
     '</div>';
   }
@@ -18735,6 +18750,54 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     } else if (m) { m.innerHTML = ''; }
   }
 
+  /* «О демоверсии» — окно для того, КОМУ стенд отправили, а не для того, кто его показывает.
+     Соседнее openHelp() написано для ведущего показ («как вести показ агенту») и человеку,
+     впервые открывшему ссылку, отвечает не на его вопросы. Здесь ровно три вопроса, которые
+     он задаёт про себя в первую минуту: что тут живое, что нарисовано и чего просто нет.
+
+     Почему это внутри стенда, а не в сопроводительном письме: письмо теряется, а границы
+     должны быть под рукой в момент, когда человек занёс палец над кнопкой «Отправить».
+     Почему сказано, что модель живая: не сказав, получаем осторожные вопросы к заготовке
+     вместо проверки на прочность. Почему отдельной строкой «наружу ничего не уходит»: пока
+     этот страх не снят, человек смотрит, а не работает, и путь остаётся непроверенным. */
+  function openAbout() {
+    const row = (ic, t) => '<div class="field"><div class="k" style="width:26px">' + I(ic) +
+      '</div><div class="v">' + t + '</div></div>';
+    const body =
+      '<p style="font-size:13px;color:var(--mut);margin-top:0">Это демонстрационная версия WESPACE — ' +
+      'рабочего места брокера. Ниже граница: что здесь работает по-настоящему, что показано, ' +
+      'а чего в этой версии ещё нет.</p>' +
+
+      '<div class="section-label" style="margin-top:12px">Работает по-настоящему</div>' +
+      row('sparkle', '<b>Консьерж — живая модель</b>, а не заготовленные ответы. Читает данные стенда и ' +
+        'видит экран, на котором вы стоите: можно спросить «а что по этой сделке?», не называя её.') +
+      row('mic', '<b>Голосовой ввод</b> — через микрофон браузера. Есть в Chrome и Safari, в Firefox нет.') +
+      row('trend', '<b>Цифры считаются из одних данных.</b> Двиньте сделку или закройте задачу — ' +
+        'сводка, доска и аналитика пересчитаются вместе.') +
+
+      '<div class="section-label" style="margin-top:14px">Показано, но имитировано</div>' +
+      row('users', '<b>Данные вымышлены целиком</b> — клиенты, объекты, сделки, суммы. ' +
+        'Их правдоподобие оценивать не нужно.') +
+      row('mail', '<b>Каналы связи</b> — WhatsApp, Telegram, почта, порталы — живут внутри стенда. ' +
+        '<b>Наружу ничего не уходит:</b> «отправлено» означает запись в ленту.') +
+      row('lock', '<b>Проверки документов и контрагентов</b> помечены значком «имитация (DEMO)» на экране.') +
+      row('clock', '<b>Часы стенда остановлены</b> на 14 мая — «сегодня» и «завтра» считаются от этой даты.') +
+
+      '<div class="section-label" style="margin-top:14px">Чего в этой версии нет</div>' +
+      '<div class="prov">' +
+      '<span class="badge">' + I('mail') + 'подключения к настоящим каналам и порталам</span>' +
+      '<span class="badge">' + I('doc') + 'подписания документов и платежей</span>' +
+      '<span class="badge">' + I('building') + 'выгрузок в государственные системы</span>' +
+      '<span class="badge">' + I('users') + 'совместной работы — одна вкладка равна одной копии</span>' +
+      '<span class="badge">' + I('grid') + 'полноценной работы с телефона: доска сделок на узком экране скрыта</span>' +
+      '</div>' +
+
+      '<div style="margin-top:14px;font-size:12px;color:var(--faint)">Всё, что вы делаете, хранится ' +
+      'только в вашем браузере — никто этого не видит. Кнопка <b>«Сброс»</b> в верхней панели ' +
+      'возвращает стенд в исходное состояние, так что сломать здесь ничего нельзя.</div>';
+    openModal('О демоверсии', body, '<button class="btn primary" data-act="closeModal">Понятно, начать</button>');
+  }
+
   function openHelp() {
     const step = (n, t) => '<div class="field"><div class="k" style="width:26px"><span class="badge acc" style="width:22px;justify-content:center">' + n + '</span></div><div class="v">' + t + '</div></div>';
     const body =
@@ -20112,7 +20175,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   }
 
   WS.ui = { render, stageLabel, STAGE_CODES: STAGES.map((x) => x.k), cgModeLabel, cgDepthLabel, cgWrites,
-    openModal, closeModal, openSections, openHelp, renderToasts, drawer, mountConcierge, cgContextMenu,
+    openModal, closeModal, openSections, openHelp, openAbout, renderToasts, drawer, mountConcierge, cgContextMenu,
     docsOfDeal, docsOfRequest, docScope, tasksOfDeal, tasksOfRequest, taskScopeLabel, DEAL_BANDS, dealBandOf, bandOutliers, reqStage, reqStageLabel, dealSteps, boardFits, reqOfferStatus, reqSelectedFree, clampStage, clientOffers, clientSeenObjects, contactsSearchList,
     openArtifact, openArtifactId, openKp, openXls, openDoc, openFinance, finSlider, finScenario, clientCard, objectCard,
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
@@ -22954,6 +23017,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'dayLine': store.dayView = 'line'; api.emit(); break;
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
+      case 'about': WS.ui.openAbout(); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
@@ -23392,6 +23456,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     // second at load costs a retry rather than the session; and every failure
     // falls back to the offline planner, which answers the same questions.
     if (WS.live && WS.live.install) WS.live.install();
+    /* Границы демо показываются САМИ при первом открытии: человек, которому прислали ссылку,
+       занесёт палец над «Отправить» в первую минуту, а не после того, как найдёт справку. */
+    if (!store.aboutSeen) { store.aboutSeen = true; api.save(); setTimeout(() => WS.ui.openAbout(), 700); }
   } catch (e) {
     var a = document.getElementById('app');
     if (a) a.innerHTML = '<div style="padding:24px;font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#222;line-height:1.5"><b>Стенд не запустился.</b><br><br>' + (e && e.message ? e.message : e) + '<br><br>Пришлите этот текст — починим.</div>';
