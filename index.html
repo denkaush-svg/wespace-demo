@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:26</title>
+  <title>WESPACE · сборка 00:48</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:26';
+    window.WS_BUILD='00:48';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -21519,7 +21519,16 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
          rec.шаг ? 'шаг ' + rec.шаг : (rec.стадия ? 'стадия ' + rec.стадия : null),
          'вопрос без явного подлежащего задан про эту запись — отвечайте сразу, не переспрашивая']
         .filter(Boolean).join(', ')
-      : (th.label || th.id);
+      /* Экран без записи — Пульс, Аналитика, сам Консьерж — раньше отдавал модели ТОЛЬКО
+         название треда, то есть последней карточки, с которой брокер ушёл. Проверено на живом
+         стенде: стоя на Пульсе и спросив «что здесь?», брокер получал описание объекта Bayline,
+         закрытого две минуты назад. Разговор при этом остаётся привязанным к записи законно —
+         тред и есть переписка по ней, — так что подменять его нельзя; не хватало второго факта:
+         где брокер стоит прямо сейчас. Теперь едут оба, и «здесь» разрешается по экрану. */
+      : [th.label || th.id,
+         sc && sc.экран ? 'брокер сейчас на экране «' + sc.экран +
+           '»; если вопрос про то, что перед ним, — отвечайте про этот экран, а не про запись выше' : null]
+        .filter(Boolean).join('; ');
     return { id: th.id, о_чём: about, экран: sc ? sc.экран : null, реплик: (th.items || []).length };
   }
 
