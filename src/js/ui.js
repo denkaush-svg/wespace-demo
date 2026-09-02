@@ -3570,7 +3570,7 @@
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём разговор? Выберите запись — он будет привязан к ней и виден из её карточки.</p>' +
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём разговор? Выберите сделку, заявку или контакт — разговор привяжется к ним и будет виден из карточки.</p>' +
       '<div class="section-label">Сделки</div>' + dealOpts +
       '<div class="section-label" style="margin-top:10px">Объекты</div>' + objOpts +
       '<div class="section-label" style="margin-top:10px">Лиды и общее</div>' + leadOpts;
@@ -3646,7 +3646,7 @@
   }
   function conciergeThreadEmpty() {
     return '<div class="empty">' + I('sparkle') + '<div style="font-weight:700;color:var(--ink)">Начните диалог</div>' +
-      '<div style="margin-top:6px">Поручите задачу по этой записи голосом или текстом.</div></div>';
+      '<div style="margin-top:6px">Поручите работу по этой карточке — голосом или текстом.</div></div>';
   }
 
   // ---------------- CLIENTS & DEALS ----------------
@@ -4417,7 +4417,7 @@
        стоял пустым, хотя пять заявок из семнадцати были именно здесь. Двойного счёта тут нет:
        у квалифицированной заявки сделки ещё нет, считать нечего дважды. Не разобранное —
        стадия `new` — по-прежнему живёт во «Входящих» и на доску не идёт. */
-    { k: 'qual', label: 'Квалифицированы', request: ['qual'], deal: [],
+    { k: 'qual', label: 'Квалификация', request: ['qual'], deal: [],
       gate: 'Бюджет и район названы' },
     { k: 'pick', label: 'Подбор и показы', request: ['offer', 'meet'], deal: [],
       gate: 'Клиент увидел варианты' },
@@ -5176,12 +5176,12 @@
          что именно. Тип уезжает в форму уже выбранным, так что лишнего шага не появилось.
          Написать клиенту можно соседней кнопкой «Написать», поэтому третьей здесь нет. */
       ['phone', 'Запланировать звонок', 'data-act="newTask" data-kind="call"', ''],
-      ['calendar', 'Запланировать встречу', 'data-act="newTask" data-kind="meet"', ''],
+      ['calendar', 'Назначить встречу', 'data-act="newTask" data-kind="meet"', ''],
       ['pencil', 'Записать заметку', 'data-act="addEvent" data-scope="contact" data-cid="' + c.id + '"', ''],
       // Was data-scn="S8" — a scripted demo run hard-wired to Анна's deal, which ran unchanged
       // whichever client's card you opened. A bar that claims to act on THIS card must.
-      ['sparkle', 'Бриф к звонку', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + ' · бриф" data-ticon="sparkle"', ''],
-      !(c.psych && c.psych.filled) ? ['users', 'Заполнить портрет', 'data-act="psychForm" data-cid="' + c.id + '"', ''] : null,
+      ['sparkle', 'Подготовиться к звонку', 'data-thread="contact:' + c.id + '" data-tlabel="' + escAttr(c.name) + ' · подготовка к звонку" data-ticon="sparkle"', ''],
+      !(c.psych && c.psych.filled) ? ['users', 'Составить портрет', 'data-act="psychForm" data-cid="' + c.id + '"', ''] : null,
     ];
   }
   // Полоса операций на карточке КЛИЕНТА говорит о человеке и о работе с ним: кто ведёт, когда
@@ -9992,7 +9992,7 @@
           f[1].map((x) => '<div class="feed-row"><div class="fi i-mut">' + I(fIco[x[1]] || 'doc') + '</div><div class="ft"><div class="t">' + x[0] + '</div><div class="m">' + x[2] + ' · ' + x[3] + '</div></div><button class="btn sm" data-act="cgFeatureStub" title="Скачать">' + I('download') + '</button></div>').join('') +
         '</div>').join('') +
         '<button class="btn sm" data-act="cgFeatureStub" style="margin-top:10px">' + I('upload') + 'Загрузить файл</button></div></div>' : '';
-    return head('Документы', 'Два слоя: документы конкретных сделок (заполненные экземпляры) и библиотека шаблонов (RERA A/B/F/I, Oqood, КП, досье, аренда). Каждый документ привязан к своим записям — <b>сделка · объект · контакт</b> — это раздельные множества вокруг записи, не смешанные; при этом один документ переиспользуется в разных сценариях (виден в карточке каждой связанной записи). Поиск по названию, клиенту или форме.',
+    return head('Документы', 'Два слоя: документы конкретных сделок (заполненные экземпляры) и библиотека шаблонов (RERA A/B/F/I, Oqood, КП, досье, аренда). Каждый документ привязан к сделке, объекту или контакту и виден в карточке каждого из них; один и тот же документ может работать сразу в нескольких сделках. Поиск по названию, клиенту или форме.',
       '<button class="btn sm primary" data-scn="S4">' + I('plus') + 'Подготовить документ (S4)</button>') +
       searchBox + seg +
       '<div class="fin"><div>' + dealsSection + tplSection + storageSection + '</div>' +
@@ -10398,7 +10398,7 @@
       '<label class="fld"><span>Тип</span><select id="ntKind">' + kindOpts + '</select></label>' +
       '<label class="fld"><span>Срок</span><select id="ntWhen"><option value="today">сегодня</option><option value="tomorrow">завтра</option></select></label>' +
       '</div>';
-    const NT_TITLE = { call: 'Запланировать звонок', meet: 'Запланировать встречу' };
+    const NT_TITLE = { call: 'Запланировать звонок', meet: 'Назначить встречу' };
     openModal(NT_TITLE[kind] || 'Новая задача', body, '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="taskCreate">' + I('check') + 'Создать</button>');
   }
   function createTaskFromForm() {
@@ -11028,7 +11028,7 @@
       '<span class="badge">' + I('replay') + 'у сценария в навигаторе «Заново» — только его данные</span></div>' +
       '<div class="section-label" style="margin-top:14px">Управление</div>' +
       '<div class="prov"><span class="badge">' + I('users') + 'Агент ↔ Руководитель (шапка)</span><span class="badge">' + I('moon') + 'Свет / тьма</span>' +
-      '<span class="badge">' + I('chat') + 'Консьерж — разговоры по записям; из карточки сделки/объекта «Чат по …»</span>' +
+      '<span class="badge">' + I('chat') + 'Консьерж ведёт отдельный разговор по каждой сделке, заявке и контакту — открывается из карточки</span>' +
       '<span class="badge">' + I('clock') + 'Демо-часы фиксированы (14 мая) — «сегодня/завтра» считаются от них</span></div>' +
       '<div style="margin-top:12px;font-size:11.5px;color:var(--faint)">Состояние сохраняется в браузере и переживает перезагрузку. Полный сброс — только кнопкой «Сброс». Подробнее: ИНСТРУКЦИЯ.md в папке стенда.</div>';
     openModal('Как показывать демо', body, '<button class="btn primary" data-act="closeModal">Понятно</button>');

@@ -1016,7 +1016,7 @@
   const tasks = [
     // Область задачи: сделка → заявка → контакт, первое непустое. Касание относится к человеку,
     // а не к сделке, поэтому у него области нет — и это законно, а не пропуск.
-    { id: 't_anna_touch', clientId: 'c_anna', title: 'Связаться — Анна Петрова', due: 'сегодня', when: 'today', kind: 'touch' },
+    { id: 't_anna_touch', clientId: 'c_anna', title: 'Связаться с Анной Петровой', due: 'сегодня', when: 'today', kind: 'touch' },
     { id: 't_anna_call', clientId: 'c_anna', dealId: 'd_anna', title: 'Позвонить Анне — уточнить дату подписания', due: 'сегодня', when: 'today', kind: 'call' },
     { id: 't_igor_kp', clientId: 'c_overdue', requestId: 'r_igor', title: 'КП для Игоря Лебедева', due: 'просрочено', when: 'overdue', kind: 'kp' },
     { id: 't_viktor_doc', clientId: 'c_docs', dealId: 'd_viktor', title: 'Проверить черновик договора', due: 'завтра', when: 'tomorrow', kind: 'doc' },
