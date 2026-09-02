@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>WESPACE — как смотреть демоверсию</title>
+<style>
+/* Ни одной строки скрипта: файл открывают из мессенджера, а встроенный просмотрщик iOS
+   скрипты не выполняет. Всё, что нужно прочитать, лежит в разметке. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font:16px/1.6 -apple-system,system-ui,"Segoe UI",sans-serif;
+  overflow-wrap:break-word;background:#f6f2ea;color:#211d16}
+img,svg{max-width:100%;height:auto}
+pre,.scroller{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+
+.wrap{max-width:720px;margin:0 auto;padding:28px 20px 64px}
+
+.top{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.mark{width:42px;height:42px;flex:none;border-radius:12px;background:#cf5a25;color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px}
+.top b{font-size:15px;letter-spacing:-.01em;display:block}
+.top span{font-size:13px;color:#766c5b;display:block}
+
+h1{font-size:27px;line-height:1.22;letter-spacing:-.02em;margin:0 0 12px}
+.lead{font-size:16px;color:#4a4338;margin:0 0 22px}
+
+.cta{display:block;text-align:center;background:#cf5a25;color:#fff;text-decoration:none;
+  font-weight:700;font-size:16px;padding:16px 20px;border-radius:14px;margin:0 0 8px}
+.cta-note{font-size:13px;color:#766c5b;text-align:center;margin:0 0 28px}
+
+h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:#766c5b;
+  font-weight:700;margin:30px 0 12px}
+
+.card{background:#fff;border:1px solid #e2dacb;border-radius:14px;padding:16px 18px;margin-bottom:10px}
+.card b{display:block;font-size:15px;margin-bottom:4px;letter-spacing:-.01em}
+.card p{margin:0;font-size:14.5px;color:#4a4338}
+.card.acc{background:#fbe9dc;border-color:#f0c3a3}
+.card.acc b{color:#7c3a18}
+
+ul{margin:0;padding-left:20px}
+li{font-size:14.5px;color:#4a4338;margin-bottom:7px}
+li b{color:#211d16}
+
+.quote{border-left:3px solid #cf5a25;padding:2px 0 2px 15px;margin:0 0 12px;
+  font-size:15px;color:#4a4338}
+.quote b{color:#211d16}
+
+.foot{margin-top:34px;padding-top:18px;border-top:1px solid #e2dacb;
+  font-size:13px;color:#9a8f7c}
+.foot a{color:#963e15}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div class="mark">W</div>
+    <div><b>WESPACE</b><span>Рабочее место брокера · демоверсия</span></div>
+  </div>
+
+  <h1>Посмотрите и скажите, что не так</h1>
+  <p class="lead">Мы делаем рабочее место брокера и хотим показать его вам первым.
+  Заранее ничего объяснять не будем — весь смысл в том, чтобы понять, читается ли оно
+  само по себе. Если что-то непонятно или вы чего-то не находите, это не ваша ошибка,
+  а наш результат.</p>
+
+  <a class="cta" href="https://denkaush-svg.github.io/wespace-demo/">Открыть стенд</a>
+  <p class="cta-note">Лучше на ноутбуке, в Chrome или Safari. С телефона работает,
+  но часть экранов сокращена — доска сделок там скрыта.</p>
+
+  <h2>С чего начать</h2>
+  <div class="card acc">
+    <b>Напишите или продиктуйте задачу словами</b>
+    <p>Стенд открывается Консьержем — это собеседник, которому работу поручают так же,
+    как поручили бы помощнику: «что просрочено», «собери КП по Анне», «подготовь меня
+    к звонку», «кто давно молчит». Он видит ваши сделки, клиентов и объекты, а ещё экран,
+    на котором вы стоите, — поэтому можно спросить «а что по этой сделке?», не называя её.</p>
+  </div>
+
+  <h2>Что работает по-настоящему</h2>
+  <div class="card">
+    <b>Консьерж — живая модель</b>
+    <p>Не заранее записанные ответы. Он читает данные стенда и отвечает по ним; чего в данных
+    нет — так и скажет. Проверяйте его на прочность, для этого он здесь и стоит.</p>
+  </div>
+  <div class="card">
+    <b>Голосовой ввод</b>
+    <p>Через микрофон браузера — можно надиктовать вместо набора. Есть в Chrome и Safari,
+    в Firefox нет.</p>
+  </div>
+  <div class="card">
+    <b>Цифры считаются из одних данных</b>
+    <p>Двиньте сделку по стадии или закройте задачу — сводка, доска сделок и аналитика
+    пересчитаются вместе. Разойтись между экранами они не могут.</p>
+  </div>
+
+  <h2>Что показано, но имитировано</h2>
+  <ul>
+    <li><b>Данные вымышлены целиком</b> — клиенты, объекты, сделки, суммы. Их правдоподобие
+    оценивать не нужно, это учебный набор.</li>
+    <li><b>Каналы связи</b> — WhatsApp, Telegram, почта, порталы — живут внутри стенда.
+    <b>Наружу ничего не уходит:</b> «отправлено» означает запись в ленту, никакой клиент
+    ничего не получит.</li>
+    <li><b>Проверки документов и контрагентов</b> помечены значком «имитация (DEMO)»
+    прямо на экране.</li>
+    <li><b>Часы остановлены</b> на 14 мая — «сегодня» и «завтра» считаются от этой даты.</li>
+  </ul>
+
+  <h2>Чего в этой версии нет</h2>
+  <ul>
+    <li>Подключения к настоящим каналам связи и порталам объявлений.</li>
+    <li>Подписания документов и платежей.</li>
+    <li>Выгрузок в государственные системы.</li>
+    <li>Совместной работы: сейчас одна вкладка — одна независимая копия,
+    коллега ваших изменений не увидит.</li>
+    <li>Полноценной работы с телефона.</li>
+  </ul>
+
+  <h2>О чём просим</h2>
+  <p class="quote"><b>Хвалить не надо, честно ругать — очень надо.</b> Полезнее всего те
+  моменты, где вы остановились и не поняли, куда идти дальше. Если можете, отмечайте:
+  что искали, где искали и что ожидали там увидеть.</p>
+  <p class="quote">Отдельно интересны <b>слова</b>: понятно ли без объяснений, что стоит
+  за названиями разделов и что именно они вам обещают.</p>
+
+  <h2>Сломать ничего нельзя</h2>
+  <div class="card">
+    <b>Кнопка «Сброс» в верхней панели</b>
+    <p>Возвращает стенд в исходное состояние. Всё, что вы делаете, хранится только в вашем
+    браузере — никто этого не видит и ни на что не влияет. Нажимайте что угодно.</p>
+  </div>
+
+  <p class="foot">Ссылка на стенд:
+  <a href="https://denkaush-svg.github.io/wespace-demo/">denkaush-svg.github.io/wespace-demo</a><br>
+  Границы демоверсии повторены внутри самого стенда — окно «О демоверсии» на первом экране.</p>
+
+</div>
+</body>
+</html>
