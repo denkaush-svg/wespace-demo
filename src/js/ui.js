@@ -3519,7 +3519,10 @@
     const withSel = (D().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'selected'));
     if (withSel) {
       const c = (D().clients || []).find((x) => x.id === withSel.clientId);
-      if (c) out.push(['doc', 'Собрать КП по ' + c.name.split(' ')[0], 'собери КП по ' + c.name]);
+      /* Дательный, а не именительный: подсказка читалась «Собрать КП по Анна» — на первом же
+         экране, который видит человек. Формы склонения хранятся у контакта (`nameDat`), брать
+         имя из `name` значит выбрасывать их; для иностранных имён форма совпадает с исходной. */
+      if (c) out.push(['doc', 'Собрать КП по ' + cDat(c).split(' ')[0], 'собери КП по ' + c.name]);
     }
     const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d));
     if (live.length) out.push(['money', 'Сколько сейчас в работе', 'сколько денег в работе по моим сделкам']);

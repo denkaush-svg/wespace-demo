@@ -8544,6 +8544,23 @@ setTimeout(async () => {
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
   }
 
+  /* ---- Подсказки Консьержа склоняют имя ----
+     «Собрать КП по Анна» стояло на первом экране стенда. Формы склонения у контакта есть
+     (`nameDat`), подсказка их не брала. */
+  {
+    WS.engine.closeThread();   // подсказки живут только на ПУСТОМ Консьерже
+    WS.router.go('concierge');
+    const hits = [].slice.call(doc.querySelectorAll('#app *'))
+      .map((e) => (e.textContent || '').trim())
+      .filter((x) => /Собрать КП по /.test(x)).sort((a, b) => a.length - b.length);
+    const chip = (/Собрать КП по \S+/.exec(hits[0] || '') || [''])[0];
+    const cl = (dd().clients || []).find((c) => c.nameDat && c.nameDat !== c.name);
+    const dat = cl ? cl.nameDat.split(' ')[0] : '';
+    const nom = cl ? cl.name.split(' ')[0] : '';
+    check('Консьерж · подсказка про КП склоняет имя',
+      !!chip && (chip.indexOf(dat) > 0 || chip.indexOf(nom) < 0), chip + ' | ждали «' + dat + '»');
+  }
+
   /* ---- Консьерж знает, на каком экране стоит брокер ----
      Разговор привязан к записи и остаётся привязанным, когда брокер уходит с её карточки, —
      это правильно, тред и есть переписка по этой записи. Но на экране БЕЗ записи (Пульс,
