@@ -8488,7 +8488,7 @@
      «подтверждён»: его написал человек, а не модель, и подтверждать нечего. */
   function taskDoneForm(taskId) {
     const t = (D().tasks || []).find((x) => x.id === taskId); if (!t) return;
-    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Назначить следующий контакт');
+    const next = t.dealId ? 'Согласовать следующий шаг по сделке' : (t.requestId ? 'Вернуться к подбору' : 'Позвонить клиенту');
     const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Закрыть можно и без комментария — тогда останется только факт выполнения. Что напишете здесь, ляжет в ленту как итог от вас.</p>' +
       '<div class="match-grid"><label class="fld"><span>Что вышло</span><input id="td_out" type="text" placeholder="Напр.: договорились о брони до пятницы"></label>' +
       '<label class="fld"><span>Следующий шаг</span><input id="td_next" type="text" value="' + escAttr(next) + '"></label></div>' +
