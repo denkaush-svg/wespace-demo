@@ -328,8 +328,11 @@
       case 'sendOwnerReport': WS.ui.sendOwnerReport(t.dataset.contract); break;
       case 'saveShowOutcome': WS.ui.saveShowOutcome(t.dataset.ev); break;
       case 'ocDictate': {
+        /* dictate(el) expects a DOM element, not a callback — el.value is where it
+           writes interim + final transcripts. Passing a callback set el.value to
+           undefined and the recognised text was lost. */
         const box = document.getElementById('ocText');
-        if (WS.voice && WS.voice.dictate) WS.voice.dictate((txt) => { if (box) box.value = txt; });
+        if (WS.voice && WS.voice.dictate) WS.voice.dictate(box || null);
         break;
       }
       case 'dayLine': store.dayView = 'line'; api.emit(); break;

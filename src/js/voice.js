@@ -114,11 +114,14 @@
     };
     rec.onerror = (e) => {
       st.lastError = (e && e.error) || 'error';
-      // «Не разрешили» is worth saying; «ты молчал» is not.
+      // Inform on hard failures; give a soft hint on silence so the broker
+      // knows the mic actually ran and just heard nothing.
       if (st.lastError === 'not-allowed' || st.lastError === 'service-not-allowed') {
         toast('Браузер не дал доступ к микрофону — наберите текстом');
       } else if (st.lastError === 'audio-capture') {
         toast('Микрофон не найден — наберите текстом');
+      } else if (st.lastError === 'no-speech') {
+        toast('Ничего не услышал — попробуйте ещё раз');
       }
       stop();
     };

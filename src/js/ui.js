@@ -3407,9 +3407,10 @@
                live and answers a press with nothing reads as broken software —
                which is exactly how it was reported. So the control says what
                it can do before it is pressed. */
-            '<button class="voice' + (voiceOff ? ' off' : '') + '" data-act="voice" title="' +
-              (voiceOff ? 'Этот браузер не умеет распознавать речь — наберите текстом или откройте в Chrome' : 'Голосом') +
-              '">' + I('mic') + '</button>' +
+            '<button class="voice' + (voiceOff ? ' off' : '') + '" data-act="voice"' +
+              ' aria-label="' + (voiceOff ? 'Голосовой ввод недоступен в этом браузере' : 'Диктовать Консьержу') + '"' +
+              ' title="' + (voiceOff ? 'Этот браузер не умеет распознавать речь — наберите текстом или откройте в Chrome' : 'Голосом') + '">' +
+              I('mic') + '</button>' +
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
         '</div>' +
