@@ -497,8 +497,11 @@
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }
-      case 'startSend': routePrompt(promptValue('startPrompt')); break;
-      case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
+      /* UI-level duplicate-send guard: blocks the send button while the Concierge
+         is processing a request. routePrompt itself is not guarded so the test
+         harness can drive sequential calls directly. */
+      case 'startSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('startPrompt')); } break;
+      case 'cgSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('cgPrompt')); } break;
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
       // Раздел показывает возможности сеткой (их много, и их сравнивают) либо колодой
       // (их разбирают по одной, со смахиванием). Флаг называется тем, что означает.
@@ -507,9 +510,9 @@
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
-      case 'cgDockSend': WS.ui.sendFromDock(promptValue('cgDockPrompt')); break;
+      case 'cgDockSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromDock(promptValue('cgDockPrompt')); } break;
       // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
-      case 'cardSend': WS.ui.sendFromCard(); break;
+      case 'cardSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromCard(); } break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
       case 'cgWorkshop': store.cgWorkshopOpen = !store.cgWorkshopOpen; api.emit(); break;
       case 'cgRailToggle': store.cgRailOpen = !store.cgRailOpen; api.emit(); break;
