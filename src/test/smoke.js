@@ -8546,6 +8546,70 @@ setTimeout(async () => {
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
   }
 
+  /* ---- Сделка из заявки наследует ответственного ----
+     `reqCreateDeal()` не переносил `request.assignee` в `deal.agent`, и новая сделка приходила
+     в аналитику ничьей: выборка «сделки Марины» не находила то, что Марина сама и завела. */
+  {
+    /* Нужна заявка, у которой есть СВОБОДНЫЙ выбранный объект: если все выбранные уже заняты
+       действующими сделками, создавать нечего, и проверка мерила бы не то. */
+    const req = (dd().requests || []).find((r) => r.assignee && WS.ui.reqSelectedFree && WS.ui.reqSelectedFree(r).length);
+    if (req) {
+      const before = (dd().deals || []).map((d) => d.id);
+      WS.ui.reqCreateDeal(req.id);
+      const made = (dd().deals || []).filter((d) => before.indexOf(d.id) < 0);
+      check('заявка → сделка · ответственный унаследован от заявки',
+        made.length > 0 && made.every((d) => d.agent === req.assignee),
+        made.map((d) => d.id + ':' + d.agent).join(', ') + ' | ждали ' + req.assignee);
+      const roster = (dd().roster || []).map((x) => x.id);
+      check('заявка → сделка · ответственный есть в составе команды',
+        made.every((d) => roster.indexOf(d.agent) >= 0), made.map((d) => d.agent).join(', '));
+      made.forEach((d) => { dd().deals = dd().deals.filter((x) => x.id !== d.id); delete (dd().dealTimeline || {})[d.id]; });
+    } else {
+      check('заявка → сделка · ответственный унаследован от заявки', false, 'не нашлось заявки с выбранным объектом');
+    }
+  }
+
+  /* ---- Назначение лида меняет состояние записи, а не удаляет её ----
+     Прежний код делал `splice` по индексу отрисованного списка: очередь уменьшалась, но
+     обращение исчезало из `data.inbox` целиком, а с ним — входящая коммуникация из календаря
+     и из истории контакта. Проверено кликом на опубликованном стенде: пропадало `in_night`.
+     И адресация была по позиции в списке плюс имя агента, поэтому после любой пересортировки
+     кнопка меняла не ту запись. */
+  {
+    const nBefore = (dd().inbox || []).length;
+    const btn = doc.querySelector('#app [data-leadassign]');
+    WS.storeApi.setRole('manager'); WS.router.go('leads');
+    const b2 = doc.querySelector('#app [data-leadassign]');
+    const payload = b2 ? b2.dataset.leadassign : '';
+    check('распределение · кнопка адресует обращение и сотрудника по id, не позицией',
+      /^in_[a-z_]+~~u_[a-z]+$/.test(payload), payload || 'кнопки нет');
+
+    const queueBefore = doc.querySelectorAll('#app .lead-row').length;
+    if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const rec = (dd().inbox || []).find((x) => x.id === payload.split('~~')[0]);
+    check('распределение · назначение не удаляет обращение из данных',
+      (dd().inbox || []).length === nBefore && !!rec,
+      'было ' + nBefore + ', стало ' + (dd().inbox || []).length + ', запись ' + (rec ? 'на месте' : 'ПОТЕРЯНА'));
+    check('распределение · у обращения появился исполнитель',
+      !!(rec && rec.assignee), rec ? String(rec.assignee) : '—');
+    check('распределение · очередь при этом сократилась',
+      doc.querySelectorAll('#app .lead-row').length === queueBefore - 1,
+      'было строк ' + queueBefore + ', стало ' + doc.querySelectorAll('#app .lead-row').length);
+
+    // Повторное назначение тому же — ничего не ломает и не плодит записей.
+    if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('распределение · повторное назначение идемпотентно',
+      (dd().inbox || []).length === nBefore, String((dd().inbox || []).length));
+
+    // Несуществующие id не проходят.
+    const bad = WS.storeApi.assignInbox('in_nope', 'u_marina');
+    const bad2 = WS.storeApi.assignInbox(payload.split('~~')[0], 'u_nope');
+    check('распределение · несуществующие id отвергаются с причиной',
+      bad.ok === false && bad.reason === 'not_found' && bad2.ok === false,
+      JSON.stringify([bad, bad2]));
+    WS.storeApi.setRole('agent');
+  }
+
   /* ---- Язык стенда: слова брокера, а не слова разработчика ----
      «Касание» — калька с CRM-шного touch: так говорит система, а не брокер. Слово разошлось
      по данным, подсказкам и офлайн-ответам, а живая модель просто повторяла наши формулировки —

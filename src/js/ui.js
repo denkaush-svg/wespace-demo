@@ -7850,7 +7850,11 @@
       const kpSnapshot = { objectIds: lots.slice(), at: 'сегодня', version: 1,
         terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
       return {
-        deal: { id: nid, clientId: r.clientId, companyId: null,
+        /* Ответственный наследуется от заявки. Без этого поля сделка приходила в аналитику
+           ничьей — `u_none`, — и «сколько сделок у Марины» считалось мимо всего, что она
+           завела из своих же заявок. Наследование, а не подстановка: жёстко вписать сюда
+           `u_marina` значило бы починить один демонстрационный случай и оставить дефект. */
+        deal: { id: nid, clientId: r.clientId, companyId: null, agent: r.assignee,
           title: (c.name || 'Клиент') + ' · ' + g.name,
           sub: g.name + (lots.length > 1 ? ' · лотов: ' + lots.length : ''),
           funnel: fk, readiness: readiness, side: r.side || null,
@@ -7869,6 +7873,12 @@
       };
     });
 
+    /* Заявка без исполнителя — не повод завести ничью сделку: лучше сказать, чего не хватает,
+       чем создать запись, которая потом не найдётся ни в одной выборке по агенту. */
+    if (!r.assignee) {
+      WS.storeApi.toast('У заявки нет ответственного — назначьте исполнителя, потом создавайте сделку');
+      return;
+    }
     D().dealTimeline = D().dealTimeline || {};
     drafts.forEach((d) => { D().deals.push(d.deal); D().dealTimeline[d.deal.id] = [d.entry]; });
     // Переход — событие заявки: именно она разошлась на договоры, и её история должна это помнить.
@@ -10661,12 +10671,17 @@
   function viewLeadsDistribution() {
     const suggest = ['u_ahmed', 'u_marina', 'u_lina'];
     const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
-    const inbox = D().inbox || [];
+    /* Очередь распределения — это НЕназначенные обращения. Раньше здесь стоял весь массив,
+       а «уменьшение очереди» достигалось удалением записи; теперь список сужается фильтром,
+       и назначенное обращение остаётся в данных, в календаре и в истории контакта. */
+    const inbox = (D().inbox || []).filter((x) => !x.assignee);
     const rows = inbox.map((it, i) => {
       const c = (D().clients || []).find((x) => x.id === it.clientId);
       const who = c ? c.name : 'Новый контакт';
       const sug = TEAM.find((x) => x.id === suggest[i % suggest.length]) || TEAM[0];
-      const btns = TEAM.map((x) => '<button class="btn xs' + (x.id === sug.id ? ' primary' : '') + '" data-leadassign="' + i + '~~' + escAttr(x.name.split(' ')[0]) + '" title="Назначить: ' + escAttr(x.name) + '">' + mgrInitials(x.name) + '</button>').join('');
+      /* Идентификаторы обеих сторон, а не позиция в списке и имя. Позиция ломается от любой
+         пересортировки, а имя вообще не адресует сотрудника. */
+      const btns = TEAM.map((x) => '<button class="btn xs' + (x.id === sug.id ? ' primary' : '') + '" data-leadassign="' + escAttr(it.id) + '~~' + escAttr(x.id) + '" title="Назначить: ' + escAttr(x.name) + '">' + mgrInitials(x.name) + '</button>').join('');
       return '<div class="lead-row"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
         '<div class="lead-main"><div class="t">' + who + ' · <span class="lead-wait">' + I('clock') + (it.at || 'сейчас') + '</span></div>' +
         '<div class="m">' + it.text + '</div></div>' +

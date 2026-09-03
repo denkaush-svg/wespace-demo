@@ -805,9 +805,32 @@
     setTimeout(() => { store.toasts = store.toasts.filter((x) => x.id !== t.id); emit(); }, 3200);
   }
 
+  /* Назначение лида. Прежний код делал `arr.splice(ix, 1)` по ИНДЕКСУ массива: очередь
+     визуально уменьшалась, но запись исчезала из `data.inbox` совсем — вместе с ней из
+     календаря и из истории контакта пропадала входящая коммуникация. Хуже того, индекс
+     брался из позиции в отрисованном списке, так что после любой пересортировки кнопка
+     меняла не ту запись.
+
+     Назначение — это СОСТОЯНИЕ записи, а не её удаление: очередь строится фильтром по
+     `assignee`, а сама запись остаётся на месте. Идентификаторы обеих сторон проверяются,
+     повторное назначение тому же агенту ничего не меняет. */
+  function assignInbox(inboxId, userId) {
+    const rec = (store.data.inbox || []).find((x) => x.id === inboxId);
+    if (!rec) return { ok: false, reason: 'not_found', what: 'обращение ' + inboxId };
+    const user = (store.data.roster || []).find((x) => x.id === userId) ||
+                 (store.data.users && store.data.users[userId] ? { id: userId } : null);
+    if (!user) return { ok: false, reason: 'not_found', what: 'сотрудник ' + userId };
+    if (rec.assignee === userId) return { ok: true, changed: false, rec: rec };
+    rec.assignee = userId;
+    rec.assignedAt = (WS.fixtures && WS.fixtures.DEMO_NOW) ? 'сегодня' : 'сейчас';
+    if (rec.stage === 'new' || !rec.stage) rec.stage = 'assigned';
+    save();
+    return { ok: true, changed: true, rec: rec };
+  }
+
   WS.store = store;
   WS.storeApi = {
-    boot, subscribe, emit, save, resetAll, resetScene,
+    boot, subscribe, emit, save, resetAll, resetScene, assignInbox,
     setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});

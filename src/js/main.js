@@ -176,7 +176,14 @@
     if (d.netsel) { store.netSel = d.netsel; return api.emit(); }
     if (d.nettype) { store.netType = d.nettype; return api.emit(); }
     if (d.navtoggle) { store.navHidden = store.navHidden || []; const i = store.navHidden.indexOf(d.navtoggle); if (i >= 0) store.navHidden.splice(i, 1); else store.navHidden.push(d.navtoggle); return api.emit(); }
-    if (d.leadassign) { const p = d.leadassign.split('~~'); const arr = store.data.inbox || []; const ix = +p[0]; if (ix >= 0 && ix < arr.length) arr.splice(ix, 1); api.toast('Заявка распределена: ' + (p[1] || 'агенту'), 'ok'); return api.emit(); }
+    if (d.leadassign) {
+      const p = d.leadassign.split('~~');
+      const res = api.assignInbox(p[0], p[1]);
+      if (!res.ok) { api.toast('Не удалось назначить: не найден ' + res.what); return api.emit(); }
+      const who = ((store.data.roster || []).find((x) => x.id === p[1]) || {}).name || p[1];
+      api.toast(res.changed ? 'Обращение назначено: ' + who : 'Уже назначено: ' + who, 'ok');
+      return api.emit();
+    }
     if (d.approve) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.approve) < 0) store.apprDone.push(+d.approve); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
     if (d.reject) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.reject) < 0) store.apprDone.push(+d.reject); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
     if (d.objfilter) { store.objFilter = d.objfilter; return api.emit(); }

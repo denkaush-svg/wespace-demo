@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 14:06</title>
+  <title>WESPACE · сборка 12:22</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='14:06';
+    window.WS_BUILD='12:22';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5993,9 +5993,32 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     setTimeout(() => { store.toasts = store.toasts.filter((x) => x.id !== t.id); emit(); }, 3200);
   }
 
+  /* Назначение лида. Прежний код делал `arr.splice(ix, 1)` по ИНДЕКСУ массива: очередь
+     визуально уменьшалась, но запись исчезала из `data.inbox` совсем — вместе с ней из
+     календаря и из истории контакта пропадала входящая коммуникация. Хуже того, индекс
+     брался из позиции в отрисованном списке, так что после любой пересортировки кнопка
+     меняла не ту запись.
+
+     Назначение — это СОСТОЯНИЕ записи, а не её удаление: очередь строится фильтром по
+     `assignee`, а сама запись остаётся на месте. Идентификаторы обеих сторон проверяются,
+     повторное назначение тому же агенту ничего не меняет. */
+  function assignInbox(inboxId, userId) {
+    const rec = (store.data.inbox || []).find((x) => x.id === inboxId);
+    if (!rec) return { ok: false, reason: 'not_found', what: 'обращение ' + inboxId };
+    const user = (store.data.roster || []).find((x) => x.id === userId) ||
+                 (store.data.users && store.data.users[userId] ? { id: userId } : null);
+    if (!user) return { ok: false, reason: 'not_found', what: 'сотрудник ' + userId };
+    if (rec.assignee === userId) return { ok: true, changed: false, rec: rec };
+    rec.assignee = userId;
+    rec.assignedAt = (WS.fixtures && WS.fixtures.DEMO_NOW) ? 'сегодня' : 'сейчас';
+    if (rec.stage === 'new' || !rec.stage) rec.stage = 'assigned';
+    save();
+    return { ok: true, changed: true, rec: rec };
+  }
+
   WS.store = store;
   WS.storeApi = {
-    boot, subscribe, emit, save, resetAll, resetScene,
+    boot, subscribe, emit, save, resetAll, resetScene, assignInbox,
     setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});
@@ -15655,7 +15678,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       const kpSnapshot = { objectIds: lots.slice(), at: 'сегодня', version: 1,
         terms: { paymentForm: r.paymentForm, vat: r.vat, horizon: r.horizon, funding: r.funding } };
       return {
-        deal: { id: nid, clientId: r.clientId, companyId: null,
+        /* Ответственный наследуется от заявки. Без этого поля сделка приходила в аналитику
+           ничьей — `u_none`, — и «сколько сделок у Марины» считалось мимо всего, что она
+           завела из своих же заявок. Наследование, а не подстановка: жёстко вписать сюда
+           `u_marina` значило бы починить один демонстрационный случай и оставить дефект. */
+        deal: { id: nid, clientId: r.clientId, companyId: null, agent: r.assignee,
           title: (c.name || 'Клиент') + ' · ' + g.name,
           sub: g.name + (lots.length > 1 ? ' · лотов: ' + lots.length : ''),
           funnel: fk, readiness: readiness, side: r.side || null,
@@ -15674,6 +15701,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       };
     });
 
+    /* Заявка без исполнителя — не повод завести ничью сделку: лучше сказать, чего не хватает,
+       чем создать запись, которая потом не найдётся ни в одной выборке по агенту. */
+    if (!r.assignee) {
+      WS.storeApi.toast('У заявки нет ответственного — назначьте исполнителя, потом создавайте сделку');
+      return;
+    }
     D().dealTimeline = D().dealTimeline || {};
     drafts.forEach((d) => { D().deals.push(d.deal); D().dealTimeline[d.deal.id] = [d.entry]; });
     // Переход — событие заявки: именно она разошлась на договоры, и её история должна это помнить.
@@ -18466,12 +18499,17 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function viewLeadsDistribution() {
     const suggest = ['u_ahmed', 'u_marina', 'u_lina'];
     const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
-    const inbox = D().inbox || [];
+    /* Очередь распределения — это НЕназначенные обращения. Раньше здесь стоял весь массив,
+       а «уменьшение очереди» достигалось удалением записи; теперь список сужается фильтром,
+       и назначенное обращение остаётся в данных, в календаре и в истории контакта. */
+    const inbox = (D().inbox || []).filter((x) => !x.assignee);
     const rows = inbox.map((it, i) => {
       const c = (D().clients || []).find((x) => x.id === it.clientId);
       const who = c ? c.name : 'Новый контакт';
       const sug = TEAM.find((x) => x.id === suggest[i % suggest.length]) || TEAM[0];
-      const btns = TEAM.map((x) => '<button class="btn xs' + (x.id === sug.id ? ' primary' : '') + '" data-leadassign="' + i + '~~' + escAttr(x.name.split(' ')[0]) + '" title="Назначить: ' + escAttr(x.name) + '">' + mgrInitials(x.name) + '</button>').join('');
+      /* Идентификаторы обеих сторон, а не позиция в списке и имя. Позиция ломается от любой
+         пересортировки, а имя вообще не адресует сотрудника. */
+      const btns = TEAM.map((x) => '<button class="btn xs' + (x.id === sug.id ? ' primary' : '') + '" data-leadassign="' + escAttr(it.id) + '~~' + escAttr(x.id) + '" title="Назначить: ' + escAttr(x.name) + '">' + mgrInitials(x.name) + '</button>').join('');
       return '<div class="lead-row"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
         '<div class="lead-main"><div class="t">' + who + ' · <span class="lead-wait">' + I('clock') + (it.at || 'сейчас') + '</span></div>' +
         '<div class="m">' + it.text + '</div></div>' +
@@ -22885,7 +22923,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (d.netsel) { store.netSel = d.netsel; return api.emit(); }
     if (d.nettype) { store.netType = d.nettype; return api.emit(); }
     if (d.navtoggle) { store.navHidden = store.navHidden || []; const i = store.navHidden.indexOf(d.navtoggle); if (i >= 0) store.navHidden.splice(i, 1); else store.navHidden.push(d.navtoggle); return api.emit(); }
-    if (d.leadassign) { const p = d.leadassign.split('~~'); const arr = store.data.inbox || []; const ix = +p[0]; if (ix >= 0 && ix < arr.length) arr.splice(ix, 1); api.toast('Заявка распределена: ' + (p[1] || 'агенту'), 'ok'); return api.emit(); }
+    if (d.leadassign) {
+      const p = d.leadassign.split('~~');
+      const res = api.assignInbox(p[0], p[1]);
+      if (!res.ok) { api.toast('Не удалось назначить: не найден ' + res.what); return api.emit(); }
+      const who = ((store.data.roster || []).find((x) => x.id === p[1]) || {}).name || p[1];
+      api.toast(res.changed ? 'Обращение назначено: ' + who : 'Уже назначено: ' + who, 'ok');
+      return api.emit();
+    }
     if (d.approve) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.approve) < 0) store.apprDone.push(+d.approve); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
     if (d.reject) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.reject) < 0) store.apprDone.push(+d.reject); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
     if (d.objfilter) { store.objFilter = d.objfilter; return api.emit(); }
