@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:22</title>
+  <title>WESPACE · сборка 13:17</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:22';
+    window.WS_BUILD='13:17';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -11355,7 +11355,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d));
     if (live.length) out.push(['money', 'Сколько сейчас в работе', 'сколько денег в работе по моим сделкам']);
     const silent = (D().clients || []).find((c) => !lastTouchOf(c.id));
-    out.push(['users', silent ? 'Кто давно молчит' : 'Кого стоит коснуться', 'кто из клиентов давно не выходил на связь']);
+    out.push(['users', silent ? 'Кто давно молчит' : 'С кем пора связаться', 'кто из клиентов давно не выходил на связь']);
     return out.slice(0, 4).map((s) =>
       '<button class="cg-start" data-cgask="' + escAttr(s[2]) + '">' + I(s[0]) + '<span>' + s[1] + '</span></button>').join('');
   }
@@ -11390,7 +11390,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const tour = st.tour.active ? tourBar() : '';
     const bar = '<div class="thread-bar"><span class="thread-label">' + I(t.icon) + t.label + '</span>' +
       '<button class="btn sm ghost" data-act="newThread" style="margin-left:auto">' + I('plus') + 'Новый</button></div>';
-    return '<div class="cg-shell">' + bar + tour + '<div class="concierge cg-thread"><div class="chat" id="chat"></div>' + dockPrompt() + '</div></div>';
+    /* Разговор по обращению открывается вместе с самой записью: кто, каким каналом, когда,
+       что именно написал и в каком состоянии обращение. Без этой карточки «Разобрать» отдавало
+       пустое поле ввода — брокеру приходилось помнить, что он вообще открыл. */
+    const inTri = /^inbox:/.test(String(WS.engine.activeThreadId() || ''))
+      ? (D().inbox || []).find((x) => 'inbox:' + x.id === WS.engine.activeThreadId())
+      : null;
+    const triage = inTri ? inboxTriageCard(inTri) : '';
+    return '<div class="cg-shell">' + bar + tour + triage +
+      '<div class="concierge cg-thread"><div class="chat" id="chat"></div>' + dockPrompt() + '</div></div>';
   }
   // "Новый диалог" — pick the entity the conversation is about.
   function openNewThread() {
@@ -18934,11 +18942,111 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     unknown_object: ['Объект вне инвентаря', 'warn'], delivery_fail: ['Ошибка доставки', 'stop'],
     noconsent: ['Нет согласия', 'warn'],
   };
+  /* Разбор входящего открывает САМО обращение, а не подходящий по типу демо-сюжет.
+     Прежний код выбирал сценарий по полю `ex`: у Sarah, написавшей «1BR investment unit in JVC,
+     budget ~1.3M», запускался S15 с чужим русским запросом про 1,5 млн, а у обращения с
+     возможным дублем сценария не находилось вовсе — и «Разобрать» открывало пустой Консьерж,
+     потеряв текст, канал, время и сам повод. Оба случая проверены кликами на опубликованном
+     стенде.
+
+     Теперь кнопка несёт id записи, разговор привязывается к ней, а исходное сообщение
+     кладётся в тред один раз — при повторном открытии оно не задваивается. Демо-сценарии
+     остаются доступны из «Навигатора демо», где они и подписаны как сценарии. */
+  const INBOX_EX_HINT = {
+    qualify: 'Обращение не разобрано: нужно понять запрос и завести заявку.',
+    duplicate: 'Похоже на дубль существующего контакта — сравните и решите.',
+    unknown_object: 'Спрашивают об объекте, которого нет в инвентаре.',
+    delivery_fail: 'Письмо не доставлено — адрес отклонил отправку.',
+    noconsent: 'Нет согласия на переписку — связываться нельзя.',
+  };
   function inboxTriageBtn(it) {
-    const scn = it.scenario || (it.ex === 'qualify' ? 'S15' : null);
-    return scn ? '<button class="btn xs" data-scn="' + scn + '">' + I('play') + 'Разобрать</button>'
-      : '<button class="btn xs" data-nav="concierge">' + I('sparkle') + 'Разобрать</button>';
+    return '<button class="btn xs" data-act="inboxTriage" data-inbox="' + escAttr(it.id) + '">' +
+      I('sparkle') + 'Разобрать</button>';
   }
+  function inboxDupCandidate(it) {
+    // Кандидат ищется по имени из текста обращения, но СВЯЗЫВАЕТСЯ по id — показанное имя
+    // не адресует запись, а решение о слиянии должно быть привязано к конкретному контакту.
+    /* Искать по имени В КАВЫЧКАХ нельзя: там латиница («M. Ibragimov»), а контакт заведён
+       кириллицей («Марат Ибрагимов»), и сравнение не совпадёт никогда. Ищем наоборот — какой
+       из существующих контактов упомянут в тексте обращения; связь всё равно ставится по id. */
+    const txt = String(it.text || '').toLowerCase();
+    return (D().clients || []).find((c) => {
+      const parts = String(c.name || '').toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+      return parts.length && parts.every((w) => txt.indexOf(w) >= 0);
+    }) || null;
+  }
+  function inboxTriageCard(it) {
+    const c = (D().clients || []).find((x) => x.id === it.clientId);
+    const who = c ? c.name : 'Новый контакт';
+    const assignee = it.assignee ? ((D().roster || []).find((x) => x.id === it.assignee) || {}).name : null;
+    const ex = INBOX_EX_LABEL[it.ex];
+    const dup = it.ex === 'duplicate' ? inboxDupCandidate(it) : null;
+    const rows = [
+      ['users', 'Кто', who],
+      ['chat', 'Канал', it.channel || '—'],
+      ['clock', 'Когда', it.at || '—'],
+      ['check', 'Состояние', assignee ? 'назначено · ' + assignee : 'не назначено'],
+    ].map((r) => '<div class="field"><div class="k">' + I(r[0]) + ' ' + r[1] + '</div><div class="v">' + escAttr(r[2]) + '</div></div>').join('');
+    const dupBlock = dup
+      ? '<div class="match" style="margin-top:10px">' + I('warn') +
+        '<span>Похожий контакт в базе: <b>' + escAttr(dup.name) + '</b>' +
+        (dup.phone ? ' · ' + escAttr(dup.phone) : '') + '. Решите: это он же или новый человек.</span></div>' +
+        '<div class="qa-row" style="margin-top:8px">' +
+        '<button class="btn xs" data-act="inboxDupMerge" data-inbox="' + escAttr(it.id) + '" data-cid="' + escAttr(dup.id) + '">' + I('link') + 'Это ' + escAttr(dup.name.split(' ')[0]) + '</button>' +
+        '<button class="btn xs" data-act="inboxDupNew" data-inbox="' + escAttr(it.id) + '">' + I('plus') + 'Новый человек</button>' +
+        '</div>'
+      : '';
+    return '<div class="card pad intriage">' +
+      '<div class="section-label" style="margin:0 0 8px">Разбор обращения</div>' +
+      (ex ? '<span class="badge ' + ex[1] + '">' + I('warn') + escAttr(ex[0]) + '</span>' : '') +
+      '<div class="prov" style="margin:8px 0 10px"><span style="font-size:12.5px;color:var(--mut)">' +
+        escAttr(INBOX_EX_HINT[it.ex] || 'Разберите обращение и решите, что с ним делать.') + '</span></div>' +
+      rows + dupBlock +
+      '<div class="qa-row" style="margin-top:12px">' +
+      '<button class="btn xs primary" data-act="inboxDraftReply" data-inbox="' + escAttr(it.id) + '">' + I('send') + 'Подготовить ответ</button>' +
+      '<button class="btn xs" data-nav="leads">' + I('users') + 'Назначить</button>' +
+      '</div></div>';
+  }
+  /* Решение по дублю пишется в саму запись и в историю контакта. Показанное имя ничего не
+     адресует — связь ставится по id кандидата, поэтому переименование контакта решение не
+     ломает, а повторный разбор видит, что вопрос уже закрыт. */
+  function inboxDupDecide(inboxId, clientId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId);
+    if (!it) { WS.storeApi.toast('Обращение не найдено: ' + inboxId); return; }
+    if (clientId) {
+      const c = (D().clients || []).find((x) => x.id === clientId);
+      if (!c) { WS.storeApi.toast('Контакт не найден: ' + clientId); return; }
+      it.clientId = clientId; it.dupOf = clientId; it.ex = null; it.resolution = 'merged';
+      D().contactTimeline = D().contactTimeline || {};
+      (D().contactTimeline[clientId] = D().contactTimeline[clientId] || []).push({
+        ch: 'system', kind: 'ai', by: 'Разбор', at: 'только что', ord: 999,
+        text: 'Обращение от ' + (it.at || '') + ' опознано как тот же человек — привязано к этому контакту.' });
+      WS.storeApi.toast('Привязано к контакту: ' + c.name, 'ok');
+    } else {
+      it.ex = null; it.resolution = 'new_person';
+      WS.storeApi.toast('Отмечено как новый человек', 'ok');
+    }
+    it.triagedAt = 'только что';
+    WS.storeApi.save(); WS.storeApi.emit();
+  }
+  function openInboxTriage(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId);
+    if (!it) { WS.storeApi.toast('Обращение не найдено: ' + inboxId); return; }
+    const c = (D().clients || []).find((x) => x.id === it.clientId);
+    const tid = 'inbox:' + it.id;
+    WS.engine.bindThread(tid, (c ? c.name + ' · ' : '') + 'обращение ' + (it.at || ''), 'mail');
+    const th = WS.engine.activeThread();
+    // Исходное сообщение кладётся ОДИН раз: повторное открытие не должно задваивать переписку.
+    if (th && !(th.items || []).length) {
+      WS.engine.pushMsg('<div class="msg user fadeup"><div class="who">' +
+        escAttr(c ? c.name : 'Новый контакт') + ' · ' + escAttr(it.channel || '') + ' · ' + escAttr(it.at || '') +
+        '</div><div class="bubble">' + escAttr(it.text || '') + '</div></div>', tid);
+    }
+    S().cgDock = false;
+    WS.router.go('concierge');
+    S().inboxTriage = it.id;
+  }
+
   // Что лежит в колонке разбора. Обращение и заявка — две разные записи, но для агента это одна
   // доска: обращение разобрали -> появилась заявка -> пошёл подбор -> заявка ушла в «Сделки».
   // Пока «Квалифицирована» набиралась только из обращений, она была вечно пустой: разбор
@@ -20241,7 +20349,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -22826,10 +22934,8 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     'g1': () => WS.engine.startScenario('G1'),
     'g2': () => WS.engine.startScenario('G2'),
     'g3': () => WS.engine.startScenario('G3'),
-    'разобрать входящее': () => WS.engine.startScenario('G1'),
     'подобрать объект': () => WS.engine.startScenario('G2'),
     'итоги показа': () => WS.engine.startScenario('G3'),
-    'ответить лиду': () => WS.engine.startScenario('S15'),
     'бриф к звонку': () => WS.engine.startScenario('S8'),
     'финмодель': () => WS.router.go('calc'),
     'оценка объекта': () => WS.router.go('valuation'),
@@ -23085,6 +23191,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
       case 'about': WS.ui.openAbout(); break;
+      case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
+      case 'inboxDraftReply': WS.ui.openReplyDraft(t.dataset.inbox); break;
+      case 'inboxDupMerge': WS.ui.inboxDupDecide(t.dataset.inbox, t.dataset.cid); break;
+      case 'inboxDupNew': WS.ui.inboxDupDecide(t.dataset.inbox, null); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':

@@ -8546,6 +8546,64 @@ setTimeout(async () => {
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
   }
 
+  /* ---- Разбор входящего открывает саму запись, а не подходящий демо-сюжет ----
+     Кнопка «Разобрать» выбирала сценарий по типу обращения: у Sarah, написавшей по-английски
+     «1BR investment unit in JVC, budget ~1.3M», запускался S15 с чужим русским запросом про
+     1,5 млн, а у обращения с возможным дублем сценария не было вовсе — и «Разобрать» отдавало
+     пустой Консьерж без текста, канала, времени и повода. Оба случая проверены кликами на
+     опубликованном стенде. */
+  {
+    WS.storeApi.resetAll();
+    WS.router.go('requests');
+    const btns = [].slice.call(doc.querySelectorAll('#app [data-act="inboxTriage"]'));
+    check('входящие · кнопок разбора столько же, сколько обращений',
+      btns.length >= (dd().inbox || []).length, btns.length + ' против ' + (dd().inbox || []).length);
+    check('входящие · ни одна кнопка разбора не запускает сценарий',
+      btns.every((b) => !b.dataset.scn) && btns.every((b) => /^in_/.test(b.dataset.inbox || '')),
+      btns.map((b) => (b.dataset.inbox || '?') + (b.dataset.scn ? ' →' + b.dataset.scn : '')).join(', '));
+
+    // Sarah: её собственный текст, её собственный тред, никакого чужого сюжета.
+    WS.ui.openInboxTriage('in_night');
+    const th = WS.engine.activeThread();
+    const said = ((th && th.items) || []).map((m) => m.html || '').join(' ');
+    check('входящие · разбор Sarah открывает её тред', WS.engine.activeThreadId() === 'inbox:in_night',
+      String(WS.engine.activeThreadId()));
+    check('входящие · в треде её собственный текст, а не подставленный',
+      /1BR investment unit in JVC/.test(said) && !/1,5 млн|1 500 000/.test(said), said.slice(0, 120));
+    check('входящие · демо-тур при разборе не запускается', !WS.store.tour.active, JSON.stringify(WS.store.tour));
+
+    // Повторное открытие не задваивает исходное сообщение.
+    const n1 = ((WS.engine.activeThread() || {}).items || []).length;
+    WS.ui.openInboxTriage('in_night'); WS.ui.openInboxTriage('in_night');
+    check('входящие · повторный разбор не дублирует исходное сообщение',
+      ((WS.engine.activeThread() || {}).items || []).length === n1, 'было ' + n1 + ', стало ' +
+      ((WS.engine.activeThread() || {}).items || []).length);
+
+    // Дубль: кандидат ищется по существующим контактам, а не по латинице в кавычках.
+    const dupRec = (dd().inbox || []).find((x) => x.id === 'in_dup');
+    const cand = WS.ui.inboxDupCandidate(dupRec);
+    check('входящие · у обращения с дублем найден кандидат из контактов',
+      !!(cand && cand.id), cand ? cand.id + ' / ' + cand.name : 'не найден');
+    WS.ui.openInboxTriage('in_dup');
+    check('входящие · разбор дубля показывает сравнение с кандидатом',
+      /Похожий контакт/.test((doc.querySelector('#app .intriage') || {}).textContent || ''),
+      ((doc.querySelector('#app .intriage') || {}).textContent || '').slice(0, 100));
+
+    // Решение по дублю привязывает обращение к контакту по id и пишет в историю.
+    WS.ui.inboxDupDecide('in_dup', cand.id);
+    const after = (dd().inbox || []).find((x) => x.id === 'in_dup');
+    check('входящие · решение по дублю связывает запись по id и оставляет след',
+      after && after.clientId === cand.id && after.resolution === 'merged' &&
+      ((dd().contactTimeline || {})[cand.id] || []).some((e) => /опознано как тот же человек/.test(e.text || '')),
+      JSON.stringify({ clientId: after && after.clientId, resolution: after && after.resolution }));
+
+    // Несуществующее обращение не роняет экран.
+    let threw = false;
+    try { WS.ui.openInboxTriage('in_nope'); } catch (e) { threw = true; }
+    check('входящие · разбор несуществующего обращения не ломает стенд', !threw, String(threw));
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Сделка из заявки наследует ответственного ----
      `reqCreateDeal()` не переносил `request.assignee` в `deal.agent`, и новая сделка приходила
      в аналитику ничьей: выборка «сделки Марины» не находила то, что Марина сама и завела. */

@@ -79,10 +79,8 @@
     'g1': () => WS.engine.startScenario('G1'),
     'g2': () => WS.engine.startScenario('G2'),
     'g3': () => WS.engine.startScenario('G3'),
-    'разобрать входящее': () => WS.engine.startScenario('G1'),
     'подобрать объект': () => WS.engine.startScenario('G2'),
     'итоги показа': () => WS.engine.startScenario('G3'),
-    'ответить лиду': () => WS.engine.startScenario('S15'),
     'бриф к звонку': () => WS.engine.startScenario('S8'),
     'финмодель': () => WS.router.go('calc'),
     'оценка объекта': () => WS.router.go('valuation'),
@@ -338,6 +336,10 @@
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
       case 'about': WS.ui.openAbout(); break;
+      case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
+      case 'inboxDraftReply': WS.ui.openReplyDraft(t.dataset.inbox); break;
+      case 'inboxDupMerge': WS.ui.inboxDupDecide(t.dataset.inbox, t.dataset.cid); break;
+      case 'inboxDupNew': WS.ui.inboxDupDecide(t.dataset.inbox, null); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
