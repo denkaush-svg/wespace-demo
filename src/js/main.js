@@ -337,6 +337,9 @@
       case 'navBack': WS.router.back(); break;
       case 'about': WS.ui.openAbout(); break;
       case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
+      case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;
+      case 'createDealShow': WS.ui.createDealShow(t.dataset.deal); break;
+      case 'calShow': WS.ui.openCalendarShowPicker(); break;
       case 'inboxDraftReply': WS.ui.openReplyDraft(t.dataset.inbox); break;
       case 'inboxDupMerge': WS.ui.inboxDupDecide(t.dataset.inbox, t.dataset.cid); break;
       case 'inboxDupNew': WS.ui.inboxDupDecide(t.dataset.inbox, null); break;

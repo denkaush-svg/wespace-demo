@@ -8546,6 +8546,68 @@ setTimeout(async () => {
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
   }
 
+  /* ---- Показ по сделке — связанная запись, а не строка в ленте ----
+     «Назначить показ» и «Записать событие» вызывали один обработчик `addEvent`: это была одна
+     кнопка, подписанная двумя способами. Показ получался заметкой — без объекта, исполнителя и
+     доступа, не попадал в календарь и не двигал следующий шаг. */
+  {
+    WS.storeApi.resetAll();
+    WS.ui.dealCard('d_anna');
+    const acts = [].slice.call(doc.querySelectorAll('#app [data-act]'))
+      .filter((b) => /Назначить показ|Записать событие/.test(b.textContent || ''))
+      .map((b) => (b.textContent || '').trim() + '→' + b.dataset.act);
+    check('показ · «назначить показ» и «записать событие» — разные действия',
+      acts.length === 2 && acts[0].indexOf(acts[0].split('→')[1]) &&
+      acts[0].split('→')[1] !== acts[1].split('→')[1], acts.join(' | '));
+
+    const before = (dd().events || []).length;
+    WS.ui.openDealShowForm('d_anna');
+    WS.ui.createDealShow('d_anna');
+    const made = (dd().events || []).slice(before);
+    const ev = made[0] || {};
+    check('показ · создан именно показ, а не заметка', made.length >= 1 && ev.kind === 'show', ev.kind || 'нет события');
+    check('показ · все связи проставлены',
+      ev.dealId === 'd_anna' && ev.clientId === 'c_anna' && !!ev.objectId && !!ev.executorId && !!ev.when,
+      JSON.stringify({ deal: ev.dealId, client: ev.clientId, obj: ev.objectId, exec: ev.executorId, when: ev.when }));
+    check('показ · спрошены исполнитель и доступ на объект',
+      !!ev.executorId && !!ev.access, JSON.stringify({ exec: ev.executorId, access: ev.access }));
+
+    const cal = (WS.ui.calendarActivities ? WS.ui.calendarActivities() : []).filter((x) => x.id === ev.id);
+    check('показ · виден в календаре', cal.length === 1, String(cal.length));
+    /* Различать надо на случае, где объект показа и «первый объект клиента» РАЗНЫЕ: у Анны они
+       совпадают, и проверка на ней прошла бы при любой из двух реализаций. Поэтому показ ставится
+       на заведомо другой объект — тогда старое поведение видно сразу. */
+    {
+      const other = (dd().objects || []).find((o) => o.id !== ev.objectId);
+      const probe = { id: 'e_probe_calobj', kind: 'show', status: 'planned', clientId: ev.clientId,
+        dealId: ev.dealId, requestId: ev.requestId, objectId: other.id, executor: 'Марина Волкова',
+        title: 'Показ · ' + other.name, when: 'сегодня 18:00' };
+      dd().events.push(probe);
+      const row = (WS.ui.calendarActivities() || []).filter((x) => x.id === probe.id)[0] || {};
+      check('показ · календарь берёт объект самого показа, а не первый объект клиента',
+        row.objectId === other.id,
+        'в календаре ' + String(row.objectId) + ', в показе ' + other.id +
+        ', первый объект клиента ' + String(WS.ui.objOfClient ? WS.ui.objOfClient(ev.clientId) : '—'));
+      dd().events = dd().events.filter((x) => x.id !== probe.id);
+    }
+    check('показ · один и тот же id виден в ленте сделки и в ленте заявки',
+      ((dd().dealTimeline || {})['d_anna'] || []).some((e) => e.eventId === ev.id) &&
+      ((dd().requestTimeline || {})[ev.requestId] || []).some((e) => e.eventId === ev.id),
+      'заявка ' + ev.requestId);
+    const d = (dd().deals || []).find((x) => x.id === 'd_anna');
+    check('показ · назначение не двигает стадию сделки — показ назначен, а не проведён',
+      d.stage === 'prep' && d.nextDue === ev.when, d.stage + ' / ' + d.nextDue);
+
+    // Календарная кнопка больше не запускает сценарий.
+    WS.router.go('shows');
+    const calBtn = [].slice.call(doc.querySelectorAll('#app button'))
+      .filter((b) => /Назначить показ/.test(b.textContent || ''));
+    check('показ · кнопка календаря не запускает демо-сценарий',
+      calBtn.length > 0 && calBtn.every((b) => !b.dataset.scn),
+      calBtn.map((b) => (b.dataset.act || '') + (b.dataset.scn ? ' scn=' + b.dataset.scn : '')).join(', ') || 'кнопки нет');
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Разбор входящего открывает саму запись, а не подходящий демо-сюжет ----
      Кнопка «Разобрать» выбирала сценарий по типу обращения: у Sarah, написавшей по-английски
      «1BR investment unit in JVC, budget ~1.3M», запускался S15 с чужим русским запросом про

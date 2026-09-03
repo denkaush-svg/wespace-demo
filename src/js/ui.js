@@ -1692,6 +1692,106 @@
     const t = parseInt(m[2], 10) * 60 + parseInt(m[3], 10) + minutes;
     return m[1] + ' ' + String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
   }
+  /* ==== Показ по сделке =================================================================
+     «Назначить показ» и «Записать событие» на карточке сделки вызывали ОДИН обработчик
+     `addEvent`, то есть были одной кнопкой, подписанной двумя способами. Показ получался
+     строкой в ленте сделки: без объекта, исполнителя, места и доступа, не появлялся в
+     календаре и не двигал следующий шаг. Заметка о встрече — это не показ.
+
+     Здесь показ создаётся как связанная запись: у неё есть сделка, заявка, клиент, объект и
+     исполнитель, поэтому один и тот же `event.id` виден в сделке, в заявке и в календаре. */
+  function dealShowObjects(d) {
+    const ids = (d.lots && d.lots.length ? d.lots : [d.objectId]).filter(Boolean);
+    return ids.map((id) => (D().objects || []).find((o) => o.id === id)).filter(Boolean);
+  }
+  function openDealShowForm(dealId) {
+    const d = (D().deals || []).find((x) => x.id === dealId);
+    if (!d) { WS.storeApi.toast('Сделка не найдена: ' + dealId); return; }
+    const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+    const objs = dealShowObjects(d);
+    if (!objs.length) { WS.storeApi.toast('В сделке нет объекта — показывать нечего', 'warn'); return; }
+    const slots = SHOW_SLOTS.map((s, i) =>
+      '<button class="chip' + (i === 0 ? ' on' : '') + '" data-showslot="' + escAttr(s[0]) + '">' +
+      I('calendar') + s[1] + '</button>').join('');
+    const rows = objs.map((o) => '<div class="opp-b"><span class="k">' + escAttr(o.name) +
+      '</span><span class="v">' + escAttr(o.area || '') + ' · ' + escAttr(o.address || '') + '</span></div>').join('');
+    const team = TEAM.map((x) => '<option value="' + escAttr(x.id) + '"' +
+      (x.id === d.agent ? ' selected' : '') + '>' + escAttr(x.name) + '</option>').join('');
+    openModal('Назначить показ · ' + escAttr(c.name || d.title),
+      '<div class="rw-lbl">' + I('calendar') + 'Когда</div><div class="qa-row" style="margin-bottom:14px">' + slots + '</div>' +
+      '<div class="rw-lbl">' + I('building') + 'Что показываем</div>' + rows +
+      '<div class="form-grid" style="margin-top:12px">' +
+      '<label class="fld"><span>Кто показывает</span><select id="dsExec">' + team + '</select></label>' +
+      '<label class="fld"><span>Доступ на объект</span><select id="dsAccess">' +
+      '<option>подтверждён у представителя объекта</option><option>нужно запросить</option>' +
+      '<option>ключи у консьержа здания</option></select></label>' +
+      '</div>' +
+      '<label class="fld" style="margin-top:8px"><span>Заметка к показу</span>' +
+      '<input id="dsNote" type="text" placeholder="Например: клиент подъедет со своим оценщиком"></label>',
+      '<button class="btn primary" data-act="createDealShow" data-deal="' + escAttr(d.id) + '">' +
+      I('check') + 'Назначить</button><button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+  function createDealShow(dealId) {
+    const d = (D().deals || []).find((x) => x.id === dealId);
+    if (!d) { WS.storeApi.toast('Сделка не найдена: ' + dealId); return; }
+    const objs = dealShowObjects(d);
+    if (!objs.length) { WS.storeApi.toast('В сделке нет объекта — показывать нечего', 'warn'); return; }
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+    const exec = g('dsExec') || d.agent;
+    const access = g('dsAccess') || 'подтверждён у представителя объекта';
+    const note = g('dsNote') || '';
+    const slot = WS._showSlot || SHOW_SLOTS[0][0];
+    const execName = ((TEAM.find((x) => x.id === exec) || {}).name) || exec;
+    D().events = D().events || [];
+    const made = objs.map((o, i) => {
+      const ev = {
+        id: 'e_show_' + d.id + '_' + o.id + '_' + (D().events.length + i),
+        kind: 'show', status: 'planned',
+        clientId: d.clientId, requestId: d.requestId || null, dealId: d.id, objectId: o.id,
+        executor: execName, executorId: exec,
+        title: 'Показ · ' + o.name, when: showShift(slot, i * SHOW_GAP_MIN),
+        location: [o.area, o.name, o.address].filter(Boolean).join(', '),
+        access: access, note: note,
+      };
+      D().events.push(ev);
+      return ev;
+    });
+    const names = objs.map((o) => o.name).join(', ');
+    // Один показ — одна запись в истории сделки и в истории заявки, со ССЫЛКОЙ на событие:
+    // именно по ней потом сходятся календарь, сделка и заявка.
+    D().dealTimeline = D().dealTimeline || {};
+    (D().dealTimeline[d.id] = D().dealTimeline[d.id] || []).push({
+      ch: 'crm', kind: 'raw', by: 'Агент', at: 'только что', ord: 999, eventId: made[0].id,
+      text: 'Назначен показ: ' + names + ' — ' + slot + ', показывает ' + execName + '. Доступ: ' + access + '.' });
+    if (d.requestId) {
+      D().requestTimeline = D().requestTimeline || {};
+      (D().requestTimeline[d.requestId] = D().requestTimeline[d.requestId] || []).push({
+        ch: 'crm', kind: 'raw', by: 'Агент', at: 'только что', ord: 999, eventId: made[0].id,
+        text: 'Назначен показ по сделке «' + d.title + '»: ' + names + ' — ' + slot + '.' });
+    }
+    // Следующий шаг двигаем, СТАДИЮ — нет: показ назначен, а не проведён.
+    d.nextDue = slot;
+    d.updated = 'только что';
+    WS.storeApi.save();
+    closeModal();
+    WS.storeApi.toast(made.length + ' ' + plural(made.length, 'показ назначен', 'показа назначено', 'показов назначено') +
+      ' — ' + slot, 'ok');
+    WS.storeApi.emit();
+  }
+  /* Календарь сначала спрашивает, ПО КАКОЙ сделке показ: раньше кнопка запускала демо-сценарий
+     S3 и ничего не создавала. Сценарий остался в навигаторе демо, где он и подписан сценарием. */
+  function openCalendarShowPicker() {
+    const live = (D().deals || []).filter((d) => !dealClosed(d) && !dealArchived(d) && dealShowObjects(d).length);
+    if (!live.length) { WS.storeApi.toast('Нет сделок с объектом — показывать нечего', 'warn'); return; }
+    const rows = live.map((d) => {
+      const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+      return '<button class="btn" data-act="openDealShow" data-deal="' + escAttr(d.id) +
+        '" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('briefcase') +
+        escAttr(c.name || 'Клиент') + ' · ' + escAttr(d.title) + '</button>';
+    }).join('');
+    openModal('По какой сделке показ?', rows, '<button class="btn" data-act="closeModal">Отмена</button>');
+  }
+
   function openShowForm(inboxId) {
     const it = (D().inbox || []).find((x) => x.id === inboxId); if (!it) return;
     const c = it.clientId ? oppClient(it.clientId) : null; if (!c) return;
@@ -6722,7 +6822,7 @@
     // Открыть контакт is removed — the client's name in the left column is already clickable.
     return [
       ['doc', 'Собрать КП', 'data-act="openDealKp" data-deal="' + d.id + '"', 'primary'],
-      ['calendar', 'Назначить показ', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', 'primary'],
+      ['calendar', 'Назначить показ', 'data-act="openDealShow" data-deal="' + d.id + '"', 'primary'],
       ['pencil', 'Записать событие', 'data-act="addEvent" data-scope="deal" data-deal="' + d.id + '"', 'primary'],
       ['clock', 'Поставить задачу', 'data-act="newTask"', 'secondary'],
       ['gear', 'Параметры сделки', 'data-act="editDeal" data-deal="' + d.id + '"', 'secondary'],
@@ -9734,7 +9834,9 @@
       const isTeam = exec && exec.indexOf(meName) < 0;
       push({ id: e.id, type: e.kind === 'call' ? 'звонок' : 'показ', when: e.when,
         dir: done ? (isTeam ? 'agent' : 'me') : (isTeam ? 'out' : 'me'),
-        clientId: e.clientId, objectId: objOfClient(e.clientId),
+        /* Объект берётся из самого события. Раньше здесь стоял «первый объект этого клиента»,
+           и у клиента с двумя объектами календарь показывал не тот, что в показе. */
+        clientId: e.clientId, objectId: e.objectId || objOfClient(e.clientId),
         title: e.title, sub: (exec ? exec.split(' · ')[0] : 'я') + (cn(e.clientId) ? ' · ' + cn(e.clientId) : ''),
         open: { event: e.id } });
     });
@@ -9817,7 +9919,7 @@
       if (!agenda) agenda = '<div class="empty">' + I('calendar') + '<div>Под фильтр активностей нет</div></div>';
     }
     return head('Календарь', 'Встречи, показы, звонки, задачи и коммуникации. Неделя кликабельна — выберите день; фильтры по типу, направлению, объекту и клиенту.',
-      '<button class="btn sm primary" data-scn="S3">' + I('calendar') + 'Назначить показ (S3)</button>') +
+      '<button class="btn sm primary" data-act="calShow">' + I('calendar') + 'Назначить показ</button>') +
       '<div class="obj-toolbar">' + typeSel + objSel + clientSel + '</div>' +
       '<div class="qa-row" style="margin-bottom:12px">' + dirChips + '</div>' +
       weekBar + grid +
@@ -12521,7 +12623,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
