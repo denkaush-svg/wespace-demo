@@ -8548,6 +8548,40 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Согласования: стабильные ID, решение пишется в историю сделки ----
+     Старый код хранил согласования в MGR_APPROVALS с числовыми индексами: перестановка пунктов
+     сдвигала индексы, и apprDone переставал соответствовать реальности. Одобрение только
+     переключало статус — в историю сделки ничего не писалось. */
+  {
+    WS.storeApi.resetAll();
+    const appr = dd().approvals || [];
+    check('согласования перешли в data.approvals, MGR_APPROVALS удалён', appr.length >= 1 && appr.every((a) => typeof a.id === 'string'),
+      'записей: ' + appr.length);
+
+    check('Согласования · КП Игоря Лебедева удалён (у него нет активной сделки)',
+      !appr.some((a) => /Игорь Лебедев/.test(a.t || '')),
+      appr.map((a) => a.t).join(' | '));
+
+    // resolveApproval writes to the matching deal timeline
+    const first = appr[0];
+    const beforeLen = ((dd().dealTimeline || {})[first.dealId] || []).length;
+    WS.ui.resolveApproval(first.id, 'approve');
+    const afterLen = ((dd().dealTimeline || {})[first.dealId] || []).length;
+    check('Согласование · resolveApproval пишет запись в историю сделки',
+      afterLen > beforeLen, 'было ' + beforeLen + ' стало ' + afterLen);
+
+    check('Согласование · одобренное попадает в done-множество со строковым ID',
+      (WS.store.apprDone || []).includes(first.id), JSON.stringify(WS.store.apprDone));
+
+    check('Согласование · идемпотентность: повторный approve не пишет вторую запись',
+      ((dd().dealTimeline || {})[first.dealId] || []).length === afterLen, 'второй approve');
+    WS.ui.resolveApproval(first.id, 'approve');
+    check('Согласование · идемпотентность: повторный approve не пишет вторую запись',
+      ((dd().dealTimeline || {})[first.dealId] || []).length === afterLen, 'записей: ' + ((dd().dealTimeline || {})[first.dealId] || []).length);
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Выбор объекта подтверждается и оставляет след; КП не молчит о расхождении ----
      Нажатие молча переписывало `offered.state`, и дальше расходились три вещи: сводка называла
      прежний объект, КП оставалось собранным по старому набору, а в истории заявки не было ни

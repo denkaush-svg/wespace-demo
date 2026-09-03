@@ -69,6 +69,7 @@
       tasks: clone(f.tasks),
       events: clone(f.events),
       inbox: clone(f.inbox),
+      approvals: clone(f.approvals),
       analytics: clone(f.analytics),
       roster: clone(f.roster),
       refModel: clone(f.refModel),

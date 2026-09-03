@@ -182,8 +182,8 @@
       api.toast(res.changed ? 'Обращение назначено: ' + who : 'Уже назначено: ' + who, 'ok');
       return api.emit();
     }
-    if (d.approve) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.approve) < 0) store.apprDone.push(+d.approve); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
-    if (d.reject) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.reject) < 0) store.apprDone.push(+d.reject); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
+    if (d.approve) { WS.ui.resolveApproval(d.approve, 'approve'); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
+    if (d.reject) { WS.ui.resolveApproval(d.reject, 'reject'); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
     if (d.objfilter) { store.objFilter = d.objfilter; return api.emit(); }
     if (d.clubcomm) { store.clubComm = d.clubcomm; return api.emit(); }
     if (d.clubreq) return WS.ui.openClubRequest(d.clubreq);

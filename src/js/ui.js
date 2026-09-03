@@ -55,7 +55,7 @@
     { id: 'contracts', label: 'Сопровождение', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).length },
-    { id: 'approvals', label: 'Согласования', icon: 'check', count: () => MGR_APPROVALS.length - (S().apprDone || []).length },
+    { id: 'approvals', label: 'Согласования', icon: 'check', count: () => (D().approvals || []).filter((a) => !(S().apprDone || []).includes(a.id)).length },
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
   ];
   const NAV_MGR_MORE = [
@@ -10781,11 +10781,14 @@
     const workload = [['Марина Волкова', 82, false], ['Ахмед Салех', 61, false], ['Лина Хассан', 108, true]]
       .map(([who, pct, over]) => '<div class="wl"><div class="who">' + who + '</div><div class="bar"><i class="' + (over ? 'over' : '') + '" style="width:' + Math.min(pct, 100) + '%"></i></div><div class="n">' + pct + '%</div></div>').join('');
     const signals = [
-      ['high', 'warn', 'Нарушение SLA — ночной лид', 'Sarah Mansour ждёт 7 ч, норма 4 ч.'],
+      ['high', 'warn', 'Нарушение SLA — ночной лид', 'Sarah Mansour ждёт 7 ч, норма 4 ч.', 'in_night'],
       ['', 'doc', '2 согласования ждут', 'КП Игоря и договор Виктора.'],
       ['', 'target', '3 заявки без ответа', 'Нет назначенного агента более 24 ч.'],
-    ].map(([sev, ic, t, why]) => '<div class="radar-row"><div class="sev ' + sev + '"></div><div class="icon-tile i-' + (sev === 'high' ? 'stop' : 'info') + '">' + I(ic) + '</div>' +
-      '<div class="rt"><div class="t">' + t + '</div><div class="why">' + why + '</div></div><div class="ra"><button class="btn sm" data-nav="clients">Разобрать</button></div></div>').join('');
+    ].map(([sev, ic, t, why, inboxId]) => '<div class="radar-row"><div class="sev ' + sev + '"></div><div class="icon-tile i-' + (sev === 'high' ? 'stop' : 'info') + '">' + I(ic) + '</div>' +
+      '<div class="rt"><div class="t">' + t + '</div><div class="why">' + why + '</div></div>' +
+      '<div class="ra">' + (inboxId
+        ? '<button class="btn sm" data-act="inboxTriage" data-inbox="' + escAttr(inboxId) + '">Разобрать</button>'
+        : '<button class="btn sm" data-nav="approvals">Разобрать</button>') + '</div></div>').join('');
     return dealsFunnel() +
       '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Загрузка команды (SLA)</div><div class="workload">' + workload + '</div></div>' +
       '<div class="section-label">Сигналы и исключения</div>' + signals;
@@ -10797,12 +10800,29 @@
     u_ahmed: { focus: 'Готовое · Marina', load: 61, conv: 41, sla: 88 },
     u_lina: { focus: 'Аренда · JVC', load: 108, conv: 22, sla: 74 },
   };
-  const MGR_APPROVALS = [
-    { ic: 'doc', t: 'КП · Игорь Лебедев', who: 'u_marina', sub: 'Bayline 1603 · 3,2 млн AED · скидка 2%', when: '20 мин назад', tone: '' },
-    { ic: 'money', t: 'Скидка 4% сверх лимита', who: 'u_ahmed', sub: 'Palm Court · Виктор · лимит агента 3%', when: '1 ч назад', tone: 'warn' },
-    { ic: 'handshake', t: 'Co-broking сплит 50/50', who: 'u_lina', sub: 'Whitewill · Creekline · подтвердить условия', when: '2 ч назад', tone: '' },
-    { ic: 'doc', t: 'Договор бронирования', who: 'u_marina', sub: 'Sarah Mansour · Marina · Form F', when: 'сегодня', tone: '' },
-  ];
+  /* MGR_APPROVALS moved to data.approvals in fixtures.js (stable string IDs).
+     resolveApproval writes the decision to the matching deal / request timeline
+     instead of only toggling a done-bit in store. */
+  function resolveApproval(approvalId, decision) {
+    const a = (D().approvals || []).find((x) => x.id === approvalId);
+    if (!a) return;
+    const done = S().apprDone || [];
+    if (done.indexOf(approvalId) >= 0) return;
+    done.push(approvalId);
+    S().apprDone = done;
+    const by = (D().users && D().users.manager ? D().users.manager.name : 'Руководитель');
+    const note = (decision === 'approve' ? 'Одобрено' : 'Отклонено') + ': ' + a.t + ' — ' + by + '.';
+    if (a.dealId) {
+      D().dealTimeline = D().dealTimeline || {};
+      (D().dealTimeline[a.dealId] = D().dealTimeline[a.dealId] || []).push(
+        { ch: 'crm', kind: 'raw', by: by, at: 'только что', ord: 9999, text: note });
+    } else if (a.requestId) {
+      D().requestTimeline = D().requestTimeline || {};
+      (D().requestTimeline[a.requestId] = D().requestTimeline[a.requestId] || []).push(
+        { ch: 'crm', kind: 'raw', by: by, at: 'только что', ord: 9999, text: note });
+    }
+    WS.storeApi.save();
+  }
   function mgrInitials(n) { return (n || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
   function teamAgentStats(id) {
     const list = D().deals.filter((d) => d.agent === id);
@@ -10843,7 +10863,7 @@
       tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
       tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
       tile('mail', 'Нераспределённые заявки', unassigned, '', '', unassigned ? 'Ждут агента — назначить' : 'Все заявки распределены', '', unassigned > 0 ? 'accent' : '', 'data-nav="leads"') +
-      tile('check', 'На согласовании', MGR_APPROVALS.length - (S().apprDone || []).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
+      tile('check', 'На согласовании', (D().approvals || []).filter((a) => !(S().apprDone || []).includes(a.id)).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
       '</div>';
   }
   function viewTeam() {
@@ -10922,14 +10942,14 @@
   }
   function viewApprovals() {
     const done = S().apprDone || [];
-    const items = MGR_APPROVALS.map((a, i) => ({ a: a, i: i })).filter((x) => done.indexOf(x.i) < 0);
-    const rows = items.map(({ a, i }) => {
+    const items = (D().approvals || []).filter((a) => done.indexOf(a.id) < 0);
+    const rows = items.map((a) => {
       const warn = a.tone === 'warn' ? ' <span class="badge warn">' + I('warn') + 'сверх лимита</span>' : '';
       return '<div class="appr-row"><div class="fi i-' + (a.tone === 'warn' ? 'stop' : 'info') + '">' + I(a.ic) + '</div>' +
         '<div class="appr-main"><div class="t">' + a.t + warn + '</div>' +
         '<div class="m">' + a.sub + ' · ' + agentName(a.who) + ' · ' + a.when + '</div></div>' +
-        '<div class="appr-acts"><button class="btn sm" data-reject="' + i + '">' + I('x') + 'Отклонить</button>' +
-        '<button class="btn sm primary" data-approve="' + i + '">' + I('check') + 'Одобрить</button></div></div>';
+        '<div class="appr-acts"><button class="btn sm" data-reject="' + escAttr(a.id) + '">' + I('x') + 'Отклонить</button>' +
+        '<button class="btn sm primary" data-approve="' + escAttr(a.id) + '">' + I('check') + 'Одобрить</button></div></div>';
     }).join('') || '<div class="empty" style="padding:24px">' + I('checkCircle') + '<div style="font-weight:700;color:var(--ink)">Очередь пуста — всё согласовано</div></div>';
     return head('Согласования', 'Очередь одобрений от агентов: коммерческие предложения, скидки сверх лимита, co-broking сплиты, договоры. Одобрение фиксируется в истории сделки; отклонение возвращается агенту.', '') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">В очереди · ' + items.length + '</div><div class="appr-list">' + rows + '</div></div>';
@@ -12726,7 +12746,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

@@ -1037,6 +1037,23 @@
   // Exception inbox (R6) — «Разобрать» becomes an exception queue. ex = exception type
   // (qualify / duplicate / noconsent / unknown_object / delivery_fail).
   // stage: inbox item status in the board — new / unreached / qualified / rejected
+  /* Manager approvals — stable string IDs so the done-set never drifts when the
+     list is reordered. Each item links to a real deal or request so resolveApproval()
+     can write its decision to the matching timeline.
+     Igor's KP approval was removed: he has no active deal, so the approval had
+     nowhere to write its decision. */
+  const approvals = [
+    { id: 'ap_discount', ic: 'money', t: 'Скидка 4% сверх лимита', who: 'u_ahmed',
+      sub: 'Palm Court · Виктор · лимит агента 3%', when: '1 ч назад', tone: 'warn',
+      dealId: 'd_viktor', requestId: null },
+    { id: 'ap_cobrok', ic: 'handshake', t: 'Co-broking сплит 50/50', who: 'u_lina',
+      sub: 'Whitewill · Creekline · подтвердить условия', when: '2 ч назад', tone: '',
+      dealId: 'd_karim_cross', requestId: null },
+    { id: 'ap_booking', ic: 'doc', t: 'Договор бронирования', who: 'u_marina',
+      sub: 'Sarah Mansour · Marina · Form F', when: 'сегодня', tone: '',
+      dealId: null, requestId: 'r_lease' },
+  ];
+
   const inbox = [
     { id: 'in_night', clientId: 'c_night', channel: 'whatsapp', at: '02:14', text: 'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?', kind: 'night', ex: 'qualify', stage: 'unreached' },
     { id: 'in_anna_vn', clientId: 'c_anna', channel: 'whatsapp', at: '09:05', text: 'Голосовое сообщение · 0:24', kind: 'voice', scenario: 'G1', ex: 'qualify', stage: 'new' },
@@ -1246,7 +1263,7 @@
   WS.fixtures = {
     version: 1, settings, outcomes,
     DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
-    deals, requests, tasks, events, inbox, analytics,
+    deals, requests, tasks, events, inbox, approvals, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, INBOX_STAGES, INBOX_STAGE_LABELS, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
