@@ -340,6 +340,7 @@
       case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;
       case 'createDealShow': WS.ui.createDealShow(t.dataset.deal); break;
       case 'calShow': WS.ui.openCalendarShowPicker(); break;
+      case 'saveReqSel': WS.ui.saveRequestSelection(t.dataset.req, t.dataset.obj, t.dataset.mode); break;
       case 'inboxDraftReply': WS.ui.openReplyDraft(t.dataset.inbox); break;
       case 'inboxDupMerge': WS.ui.inboxDupDecide(t.dataset.inbox, t.dataset.cid); break;
       case 'inboxDupNew': WS.ui.inboxDupDecide(t.dataset.inbox, null); break;

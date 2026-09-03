@@ -8546,6 +8546,76 @@ setTimeout(async () => {
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
   }
 
+  const appEl2 = () => doc.getElementById('app');
+
+  /* ---- Выбор объекта подтверждается и оставляет след; КП не молчит о расхождении ----
+     Нажатие молча переписывало `offered.state`, и дальше расходились три вещи: сводка называла
+     прежний объект, КП оставалось собранным по старому набору, а в истории заявки не было ни
+     следа о том, когда и откуда взялся новый выбор. Проверено на Анне: после выбора Bay Central
+     сводка продолжала утверждать, что выбран Creekline. */
+  {
+    WS.storeApi.resetAll();
+    const r0 = (dd().requests || []).find((x) => x.id === 'r_anna');
+    const before = (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    const other = (r0.offered || []).find((o) => o.state !== 'selected');
+
+    WS.ui.reqObjState('r_anna', other.id, 'selected');
+    check('выбор · нажатие не меняет выбор молча, а спрашивает подтверждение',
+      !!doc.getElementById('selSrc') &&
+      (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id).join() === before.join(),
+      'выбрано ' + (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id).join(', '));
+
+    WS.ui.saveRequestSelection('r_anna', other.id, 'replace');
+    const after = (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    check('выбор · подтверждение заменяет прежний выбор', after.length === 1 && after[0] === other.id,
+      before.join(',') + ' → ' + after.join(','));
+    check('выбор · записан источник', !!r0.selectionSource && !!r0.selectionConfirmedAt,
+      String(r0.selectionSource));
+    const tl = ((dd().requestTimeline || {})['r_anna'] || []).slice(-1)[0] || {};
+    check('выбор · в истории заявки появился след с источником',
+      /Выбран/.test(tl.text || '') && (tl.text || '').indexOf(r0.selectionSource) > 0, (tl.text || '').slice(0, 110));
+
+    // Отказ и возврат в «предложено» подтверждения не требуют — они ничего не обещают.
+    const third = (r0.offered || []).find((o) => o.id !== other.id);
+    WS.ui.closeModal();
+    WS.ui.reqObjState('r_anna', third.id, 'rejected');
+    check('выбор · отказ применяется сразу, без подтверждения',
+      ((r0.offered || []).find((o) => o.id === third.id) || {}).state === 'rejected' && !doc.getElementById('selSrc'),
+      String(((r0.offered || []).find((o) => o.id === third.id) || {}).state));
+
+    // КП расходится с текущим выбором — и говорит об этом.
+    check('КП · расхождение с текущим выбором обнаружено', !!WS.ui.reqKpDrift(r0), JSON.stringify(WS.ui.reqKpDrift(r0)));
+    WS.ui.requestCard('r_anna');
+    check('КП · о расхождении сказано на экране',
+      /разошлось с выбором/.test(appEl2().textContent || '') && /Пересоберите/.test(appEl2().textContent || ''),
+      (appEl2().textContent || '').slice(0, 60));
+
+    /* Кнопка «Создать сделку» рисовалась всегда, а проверка стояла внутри обработчика: когда
+       все выбранные объекты заняты действующими сделками, нажатие заканчивалось отпиской. */
+    const busy = (dd().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'selected') &&
+      WS.ui.reqSelectedFree && !WS.ui.reqSelectedFree(r).length && r.kp && r.kp.formed);
+    if (busy) {
+      WS.ui.requestCard(busy.id);
+      check('КП · когда создавать нечего, кнопка не обещает сделку',
+        !appEl2().querySelector('[data-act="reqCreateDeal"]') &&
+        /уже в сделках/.test(appEl2().textContent || ''),
+        (appEl2().textContent || '').slice(0, 80));
+    } else {
+      // Строим случай сами: заявка с выбранным объектом, который уже лежит в её же сделке.
+      const r2 = (dd().requests || []).find((r) => r.kp && r.kp.formed && (r.offered || []).some((o) => o.state === 'selected'));
+      const selId = (r2.offered || []).filter((o) => o.state === 'selected')[0].id;
+      dd().deals.push({ id: 'd_probe_busy', clientId: r2.clientId, requestId: r2.id, agent: r2.assignee,
+        title: 'проба', funnel: r2.funnel, stage: 'prep', lots: [selId], objectId: selId, amount: 0 });
+      WS.ui.requestCard(r2.id);
+      check('КП · когда создавать нечего, кнопка не обещает сделку',
+        !appEl2().querySelector('[data-act="reqCreateDeal"]') &&
+        /уже в сделках/.test(appEl2().textContent || ''),
+        'свободных ' + WS.ui.reqSelectedFree(r2).length + ' · ' + (appEl2().textContent || '').slice(0, 70));
+      dd().deals = dd().deals.filter((x) => x.id !== 'd_probe_busy');
+    }
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Показ по сделке — связанная запись, а не строка в ленте ----
      «Назначить показ» и «Записать событие» вызывали один обработчик `addEvent`: это была одна
      кнопка, подписанная двумя способами. Показ получался заметкой — без объекта, исполнителя и

@@ -7676,7 +7676,9 @@
     return [
       ['plus', 'Добавить объект', 'data-act="reqAddObject" data-req="' + r.id + '"', 'primary'],
       sel ? ['doc', 'Собрать КП · ' + sel, 'data-act="reqFormKp" data-req="' + r.id + '"', ''] : null,
-      sel ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
+      // Свободные выбранные, а не просто выбранные: объект, уже лежащий в действующей
+      // сделке, второй раз в сделку не пойдёт, и кнопка обещала бы невыполнимое.
+      reqSelectedFree(r).length ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
       c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', ''] : null,
       ['pencil', 'Изменить запрос', 'data-act="editRequest" data-req="' + r.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
@@ -7829,12 +7831,33 @@
       const m = [o.area, WS.AED(o.price), (ny != null ? 'доходность ' + (ny * 100).toFixed(1) + '%' : null), (o.commissionPct ? 'комиссия ' + o.commissionPct + '%' : null)].filter(Boolean).join(' · ');
       return '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + m + '</div></div></div>';
     }).join('');
-    return dxSec('doc', 'Коммерческое предложение · ' + r.kp.at, '<span class="badge ok">' + I('check') + 'собрано</span>',
-      '<div class="feed">' + rows + '</div>' +
-      '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
+    /* Кнопка «Создать сделку» рисовалась всегда, а проверка стояла внутри обработчика: если
+       все выбранные объекты уже заняты действующими сделками, нажатие заканчивалось отпиской
+       «Сначала отметьте объекты». Кнопка не должна обещать того, чего не может. */
+    const free = reqSelectedFree(r);
+    const drift = reqKpDrift(r);
+    const driftLine = drift
+      ? '<div class="match" style="margin-top:10px">' + I('warn') +
+        '<span>КП собрано ' + escAttr(r.kp.at) + ' по другому набору: в документе ' +
+        (drift.inKp.length ? escAttr(String(drift.inKp.length)) : 'ничего') + ', сейчас выбрано ' +
+        (drift.now.length ? escAttr(String(drift.now.length)) : 'ничего') +
+        '. Пересоберите, иначе клиент получит набор, от которого уже отказался.</span></div>'
+      : '';
+    const createBtn = free.length
+      ? '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку · ' + free.length + '</button>'
+      : '<span class="badge">' + I('lock') + 'Все выбранные объекты уже в сделках</span>';
+    const srcLine = r.selectionSource
+      ? '<div style="margin-top:8px;font-size:11.5px;color:var(--faint)">Выбор подтверждён ' +
+        escAttr(r.selectionConfirmedAt || '') + ' · ' + escAttr(r.selectionSource) + '</div>'
+      : '';
+    return dxSec('doc', 'Коммерческое предложение · ' + r.kp.at,
+      drift ? '<span class="badge warn">' + I('warn') + 'разошлось с выбором</span>'
+            : '<span class="badge ok">' + I('check') + 'собрано</span>',
+      '<div class="feed">' + rows + '</div>' + driftLine + srcLine +
+      '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
       '<button class="btn sm" data-act="openReqKp" data-req="' + r.id + '">' + I('arrowRight') + 'Открыть КП</button>' +
-      '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
-      '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
+      '<button class="btn sm' + (drift ? ' primary' : '') + '" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
+      createBtn + '</div>');
   }
   function prefProfileInner(r) {
     const off = r.offered || [];
@@ -7883,9 +7906,87 @@
       '</div>';
   }
   // ---- Request funnel actions (A1): client-selection state, add object, form КП, create deal ----
+  /* Смена выбранного объекта — факт со слов клиента, а не движение ползунка. Раньше нажатие
+     молча переписывало `offered.state`, и дальше расходились три вещи: сводка продолжала
+     называть прежний объект, КП оставалось собранным по старому набору, а в истории заявки
+     не оставалось ни следа о том, КОГДА и ОТКУДА взялся новый выбор. Проверено на Анне:
+     после выбора Bay Central сводка по-прежнему утверждала, что выбран Creekline.
+
+     Теперь выбор подтверждается, у него обязателен источник, и он пишется в историю заявки.
+     Отказ и возврат в «предложено» подтверждения не требуют: они ничего не обещают. */
+  const SELECTION_SOURCES = ['со слов клиента в WhatsApp', 'со слов клиента по телефону',
+    'на встрече', 'письмом от клиента', 'моя правка — клиент не подтверждал'];
+  function openRequestSelectionConfirm(reqId, objId) {
+    const r = requestById(reqId); if (!r) return;
+    const o = (D().objects || []).find((x) => x.id === objId); if (!o) return;
+    const cur = (r.offered || []).filter((x) => x.state === 'selected')
+      .map((x) => (D().objects || []).find((y) => y.id === x.id)).filter(Boolean);
+    const curLine = cur.length
+      ? cur.map((x) => escAttr(x.name)).join(', ')
+      : 'пока ничего не выбрано';
+    const srcs = SELECTION_SOURCES.map((s, i) =>
+      '<option value="' + escAttr(s) + '"' + (i === 0 ? ' selected' : '') + '>' + escAttr(s) + '</option>').join('');
+    openModal('Клиент выбрал ' + escAttr(o.name),
+      '<div class="field"><div class="k">Сейчас выбрано</div><div class="v">' + curLine + '</div></div>' +
+      '<div class="field"><div class="k">Станет</div><div class="v">' + escAttr(o.name) + ' · ' +
+        escAttr(o.area || '') + ' · ' + WS.AED(o.price) + '</div></div>' +
+      '<label class="fld" style="margin-top:10px"><span>Откуда это известно</span>' +
+      '<select id="selSrc">' + srcs + '</select></label>' +
+      '<div class="rw-prov" style="margin-top:10px">' + I('shield') +
+        'Источник попадёт в историю заявки: через неделю будет видно, чей это выбор — клиента или наш.</div>',
+      (cur.length
+        ? '<button class="btn primary" data-act="saveReqSel" data-req="' + escAttr(r.id) + '" data-obj="' + escAttr(o.id) + '" data-mode="add">' + I('plus') + 'Добавить к выбранным</button>' +
+          '<button class="btn" data-act="saveReqSel" data-req="' + escAttr(r.id) + '" data-obj="' + escAttr(o.id) + '" data-mode="replace">' + I('replay') + 'Заменить прежний выбор</button>'
+        : '<button class="btn primary" data-act="saveReqSel" data-req="' + escAttr(r.id) + '" data-obj="' + escAttr(o.id) + '" data-mode="add">' + I('check') + 'Подтвердить</button>') +
+      '<button class="btn" data-act="closeModal">Отмена</button>');
+  }
+  function saveRequestSelection(reqId, objId, mode) {
+    const r = requestById(reqId); if (!r) return;
+    const off = (r.offered || []).find((x) => x.id === objId); if (!off) return;
+    const o = (D().objects || []).find((x) => x.id === objId) || {};
+    const el = document.getElementById('selSrc');
+    const src = (el && el.value) || SELECTION_SOURCES[0];
+    const dropped = [];
+    if (mode === 'replace') {
+      (r.offered || []).forEach((x) => {
+        if (x.id !== objId && x.state === 'selected') {
+          x.state = 'offered';
+          const oo = (D().objects || []).find((y) => y.id === x.id);
+          if (oo) dropped.push(oo.name);
+        }
+      });
+    }
+    off.state = 'selected';
+    delete off.reason;
+    r.selectionConfirmedAt = 'только что';
+    r.selectionSource = src;
+    r.selectionBy = (D().users && D().users.agent ? D().users.agent.name : 'Агент');
+    D().requestTimeline = D().requestTimeline || {};
+    (D().requestTimeline[r.id] = D().requestTimeline[r.id] || []).push({
+      ch: 'crm', kind: 'raw', by: r.selectionBy, at: 'только что', ord: 999,
+      text: 'Выбран ' + (o.name || objId) + (dropped.length ? ' вместо ' + dropped.join(', ') : '') +
+        ' — ' + src + '.' });
+    WS.storeApi.save();
+    closeModal();
+    WS.storeApi.toast('Выбор записан: ' + (o.name || objId), 'ok');
+    WS.storeApi.emit();
+  }
+  /* Расходится ли собранное КП с тем, что выбрано сейчас. Документ намеренно заморожен на
+     момент сборки — но молчать о расхождении нельзя: брокер отправит клиенту набор, от
+     которого тот уже отказался. */
+  function reqKpDrift(r) {
+    if (!r.kp || !r.kp.formed) return null;
+    const inKp = (r.kp.objectIds || []).slice().sort().join('|');
+    const now = (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id).sort().join('|');
+    return inKp === now ? null : { inKp: r.kp.objectIds || [], now: now ? now.split('|') : [] };
+  }
+
   function reqObjState(reqId, objId, state) {
     const r = requestById(reqId); if (!r) return;
     const off = (r.offered || []).find((o) => o.id === objId); if (!off) return;
+    // «Выбран» — обещание клиента, оно подтверждается и записывается. Остальные состояния
+    // ничего не обещают и меняются сразу.
+    if (state === 'selected') { openRequestSelectionConfirm(reqId, objId); return; }
     off.state = state;
     if (state !== 'rejected') delete off.reason;
     WS.storeApi.save(); WS.storeApi.emit();
@@ -8070,7 +8171,9 @@
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     openModal('КП · ' + r.title, kpDocBody(c.name || 'Клиент', r.title, objs, r, null),
       '<button class="btn" data-act="closeModal">Закрыть</button>' +
-      '<button class="btn primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button>');
+      (reqSelectedFree(r).length
+        ? '<button class="btn primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку · ' + reqSelectedFree(r).length + '</button>'
+        : '<span class="badge">' + I('lock') + 'Все выбранные объекты уже в сделках</span>'));
   }
   // The КП objects a deal carries — its own frozen snapshot, else (pre-baked demo deals) its request's КП.
   function dealKpObjects(d) {
@@ -12623,7 +12726,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
