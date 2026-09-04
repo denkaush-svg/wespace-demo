@@ -3594,6 +3594,9 @@ setTimeout(async () => {
         win.fetch = (url) => {
           const u = String(url);
           if (/\/health$/.test(u)) return health();
+          /* Считаем ТОЛЬКО попытки спросить. Выгрузка накопленного ходит на /snapshot
+             своим чередом и к повтору запроса отношения не имеет. */
+          if (/\/snapshot$/.test(u)) return Promise.reject(new TypeError('Failed to fetch'));
           asked.push(u);
           return Promise.reject(new TypeError('Failed to fetch'));
         };

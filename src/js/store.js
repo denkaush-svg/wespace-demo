@@ -139,7 +139,7 @@
         eventsPlayed: store.eventsPlayed, feedback: store.feedback, dayStep: store.dayStep,
         /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
            стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
-        signals: store.signals,
+        signals: store.signals, snapSentHash: store.snapSentHash,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -166,6 +166,7 @@
     store.feedback = p.feedback || [];
     store.dayStep = p.dayStep || 0;
     store.signals = p.signals || [];
+    store.snapSentHash = p.snapSentHash || null;
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
     /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
 

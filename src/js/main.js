@@ -790,6 +790,11 @@
     // second at load costs a retry rather than the session; and every failure
     // falls back to the offline planner, which answers the same questions.
     if (WS.live && WS.live.install) WS.live.install();
+    /* Спасение накопленного. Переписка живого брокера существует в одном экземпляре — в его
+       браузере, и раскатка новой сборки её не восстановит: она только не даёт её потерять.
+       Отправляется по изменению содержимого, так что офлайновые ответы, которых нет в
+       серверной стенограмме, тоже доезжают. Отложено, чтобы не занимать первый кадр. */
+    if (WS.live && WS.live.uploadSnapshot) setTimeout(() => WS.live.uploadSnapshot('boot'), 1500);
     /* Границы демо показываются САМИ при первом открытии: человек, которому прислали ссылку,
        занесёт палец над «Отправить» в первую минуту, а не после того, как найдёт справку. */
     if (!store.aboutSeen) { store.aboutSeen = true; api.save(); setTimeout(() => WS.ui.openAbout(), 700); }
