@@ -567,7 +567,15 @@
     /* Если в вопросе названа запись, которая У НАС ЕСТЬ, ответ «такого нет» — ложь.
        Офлайновый планировщик не умеет рассуждать («кому подходит», «как продавать»),
        но он обязан сказать, что запись есть, что по ней известно и что именно он показать может. */
-    const named = namedRecord(text);
+    /* Вопрос ПРО РАЙОН разбирается НИЖЕ и имеет приоритет: «аналитика по Dubai Creek
+       Harbour» по одному корню совпадала с объектом «Creek Rise, Unit 2703» и вместо среза
+       по рынку получала карточку квартиры. Поиск записи — только когда спрашивали не про рынок. */
+    const marketRes = WS.query.run({ from: 'market' });
+    const marketAreas = (marketRes && Array.isArray(marketRes.rows) ? marketRes.rows : [])
+      .map((m) => m.район || m.area || m.name).filter(Boolean);
+    const aboutArea = marketAreas.length &&
+      /район|аналитик|рынок|цена за метр|доходн/i.test(t);
+    const named = aboutArea ? null : namedRecord(text);
     if (named) {
       const r = named.rec;
       const facts = named.kind === 'object'

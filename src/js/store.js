@@ -140,6 +140,9 @@
         /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
            стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
         signals: store.signals, snapSentHash: store.snapSentHash,
+        /* Решённые согласования. Без этого они возвращались в очередь после перезагрузки,
+           а повторное решение дописывало в историю сделки вторую запись о том же самом. */
+        apprDone: store.apprDone,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -167,6 +170,7 @@
     store.dayStep = p.dayStep || 0;
     store.signals = p.signals || [];
     store.snapSentHash = p.snapSentHash || null;
+    store.apprDone = p.apprDone || [];
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
     /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
 
@@ -845,7 +849,9 @@
     if (rec.assignee === userId) return { ok: true, changed: false, rec: rec };
     rec.assignee = userId;
     rec.assignedAt = (WS.fixtures && WS.fixtures.DEMO_NOW) ? 'сегодня' : 'сейчас';
-    if (rec.stage === 'new' || !rec.stage) rec.stage = 'assigned';
+    /* Стадию НЕ трогаем. Назначение и разбор — разные оси: отдать обращение агенту
+     не значит что-то по нему выяснить. Здесь стояло rec.stage = 'assigned' — такой стадии
+     в INBOX_STAGES нет, и назначенное обращение просто исчезало с доски разбора. */
     save();
     return { ok: true, changed: true, rec: rec };
   }

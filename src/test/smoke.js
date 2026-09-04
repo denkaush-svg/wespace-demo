@@ -8556,6 +8556,106 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Находки кросс-модельной вычитки (Codex) ----
+     Девять дефектов, из которых пять внесены правками того же дня. Каждый закреплён
+     проверкой: они прошли 1944 зелёных проверки незамеченными. */
+  {
+    WS.storeApi.resetAll();
+
+    // 1. Защита от двойной отправки читала литерал, а не флаг.
+    check('двойная отправка · WS.engine.inFlight отражает настоящее состояние, а не вечное false',
+      (() => {
+        const d = Object.getOwnPropertyDescriptor(WS.engine, 'inFlight');
+        return !!(d && typeof d.get === 'function');
+      })(), 'сейчас ' + String(WS.engine.inFlight));
+
+    // 2. Назначение не выбивает обращение с доски разбора.
+    {
+      const rec = (dd().inbox || []).filter((x) => !x.assignee)[0];
+      const wasStage = rec.stage;
+      WS.storeApi.assignInbox(rec.id, 'u_ahmed');
+      const stages = WS.fixtures.INBOX_STAGES || ['new', 'unreached', 'qualified', 'rejected'];
+      check('назначение · стадия остаётся из списка допустимых',
+        stages.indexOf(rec.stage) >= 0, 'было ' + wasStage + ', стало ' + rec.stage);
+      check('назначение · агент проставлен', rec.assignee === 'u_ahmed', String(rec.assignee));
+
+      // 3. Счётчики нераспределённых должны уменьшиться.
+      const free = (dd().inbox || []).filter((x) => !x.assignee).length;
+      const all = (dd().inbox || []).length;
+      WS.store.role = 'manager'; WS.router.go('start'); WS.ui.render();
+      const nav = doc.querySelector('[data-nav="leads"] .n, [data-nav="leads"] .count, [data-nav="leads"] span:last-child');
+      const navTxt = (nav && nav.textContent) || '';
+      check('очередь распределения · счётчик считает НЕназначенные, а не всё подряд',
+        free < all && navTxt.indexOf(String(all)) < 0,
+        'свободных ' + free + ' из ' + all + ', в корешке «' + navTxt.trim() + '»');
+      WS.store.role = 'agent';
+    }
+
+    // 4. Решённые согласования переживают перезагрузку.
+    {
+      WS.storeApi.resetAll();
+      const a0 = (dd().approvals || [])[0];
+      WS.ui.resolveApproval(a0.id, 'approve');
+      WS.storeApi.save();
+      const key = (() => {
+        for (let i = 0; i < win.localStorage.length; i++) {
+          const k = win.localStorage.key(i);
+          if ((win.localStorage.getItem(k) || '').indexOf('"schema"') >= 0) return k;
+        }
+        return null;
+      })();
+      const saved = key ? JSON.parse(win.localStorage.getItem(key)) : {};
+      check('согласования · решённое сохраняется, а не возвращается в очередь',
+        Array.isArray(saved.apprDone) && saved.apprDone.indexOf(a0.id) >= 0,
+        JSON.stringify(saved.apprDone));
+    }
+
+    // 5. Исполнитель показа — из ростера, а не из троих.
+    {
+      WS.storeApi.resetAll();
+      const foreign = (dd().deals || []).find((d) => d.agent === 'u_omar' && !WS.ui.dealClosed(d));
+      if (foreign) {
+        WS.ui.openDealShowForm(foreign.id);
+        const sel = doc.getElementById('dsExec');
+        const ids = sel ? [].slice.call(sel.options).map((o) => o.value) : [];
+        check('показ · владелец сделки есть в списке исполнителей',
+          ids.indexOf('u_omar') >= 0, ids.join(', '));
+        check('показ · выбран именно владелец, а не первый по списку',
+          sel && sel.value === 'u_omar', sel ? sel.value : 'нет списка');
+        WS.ui.closeModal();
+      } else {
+        check('показ · владелец сделки есть в списке исполнителей', false, 'нет сделки u_omar для проверки');
+      }
+    }
+
+    // 6. Форма показа сбрасывает слот, а не наследует чужой.
+    {
+      WS.storeApi.resetAll();
+      WS._showSlot = 'заведомо-чужой-слот';
+      WS.ui.openDealShowForm('d_anna');
+      check('показ · форма не наследует время от предыдущей',
+        WS._showSlot !== 'заведомо-чужой-слот', String(WS._showSlot));
+      WS.ui.closeModal();
+    }
+
+    // 7. Вопрос про район не ловится поиском объекта.
+    {
+      WS.storeApi.resetAll();
+      const r = WS.agent.ask('аналитика по Dubai Creek Harbour');
+      const txt = String((r && r.text) || '');
+      check('офлайн · вопрос про район не подменяется карточкой квартиры',
+        !/Такой объект у нас есть/.test(txt), txt.slice(0, 90));
+
+      // Но названный объект по-прежнему опознаётся — ради этого всё и делалось.
+      const r2 = WS.agent.ask('как лучше продавать Creekline Residences, Unit 1208');
+      check('офлайн · названный объект не объявляется отсутствующим',
+        !/Такого у нас в данных нет/.test(String((r2 && r2.text) || '')),
+        String((r2 && r2.text) || '').slice(0, 90));
+    }
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Пульс руководителя и его Консьерж — в том же формате, что у брокера ----
      Два экрана с одним названием были устроены по-разному: у брокера разделы с корешками
      и целями в боковой колонке, у руководителя — плоская простыня плиток. А подсказки

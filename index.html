@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 14:34</title>
+  <title>WESPACE · сборка 15:42</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='14:34';
+    window.WS_BUILD='15:42';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5349,6 +5349,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
            стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
         signals: store.signals, snapSentHash: store.snapSentHash,
+        /* Решённые согласования. Без этого они возвращались в очередь после перезагрузки,
+           а повторное решение дописывало в историю сделки вторую запись о том же самом. */
+        apprDone: store.apprDone,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -5376,6 +5379,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.dayStep = p.dayStep || 0;
     store.signals = p.signals || [];
     store.snapSentHash = p.snapSentHash || null;
+    store.apprDone = p.apprDone || [];
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
     /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
 
@@ -6054,7 +6058,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     if (rec.assignee === userId) return { ok: true, changed: false, rec: rec };
     rec.assignee = userId;
     rec.assignedAt = (WS.fixtures && WS.fixtures.DEMO_NOW) ? 'сегодня' : 'сейчас';
-    if (rec.stage === 'new' || !rec.stage) rec.stage = 'assigned';
+    /* Стадию НЕ трогаем. Назначение и разбор — разные оси: отдать обращение агенту
+     не значит что-то по нему выяснить. Здесь стояло rec.stage = 'assigned' — такой стадии
+     в INBOX_STAGES нет, и назначенное обращение просто исчезало с доски разбора. */
     save();
     return { ok: true, changed: true, rec: rec };
   }
@@ -7519,7 +7525,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     startScenario(id, chainId);
   }
 
-  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply, inFlight: false,
+  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     // Readable and settable: it is conversation state, and the deterministic
@@ -7527,6 +7533,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     // A getter alone meant a test could not set up that situation at all.
     get lastReply() { return engine.lastReply; },
     set lastReply(v) { engine.lastReply = v; },
+    /* Здесь стоял отдельный литерал `inFlight: false`, не связанный ни с чем: настоящий флаг
+       живёт на внутреннем `engine`, и каждая проверка в main.js читала вечное false. Защита
+       от двойной отправки не срабатывала ни разу с момента, как была написана. */
+    get inFlight() { return !!engine.inFlight; },
     openThread, bindThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     pendingAction, setPendingAction, clearPendingAction,
@@ -7947,7 +7957,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
     { id: 'contracts', label: 'Сопровождение', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
-    { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).length },
+    /* Считается то же, что показывает сам раздел, — НЕназначенные. Раньше очередь
+       уменьшалась удалением записи, и счётчик по длине совпадал случайно. Запись больше
+       не удаляется — и счётчик перестал двигаться вовсе. */
+    { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).filter((x) => !x.assignee).length },
     { id: 'approvals', label: 'Согласования', icon: 'check', count: () => (D().approvals || []).filter((a) => !(S().apprDone || []).includes(a.id)).length },
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
   ];
@@ -9620,7 +9633,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       I('calendar') + s[1] + '</button>').join('');
     const rows = objs.map((o) => '<div class="opp-b"><span class="k">' + escAttr(o.name) +
       '</span><span class="v">' + escAttr(o.area || '') + ' · ' + escAttr(o.address || '') + '</span></div>').join('');
-    const team = TEAM.map((x) => '<option value="' + escAttr(x.id) + '"' +
+    /* Из РОСТЕРА, а не из TEAM: TEAM — трое агентов для экранов руководителя, а сделки
+       есть и у u_omar. Его строки в списке не было — браузер выбирал первый пункт, и показ
+       тихо записывался на Марину. */
+    /* Форма НЕ сбрасывала выбранный слот: createDealShow брал тот, что остался от прошлой
+       формы, и сохранённое время расходилось с подсвеченным на экране. */
+    WS._showSlot = SHOW_SLOTS[0][0];
+    const execList = (D().roster && D().roster.length) ? D().roster : TEAM;
+    const team = execList.map((x) => '<option value="' + escAttr(x.id) + '"' +
       (x.id === d.agent ? ' selected' : '') + '>' + escAttr(x.name) + '</option>').join('');
     openModal('Назначить показ · ' + escAttr(c.name || d.title),
       '<div class="rw-lbl">' + I('calendar') + 'Когда</div><div class="qa-row" style="margin-bottom:14px">' + slots + '</div>' +
@@ -9646,7 +9666,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const access = g('dsAccess') || 'подтверждён у представителя объекта';
     const note = g('dsNote') || '';
     const slot = WS._showSlot || SHOW_SLOTS[0][0];
-    const execName = ((TEAM.find((x) => x.id === exec) || {}).name) || exec;
+    const execName = (((D().roster || TEAM).find((x) => x.id === exec) || {}).name) || exec;
     D().events = D().events || [];
     const made = objs.map((o, i) => {
       const ev = {
@@ -18798,7 +18818,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const earned = attr.reduce((s, x) => s + (x.commission || 0), 0) +
       Math.round(deals.filter(dealWon).reduce((s, d) => s + dealCommission(d), 0));
     const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter(dealWon).length;
-    const unassigned = (D().inbox || []).length;
+    const unassigned = (D().inbox || []).filter((x) => !x.assignee).length;
     const atRisk = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
     const avgSla = Math.round(Object.keys(TEAM_META).reduce((s, k) => s + TEAM_META[k].sla, 0) / Object.keys(TEAM_META).length);
     const stuckPred = (SAVED_VIEWS.find((v) => v.k === 'stuck') || {}).pred || (() => false);
@@ -21424,7 +21444,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     /* Если в вопросе названа запись, которая У НАС ЕСТЬ, ответ «такого нет» — ложь.
        Офлайновый планировщик не умеет рассуждать («кому подходит», «как продавать»),
        но он обязан сказать, что запись есть, что по ней известно и что именно он показать может. */
-    const named = namedRecord(text);
+    /* Вопрос ПРО РАЙОН разбирается НИЖЕ и имеет приоритет: «аналитика по Dubai Creek
+       Harbour» по одному корню совпадала с объектом «Creek Rise, Unit 2703» и вместо среза
+       по рынку получала карточку квартиры. Поиск записи — только когда спрашивали не про рынок. */
+    const marketRes = WS.query.run({ from: 'market' });
+    const marketAreas = (marketRes && Array.isArray(marketRes.rows) ? marketRes.rows : [])
+      .map((m) => m.район || m.area || m.name).filter(Boolean);
+    const aboutArea = marketAreas.length &&
+      /район|аналитик|рынок|цена за метр|доходн/i.test(t);
+    const named = aboutArea ? null : namedRecord(text);
     if (named) {
       const r = named.rec;
       const facts = named.kind === 'object'

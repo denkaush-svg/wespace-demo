@@ -111,6 +111,14 @@ const CFG = {
   alertAt: (process.env.WESPACE_PROXY_ALERT_AT || '90,95')
     .split(',').map((s) => Number(s.trim())).filter((n) => n > 0).sort((a, b) => a - b),
   usageFile: process.env.WESPACE_PROXY_USAGE_FILE || path.join(__dirname, 'usage.json'),
+  // Стенограмма обращений. Считать вызовы мало: самое ценное, что даёт живой показ, —
+  // как брокер формулирует задачу СВОИМИ словами и с какого экрана он её ставит.
+  // Пишется дописыванием, одна строка на вызов, и никогда не роняет ответ.
+  transcriptFile: process.env.WESPACE_PROXY_TRANSCRIPT || path.join(__dirname, 'transcript.jsonl'),
+  // Выгрузка накопленного из браузера. Своя граница: снимок рабочего места на порядок
+  // больше вопроса, а общий maxBody (96 КБ) уже впритык к нынешним 87 КБ.
+  snapshotFile: process.env.WESPACE_PROXY_SNAPSHOTS || path.join(__dirname, 'snapshots.jsonl'),
+  maxSnapshot: 4 * 1024 * 1024,
   // Telegram, if the machine has been given the two values. Never in this file
   // and never on a command line: sourced from the environment like the
   // subscription credential, and simply off when absent.
@@ -272,6 +280,13 @@ function telegramSend(text) {
     req.end(body);
     return true;
   } catch (e) { return false; }
+}
+
+function recordCall(rec) {
+  try {
+    rec.ts = new Date().toISOString();
+    fs.appendFileSync(CFG.transcriptFile, JSON.stringify(rec) + String.fromCharCode(10));
+  } catch (e) { /* запись стенограммы никогда не мешает ответу */ }
 }
 
 function isOff() {
@@ -1133,7 +1148,7 @@ function json(res, code, obj) {
   res.end(body);
 }
 
-function readBody(req) {
+function readBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
     // A body that trickles in would otherwise hold a concurrency slot for as
     // long as the request timeout allows.
@@ -1148,7 +1163,7 @@ function readBody(req) {
       size += c.length;
       // Stop keeping it, but keep draining — killing the socket here would
       // take the 400 down with it.
-      if (size > CFG.maxBody) { over = true; parts.length = 0; return; }
+      if (size > (maxBytes || CFG.maxBody)) { over = true; parts.length = 0; return; }
       parts.push(c);
     });
     req.on('end', () => {
@@ -1170,6 +1185,33 @@ function sse(res) {
   return function send(event, data) {
     res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
   };
+}
+
+/* Разовое спасение накопленного: переписка брокера существует в единственном
+   экземпляре — в localStorage его браузера. Стенограмма пишет только ЖИВЫЕ вызовы,
+   поэтому офлайновые ответы сюда же и попадают. Модель не трогается, дневной
+   потолок не расходуется. */
+async function handleSnapshot(req, res) {
+  if (!originAllowed(req)) return json(res, 403, { ok: false, code: 'origin' });
+  if (!takeToken(clientIp(req))) return json(res, 429, { ok: false, code: 'rate' });
+  let body;
+  try { body = await readBody(req, CFG.maxSnapshot); }
+  catch (e) { return json(res, 400, { ok: false, code: 'bad_request' }); }
+  if (!body || typeof body !== 'object') return json(res, 400, { ok: false, code: 'empty' });
+  try {
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      ip: clientIp(req),
+      ua: String(req.headers['user-agent'] || '').slice(0, 200),
+      reason: String(body.reason || '').slice(0, 40),
+      hash: String(body.hash || '').slice(0, 40),
+      payload: body.payload === undefined ? body : body.payload,
+    });
+    fs.appendFileSync(CFG.snapshotFile, line + String.fromCharCode(10));
+    return json(res, 200, { ok: true, bytes: line.length });
+  } catch (e) {
+    return json(res, 500, { ok: false, code: 'write' });
+  }
 }
 
 async function handleAsk(req, res) {
@@ -1216,6 +1258,18 @@ async function handleAsk(req, res) {
   const text = clip(body && body.text, CFG.maxText).trim();
   if (!text) { release(true); return json(res, 400, { ok: false, code: 'empty' }); }
 
+  /* Вопрос, экран, на котором он задан, и открытая запись. Это и есть «семантика
+     запроса»: без экрана «а что по этой сделке?» нечитаемо задним числом. */
+  const rec = {
+    text: text,
+    screen: (body && body.screen) || null,
+    scope: (body && body.scope) || null,
+    pending: (body && body.pending) || null,
+    turns: Array.isArray(body && body.history) ? body.history.length : 0,
+    ua: String(req.headers['user-agent'] || '').slice(0, 120),
+    ip: clientIp(req),
+  };
+
   // From here on the model is actually called, so the day stays charged.
   const send = sse(res);
   let aborted = false;
@@ -1242,10 +1296,19 @@ async function handleAsk(req, res) {
         mode: spec.mode, depth: spec.depth, doc: spec.doc, chat: spec.chat, docWhy: spec.why });
       state.served += 1;
     }
+    rec.ok = true;
+    rec.ms = Date.now() - started;
+    rec.mode = spec.mode; rec.depth = spec.depth;
+    rec.say = String(parts.say == null ? '' : parts.say).slice(0, 6000);
+    rec.plan = parts.plan || null;
+    rec.aborted = aborted;
   } catch (e) {
     bump('model');
+    rec.ok = false;
+    rec.err = String(e.message || e).slice(0, 300);
     if (!aborted) send('error', { code: 'model', error: String(e.message || e).slice(0, 300) });
   } finally {
+    recordCall(rec);
     release();
     res.end();
   }
@@ -1276,6 +1339,7 @@ const server = http.createServer((req, res) => {
     });
   }
   if (req.method === 'POST' && url === '/ask') return handleAsk(req, res);
+  if (req.method === 'POST' && url === '/snapshot') return handleSnapshot(req, res);
 
   return json(res, 404, { ok: false, code: 'not_found' });
 });

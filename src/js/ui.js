@@ -54,7 +54,10 @@
     { id: 'clients', tab: 'deals', label: 'Сделки', icon: 'briefcase', count: () => D().deals.length },
     { id: 'contracts', label: 'Сопровождение', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
-    { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).length },
+    /* Считается то же, что показывает сам раздел, — НЕназначенные. Раньше очередь
+       уменьшалась удалением записи, и счётчик по длине совпадал случайно. Запись больше
+       не удаляется — и счётчик перестал двигаться вовсе. */
+    { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).filter((x) => !x.assignee).length },
     { id: 'approvals', label: 'Согласования', icon: 'check', count: () => (D().approvals || []).filter((a) => !(S().apprDone || []).includes(a.id)).length },
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
   ];
@@ -1727,7 +1730,14 @@
       I('calendar') + s[1] + '</button>').join('');
     const rows = objs.map((o) => '<div class="opp-b"><span class="k">' + escAttr(o.name) +
       '</span><span class="v">' + escAttr(o.area || '') + ' · ' + escAttr(o.address || '') + '</span></div>').join('');
-    const team = TEAM.map((x) => '<option value="' + escAttr(x.id) + '"' +
+    /* Из РОСТЕРА, а не из TEAM: TEAM — трое агентов для экранов руководителя, а сделки
+       есть и у u_omar. Его строки в списке не было — браузер выбирал первый пункт, и показ
+       тихо записывался на Марину. */
+    /* Форма НЕ сбрасывала выбранный слот: createDealShow брал тот, что остался от прошлой
+       формы, и сохранённое время расходилось с подсвеченным на экране. */
+    WS._showSlot = SHOW_SLOTS[0][0];
+    const execList = (D().roster && D().roster.length) ? D().roster : TEAM;
+    const team = execList.map((x) => '<option value="' + escAttr(x.id) + '"' +
       (x.id === d.agent ? ' selected' : '') + '>' + escAttr(x.name) + '</option>').join('');
     openModal('Назначить показ · ' + escAttr(c.name || d.title),
       '<div class="rw-lbl">' + I('calendar') + 'Когда</div><div class="qa-row" style="margin-bottom:14px">' + slots + '</div>' +
@@ -1753,7 +1763,7 @@
     const access = g('dsAccess') || 'подтверждён у представителя объекта';
     const note = g('dsNote') || '';
     const slot = WS._showSlot || SHOW_SLOTS[0][0];
-    const execName = ((TEAM.find((x) => x.id === exec) || {}).name) || exec;
+    const execName = (((D().roster || TEAM).find((x) => x.id === exec) || {}).name) || exec;
     D().events = D().events || [];
     const made = objs.map((o, i) => {
       const ev = {
@@ -10905,7 +10915,7 @@
     const earned = attr.reduce((s, x) => s + (x.commission || 0), 0) +
       Math.round(deals.filter(dealWon).reduce((s, d) => s + dealCommission(d), 0));
     const closedN = attr.reduce((s, x) => s + (x.deals || 0), 0) + deals.filter(dealWon).length;
-    const unassigned = (D().inbox || []).length;
+    const unassigned = (D().inbox || []).filter((x) => !x.assignee).length;
     const atRisk = Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80).length;
     const avgSla = Math.round(Object.keys(TEAM_META).reduce((s, k) => s + TEAM_META[k].sla, 0) / Object.keys(TEAM_META).length);
     const stuckPred = (SAVED_VIEWS.find((v) => v.k === 'stuck') || {}).pred || (() => false);

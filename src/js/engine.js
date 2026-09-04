@@ -1167,7 +1167,7 @@
     startScenario(id, chainId);
   }
 
-  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply, inFlight: false,
+  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     // Readable and settable: it is conversation state, and the deterministic
@@ -1175,6 +1175,10 @@
     // A getter alone meant a test could not set up that situation at all.
     get lastReply() { return engine.lastReply; },
     set lastReply(v) { engine.lastReply = v; },
+    /* Здесь стоял отдельный литерал `inFlight: false`, не связанный ни с чем: настоящий флаг
+       живёт на внутреннем `engine`, и каждая проверка в main.js читала вечное false. Защита
+       от двойной отправки не срабатывала ни разу с момента, как была написана. */
+    get inFlight() { return !!engine.inFlight; },
     openThread, bindThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     pendingAction, setPendingAction, clearPendingAction,
