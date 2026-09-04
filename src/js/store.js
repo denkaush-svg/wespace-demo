@@ -128,6 +128,20 @@
   function emit() { subs.forEach((fn) => fn(store)); }
 
   // ---- persistence
+  /* Сквозные идентификаторы. Адрес и строка браузера не связывают события надёжно:
+     адрес меняется, строка одинакова у многих. Без устойчивого ключа два устройства одного
+     человека читаются как два разных человека, а переформулировку не связать с тем, что её вызвало. */
+  function rid(p) {
+    return p + '_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  }
+  const SESSION_ID = rid('s');
+  let turnSeq = 0;
+  function ids() {
+    if (!store.installId) { store.installId = rid('i'); save(); }
+    return { installId: store.installId, sessionId: SESSION_ID };
+  }
+  function nextTurnId() { turnSeq += 1; return SESSION_ID + '.' + turnSeq; }
+
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
@@ -139,7 +153,7 @@
         eventsPlayed: store.eventsPlayed, feedback: store.feedback, dayStep: store.dayStep,
         /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
            стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
-        signals: store.signals, snapSentHash: store.snapSentHash,
+        signals: store.signals, snapSentHash: store.snapSentHash, installId: store.installId,
         /* Решённые согласования. Без этого они возвращались в очередь после перезагрузки,
            а повторное решение дописывало в историю сделки вторую запись о том же самом. */
         apprDone: store.apprDone,
@@ -171,6 +185,7 @@
     store.signals = p.signals || [];
     store.snapSentHash = p.snapSentHash || null;
     store.apprDone = p.apprDone || [];
+    store.installId = p.installId || null;
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
     /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
 
@@ -858,7 +873,7 @@
 
   WS.store = store;
   WS.storeApi = {
-    boot, subscribe, emit, save, resetAll, resetScene, assignInbox,
+    boot, subscribe, emit, save, resetAll, resetScene, assignInbox, ids, nextTurnId,
     setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});

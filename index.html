@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 15:42</title>
+  <title>WESPACE · сборка 16:38</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='15:42';
+    window.WS_BUILD='16:38';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5337,6 +5337,20 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function emit() { subs.forEach((fn) => fn(store)); }
 
   // ---- persistence
+  /* Сквозные идентификаторы. Адрес и строка браузера не связывают события надёжно:
+     адрес меняется, строка одинакова у многих. Без устойчивого ключа два устройства одного
+     человека читаются как два разных человека, а переформулировку не связать с тем, что её вызвало. */
+  function rid(p) {
+    return p + '_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  }
+  const SESSION_ID = rid('s');
+  let turnSeq = 0;
+  function ids() {
+    if (!store.installId) { store.installId = rid('i'); save(); }
+    return { installId: store.installId, sessionId: SESSION_ID };
+  }
+  function nextTurnId() { turnSeq += 1; return SESSION_ID + '.' + turnSeq; }
+
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
@@ -5348,7 +5362,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         eventsPlayed: store.eventsPlayed, feedback: store.feedback, dayStep: store.dayStep,
         /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
            стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
-        signals: store.signals, snapSentHash: store.snapSentHash,
+        signals: store.signals, snapSentHash: store.snapSentHash, installId: store.installId,
         /* Решённые согласования. Без этого они возвращались в очередь после перезагрузки,
            а повторное решение дописывало в историю сделки вторую запись о том же самом. */
         apprDone: store.apprDone,
@@ -5380,6 +5394,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.signals = p.signals || [];
     store.snapSentHash = p.snapSentHash || null;
     store.apprDone = p.apprDone || [];
+    store.installId = p.installId || null;
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
     /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
 
@@ -6067,7 +6082,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
 
   WS.store = store;
   WS.storeApi = {
-    boot, subscribe, emit, save, resetAll, resetScene, assignInbox,
+    boot, subscribe, emit, save, resetAll, resetScene, assignInbox, ids, nextTurnId,
     setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});
@@ -21737,6 +21752,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         const reply = await asyncHead(clean, opts || {});
         if (reply && reply.kind) {
           if (!Array.isArray(reply.next) || !reply.next.length) reply.next = suggestions();
+          /* Кто ответил. Без этой пометки дефекты модели, инструкции, сети и офлайнового
+             планировщика смешиваются в один класс, и любой замер качества мерит смесь причин. */
+          reply.source = 'live';
           return reply;
         }
       } catch (e) {
@@ -21748,8 +21766,15 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       // built to make invisible to a visitor — and therefore the one most worth
       // counting, because nothing else about the answer will say it happened.
       note('fallback');
+      const off = ask(clean);
+      off.source = 'offline';
+      off.fallbackReason = (WS.live && WS.live.lastFailure) ? WS.live.lastFailure() : 'unreachable';
+      return off;
     }
-    return ask(clean);
+    const plain = ask(clean);
+    plain.source = 'offline';
+    plain.fallbackReason = 'no_live_head';
+    return plain;
   }
 
   // Synchronous for the deterministic head. When the live model is wired in it
@@ -22916,7 +22941,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
         // На что смотрит агент прямо сейчас. Без этого «а по этой сделке что?» приходило без
         // подлежащего: тред у модели был, экрана — нет, и она честно отвечала, что не поняла.
-        screen: screen(), pending: pendingAction(), lang: langs(text) }, composer())),
+        screen: screen(), pending: pendingAction(), lang: langs(text),
+        // Сквозные ключи: связать ходы в один разговор и разговоры — в одно рабочее место.
+        ids: (WS.storeApi && WS.storeApi.ids) ? WS.storeApi.ids() : null,
+        turnId: (WS.storeApi && WS.storeApi.nextTurnId) ? WS.storeApi.nextTurnId() : null,
+        build: (document.body && document.body.getAttribute('data-build')) || null }, composer())),
     });
   }
 
@@ -23082,6 +23111,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         feedback: st.feedback || [],
         eventsPlayed: st.eventsPlayed || [],
         role: st.role, view: st.view,
+        ids: (WS.storeApi && WS.storeApi.ids) ? WS.storeApi.ids() : null,
         migratedKeys: st.migratedKeys || null,
         build: (document.body && document.body.getAttribute('data-build')) || null,
       };
@@ -23141,6 +23171,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return 'fallback_model';
   }
 
+  /* Почему ответил не живой слой. Без причины пометка «офлайн» говорит, что сломалось,
+     но не говорит где: сеть, потолок, окно отказа или ошибка самой модели. */
+  function lastFailure() {
+    if (cfg.downUntil && cfg.downUntil > Date.now()) return 'standdown:' + (cfg.lastError || '');
+    return cfg.lastError || 'unreachable';
+  }
+
   function noteFailure(why, err) {
     // Our own refusal during the window: not new evidence the service is down,
     // and counting it would inflate whichever reason armed the window.
@@ -23167,7 +23204,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   }
 
   WS.live = {
-    ask, probe, install, uploadSnapshot, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
+    ask, probe, install, uploadSnapshot, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, lastFailure, disable, composer, langs, langOf, reportProse,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

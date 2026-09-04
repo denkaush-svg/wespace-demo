@@ -1266,6 +1266,11 @@ async function handleAsk(req, res) {
     scope: (body && body.scope) || null,
     pending: (body && body.pending) || null,
     turns: Array.isArray(body && body.history) ? body.history.length : 0,
+    // Сквозные ключи: связать ходы в разговор, разговоры — в рабочее место,
+    // и всё это — с версией сборки, которая так ответила.
+    ids: (body && body.ids) || null,
+    turnId: (body && body.turnId) || null,
+    build: (body && body.build) || null,
     ua: String(req.headers['user-agent'] || '').slice(0, 120),
     ip: clientIp(req),
   };

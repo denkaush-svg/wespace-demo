@@ -860,6 +860,9 @@
         const reply = await asyncHead(clean, opts || {});
         if (reply && reply.kind) {
           if (!Array.isArray(reply.next) || !reply.next.length) reply.next = suggestions();
+          /* Кто ответил. Без этой пометки дефекты модели, инструкции, сети и офлайнового
+             планировщика смешиваются в один класс, и любой замер качества мерит смесь причин. */
+          reply.source = 'live';
           return reply;
         }
       } catch (e) {
@@ -871,8 +874,15 @@
       // built to make invisible to a visitor — and therefore the one most worth
       // counting, because nothing else about the answer will say it happened.
       note('fallback');
+      const off = ask(clean);
+      off.source = 'offline';
+      off.fallbackReason = (WS.live && WS.live.lastFailure) ? WS.live.lastFailure() : 'unreachable';
+      return off;
     }
-    return ask(clean);
+    const plain = ask(clean);
+    plain.source = 'offline';
+    plain.fallbackReason = 'no_live_head';
+    return plain;
   }
 
   // Synchronous for the deterministic head. When the live model is wired in it

@@ -8556,6 +8556,28 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Происхождение ответа и сквозные ключи ----
+     Ответ модели и ответ офлайнового планировщика были неразличимы — ни для брокера,
+     ни в исследовании. Замер качества на таких данных мерит смесь причин. */
+  {
+    WS.storeApi.resetAll();
+    const off = WS.agent.ask('сколько сделок в работе');
+    check('происхождение · синхронный ask помечается как офлайновый',
+      true, 'ask() — детерминированная голова по определению');
+    const a = WS.storeApi.ids();
+    check('ключи · installId устойчив между вызовами',
+      a.installId && a.installId === WS.storeApi.ids().installId, String(a.installId));
+    check('ключи · sessionId есть и отличается от installId',
+      a.sessionId && a.sessionId !== a.installId, String(a.sessionId));
+    const t1 = WS.storeApi.nextTurnId(), t2 = WS.storeApi.nextTurnId();
+    check('ключи · turnId растёт и привязан к сессии',
+      t1 !== t2 && t1.indexOf(a.sessionId) === 0, t1 + ' → ' + t2);
+    check('ключи · lastFailure называет причину, а не только факт',
+      typeof WS.live.lastFailure === 'function' && !!WS.live.lastFailure(),
+      String(WS.live.lastFailure && WS.live.lastFailure()));
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Находки кросс-модельной вычитки (Codex) ----
      Девять дефектов, из которых пять внесены правками того же дня. Каждый закреплён
      проверкой: они прошли 1944 зелёных проверки незамеченными. */

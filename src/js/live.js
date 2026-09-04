@@ -888,7 +888,11 @@
       body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
         // На что смотрит агент прямо сейчас. Без этого «а по этой сделке что?» приходило без
         // подлежащего: тред у модели был, экрана — нет, и она честно отвечала, что не поняла.
-        screen: screen(), pending: pendingAction(), lang: langs(text) }, composer())),
+        screen: screen(), pending: pendingAction(), lang: langs(text),
+        // Сквозные ключи: связать ходы в один разговор и разговоры — в одно рабочее место.
+        ids: (WS.storeApi && WS.storeApi.ids) ? WS.storeApi.ids() : null,
+        turnId: (WS.storeApi && WS.storeApi.nextTurnId) ? WS.storeApi.nextTurnId() : null,
+        build: (document.body && document.body.getAttribute('data-build')) || null }, composer())),
     });
   }
 
@@ -1054,6 +1058,7 @@
         feedback: st.feedback || [],
         eventsPlayed: st.eventsPlayed || [],
         role: st.role, view: st.view,
+        ids: (WS.storeApi && WS.storeApi.ids) ? WS.storeApi.ids() : null,
         migratedKeys: st.migratedKeys || null,
         build: (document.body && document.body.getAttribute('data-build')) || null,
       };
@@ -1113,6 +1118,13 @@
     return 'fallback_model';
   }
 
+  /* Почему ответил не живой слой. Без причины пометка «офлайн» говорит, что сломалось,
+     но не говорит где: сеть, потолок, окно отказа или ошибка самой модели. */
+  function lastFailure() {
+    if (cfg.downUntil && cfg.downUntil > Date.now()) return 'standdown:' + (cfg.lastError || '');
+    return cfg.lastError || 'unreachable';
+  }
+
   function noteFailure(why, err) {
     // Our own refusal during the window: not new evidence the service is down,
     // and counting it would inflate whichever reason armed the window.
@@ -1139,7 +1151,7 @@
   }
 
   WS.live = {
-    ask, probe, install, uploadSnapshot, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
+    ask, probe, install, uploadSnapshot, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, lastFailure, disable, composer, langs, langOf, reportProse,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
