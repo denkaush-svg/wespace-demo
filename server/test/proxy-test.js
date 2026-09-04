@@ -369,6 +369,51 @@ async function modelChecks() {
   budgetChecks();
 }
 
+/* ---------- the wait, made observable ----------
+
+   The browser shows one spinner for the whole call today, and the only stage
+   the server ever announces is 'web' — everything else (accepted, the model
+   actually starting) is invisible, so a broker watching the Concierge cannot
+   tell «taken» from «thinking» from «stuck». These checks encode the new
+   stage contract from the intent: accepted arrives before any model text,
+   model_started arrives after acceptance, and acceptance carries the
+   mode/depth the server actually resolved — the acceptance criterion is
+   literally «the accepted server mode/depth is visible». None of this exists
+   in server/proxy.js yet: onStage is called only for 'web' (grep confirms
+   it), so every check below is expected to fail against the current code. */
+async function stageChecks() {
+  const P = require('../proxy.js');
+  refill();
+  let res = await ask({ text: 'вопрос про стадии', mode: 'roi', depth: 'deep' });
+  let evs = events(res.body);
+  const acceptedIdx = evs.findIndex((e) => e.event === 'stage' && e.data && e.data.k === 'accepted');
+  const startedIdx = evs.findIndex((e) => e.event === 'stage' && e.data && e.data.k === 'model_started');
+  const firstDeltaIdx = evs.findIndex((e) => e.event === 'delta');
+  const shape = evs.map((e) => e.event + (e.data && e.data.k ? ':' + e.data.k : '')).join(',');
+
+  ok('the server announces acceptance, and before any model text arrives',
+    acceptedIdx >= 0 && (firstDeltaIdx < 0 || acceptedIdx < firstDeltaIdx),
+    'events=' + shape);
+  ok('the server announces the model actually starting, after acceptance and no later than the first text',
+    startedIdx >= 0 && startedIdx > acceptedIdx && (firstDeltaIdx < 0 || startedIdx <= firstDeltaIdx),
+    'events=' + shape);
+
+  const expect = P.resolveCall({ mode: 'roi', depth: 'deep' });
+  const acc = evs.find((e) => e.event === 'stage' && e.data && e.data.k === 'accepted');
+  ok('acceptance carries the mode/depth the server actually resolved, not just a bare «waiting»',
+    !!acc && acc.data.mode === expect.mode && acc.data.depth === expect.depth,
+    JSON.stringify(acc && acc.data) + ' expected mode=' + expect.mode + ' depth=' + expect.depth);
+
+  // A short question still gets the courtesy of "accepted" — this is not
+  // conditional on the reply being long enough to make a spinner worthwhile.
+  refill();
+  res = await ask({ text: 'да' }, 'plain');
+  evs = events(res.body);
+  ok('even a call that answers in one shot was told it was accepted first',
+    evs.some((e) => e.event === 'stage' && e.data && e.data.k === 'accepted'),
+    'events=' + evs.map((e) => e.event).join(','));
+}
+
 /* ---------- the smoke detector ----------
 
    The endpoint is public and the subscription is shared. A door was one answer;
@@ -661,6 +706,44 @@ async function guardChecks() {
       freed, 'inFlight=' + state.inFlight + ' was=' + before);
   }
 
+  /* Stronger than the counter above: the acceptance criterion is "frees the
+     server's concurrency slot", i.e. a REAL follow-up call gets to run, not
+     merely that a number resets. This is what a Cancel button has to buy —
+     res.on('close') -> call.cancel() already exists in handleAsk today, so
+     unlike the stage checks above this one is expected to PASS against the
+     current code; it earns its place by being the one thing this task's
+     mutation pass has to prove, not by being new. */
+  {
+    refill();
+    const conWas = CFG.concurrency;
+    CFG.concurrency = 1;
+    process.env.FAKE_CLI_MODE = 'slow';
+    const before = state.inFlight;
+    await new Promise((resolve) => {
+      const r = http.request({ host: '127.0.0.1', port: PORT, method: 'POST', path: '/ask',
+        headers: { 'content-type': 'application/json' } }, () => {});
+      r.on('error', () => {});
+      r.write(JSON.stringify({ text: 'отменяемый вопрос' }));
+      r.end();
+      setTimeout(() => { r.destroy(); resolve(); }, 350);
+    });
+    // Wait for the close to be noticed (as the existing test above does), THEN
+    // make exactly one follow-up call — repeated calls here would themselves
+    // trip the per-IP burst guard and produce a false failure unrelated to
+    // concurrency at all.
+    let freed = false;
+    for (let i = 0; i < 40 && !freed; i++) {
+      await new Promise((r2) => setTimeout(r2, 50));
+      freed = state.inFlight === before;
+    }
+    refill();
+    const res2 = await ask({ text: 'после отмены' }, 'ok');
+    ok('cancelling one call lets the very next one actually run, not just reset a counter',
+      freed && res2.status === 200 && /event: done/.test(res2.body),
+      'freed=' + freed + ' status=' + res2.status);
+    CFG.concurrency = conWas;
+  }
+
   refill();
   const tWas = CFG.callTimeoutMs;
   CFG.callTimeoutMs = 700;
@@ -711,6 +794,7 @@ async function guardChecks() {
   try {
     await httpChecks();
     await modelChecks();
+    await stageChecks();
     await guardChecks();
   } finally {
     server.close();

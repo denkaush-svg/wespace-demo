@@ -1,0 +1,13 @@
+npm test && npm run test:proxy && node src/test/live-ux.js
+
+> wespace-demo@1.0.0 test
+> node src/test/smoke.js && node src/test/acceptance-audience.js && node src/test/acceptance-incident-consent.js
+
+checks: 1954  passed: 1950  FAILED: 4
+
+--- failures ---
+  ✗ turn-state · Enter in a busy thread must not start a second call (main.js:613 has no guard)  [calls=2]
+  ✗ turn-state · a different, idle thread is not blocked by another thread being busy  [calls=1]
+  ✗ turn-state · the waiting card offers a way to cancel the request  [buttons on card: ]
+  ✗ turn-state · the accepted mode/depth is shown on the waiting card, not just a spinner  [card text:  текствопрос КонсьержРазбираю запросСмотрю рабочее место10 сделок — суммы, стадии, сроки шагов · Формулирую ответ]
+RC=1

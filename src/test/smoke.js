@@ -3934,6 +3934,147 @@ setTimeout(async () => {
   }
 
   // ============================================================
+  //  Waiting for the Concierge — one call per THREAD, not one call for the
+  //  whole app. engine.inFlight is a single flat boolean today (see the WS.engine
+  //  export at the bottom of engine.js) and only the CLICK handlers in main.js
+  //  read it — the Enter-key handlers (main.js:612-616) call routePrompt directly
+  //  with no guard at all. Two failures fall out of that, reproduced below against
+  //  the real send paths (dispatched DOM events — routePrompt() itself is left
+  //  unguarded on purpose, see the comment above main.js's handleAct switch, so
+  //  calling it directly would not exercise the guard being tested):
+  //    - Enter in a busy thread starts a second call instead of being blocked
+  //    - being busy in one thread blocks a completely different, idle thread
+  //
+  //  The guard checks below stub engine.freeReply itself (same convention as the
+  //  "routing" block above) instead of waiting on askAsync: freeReply flips
+  //  engine.inFlight = true synchronously, before its own internal delay(60) +
+  //  delay(500) setup (engine.js ~line 690-700) ever runs. Waiting on askAsync
+  //  there would mean waiting on that fixed ~560ms for no reason. Real per-block
+  //  waits are reserved for the two checks that need freeReply's actual rendered
+  //  card (cancel button, stage callback) — that card cannot exist before the
+  //  setup delay elapses, guard or not.
+  // ============================================================
+  if (eng && typeof eng.openThread === 'function' && WS.agent && typeof WS.agent.setAsyncHead === 'function'
+      && typeof WS.router.go === 'function') {
+    const cgSendBtn = () => doc.querySelector('[data-act="cgSend"]');
+    const type = (v) => { const el = doc.getElementById('cgPrompt'); if (el) el.value = v; };
+    const clickSend = () => { const b = cgSendBtn(); if (b) b.dispatchEvent(new win.MouseEvent('click', { bubbles: true })); };
+    const pressEnter = () => {
+      const el = doc.getElementById('cgPrompt');
+      if (el) el.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    };
+    const realFreeReply = eng.freeReply;
+    // A stand-in for freeReply that only reproduces the one side effect the guard
+    // in main.js actually reads (engine.inFlight), synchronously — no real timers.
+    const stubFreeReply = () => {
+      let calls = 0; const resolvers = [];
+      eng.freeReply = () => { calls++; WS.engine.inFlight = true; resolvers.push(() => { WS.engine.inFlight = false; }); };
+      return { count: () => calls, settleAll: () => resolvers.forEach((f) => f()) };
+    };
+    const waitPastSetup = () => new Promise((r) => setTimeout(r, 750)); // > freeReply's delay(60)+delay(500)
+    const waitPastFlash = () => new Promise((r) => setTimeout(r, 220)); // > freeReply's own 180ms post-reply delay
+
+    // ---- the existing click guard already blocks a second Send in a busy thread ----
+    {
+      eng.openThread('probe:turnClick', 'Турн · клик', 'sparkle');
+      WS.router.go('concierge');
+      const stub = stubFreeReply();
+      type('первый вопрос'); clickSend();
+      check('turn-state · sending starts exactly one call', stub.count() === 1, 'calls=' + stub.count());
+      type('второй, пока первый висит'); clickSend();
+      check('turn-state · a second Send click in a busy thread is blocked (existing guard)',
+        stub.count() === 1, 'calls=' + stub.count());
+      stub.settleAll();
+      check('turn-state · the thread is free again once the call settles', WS.engine.inFlight === false,
+        'inFlight=' + WS.engine.inFlight);
+      eng.closeThread('probe:turnClick');
+      eng.freeReply = realFreeReply;
+    }
+
+    // ---- Enter takes a path the click guard does not cover ----
+    {
+      eng.openThread('probe:turnEnter', 'Турн · Enter', 'sparkle');
+      WS.router.go('concierge');
+      const stub = stubFreeReply();
+      type('первый вопрос'); clickSend();
+      check('turn-state · setup: the thread is busy after the first send', stub.count() === 1, 'calls=' + stub.count());
+      type('второй, через Enter, пока первый висит'); pressEnter();
+      check('turn-state · Enter in a busy thread must not start a second call (main.js:613 has no guard)',
+        stub.count() === 1, 'calls=' + stub.count());
+      stub.settleAll();
+      eng.closeThread('probe:turnEnter');
+      eng.freeReply = realFreeReply;
+    }
+
+    // ---- being busy in thread A must not block a different, idle thread B ----
+    // (per-turn state, not a global field — that is the point of this task)
+    {
+      eng.openThread('probe:turnA', 'Турн А', 'sparkle');
+      WS.router.go('concierge');
+      const stub = stubFreeReply();
+      type('вопрос в А'); clickSend();
+      check('turn-state · setup: thread A is now busy', stub.count() === 1, 'calls=' + stub.count());
+
+      eng.openThread('probe:turnB', 'Турн Б', 'sparkle');
+      WS.router.go('concierge');
+      type('вопрос в Б, пока А занят'); clickSend();
+      check('turn-state · a different, idle thread is not blocked by another thread being busy',
+        stub.count() === 2, 'calls=' + stub.count());
+
+      stub.settleAll();
+      eng.closeThread('probe:turnA'); eng.closeThread('probe:turnB');
+      eng.freeReply = realFreeReply;
+    }
+
+    // ---- the waiting card offers no way out today ----
+    {
+      eng.openThread('probe:turnCancel', 'Турн · отмена', 'sparkle');
+      WS.router.go('concierge');
+      let settle;
+      WS.agent.setAsyncHead(() => new Promise((res) => { settle = res; }));
+      type('долгий вопрос'); clickSend();
+      await waitPastSetup();
+      const chat = doc.getElementById('chat');
+      const buttons = chat ? [].slice.call(chat.querySelectorAll('button')) : [];
+      const cancelBtn = buttons.find((b) => /отменить/i.test(b.textContent || ''));
+      check('turn-state · the waiting card offers a way to cancel the request',
+        !!cancelBtn, 'buttons on card: ' + buttons.map((b) => b.textContent).join(' | '));
+      if (settle) settle({ kind: 'answer', text: 'готово', evidence: [], next: [] });
+      await waitPastFlash();
+      eng.closeThread('probe:turnCancel');
+      WS.agent.setAsyncHead(null);
+    }
+
+    // ---- acceptance is meant to carry mode/depth so the card can show them,
+    //      not just a spinner (acceptance criterion: "the accepted server
+    //      mode/depth is visible"). onStage today takes a bare string key and
+    //      only ever reacts to 'web' (engine.js freeReply) — nothing renders
+    //      mode/depth even if the transport told it. ----
+    {
+      eng.openThread('probe:turnAccept', 'Турн · accepted', 'sparkle');
+      WS.router.go('concierge');
+      let stageFn; let settle;
+      WS.agent.setAsyncHead((t, opts) => { stageFn = opts && opts.onStage; return new Promise((res) => { settle = res; }); });
+      type('вопрос'); clickSend();
+      await waitPastSetup();
+      check('turn-state · freeReply hands askAsync a stage callback', typeof stageFn === 'function');
+      if (typeof stageFn === 'function') {
+        stageFn({ k: 'accepted', mode: 'roi', depth: 'deep' });
+        const chat = doc.getElementById('chat');
+        const shown = chat ? (chat.textContent || '') : '';
+        check('turn-state · the accepted mode/depth is shown on the waiting card, not just a spinner',
+          /roi|deep|инвест|глубок/i.test(shown), 'card text: ' + shown.slice(0, 200));
+      }
+      if (settle) settle({ kind: 'answer', text: 'готово', evidence: [], next: [] });
+      await waitPastFlash();
+      eng.closeThread('probe:turnAccept');
+      WS.agent.setAsyncHead(null);
+    }
+  } else {
+    check('turn-state · concierge composer is reachable for testing', false);
+  }
+
+  // ============================================================
   //  Language. The one parameter of a document nobody computed. The prompt
   //  bound the language of the CHAT reply and told the model of the file only
   //  that it goes to the client without them — recipient named, language not.
