@@ -7317,7 +7317,11 @@ setTimeout(async () => {
        область у каждого названа и что части сходятся в целое. */
     {
       const wasRole = WS.store.role;
-      WS.store.role = 'manager'; WS.router.go('start'); WS.ui.render();
+      /* Пульс руководителя переведён на ту же раскладку, что у брокера: разделы с корешками,
+         а не одна простыня. Плитки отдела живут в «Аналитике» — раздел выбирается явно, иначе
+         проверка меряет раздел «Требует решения», в котором их и не должно быть. */
+      WS.store.role = 'manager'; WS.store.pulseSection = 'analytics';
+      WS.router.go('start'); WS.ui.render();
       const t2 = (doc.getElementById('main') || doc.body).textContent.replace(/\s+/g, ' ');
       /* Разбирается РАЗМЕТКА, а не склеенный текст экрана: в строке «Закрыто в самом стенде
          1 1 750 000 AED» соседние числа сливаются, и первая версия этой проверки прочитала
@@ -7344,7 +7348,8 @@ setTimeout(async () => {
         !!depM && !!bookM && canonN !== null &&
         Number(depM[1]) === Number(bookM[1]) + canonN && Number(depM[2]) === canonN,
         depM ? depM[1] + ' = ' + (bookM ? bookM[1] : '?') + ' + ' + canonN : 'не разобрано');
-      WS.store.role = wasRole; WS.router.go('start'); WS.ui.render();
+      WS.store.role = wasRole; WS.store.pulseSection = null;
+      WS.router.go('start'); WS.ui.render();
     }
     /* Одно понятие — одно слово, и русское, раз оно есть. «Пайплайн» стоял рядом с
        «активными сделками» и «сделками в работе» на одном и том же экране. */
@@ -8547,6 +8552,57 @@ setTimeout(async () => {
   }
 
   const appEl2 = () => doc.getElementById('app');
+
+  /* ---- Пульс руководителя и его Консьерж — в том же формате, что у брокера ----
+     Два экрана с одним названием были устроены по-разному: у брокера разделы с корешками
+     и целями в боковой колонке, у руководителя — плоская простыня плиток. А подсказки
+     Консьержа предлагали руководителю собрать КП по чужой клиентке и спросить про «мои
+     сделки», которых у него нет. */
+  {
+    const wasRole = WS.store.role;
+
+    WS.store.role = 'manager'; WS.store.pulseSection = null;
+    WS.router.go('start'); WS.ui.render();
+    const app = doc.getElementById('app');
+    check('Пульс руководителя · та же раскладка с боковой колонкой, что у брокера',
+      !!app.querySelector('.psec') && !!app.querySelector('.psec-side') && !!app.querySelector('.psec-body'),
+      'psec=' + !!app.querySelector('.psec'));
+    const tabs = [].slice.call(app.querySelectorAll('.psec-tab'))
+      .map((b) => (b.textContent || '').replace(/\s+/g, ' ').trim());
+    check('Пульс руководителя · четыре своих раздела, не брокерские',
+      tabs.length === 4 && /Требует решения/.test(tabs.join(' ')) &&
+      !/Мои дела|Перспективные сделки/.test(tabs.join(' ')), tabs.join(' | '));
+    check('Пульс руководителя · цели стоят в боковой колонке, как у брокера',
+      !!app.querySelector('.psec-side .pgoal'), 'pgoal в side');
+
+    // Каждый раздел что-то рисует, а не падает.
+    ['decide', 'risk', 'team', 'analytics'].forEach((k) => {
+      WS.store.pulseSection = k; WS.ui.render();
+      const body = doc.getElementById('app').querySelector('.psec-body');
+      const len = ((body || {}).textContent || '').replace(/\s+/g, ' ').trim().length;
+      check('Пульс руководителя · раздел «' + k + '» наполнен', len > 60, 'длина ' + len);
+    });
+
+    // Подсказки Консьержа говорят о работе руководителя, а не брокера.
+    WS.store.pulseSection = null;
+    WS.engine.closeThread && WS.engine.closeThread();
+    WS.router.go('concierge'); WS.ui.render();
+    const cgTxt = (doc.getElementById('app').textContent || '').replace(/\s+/g, ' ');
+    check('Консьерж руководителя · не предлагает чужую брокерскую работу',
+      !/Собрать КП по /.test(cgTxt) && !/по моим сделкам/.test(cgTxt),
+      cgTxt.slice(0, 120));
+    check('Консьерж руководителя · говорит, что видит отдел',
+      /отдел/.test(cgTxt), cgTxt.slice(0, 140));
+
+    WS.store.role = 'agent'; WS.store.pulseSection = null;
+    WS.router.go('concierge'); WS.ui.render();
+    const cgAgent = (doc.getElementById('app').textContent || '').replace(/\s+/g, ' ');
+    check('Консьерж брокера · по-прежнему про его собственную работу',
+      /ваши сделки/.test(cgAgent), cgAgent.slice(0, 120));
+
+    WS.store.role = wasRole; WS.store.pulseSection = null;
+    WS.router.go('start'); WS.ui.render();
+  }
 
   /* ---- Согласования: стабильные ID, решение пишется в историю сделки ----
      Старый код хранил согласования в MGR_APPROVALS с числовыми индексами: перестановка пунктов

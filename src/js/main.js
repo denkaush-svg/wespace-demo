@@ -178,6 +178,7 @@
       const p = d.leadassign.split('~~');
       const res = api.assignInbox(p[0], p[1]);
       if (!res.ok) { api.toast('Не удалось назначить: не найден ' + res.what); return api.emit(); }
+      if (WS.ui.closeModal) WS.ui.closeModal();
       const who = ((store.data.roster || []).find((x) => x.id === p[1]) || {}).name || p[1];
       api.toast(res.changed ? 'Обращение назначено: ' + who : 'Уже назначено: ' + who, 'ok');
       return api.emit();
@@ -340,6 +341,7 @@
       case 'navBack': WS.router.back(); break;
       case 'about': WS.ui.openAbout(); break;
       case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
+      case 'inboxAssign': WS.ui.openInboxAssign(t.dataset.inbox); break;
       case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;
       case 'createDealShow': WS.ui.createDealShow(t.dataset.deal); break;
       case 'calShow': WS.ui.openCalendarShowPicker(); break;

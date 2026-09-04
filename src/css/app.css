@@ -186,6 +186,7 @@ button { font-family: inherit; cursor: pointer; }
 .psec-side .pgoal-k { font-size: 11px; }
 .psec-side .pgoal-v { font-size: 12px; }
 .psec-side .pgoal-foot { padding: 7px 13px 10px; font-size: 11px; }
+.psec-side .pgoal-bar { margin: 0 13px; }
 .psec-side .pgoal-drill { display: none; }
 .psec-side .btn.sm { display: none; }
 
@@ -420,19 +421,22 @@ button { font-family: inherit; cursor: pointer; }
 .pgoal { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
   overflow: hidden; box-shadow: var(--shadow-sm); margin-top: 10px; }
 .pgoal-row + .pgoal-row { border-top: 1px solid var(--line); }
-.pgoal-cells { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 18px 11px;
-  background: var(--surface-2); }
+/* Одна поверхность на всю строку. Серая шапка поверх белого подвала резала карточку
+   надвое по горизонтали: на узком экране, где ячейки встают в колонку, шапка становится
+   высокой, и граница читается как две разные карточки, слипшиеся боками. Мерило
+   здесь — полоса, а не заливка; фон у строки один. */
+.pgoal-cells { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 18px 11px; }
 @media (max-width: 719.98px) { .pgoal-cells { grid-template-columns: 1fr; gap: 8px; } }
 .pgoal-cell { min-width: 0; }
 .pgoal-k { font-size: 15px; font-weight: 750; color: var(--ink); line-height: 1.3; }
 .pgoal-v { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
 /* Двухцветная линия: сделанное — акцентом, остаток — своей дорожкой. Один элемент, две части. */
-.pgoal-bar { height: 9px; background: var(--acc-soft); }
+.pgoal-bar { height: 8px; background: var(--acc-soft); margin: 0 18px; border-radius: 999px; }
 .pgoal-bar > i { display: block; height: 100%; background: var(--acc); transition: width .35s var(--ease); }
 /* В этой палитре --warn — цвет ТЕКСТА (тёмно-коричневый для контраста на светлом), и
    заливка полосы им читается как грязь. Для заливки нужен собственный янтарный. */
 .pgoal-row.is-behind .pgoal-bar > i { background: var(--warn-bar, #D89A34); }
-.pgoal-foot { display: flex; align-items: center; gap: 7px; padding: 9px 18px 12px;
+.pgoal-foot { display: flex; align-items: center; gap: 7px; padding: 9px 18px 13px;
   font-size: 11.5px; color: var(--mut); line-height: 1.3; }
 .pgoal-foot svg { width: 13px; height: 13px; flex: none; color: var(--ok); }
 .pgoal-pct { font-weight: 800; color: var(--acc-deep); font-size: 13px; }

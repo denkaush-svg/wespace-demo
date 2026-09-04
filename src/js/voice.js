@@ -212,9 +212,36 @@
     return out.length ? out : [String(text)];
   }
 
+  /* Что синтезатор читает неправильно, если дать ему экранный текст как есть.
+
+     Intl в ru-RU группирует разряды неразрывным пробелом: «20 228 000». Голос видит
+     три разных числа и читает «двадцать — двести двадцать восемь — ноль» вместо
+     «двадцать миллионов двести двадцать восемь тысяч». Склеиваем группы обратно.
+     «AED» тот же голос читает по буквам — подставляем русское слово в нужном числе. */
+  function plural(n, one, few, many) {
+    const a = Math.abs(n) % 100;
+    const b = a % 10;
+    if (a > 10 && a < 20) return many;
+    if (b > 1 && b < 5) return few;
+    if (b === 1) return one;
+    return many;
+  }
+  function forSpeech(text) {
+    let t = String(text || '');
+    // Склеить разряды: «20 228 000» → «20228000» (обычный и неразрывный пробел, узкий неразрывный).
+    for (let i = 0; i < 4; i++) t = t.replace(/(\d)[\u00a0\u202f ](\d{3})\b/g, '$1$2');
+    // Валюта словом, в согласии с числом перед ней.
+    t = t.replace(/(\d+)\s*AED\b/gi, (m, n) => n + ' ' + plural(+n, 'дирхам', 'дирхама', 'дирхамов'));
+    t = t.replace(/\bAED\b/gi, 'дирхамов');
+    // Единицы, которые иначе читаются символами.
+    t = t.replace(/(\d)\s*м²/g, '$1 квадратных метров');
+    t = t.replace(/(\d)\s*%/g, '$1 процентов');
+    return t;
+  }
+
   function say(text, key) {
     const s = synth(); const U = UtterCtor();
-    const t = String(text || '').trim();
+    const t = forSpeech(text).trim();
     if (!s || !U || !t) return false;
     try { s.cancel(); } catch (e) { /* nothing to cancel */ }
 
@@ -262,6 +289,6 @@
     window.addEventListener('pagehide', () => { stop(); stopSpeech(); });
   }
 
-  WS.voice = { canDictate, canSpeak, dictate, stop, dictating, spokenText, say, sayReply, stopSpeech, speaking,
+  WS.voice = { canDictate, canSpeak, dictate, stop, dictating, spokenText, say, sayReply, stopSpeech, speaking, forSpeech,
     get lastError() { return st.lastError; } };
 })(window.WS = window.WS || {});

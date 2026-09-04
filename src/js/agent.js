@@ -537,9 +537,54 @@
      So: say what is missing, and — when the question named a district — say
      which districts there ARE, because that is the one thing that makes the
      next question answerable. */
+  /* Названная запись — объект, контакт или компания. findEntity ищет только среди
+     контактов и компаний — объекты в нём не ищутся вовсе, и вопрос про Creekline
+     Residences падал в «такого у нас в данных нет» при том, что объект лежит в инвентаре.
+     Стенд не имеет права отрицать то, что у него есть. */
+  function namedRecord(text) {
+    const t = lc(text || '');
+    const d = WS.store.data || {};
+    const scan = (list, kind) => {
+      let top = null;
+      (list || []).forEach((x) => {
+        let hits = 0;
+        String(x.name || '').split(/\s+/).forEach((w) => {
+          const s = stem(w);
+          if (s.length >= 4 && t.indexOf(s) >= 0) hits++;
+        });
+        if (hits && (!top || hits > top.hits)) top = { kind: kind, rec: x, hits: hits };
+      });
+      return top;
+    };
+    const best = [scan(d.objects, 'object'), scan(d.clients, 'contact'), scan(d.companies, 'company')]
+      .filter(Boolean).sort((a, b) => b.hits - a.hits)[0];
+    return best || null;
+  }
+
   function orient(text) {
     const know = inventory();
     const t = lc(text || '');
+    /* Если в вопросе названа запись, которая У НАС ЕСТЬ, ответ «такого нет» — ложь.
+       Офлайновый планировщик не умеет рассуждать («кому подходит», «как продавать»),
+       но он обязан сказать, что запись есть, что по ней известно и что именно он показать может. */
+    const named = namedRecord(text);
+    if (named) {
+      const r = named.rec;
+      const facts = named.kind === 'object'
+        ? [r.area, r.attrs && r.attrs.area ? r.attrs.area : null, r.price ? WS.AED(r.price) : null]
+            .filter(Boolean).join(' · ')
+        : [r.phone, r.budget ? WS.AED(r.budget) : null].filter(Boolean).join(' · ');
+      const what = named.kind === 'object' ? 'объект' : named.kind === 'contact' ? 'контакт' : 'компания';
+      return {
+        kind: 'answer',
+        text: 'Такой ' + what + ' у нас есть: «' + r.name + '»' + (facts ? ' — ' + facts : '') + '. ' +
+          'Но разбор «как продавать и кому подходит» делает модель, а сейчас отвечает офлайновый режим — ' +
+          'связи с моделью нет. Могу показать по нему цифры из данных: цену, площадь, срез по району, ' +
+          'кто из клиентов его смотрел и что по нему в работе.',
+        evidence: [],
+        next: suggestions(),
+      };
+    }
     /* Which districts this stand can actually speak about — read from the
        market slice, not from AREAS. AREAS holds the four with the full picture
        (they also carry inventory); the slice covers nine, five of them
