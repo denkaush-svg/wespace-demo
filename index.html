@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:39</title>
+  <title>WESPACE · сборка 12:34</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:39';
+    window.WS_BUILD='12:34';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -338,6 +338,7 @@ button { font-family: inherit; cursor: pointer; }
 .psec-side .pgoal-k { font-size: 11px; }
 .psec-side .pgoal-v { font-size: 12px; }
 .psec-side .pgoal-foot { padding: 7px 13px 10px; font-size: 11px; }
+.psec-side .pgoal-bar { margin: 0 13px; }
 .psec-side .pgoal-drill { display: none; }
 .psec-side .btn.sm { display: none; }
 
@@ -572,19 +573,22 @@ button { font-family: inherit; cursor: pointer; }
 .pgoal { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
   overflow: hidden; box-shadow: var(--shadow-sm); margin-top: 10px; }
 .pgoal-row + .pgoal-row { border-top: 1px solid var(--line); }
-.pgoal-cells { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 18px 11px;
-  background: var(--surface-2); }
+/* Одна поверхность на всю строку. Серая шапка поверх белого подвала резала карточку
+   надвое по горизонтали: на узком экране, где ячейки встают в колонку, шапка становится
+   высокой, и граница читается как две разные карточки, слипшиеся боками. Мерило
+   здесь — полоса, а не заливка; фон у строки один. */
+.pgoal-cells { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 18px 11px; }
 @media (max-width: 719.98px) { .pgoal-cells { grid-template-columns: 1fr; gap: 8px; } }
 .pgoal-cell { min-width: 0; }
 .pgoal-k { font-size: 15px; font-weight: 750; color: var(--ink); line-height: 1.3; }
 .pgoal-v { font-size: 12.5px; color: var(--mut); margin-top: 3px; }
 /* Двухцветная линия: сделанное — акцентом, остаток — своей дорожкой. Один элемент, две части. */
-.pgoal-bar { height: 9px; background: var(--acc-soft); }
+.pgoal-bar { height: 8px; background: var(--acc-soft); margin: 0 18px; border-radius: 999px; }
 .pgoal-bar > i { display: block; height: 100%; background: var(--acc); transition: width .35s var(--ease); }
 /* В этой палитре --warn — цвет ТЕКСТА (тёмно-коричневый для контраста на светлом), и
    заливка полосы им читается как грязь. Для заливки нужен собственный янтарный. */
 .pgoal-row.is-behind .pgoal-bar > i { background: var(--warn-bar, #D89A34); }
-.pgoal-foot { display: flex; align-items: center; gap: 7px; padding: 9px 18px 12px;
+.pgoal-foot { display: flex; align-items: center; gap: 7px; padding: 9px 18px 13px;
   font-size: 11.5px; color: var(--mut); line-height: 1.3; }
 .pgoal-foot svg { width: 13px; height: 13px; flex: none; color: var(--ok); }
 .pgoal-pct { font-weight: 800; color: var(--acc-deep); font-size: 13px; }
@@ -4549,6 +4553,23 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // Exception inbox (R6) — «Разобрать» becomes an exception queue. ex = exception type
   // (qualify / duplicate / noconsent / unknown_object / delivery_fail).
   // stage: inbox item status in the board — new / unreached / qualified / rejected
+  /* Manager approvals — stable string IDs so the done-set never drifts when the
+     list is reordered. Each item links to a real deal or request so resolveApproval()
+     can write its decision to the matching timeline.
+     Igor's KP approval was removed: he has no active deal, so the approval had
+     nowhere to write its decision. */
+  const approvals = [
+    { id: 'ap_discount', ic: 'money', t: 'Скидка 4% сверх лимита', who: 'u_ahmed',
+      sub: 'Palm Court · Виктор · лимит агента 3%', when: '1 ч назад', tone: 'warn',
+      dealId: 'd_viktor', requestId: null },
+    { id: 'ap_cobrok', ic: 'handshake', t: 'Co-broking сплит 50/50', who: 'u_lina',
+      sub: 'Whitewill · Creekline · подтвердить условия', when: '2 ч назад', tone: '',
+      dealId: 'd_karim_cross', requestId: null },
+    { id: 'ap_booking', ic: 'doc', t: 'Договор бронирования', who: 'u_marina',
+      sub: 'Sarah Mansour · Marina · Form F', when: 'сегодня', tone: '',
+      dealId: null, requestId: 'r_lease' },
+  ];
+
   const inbox = [
     { id: 'in_night', clientId: 'c_night', channel: 'whatsapp', at: '02:14', text: 'Hi, still looking for a 1BR investment unit in JVC, budget ~1.3M. Can you help?', kind: 'night', ex: 'qualify', stage: 'unreached' },
     { id: 'in_anna_vn', clientId: 'c_anna', channel: 'whatsapp', at: '09:05', text: 'Голосовое сообщение · 0:24', kind: 'voice', scenario: 'G1', ex: 'qualify', stage: 'new' },
@@ -4758,7 +4779,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   WS.fixtures = {
     version: 1, settings, outcomes,
     DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market,
-    deals, requests, tasks, events, inbox, analytics,
+    deals, requests, tasks, events, inbox, approvals, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, INBOX_STAGES, INBOX_STAGE_LABELS, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
@@ -5257,6 +5278,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       tasks: clone(f.tasks),
       events: clone(f.events),
       inbox: clone(f.inbox),
+      approvals: clone(f.approvals),
       analytics: clone(f.analytics),
       roster: clone(f.roster),
       refModel: clone(f.refModel),
@@ -6991,6 +7013,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   }
 
   async function freeReply(text) {
+    /* inFlight is set for the duration of the call so the UI can disable the send
+       button. The guard itself lives in the UI click handlers (cgSend / cgDockSend /
+       cardSend in main.js), not here: engine-level blocking would also block test
+       harness calls that correctly send a second prompt while the first is still in
+       the delay(180) terminal flash. */
+    engine.inFlight = true;
     const threadId = engine.activeThreadId || 'general';
     ensureThread(threadId); engine.activeThreadId = threadId;
     // A scripted run waiting on a confirmation is not discarded just because a question
@@ -7042,7 +7070,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const started = Date.now();
     let tick = 0;
     let at = 1;
-    const secs = () => Math.round((Date.now() - started) / 1000) + ' с';
+    const secs = () => { const e = Math.round((Date.now() - started) / 1000); return e > 0 ? e + ' с' : ''; };
     function note() {
       const web = trace.steps[at] === 'Ищу во внешних источниках';
       const list = web ? WEB_LOOK : LOOK;
@@ -7073,17 +7101,27 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         },
         onText: (partial) => {
           if (!same() || !partial) return;
-          // The first words are the last real event: the card gives way to the
-          // answer itself, so the beat has nothing left to keep alive.
           clearInterval(beat);
+          // Briefly show «Формулирую ответ» as active before the text lands, so the step
+          // is never a permanent fixture of the card that is never reached.
+          at = trace.steps.indexOf('Формулирую ответ');
+          if (at < 0) at = trace.steps.length - 1;
+          updateMsg(workMid, processCard(trace, at, false, false), threadId);
           updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
         },
       });
     } finally {
-      // Every exit, including a throw: an interval left running would redraw
-      // the waiting card over the answer that replaced it.
       clearInterval(beat);
+      engine.inFlight = false;
     }
+    engine.inFlight = false;
+    // Flash the all-done card so the progress card reads as concluded,
+    // not as stuck mid-run. 180 ms is enough to register and not enough to
+    // intrude. The live (streaming) path ran onText and already replaced the
+    // card; updateMsg here just overwrites an already-replaced card, which is
+    // safe and produces the same brief done-flash.
+    updateMsg(workMid, processCard(trace, trace.steps.length, true, false), threadId);
+    await delay(180);
     // The reply is written back to the thread it was asked in, whether or not
     // the agent has since walked to another one — messages are addressed, so
     // this is safe, and returning early left a «Разбираю запрос» card there
@@ -7454,7 +7492,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     startScenario(id, chainId);
   }
 
-  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply, inFlight: false,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     // Readable and settable: it is conversation state, and the deterministic
@@ -7883,7 +7921,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     { id: 'contracts', label: 'Сопровождение', icon: 'doc', count: () => (D().contracts || []).filter((k) => k.status !== 'closed').length },
     { id: 'tasks', label: 'Задачи', icon: 'checkCircle', count: () => (D().tasks || []).filter((t) => t.status !== 'done').length },
     { id: 'leads', label: 'Распределение', icon: 'mail', count: () => (D().inbox || []).length },
-    { id: 'approvals', label: 'Согласования', icon: 'check', count: () => MGR_APPROVALS.length - (S().apprDone || []).length },
+    { id: 'approvals', label: 'Согласования', icon: 'check', count: () => (D().approvals || []).filter((a) => !(S().apprDone || []).includes(a.id)).length },
     { id: 'analytics', label: 'Аналитика', icon: 'trend' },
   ];
   const NAV_MGR_MORE = [
@@ -9006,9 +9044,16 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      У «Аналитики» числа нет намеренно: там нечего считать штуками, и «4» рядом с ней
      означало бы четыре чего-то, чего не существует. */
   const PULSE_SECTIONS = ['day', 'prospects', 'insights', 'analytics'];
+  /* У руководителя свои четыре раздела — но та же раскладка и те же корешки. Раньше
+     его Пульс был плоской простынёй из плиток и списков без разделов: два одинаково
+     названных экрана, устроенных по-разному, — это два разных продукта под одной крышей.
+     Отличие роли — в СОДЕРЖАНИИ разделов, а не в устройстве экрана. */
+  const PULSE_SECTIONS_MGR = ['decide', 'risk', 'team', 'analytics'];
+  function pulseSectionList() { return S().role === 'manager' ? PULSE_SECTIONS_MGR : PULSE_SECTIONS; }
   function pulseSection() {
+    const list = pulseSectionList();
     const k = S().pulseSection;
-    return PULSE_SECTIONS.indexOf(k) >= 0 ? k : 'day';
+    return list.indexOf(k) >= 0 ? k : list[0];
   }
   function pulseNav(items) {
     return '<nav class="psec-nav" aria-label="Разделы Пульса">' + items.map((it) =>
@@ -9241,8 +9286,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         '<div class="rw-prov">' + I('radar') + 'черновик собран из карточки клиента и свободного инвентаря · ' +
         'согласие проверено · отправка имитируется (DEMO)</div>' +
         '</div>';
+    /* Заблокированное окно обязано давать действие, а не только объяснение. Без карточки
+       контакта в подвале оставалось одно «Закрыть»: брокер жал «Подготовить ответ», получал
+       стену текста и тупик — ровно то, что читается как «кнопка ничего не делает». */
     const foot = blocked
-      ? (c ? '<button class="btn primary" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>' : '') +
+      ? (c
+          ? '<button class="btn primary" data-client="' + c.id + '">' + I('users') + 'Открыть контакт</button>'
+          : '<button class="btn primary" data-act="newContact">' + I('plus') + 'Завести контакт</button>') +
         '<button class="btn" data-act="closeModal">Закрыть</button>'
       : '<button class="btn primary" data-act="sendReply" data-inbox="' + it.id + '">' + I('send') + 'Отправить</button>' +
         '<button class="btn" data-act="openSelection" data-inbox="' + it.id + '">' +
@@ -11007,22 +11057,46 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const isMgr = st.role === 'manager';
     const firstName = (D().users[st.role].name || '').split(' ')[0];
 
-    // P7: manager gets a distinct "Пульс команды" — team KPIs, funnel, SLA & exceptions — not the agent tiles.
+    /* Пульс руководителя — та же раскладка, что у брокера (боковая колонка с корешками
+       и целями + содержание раздела), но разделы свои. Разница ролей одна: брокер
+       ведёт СВОИ сделки, руководитель разбирает то, что без него НЕ СДВИНЕТСЯ: согласование,
+       нераспределённый лид, нарушенный норматив, застрявшая сделка, перегруженный агент. */
     if (isMgr) {
-      const mgrQa = [
-        { t: 'Распределить заявки', ic: 'mail', nav: 'leads' },
-        { t: 'Согласования', ic: 'check', nav: 'approvals' },
-        { t: 'Команда', ic: 'users', nav: 'team' },
-        { t: 'Аналитика', ic: 'trend', nav: 'analytics' },
-      ].map((q) => '<button class="chip" data-nav="' + q.nav + '">' + I(q.ic) + q.t + '</button>').join('');
+      const appr = approvalsPending();
+      const unassigned = (D().inbox || []).filter((x) => !x.assignee);
+      const risky = mgrAtRisk();
+      const stuck = stuckDeals();
+      const stuckSum = stuck.reduce((s, d) => s + (d.amount || 0), 0);
+      const decideN = appr.length + unassigned.length + risky.length;
+      const m = computeMetrics();
+      const items = [
+        { key: 'decide', title: 'Требует решения', icon: 'check',
+          count: decideN, urgent: risky.length > 0 || unassigned.length > 0,
+          sub: 'согласований ' + appr.length + ' · нераспределённых заявок ' + unassigned.length +
+            (risky.length ? ' · агентов вне норматива ' + risky.length : ''),
+          body: () => mgrDecideBody(appr, unassigned, risky) },
+        { key: 'risk', title: 'Сделки под риском', icon: 'flame',
+          count: stuck.length, urgent: stuck.length > 0,
+          sub: stuck.length
+            ? WS.AED(stuckSum) + ' без движения 5+ дней'
+            : 'всё движется',
+          body: () => mgrRiskBody(stuck) },
+        { key: 'team', title: 'Команда', icon: 'users',
+          count: TEAM.length, urgent: risky.length > 0,
+          sub: 'загрузка, конверсия и SLA каждого агента',
+          body: () => mgrTeamBody() },
+        { key: 'analytics', title: 'Аналитика', icon: 'trend',
+          count: null,
+          sub: 'конверсия ' + m.conv + '% · ожидаемая комиссия ' + WS.AED(m.expectedComm),
+          body: () => mgrTiles() + canonMetrics() + dealsFunnel() },
+      ];
       return '<div class="start fadeup">' +
-        heroViz('pulse', 'Пульс команды', greet + ', ' + firstName + '. Обзор отдела на смене — план, SLA, распределение и согласования.', { descBig: true }) +
-        cgComposer('startPrompt', 'Спросите Консьержа по команде — «кто перегружен», «что нарушает SLA», «сводка за неделю»…', 'startSend', 'prompt-lead') +
-        '<div class="qa-row" style="margin-top:16px">' + mgrQa + '</div>' +
-        pulseMyGoals() +
-        mgrTiles() +
-        canonMetrics() +
-        '<div class="section-label" style="margin-top:28px">Команда и исключения</div>' + workQueueManager() +
+        heroViz('pulse', 'Пульс команды', greet + ', ' + firstName + '. Что без вас не сдвинется.', { descBig: true, slim: true }) +
+        pulseMoved() +
+        '<div class="psec">' +
+          '<div class="psec-side">' + pulseNav(items) + pulseMyGoals() + '</div>' +
+          pulseSectionBody(items) +
+        '</div>' +
       '</div>';
     }
 
@@ -11235,9 +11309,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
                live and answers a press with nothing reads as broken software —
                which is exactly how it was reported. So the control says what
                it can do before it is pressed. */
-            '<button class="voice' + (voiceOff ? ' off' : '') + '" data-act="voice" title="' +
-              (voiceOff ? 'Этот браузер не умеет распознавать речь — наберите текстом или откройте в Chrome' : 'Голосом') +
-              '">' + I('mic') + '</button>' +
+            '<button class="voice' + (voiceOff ? ' off' : '') + '" data-act="voice"' +
+              ' aria-label="' + (voiceOff ? 'Голосовой ввод недоступен в этом браузере' : 'Диктовать Консьержу') + '"' +
+              ' title="' + (voiceOff ? 'Этот браузер не умеет распознавать речь — наберите текстом или откройте в Chrome' : 'Голосом') + '">' +
+              I('mic') + '</button>' +
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
         '</div>' +
@@ -11439,7 +11514,25 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      ввода на белом поле читается как «здесь ничего нет». Отвечают на него подсказки — но не
      выдуманные, а собранные из ЭТИХ данных: они и снимают пустоту, и с первой секунды
      показывают, что Консьерж знает рабочее место, а не отвечает вообще. */
+  /* Подсказки первого экрана говорят о работе ТОГО, КТО СМОТРИТ. Руководителю
+     предлагали «Собрать КП по Анне» и «Сколько в работе по моим сделкам» — чужую работу
+     от его имени. У него нет своих сделок; у него есть отдел. */
+  function conciergeStartersMgr() {
+    const out = [];
+    const appr = approvalsPending();
+    if (appr.length) out.push(['check', 'Что ждёт согласования', 'что ждёт моего согласования']);
+    const risky = mgrAtRisk();
+    if (risky.length) out.push(['warn', 'Кто вне норматива', 'кто из агентов перегружен или нарушает SLA']);
+    const stuck = stuckDeals();
+    if (stuck.length) out.push(['clock', 'Какие сделки застряли', 'какие сделки стоят без движения']);
+    const unassigned = (D().inbox || []).filter((x) => !x.assignee);
+    if (unassigned.length) out.push(['mail', 'Заявки без агента', 'какие заявки ещё не распределены']);
+    out.push(['trend', 'Сводка по отделу', 'сводка по отделу за неделю']);
+    return out.slice(0, 4).map((s) =>
+      '<button class="cg-start" data-cgask="' + escAttr(s[2]) + '">' + I(s[0]) + '<span>' + s[1] + '</span></button>').join('');
+  }
   function conciergeStarters() {
+    if (S().role === 'manager') return conciergeStartersMgr();
     const out = [];
     const overdue = (D().tasks || []).filter((t) => t.status !== 'done' && t.when === 'overdue');
     if (overdue.length) out.push(['clock', 'Что просрочено', 'что просрочено']);
@@ -11463,11 +11556,17 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const me = (D().users[S().role] || {}).name || '';
     const hi = 'Чем помочь' + (me ? ', ' + me.split(' ')[0] : '') + '?';
     const starters = conciergeStarters();
+    const isMgr = S().role === 'manager';
+    const blurb = isMgr
+      ? 'Напишите вопрос словами — «кто перегружен», «что нарушает SLA», «где стоят деньги». '
+        + 'Консьерж видит сделки всего отдела, загрузку агентов и очередь согласований — уточнять «по какому агенту» не нужно.'
+      : 'Напишите задачу словами — «собери КП», «подготовь к звонку», «что просрочено». '
+        + 'Консьерж видит ваши сделки, клиентов и объекты, поэтому спрашивать «по какому клиенту» не нужно.';
     return '<div class="cg-main-inner cg-home">' +
       '<div class="cg-greet"><div class="cg-greet-w">W</div>' +
       '<h1 class="cg-greet-t">' + hi + '</h1>' +
-      '<p class="cg-greet-m">Напишите задачу словами — «собери КП», «подготовь к звонку», «что просрочено». Консьерж видит ваши сделки, клиентов и объекты, поэтому спрашивать «по какому клиенту» не нужно.</p></div>' +
-      cgComposer('cgPrompt', 'Опишите задачу или задайте вопрос…', 'cgSend', 'cg-hero') +
+      '<p class="cg-greet-m">' + blurb + '</p></div>' +
+      cgComposer('cgPrompt', isMgr ? 'Спросите по отделу или поставьте задачу…' : 'Опишите задачу или задайте вопрос…', 'cgSend', 'cg-hero') +
       (starters ? '<div class="cg-starters">' + starters + '</div>' : '') +
       /* Вход в границы демо стоит на первом экране: это первый вопрос человека, которому
          прислали ссылку, и искать ответ в меню он не пойдёт. */
@@ -15504,7 +15603,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return [
       ['plus', 'Добавить объект', 'data-act="reqAddObject" data-req="' + r.id + '"', 'primary'],
       sel ? ['doc', 'Собрать КП · ' + sel, 'data-act="reqFormKp" data-req="' + r.id + '"', ''] : null,
-      sel ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
+      // Свободные выбранные, а не просто выбранные: объект, уже лежащий в действующей
+      // сделке, второй раз в сделку не пойдёт, и кнопка обещала бы невыполнимое.
+      reqSelectedFree(r).length ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
       c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', ''] : null,
       ['pencil', 'Изменить запрос', 'data-act="editRequest" data-req="' + r.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
@@ -15657,12 +15758,33 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       const m = [o.area, WS.AED(o.price), (ny != null ? 'доходность ' + (ny * 100).toFixed(1) + '%' : null), (o.commissionPct ? 'комиссия ' + o.commissionPct + '%' : null)].filter(Boolean).join(' · ');
       return '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + m + '</div></div></div>';
     }).join('');
-    return dxSec('doc', 'Коммерческое предложение · ' + r.kp.at, '<span class="badge ok">' + I('check') + 'собрано</span>',
-      '<div class="feed">' + rows + '</div>' +
-      '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">' +
+    /* Кнопка «Создать сделку» рисовалась всегда, а проверка стояла внутри обработчика: если
+       все выбранные объекты уже заняты действующими сделками, нажатие заканчивалось отпиской
+       «Сначала отметьте объекты». Кнопка не должна обещать того, чего не может. */
+    const free = reqSelectedFree(r);
+    const drift = reqKpDrift(r);
+    const driftLine = drift
+      ? '<div class="match" style="margin-top:10px">' + I('warn') +
+        '<span>КП собрано ' + escAttr(r.kp.at) + ' по другому набору: в документе ' +
+        (drift.inKp.length ? escAttr(String(drift.inKp.length)) : 'ничего') + ', сейчас выбрано ' +
+        (drift.now.length ? escAttr(String(drift.now.length)) : 'ничего') +
+        '. Пересоберите, иначе клиент получит набор, от которого уже отказался.</span></div>'
+      : '';
+    const createBtn = free.length
+      ? '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку · ' + free.length + '</button>'
+      : '<span class="badge">' + I('lock') + 'Все выбранные объекты уже в сделках</span>';
+    const srcLine = r.selectionSource
+      ? '<div style="margin-top:8px;font-size:11.5px;color:var(--faint)">Выбор подтверждён ' +
+        escAttr(r.selectionConfirmedAt || '') + ' · ' + escAttr(r.selectionSource) + '</div>'
+      : '';
+    return dxSec('doc', 'Коммерческое предложение · ' + r.kp.at,
+      drift ? '<span class="badge warn">' + I('warn') + 'разошлось с выбором</span>'
+            : '<span class="badge ok">' + I('check') + 'собрано</span>',
+      '<div class="feed">' + rows + '</div>' + driftLine + srcLine +
+      '<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
       '<button class="btn sm" data-act="openReqKp" data-req="' + r.id + '">' + I('arrowRight') + 'Открыть КП</button>' +
-      '<button class="btn sm" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
-      '<button class="btn sm primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button></div>');
+      '<button class="btn sm' + (drift ? ' primary' : '') + '" data-act="reqFormKp" data-req="' + r.id + '">' + I('sparkle') + 'Пересобрать</button>' +
+      createBtn + '</div>');
   }
   function prefProfileInner(r) {
     const off = r.offered || [];
@@ -15711,9 +15833,87 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       '</div>';
   }
   // ---- Request funnel actions (A1): client-selection state, add object, form КП, create deal ----
+  /* Смена выбранного объекта — факт со слов клиента, а не движение ползунка. Раньше нажатие
+     молча переписывало `offered.state`, и дальше расходились три вещи: сводка продолжала
+     называть прежний объект, КП оставалось собранным по старому набору, а в истории заявки
+     не оставалось ни следа о том, КОГДА и ОТКУДА взялся новый выбор. Проверено на Анне:
+     после выбора Bay Central сводка по-прежнему утверждала, что выбран Creekline.
+
+     Теперь выбор подтверждается, у него обязателен источник, и он пишется в историю заявки.
+     Отказ и возврат в «предложено» подтверждения не требуют: они ничего не обещают. */
+  const SELECTION_SOURCES = ['со слов клиента в WhatsApp', 'со слов клиента по телефону',
+    'на встрече', 'письмом от клиента', 'моя правка — клиент не подтверждал'];
+  function openRequestSelectionConfirm(reqId, objId) {
+    const r = requestById(reqId); if (!r) return;
+    const o = (D().objects || []).find((x) => x.id === objId); if (!o) return;
+    const cur = (r.offered || []).filter((x) => x.state === 'selected')
+      .map((x) => (D().objects || []).find((y) => y.id === x.id)).filter(Boolean);
+    const curLine = cur.length
+      ? cur.map((x) => escAttr(x.name)).join(', ')
+      : 'пока ничего не выбрано';
+    const srcs = SELECTION_SOURCES.map((s, i) =>
+      '<option value="' + escAttr(s) + '"' + (i === 0 ? ' selected' : '') + '>' + escAttr(s) + '</option>').join('');
+    openModal('Клиент выбрал ' + escAttr(o.name),
+      '<div class="field"><div class="k">Сейчас выбрано</div><div class="v">' + curLine + '</div></div>' +
+      '<div class="field"><div class="k">Станет</div><div class="v">' + escAttr(o.name) + ' · ' +
+        escAttr(o.area || '') + ' · ' + WS.AED(o.price) + '</div></div>' +
+      '<label class="fld" style="margin-top:10px"><span>Откуда это известно</span>' +
+      '<select id="selSrc">' + srcs + '</select></label>' +
+      '<div class="rw-prov" style="margin-top:10px">' + I('shield') +
+        'Источник попадёт в историю заявки: через неделю будет видно, чей это выбор — клиента или наш.</div>',
+      (cur.length
+        ? '<button class="btn primary" data-act="saveReqSel" data-req="' + escAttr(r.id) + '" data-obj="' + escAttr(o.id) + '" data-mode="add">' + I('plus') + 'Добавить к выбранным</button>' +
+          '<button class="btn" data-act="saveReqSel" data-req="' + escAttr(r.id) + '" data-obj="' + escAttr(o.id) + '" data-mode="replace">' + I('replay') + 'Заменить прежний выбор</button>'
+        : '<button class="btn primary" data-act="saveReqSel" data-req="' + escAttr(r.id) + '" data-obj="' + escAttr(o.id) + '" data-mode="add">' + I('check') + 'Подтвердить</button>') +
+      '<button class="btn" data-act="closeModal">Отмена</button>');
+  }
+  function saveRequestSelection(reqId, objId, mode) {
+    const r = requestById(reqId); if (!r) return;
+    const off = (r.offered || []).find((x) => x.id === objId); if (!off) return;
+    const o = (D().objects || []).find((x) => x.id === objId) || {};
+    const el = document.getElementById('selSrc');
+    const src = (el && el.value) || SELECTION_SOURCES[0];
+    const dropped = [];
+    if (mode === 'replace') {
+      (r.offered || []).forEach((x) => {
+        if (x.id !== objId && x.state === 'selected') {
+          x.state = 'offered';
+          const oo = (D().objects || []).find((y) => y.id === x.id);
+          if (oo) dropped.push(oo.name);
+        }
+      });
+    }
+    off.state = 'selected';
+    delete off.reason;
+    r.selectionConfirmedAt = 'только что';
+    r.selectionSource = src;
+    r.selectionBy = (D().users && D().users.agent ? D().users.agent.name : 'Агент');
+    D().requestTimeline = D().requestTimeline || {};
+    (D().requestTimeline[r.id] = D().requestTimeline[r.id] || []).push({
+      ch: 'crm', kind: 'raw', by: r.selectionBy, at: 'только что', ord: 999,
+      text: 'Выбран ' + (o.name || objId) + (dropped.length ? ' вместо ' + dropped.join(', ') : '') +
+        ' — ' + src + '.' });
+    WS.storeApi.save();
+    closeModal();
+    WS.storeApi.toast('Выбор записан: ' + (o.name || objId), 'ok');
+    WS.storeApi.emit();
+  }
+  /* Расходится ли собранное КП с тем, что выбрано сейчас. Документ намеренно заморожен на
+     момент сборки — но молчать о расхождении нельзя: брокер отправит клиенту набор, от
+     которого тот уже отказался. */
+  function reqKpDrift(r) {
+    if (!r.kp || !r.kp.formed) return null;
+    const inKp = (r.kp.objectIds || []).slice().sort().join('|');
+    const now = (r.offered || []).filter((o) => o.state === 'selected').map((o) => o.id).sort().join('|');
+    return inKp === now ? null : { inKp: r.kp.objectIds || [], now: now ? now.split('|') : [] };
+  }
+
   function reqObjState(reqId, objId, state) {
     const r = requestById(reqId); if (!r) return;
     const off = (r.offered || []).find((o) => o.id === objId); if (!off) return;
+    // «Выбран» — обещание клиента, оно подтверждается и записывается. Остальные состояния
+    // ничего не обещают и меняются сразу.
+    if (state === 'selected') { openRequestSelectionConfirm(reqId, objId); return; }
     off.state = state;
     if (state !== 'rejected') delete off.reason;
     WS.storeApi.save(); WS.storeApi.emit();
@@ -15898,7 +16098,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const c = D().clients.find((x) => x.id === r.clientId) || {};
     openModal('КП · ' + r.title, kpDocBody(c.name || 'Клиент', r.title, objs, r, null),
       '<button class="btn" data-act="closeModal">Закрыть</button>' +
-      '<button class="btn primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку из выбранного</button>');
+      (reqSelectedFree(r).length
+        ? '<button class="btn primary" data-act="reqCreateDeal" data-req="' + r.id + '">' + I('briefcase') + 'Создать сделку · ' + reqSelectedFree(r).length + '</button>'
+        : '<span class="badge">' + I('lock') + 'Все выбранные объекты уже в сделках</span>'));
   }
   // The КП objects a deal carries — its own frozen snapshot, else (pre-baked demo deals) its request's КП.
   function dealKpObjects(d) {
@@ -18506,11 +18708,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const workload = [['Марина Волкова', 82, false], ['Ахмед Салех', 61, false], ['Лина Хассан', 108, true]]
       .map(([who, pct, over]) => '<div class="wl"><div class="who">' + who + '</div><div class="bar"><i class="' + (over ? 'over' : '') + '" style="width:' + Math.min(pct, 100) + '%"></i></div><div class="n">' + pct + '%</div></div>').join('');
     const signals = [
-      ['high', 'warn', 'Нарушение SLA — ночной лид', 'Sarah Mansour ждёт 7 ч, норма 4 ч.'],
+      ['high', 'warn', 'Нарушение SLA — ночной лид', 'Sarah Mansour ждёт 7 ч, норма 4 ч.', 'in_night'],
       ['', 'doc', '2 согласования ждут', 'КП Игоря и договор Виктора.'],
       ['', 'target', '3 заявки без ответа', 'Нет назначенного агента более 24 ч.'],
-    ].map(([sev, ic, t, why]) => '<div class="radar-row"><div class="sev ' + sev + '"></div><div class="icon-tile i-' + (sev === 'high' ? 'stop' : 'info') + '">' + I(ic) + '</div>' +
-      '<div class="rt"><div class="t">' + t + '</div><div class="why">' + why + '</div></div><div class="ra"><button class="btn sm" data-nav="clients">Разобрать</button></div></div>').join('');
+    ].map(([sev, ic, t, why, inboxId]) => '<div class="radar-row"><div class="sev ' + sev + '"></div><div class="icon-tile i-' + (sev === 'high' ? 'stop' : 'info') + '">' + I(ic) + '</div>' +
+      '<div class="rt"><div class="t">' + t + '</div><div class="why">' + why + '</div></div>' +
+      '<div class="ra">' + (inboxId
+        ? '<button class="btn sm" data-act="inboxTriage" data-inbox="' + escAttr(inboxId) + '">Разобрать</button>'
+        : '<button class="btn sm" data-nav="approvals">Разобрать</button>') + '</div></div>').join('');
     return dealsFunnel() +
       '<div class="card pad" style="margin-bottom:16px"><div class="section-label">Загрузка команды (SLA)</div><div class="workload">' + workload + '</div></div>' +
       '<div class="section-label">Сигналы и исключения</div>' + signals;
@@ -18522,12 +18727,29 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     u_ahmed: { focus: 'Готовое · Marina', load: 61, conv: 41, sla: 88 },
     u_lina: { focus: 'Аренда · JVC', load: 108, conv: 22, sla: 74 },
   };
-  const MGR_APPROVALS = [
-    { ic: 'doc', t: 'КП · Игорь Лебедев', who: 'u_marina', sub: 'Bayline 1603 · 3,2 млн AED · скидка 2%', when: '20 мин назад', tone: '' },
-    { ic: 'money', t: 'Скидка 4% сверх лимита', who: 'u_ahmed', sub: 'Palm Court · Виктор · лимит агента 3%', when: '1 ч назад', tone: 'warn' },
-    { ic: 'handshake', t: 'Co-broking сплит 50/50', who: 'u_lina', sub: 'Whitewill · Creekline · подтвердить условия', when: '2 ч назад', tone: '' },
-    { ic: 'doc', t: 'Договор бронирования', who: 'u_marina', sub: 'Sarah Mansour · Marina · Form F', when: 'сегодня', tone: '' },
-  ];
+  /* MGR_APPROVALS moved to data.approvals in fixtures.js (stable string IDs).
+     resolveApproval writes the decision to the matching deal / request timeline
+     instead of only toggling a done-bit in store. */
+  function resolveApproval(approvalId, decision) {
+    const a = (D().approvals || []).find((x) => x.id === approvalId);
+    if (!a) return;
+    const done = S().apprDone || [];
+    if (done.indexOf(approvalId) >= 0) return;
+    done.push(approvalId);
+    S().apprDone = done;
+    const by = (D().users && D().users.manager ? D().users.manager.name : 'Руководитель');
+    const note = (decision === 'approve' ? 'Одобрено' : 'Отклонено') + ': ' + a.t + ' — ' + by + '.';
+    if (a.dealId) {
+      D().dealTimeline = D().dealTimeline || {};
+      (D().dealTimeline[a.dealId] = D().dealTimeline[a.dealId] || []).push(
+        { ch: 'crm', kind: 'raw', by: by, at: 'только что', ord: 9999, text: note });
+    } else if (a.requestId) {
+      D().requestTimeline = D().requestTimeline || {};
+      (D().requestTimeline[a.requestId] = D().requestTimeline[a.requestId] || []).push(
+        { ch: 'crm', kind: 'raw', by: by, at: 'только что', ord: 9999, text: note });
+    }
+    WS.storeApi.save();
+  }
   function mgrInitials(n) { return (n || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
   function teamAgentStats(id) {
     const list = D().deals.filter((d) => d.agent === id);
@@ -18568,9 +18790,70 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       tile('flame', 'Риск невыполнения', atRisk, '', '', atRisk ? 'Агенты вне норматива — перегрузка или SLA' : 'Все агенты в норме', '', atRisk > 0 ? 'accent' : '', 'data-nav="team"') +
       tile('warn', 'SLA отдела', avgSla + '%', '', '', 'Реакция на лид · норма 85%', '', avgSla < 85 ? 'accent' : '', 'data-nav="team"') +
       tile('mail', 'Нераспределённые заявки', unassigned, '', '', unassigned ? 'Ждут агента — назначить' : 'Все заявки распределены', '', unassigned > 0 ? 'accent' : '', 'data-nav="leads"') +
-      tile('check', 'На согласовании', MGR_APPROVALS.length - (S().apprDone || []).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
+      tile('check', 'На согласовании', (D().approvals || []).filter((a) => !(S().apprDone || []).includes(a.id)).length, '', '', 'КП, скидки, co-broking', '', '', 'data-nav="approvals"') +
       '</div>';
   }
+  /* «Требует решения» — аналог «Моих дел» у брокера: три очереди, каждая со своим
+     действием на месте. Ни одна из них не отсылает на другой экран без нужды. */
+  function mgrDecideBody(appr, unassigned, risky) {
+    const apprBlock = dxSec('check', 'Согласования · ' + appr.length,
+      appr.length ? '<button class="btn xs" data-nav="approvals">' + I('arrowRight') + 'Всё с подробностями</button>' : '',
+      '<div class="appr-list">' + approvalRows(appr.slice(0, 3)) + '</div>');
+    const leadRows = unassigned.map((it) => {
+      const c = (D().clients || []).find((x) => x.id === it.clientId);
+      const who = c ? c.name : 'Новый контакт';
+      return '<div class="feed-row"><div class="fi i-acc">' + I('mail') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(who) + '</div>' +
+        '<div class="m">' + escAttr(it.channel || '') + ' · ' + escAttr(it.at || '') + ' · без агента</div></div>' +
+        '<div class="fa"><button class="btn xs primary" data-act="inboxAssign" data-inbox="' + escAttr(it.id) + '">Назначить</button></div></div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">все заявки распределены</div>';
+    const leadBlock = dxSec('mail', 'Нераспределённые заявки · ' + unassigned.length,
+      unassigned.length ? '<button class="btn xs" data-nav="leads">' + I('arrowRight') + 'Очередь распределения</button>' : '',
+      '<div class="feed">' + leadRows + '</div>');
+    const slaRows = risky.map((id) => {
+      const meta = TEAM_META[id] || {};
+      const why = meta.load > 100 ? 'загрузка ' + meta.load + '% — выше нормы' : 'SLA ' + meta.sla + '% — норма 85%';
+      return '<div class="feed-row"><div class="fi i-stop">' + I('warn') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(agentName(id)) + '</div><div class="m">' + why + '</div></div>' +
+        '<div class="fa"><button class="btn xs" data-teamagent="' + escAttr(id) + '" data-act="pulseSection" data-section="team">Книга агента</button></div></div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">все агенты в норме</div>';
+    const slaBlock = dxSec('warn', 'Вне норматива · ' + risky.length, '',
+      '<div class="feed">' + slaRows + '</div>');
+    return apprBlock + leadBlock + slaBlock;
+  }
+  /* «Сделки под риском» — аналог «Перспективных сделок», но с другой стороны: брокеру
+     показывают, где можно заработать, руководителю — где деньги сейчас стоят. */
+  function mgrRiskBody(stuck) {
+    const rows = stuck.map((d) => {
+      const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer">' +
+        '<div class="fi i-stop">' + I('clock') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(d.title) + '</div>' +
+        '<div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) +
+        (c.name ? ' · ' + escAttr(c.name) : '') + ' · ' + escAttr(agentName(d.agent)) + '</div></div>' +
+        I('arrowRight') + '</div>';
+    }).join('') || '<div class="empty" style="padding:24px">' + I('checkCircle') +
+      '<div style="font-weight:700;color:var(--ink)">Ни одна сделка не стоит больше пяти дней</div></div>';
+    return dxSec('clock', 'Без движения 5+ дней · ' + stuck.length,
+      '<button class="btn xs" data-savedview="stuck" data-nav="clients">' + I('arrowRight') + 'Открыть в сделках</button>',
+      '<div class="feed">' + rows + '</div>');
+  }
+  /* «Команда» — раздел, у которого у брокера соответствия нет вовсе: ростер и книга выбранного. */
+  function mgrTeamBody() {
+    const sel = S().teamAgent || TEAM[0].id;
+    const m = TEAM.find((x) => x.id === sel) || TEAM[0];
+    const st2 = teamAgentStats(sel);
+    const dealRows = st2.list.map((d) => {
+      const c = (D().clients || []).find((x) => x.id === d.clientId) || {};
+      return '<div class="feed-row" data-deal="' + d.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('briefcase') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(d.title) + '</div><div class="m">' + stageLabel(d.stage) + ' · ' + WS.AED(d.amount) + (c.name ? ' · ' + escAttr(c.name) : '') + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">активных сделок нет</div>';
+    return '<div class="team-grid">' + teamCards() + '</div>' +
+      '<div style="margin-top:16px">' +
+      dxSec('users', 'Книга агента · ' + escAttr(m.name), '',
+        '<div class="feed">' + dealRows + '</div>') + '</div>';
+  }
+
   function viewTeam() {
     const sel = S().teamAgent || TEAM[0].id;
     const cards = TEAM.map((m) => {
@@ -18645,16 +18928,60 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return '<div class="card" style="overflow-x:auto;margin-bottom:16px"><div class="section-label" style="padding:12px 16px 4px">Перформанс по агентам</div>' +
       '<table class="deals-table"><thead><tr><th>Агент</th><th>Активных</th><th>Пайплайн</th><th>Конверсия</th><th>SLA</th><th>Загрузка</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
-  function viewApprovals() {
+  function approvalsPending() {
     const done = S().apprDone || [];
-    const items = MGR_APPROVALS.map((a, i) => ({ a: a, i: i })).filter((x) => done.indexOf(x.i) < 0);
-    const rows = items.map(({ a, i }) => {
+    return (D().approvals || []).filter((a) => done.indexOf(a.id) < 0);
+  }
+  function approvalRows(items) {
+    return items.map((a) => {
       const warn = a.tone === 'warn' ? ' <span class="badge warn">' + I('warn') + 'сверх лимита</span>' : '';
       return '<div class="appr-row"><div class="fi i-' + (a.tone === 'warn' ? 'stop' : 'info') + '">' + I(a.ic) + '</div>' +
         '<div class="appr-main"><div class="t">' + a.t + warn + '</div>' +
         '<div class="m">' + a.sub + ' · ' + agentName(a.who) + ' · ' + a.when + '</div></div>' +
-        '<div class="appr-acts"><button class="btn sm" data-reject="' + i + '">' + I('x') + 'Отклонить</button>' +
-        '<button class="btn sm primary" data-approve="' + i + '">' + I('check') + 'Одобрить</button></div></div>';
+        '<div class="appr-acts"><button class="btn sm" data-reject="' + escAttr(a.id) + '">' + I('x') + 'Отклонить</button>' +
+        '<button class="btn sm primary" data-approve="' + escAttr(a.id) + '">' + I('check') + 'Одобрить</button></div></div>';
+    }).join('') || '<div class="empty" style="padding:24px">' + I('checkCircle') + '<div style="font-weight:700;color:var(--ink)">Очередь пуста — всё согласовано</div></div>';
+  }
+  /* Ростер отдела карточками — нужен и в разделе Пульса, и на отдельном экране. */
+  function teamCards() {
+    const sel = S().teamAgent || TEAM[0].id;
+    return TEAM.map((m) => {
+      const st = teamAgentStats(m.id);
+      const over = st.meta.load > 100;
+      const slaLow = st.meta.sla < 80;
+      const badge = over ? '<span class="badge stop">' + I('warn') + 'перегрузка</span>'
+        : slaLow ? '<span class="badge warn">' + I('warn') + 'SLA</span>'
+          : '<span class="badge ok">' + I('check') + 'в норме</span>';
+      return '<button class="team-card' + (m.id === sel ? ' on' : '') + '" data-teamagent="' + m.id + '">' +
+        '<div class="tc-head"><span class="tc-av">' + mgrInitials(m.name) + '</span>' +
+        '<div class="tc-id"><div class="tc-name">' + m.name + '</div><div class="tc-focus">' + st.meta.focus + '</div></div>' + badge + '</div>' +
+        '<div class="tc-load"><div class="tc-load-bar"><i class="' + (over ? 'over' : '') + '" style="width:' + Math.min(100, st.meta.load) + '%"></i></div><span class="tc-load-n">' + st.meta.load + '%</span></div>' +
+        '<div class="tc-stats">' +
+        '<div><b>' + st.active + '</b><span>сделок</span></div>' +
+        '<div><b>' + WS.AED(st.val) + '</b><span>сделки в работе</span></div>' +
+        '<div><b>' + st.meta.conv + '%</b><span>конверсия</span></div>' +
+        '<div><b>' + st.meta.sla + '%</b><span>SLA</span></div>' +
+        '</div></button>';
+    }).join('');
+  }
+  function stuckDeals() {
+    const pred = (SAVED_VIEWS.find((v) => v.k === 'stuck') || {}).pred || (() => false);
+    return (D().deals || []).filter(pred);
+  }
+  function mgrAtRisk() {
+    return Object.keys(TEAM_META).filter((k) => TEAM_META[k].load > 100 || TEAM_META[k].sla < 80);
+  }
+
+  function viewApprovals() {
+    const done = S().apprDone || [];
+    const items = (D().approvals || []).filter((a) => done.indexOf(a.id) < 0);
+    const rows = items.map((a) => {
+      const warn = a.tone === 'warn' ? ' <span class="badge warn">' + I('warn') + 'сверх лимита</span>' : '';
+      return '<div class="appr-row"><div class="fi i-' + (a.tone === 'warn' ? 'stop' : 'info') + '">' + I(a.ic) + '</div>' +
+        '<div class="appr-main"><div class="t">' + a.t + warn + '</div>' +
+        '<div class="m">' + a.sub + ' · ' + agentName(a.who) + ' · ' + a.when + '</div></div>' +
+        '<div class="appr-acts"><button class="btn sm" data-reject="' + escAttr(a.id) + '">' + I('x') + 'Отклонить</button>' +
+        '<button class="btn sm primary" data-approve="' + escAttr(a.id) + '">' + I('check') + 'Одобрить</button></div></div>';
     }).join('') || '<div class="empty" style="padding:24px">' + I('checkCircle') + '<div style="font-weight:700;color:var(--ink)">Очередь пуста — всё согласовано</div></div>';
     return head('Согласования', 'Очередь одобрений от агентов: коммерческие предложения, скидки сверх лимита, co-broking сплиты, договоры. Одобрение фиксируется в истории сделки; отклонение возвращается агенту.', '') +
       '<div class="card"><div class="section-label" style="padding:12px 16px 4px">В очереди · ' + items.length + '</div><div class="appr-list">' + rows + '</div></div>';
@@ -19106,8 +19433,33 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       rows + dupBlock +
       '<div class="qa-row" style="margin-top:12px">' +
       '<button class="btn xs primary" data-act="inboxDraftReply" data-inbox="' + escAttr(it.id) + '">' + I('send') + 'Подготовить ответ</button>' +
-      '<button class="btn xs" data-nav="leads">' + I('users') + 'Назначить</button>' +
+      /* Было data-nav="leads" — экран РУКОВОДИТЕЛЯ. У брокера этого раздела в навигации
+         нет, и кнопка не делала ничего. Назначение принадлежит ЭТОМУ обращению —
+         значит, решается здесь же, а не переходом в чужой список. */
+      '<button class="btn xs" data-act="inboxAssign" data-inbox="' + escAttr(it.id) + '">' + I('users') + 'Назначить</button>' +
       '</div></div>';
+  }
+  /* Кому отдать обращение. Тот же ростер и тот же storeApi.assignInbox, что и у
+     руководителя в «Распределении лидов», — два входа в одно действие, а не два действия. */
+  function openInboxAssign(inboxId) {
+    const it = (D().inbox || []).find((x) => x.id === inboxId);
+    if (!it) { WS.storeApi.toast('Обращение не найдено: ' + inboxId); return; }
+    const cur = it.assignee;
+    const rows = (D().roster || []).map((m) => {
+      const mine = m.id === cur;
+      const st = (typeof teamAgentStats === 'function') ? teamAgentStats(m.id) : null;
+      const load = st && st.meta ? st.meta.load + '% загрузка · ' + st.active + ' в работе' : '';
+      return '<button class="feed-row" style="width:100%;text-align:left" data-leadassign="' +
+        escAttr(it.id) + '~~' + escAttr(m.id) + '">' +
+        '<div class="fi i-' + (mine ? 'ok' : 'info') + '">' + I(mine ? 'check' : 'users') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(m.name) + (mine ? ' · сейчас на нём' : '') + '</div>' +
+        (load ? '<div class="m">' + load + '</div>' : '') + '</div>' + I('arrowRight') + '</button>';
+    }).join('');
+    openModal('Кому назначить обращение',
+      '<div class="rw-prov" style="margin-bottom:10px">' + I('shield') +
+        'Назначение остаётся в записи: обращение уйдёт из очереди распределения, но не из данных.</div>' +
+      '<div class="feed">' + rows + '</div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
   /* Решение по дублю пишется в саму запись и в историю контакта. Показанное имя ничего не
      адресует — связь ставится по id кандидата, поэтому переименование контакта решение не
@@ -20451,7 +20803,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
@@ -21015,9 +21367,54 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      So: say what is missing, and — when the question named a district — say
      which districts there ARE, because that is the one thing that makes the
      next question answerable. */
+  /* Названная запись — объект, контакт или компания. findEntity ищет только среди
+     контактов и компаний — объекты в нём не ищутся вовсе, и вопрос про Creekline
+     Residences падал в «такого у нас в данных нет» при том, что объект лежит в инвентаре.
+     Стенд не имеет права отрицать то, что у него есть. */
+  function namedRecord(text) {
+    const t = lc(text || '');
+    const d = WS.store.data || {};
+    const scan = (list, kind) => {
+      let top = null;
+      (list || []).forEach((x) => {
+        let hits = 0;
+        String(x.name || '').split(/\s+/).forEach((w) => {
+          const s = stem(w);
+          if (s.length >= 4 && t.indexOf(s) >= 0) hits++;
+        });
+        if (hits && (!top || hits > top.hits)) top = { kind: kind, rec: x, hits: hits };
+      });
+      return top;
+    };
+    const best = [scan(d.objects, 'object'), scan(d.clients, 'contact'), scan(d.companies, 'company')]
+      .filter(Boolean).sort((a, b) => b.hits - a.hits)[0];
+    return best || null;
+  }
+
   function orient(text) {
     const know = inventory();
     const t = lc(text || '');
+    /* Если в вопросе названа запись, которая У НАС ЕСТЬ, ответ «такого нет» — ложь.
+       Офлайновый планировщик не умеет рассуждать («кому подходит», «как продавать»),
+       но он обязан сказать, что запись есть, что по ней известно и что именно он показать может. */
+    const named = namedRecord(text);
+    if (named) {
+      const r = named.rec;
+      const facts = named.kind === 'object'
+        ? [r.area, r.attrs && r.attrs.area ? r.attrs.area : null, r.price ? WS.AED(r.price) : null]
+            .filter(Boolean).join(' · ')
+        : [r.phone, r.budget ? WS.AED(r.budget) : null].filter(Boolean).join(' · ');
+      const what = named.kind === 'object' ? 'объект' : named.kind === 'contact' ? 'контакт' : 'компания';
+      return {
+        kind: 'answer',
+        text: 'Такой ' + what + ' у нас есть: «' + r.name + '»' + (facts ? ' — ' + facts : '') + '. ' +
+          'Но разбор «как продавать и кому подходит» делает модель, а сейчас отвечает офлайновый режим — ' +
+          'связи с моделью нет. Могу показать по нему цифры из данных: цену, площадь, срез по району, ' +
+          'кто из клиентов его смотрел и что по нему в работе.',
+        evidence: [],
+        next: suggestions(),
+      };
+    }
     /* Which districts this stand can actually speak about — read from the
        market slice, not from AREAS. AREAS holds the four with the full picture
        (they also carry inventory); the slice covers nine, five of them
@@ -22804,11 +23201,14 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     };
     rec.onerror = (e) => {
       st.lastError = (e && e.error) || 'error';
-      // «Не разрешили» is worth saying; «ты молчал» is not.
+      // Inform on hard failures; give a soft hint on silence so the broker
+      // knows the mic actually ran and just heard nothing.
       if (st.lastError === 'not-allowed' || st.lastError === 'service-not-allowed') {
         toast('Браузер не дал доступ к микрофону — наберите текстом');
       } else if (st.lastError === 'audio-capture') {
         toast('Микрофон не найден — наберите текстом');
+      } else if (st.lastError === 'no-speech') {
+        toast('Ничего не услышал — попробуйте ещё раз');
       }
       stop();
     };
@@ -22899,9 +23299,36 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return out.length ? out : [String(text)];
   }
 
+  /* Что синтезатор читает неправильно, если дать ему экранный текст как есть.
+
+     Intl в ru-RU группирует разряды неразрывным пробелом: «20 228 000». Голос видит
+     три разных числа и читает «двадцать — двести двадцать восемь — ноль» вместо
+     «двадцать миллионов двести двадцать восемь тысяч». Склеиваем группы обратно.
+     «AED» тот же голос читает по буквам — подставляем русское слово в нужном числе. */
+  function plural(n, one, few, many) {
+    const a = Math.abs(n) % 100;
+    const b = a % 10;
+    if (a > 10 && a < 20) return many;
+    if (b > 1 && b < 5) return few;
+    if (b === 1) return one;
+    return many;
+  }
+  function forSpeech(text) {
+    let t = String(text || '');
+    // Склеить разряды: «20 228 000» → «20228000» (обычный и неразрывный пробел, узкий неразрывный).
+    for (let i = 0; i < 4; i++) t = t.replace(/(\d)[\u00a0\u202f ](\d{3})\b/g, '$1$2');
+    // Валюта словом, в согласии с числом перед ней.
+    t = t.replace(/(\d+)\s*AED\b/gi, (m, n) => n + ' ' + plural(+n, 'дирхам', 'дирхама', 'дирхамов'));
+    t = t.replace(/\bAED\b/gi, 'дирхамов');
+    // Единицы, которые иначе читаются символами.
+    t = t.replace(/(\d)\s*м²/g, '$1 квадратных метров');
+    t = t.replace(/(\d)\s*%/g, '$1 процентов');
+    return t;
+  }
+
   function say(text, key) {
     const s = synth(); const U = UtterCtor();
-    const t = String(text || '').trim();
+    const t = forSpeech(text).trim();
     if (!s || !U || !t) return false;
     try { s.cancel(); } catch (e) { /* nothing to cancel */ }
 
@@ -22949,7 +23376,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     window.addEventListener('pagehide', () => { stop(); stopSpeech(); });
   }
 
-  WS.voice = { canDictate, canSpeak, dictate, stop, dictating, spokenText, say, sayReply, stopSpeech, speaking,
+  WS.voice = { canDictate, canSpeak, dictate, stop, dictating, spokenText, say, sayReply, stopSpeech, speaking, forSpeech,
     get lastError() { return st.lastError; } };
 })(window.WS = window.WS || {});
 
@@ -23135,12 +23562,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       const p = d.leadassign.split('~~');
       const res = api.assignInbox(p[0], p[1]);
       if (!res.ok) { api.toast('Не удалось назначить: не найден ' + res.what); return api.emit(); }
+      if (WS.ui.closeModal) WS.ui.closeModal();
       const who = ((store.data.roster || []).find((x) => x.id === p[1]) || {}).name || p[1];
       api.toast(res.changed ? 'Обращение назначено: ' + who : 'Уже назначено: ' + who, 'ok');
       return api.emit();
     }
-    if (d.approve) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.approve) < 0) store.apprDone.push(+d.approve); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
-    if (d.reject) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.reject) < 0) store.apprDone.push(+d.reject); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
+    if (d.approve) { WS.ui.resolveApproval(d.approve, 'approve'); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
+    if (d.reject) { WS.ui.resolveApproval(d.reject, 'reject'); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
     if (d.objfilter) { store.objFilter = d.objfilter; return api.emit(); }
     if (d.clubcomm) { store.clubComm = d.clubcomm; return api.emit(); }
     if (d.clubreq) return WS.ui.openClubRequest(d.clubreq);
@@ -23285,8 +23713,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'sendOwnerReport': WS.ui.sendOwnerReport(t.dataset.contract); break;
       case 'saveShowOutcome': WS.ui.saveShowOutcome(t.dataset.ev); break;
       case 'ocDictate': {
+        /* dictate(el) expects a DOM element, not a callback — el.value is where it
+           writes interim + final transcripts. Passing a callback set el.value to
+           undefined and the recognised text was lost. */
         const box = document.getElementById('ocText');
-        if (WS.voice && WS.voice.dictate) WS.voice.dictate((txt) => { if (box) box.value = txt; });
+        if (WS.voice && WS.voice.dictate) WS.voice.dictate(box || null);
         break;
       }
       case 'dayLine': store.dayView = 'line'; api.emit(); break;
@@ -23294,9 +23725,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       case 'navBack': WS.router.back(); break;
       case 'about': WS.ui.openAbout(); break;
       case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
+      case 'inboxAssign': WS.ui.openInboxAssign(t.dataset.inbox); break;
       case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;
       case 'createDealShow': WS.ui.createDealShow(t.dataset.deal); break;
       case 'calShow': WS.ui.openCalendarShowPicker(); break;
+      case 'saveReqSel': WS.ui.saveRequestSelection(t.dataset.req, t.dataset.obj, t.dataset.mode); break;
       case 'inboxDraftReply': WS.ui.openReplyDraft(t.dataset.inbox); break;
       case 'inboxDupMerge': WS.ui.inboxDupDecide(t.dataset.inbox, t.dataset.cid); break;
       case 'inboxDupNew': WS.ui.inboxDupDecide(t.dataset.inbox, null); break;
@@ -23453,8 +23886,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }
-      case 'startSend': routePrompt(promptValue('startPrompt')); break;
-      case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
+      /* UI-level duplicate-send guard: blocks the send button while the Concierge
+         is processing a request. routePrompt itself is not guarded so the test
+         harness can drive sequential calls directly. */
+      case 'startSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('startPrompt')); } break;
+      case 'cgSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('cgPrompt')); } break;
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
       // Раздел показывает возможности сеткой (их много, и их сравнивают) либо колодой
       // (их разбирают по одной, со смахиванием). Флаг называется тем, что означает.
@@ -23463,9 +23899,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
-      case 'cgDockSend': WS.ui.sendFromDock(promptValue('cgDockPrompt')); break;
+      case 'cgDockSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromDock(promptValue('cgDockPrompt')); } break;
       // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
-      case 'cardSend': WS.ui.sendFromCard(); break;
+      case 'cardSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromCard(); } break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
       case 'cgWorkshop': store.cgWorkshopOpen = !store.cgWorkshopOpen; api.emit(); break;
       case 'cgRailToggle': store.cgRailOpen = !store.cgRailOpen; api.emit(); break;
