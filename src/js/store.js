@@ -69,6 +69,7 @@
       tasks: clone(f.tasks),
       events: clone(f.events),
       inbox: clone(f.inbox),
+      approvals: clone(f.approvals),
       analytics: clone(f.analytics),
       roster: clone(f.roster),
       refModel: clone(f.refModel),
@@ -136,6 +137,9 @@
         shortlist: store.shortlist, podborClient: store.podborClient, docTab: store.docTab,
         // event layer + Concierge threads survive F5 (audit P0-6)
         eventsPlayed: store.eventsPlayed, feedback: store.feedback, dayStep: store.dayStep,
+        /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
+           стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
+        signals: store.signals, snapSentHash: store.snapSentHash,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -161,7 +165,25 @@
     store.eventsPlayed = p.eventsPlayed || [];
     store.feedback = p.feedback || [];
     store.dayStep = p.dayStep || 0;
+    store.signals = p.signals || [];
+    store.snapSentHash = p.snapSentHash || null;
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
+    /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
+
+       Раньше любое изменение формы данных требовало поднять SCHEMA, а поднятая SCHEMA
+       выбрасывает ВСЁ сохранённое состояние — вместе с перепиской живого брокера, которая
+       существует в единственном экземпляре у него в браузере. Цена чистоты оказалась выше,
+       чем то, что она защищает.
+
+       Добавление НОВОЙ коллекции подъёма схемы не требует: чего в снимке нет —
+       берётся из свежих фикстур, что есть — не трогается. Поднимать SCHEMA теперь
+       нужно только когда ИЗМЕНИЛАСЬ форма СУЩЕСТВУЮЩЕЙ записи и старая читается неверно. */
+    const fresh = freshData();
+    const filled = [];
+    Object.keys(fresh).forEach((k) => {
+      if (store.data[k] === undefined || store.data[k] === null) { store.data[k] = fresh[k]; filled.push(k); }
+    });
+    if (filled.length) store.migratedKeys = filled;
     return true;
   }
 
@@ -805,9 +827,32 @@
     setTimeout(() => { store.toasts = store.toasts.filter((x) => x.id !== t.id); emit(); }, 3200);
   }
 
+  /* Назначение лида. Прежний код делал `arr.splice(ix, 1)` по ИНДЕКСУ массива: очередь
+     визуально уменьшалась, но запись исчезала из `data.inbox` совсем — вместе с ней из
+     календаря и из истории контакта пропадала входящая коммуникация. Хуже того, индекс
+     брался из позиции в отрисованном списке, так что после любой пересортировки кнопка
+     меняла не ту запись.
+
+     Назначение — это СОСТОЯНИЕ записи, а не её удаление: очередь строится фильтром по
+     `assignee`, а сама запись остаётся на месте. Идентификаторы обеих сторон проверяются,
+     повторное назначение тому же агенту ничего не меняет. */
+  function assignInbox(inboxId, userId) {
+    const rec = (store.data.inbox || []).find((x) => x.id === inboxId);
+    if (!rec) return { ok: false, reason: 'not_found', what: 'обращение ' + inboxId };
+    const user = (store.data.roster || []).find((x) => x.id === userId) ||
+                 (store.data.users && store.data.users[userId] ? { id: userId } : null);
+    if (!user) return { ok: false, reason: 'not_found', what: 'сотрудник ' + userId };
+    if (rec.assignee === userId) return { ok: true, changed: false, rec: rec };
+    rec.assignee = userId;
+    rec.assignedAt = (WS.fixtures && WS.fixtures.DEMO_NOW) ? 'сегодня' : 'сейчас';
+    if (rec.stage === 'new' || !rec.stage) rec.stage = 'assigned';
+    save();
+    return { ok: true, changed: true, rec: rec };
+  }
+
   WS.store = store;
   WS.storeApi = {
-    boot, subscribe, emit, save, resetAll, resetScene,
+    boot, subscribe, emit, save, resetAll, resetScene, assignInbox,
     setTheme, setRole, setView, setScenarioStatus, logEvent, applyEffects, apply, preview, taskAction, addTask, setDealStage, touch, updateEvent, toast, clockLabel, clone,
   };
 })(window.WS = window.WS || {});

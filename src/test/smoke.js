@@ -3594,6 +3594,9 @@ setTimeout(async () => {
         win.fetch = (url) => {
           const u = String(url);
           if (/\/health$/.test(u)) return health();
+          /* Считаем ТОЛЬКО попытки спросить. Выгрузка накопленного ходит на /snapshot
+             своим чередом и к повтору запроса отношения не имеет. */
+          if (/\/snapshot$/.test(u)) return Promise.reject(new TypeError('Failed to fetch'));
           asked.push(u);
           return Promise.reject(new TypeError('Failed to fetch'));
         };
@@ -7317,7 +7320,11 @@ setTimeout(async () => {
        область у каждого названа и что части сходятся в целое. */
     {
       const wasRole = WS.store.role;
-      WS.store.role = 'manager'; WS.router.go('start'); WS.ui.render();
+      /* Пульс руководителя переведён на ту же раскладку, что у брокера: разделы с корешками,
+         а не одна простыня. Плитки отдела живут в «Аналитике» — раздел выбирается явно, иначе
+         проверка меряет раздел «Требует решения», в котором их и не должно быть. */
+      WS.store.role = 'manager'; WS.store.pulseSection = 'analytics';
+      WS.router.go('start'); WS.ui.render();
       const t2 = (doc.getElementById('main') || doc.body).textContent.replace(/\s+/g, ' ');
       /* Разбирается РАЗМЕТКА, а не склеенный текст экрана: в строке «Закрыто в самом стенде
          1 1 750 000 AED» соседние числа сливаются, и первая версия этой проверки прочитала
@@ -7344,7 +7351,8 @@ setTimeout(async () => {
         !!depM && !!bookM && canonN !== null &&
         Number(depM[1]) === Number(bookM[1]) + canonN && Number(depM[2]) === canonN,
         depM ? depM[1] + ' = ' + (bookM ? bookM[1] : '?') + ' + ' + canonN : 'не разобрано');
-      WS.store.role = wasRole; WS.router.go('start'); WS.ui.render();
+      WS.store.role = wasRole; WS.store.pulseSection = null;
+      WS.router.go('start'); WS.ui.render();
     }
     /* Одно понятие — одно слово, и русское, раз оно есть. «Пайплайн» стоял рядом с
        «активными сделками» и «сделками в работе» на одном и том же экране. */
@@ -8544,6 +8552,345 @@ setTimeout(async () => {
     check('каркас · внизу заявки одна строка ввода',
       doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length === 1,
       String(doc.querySelectorAll('#app .view .dcard-composer .dx-cbar').length));
+  }
+
+  const appEl2 = () => doc.getElementById('app');
+
+  /* ---- Пульс руководителя и его Консьерж — в том же формате, что у брокера ----
+     Два экрана с одним названием были устроены по-разному: у брокера разделы с корешками
+     и целями в боковой колонке, у руководителя — плоская простыня плиток. А подсказки
+     Консьержа предлагали руководителю собрать КП по чужой клиентке и спросить про «мои
+     сделки», которых у него нет. */
+  {
+    const wasRole = WS.store.role;
+
+    WS.store.role = 'manager'; WS.store.pulseSection = null;
+    WS.router.go('start'); WS.ui.render();
+    const app = doc.getElementById('app');
+    check('Пульс руководителя · та же раскладка с боковой колонкой, что у брокера',
+      !!app.querySelector('.psec') && !!app.querySelector('.psec-side') && !!app.querySelector('.psec-body'),
+      'psec=' + !!app.querySelector('.psec'));
+    const tabs = [].slice.call(app.querySelectorAll('.psec-tab'))
+      .map((b) => (b.textContent || '').replace(/\s+/g, ' ').trim());
+    check('Пульс руководителя · четыре своих раздела, не брокерские',
+      tabs.length === 4 && /Требует решения/.test(tabs.join(' ')) &&
+      !/Мои дела|Перспективные сделки/.test(tabs.join(' ')), tabs.join(' | '));
+    check('Пульс руководителя · цели стоят в боковой колонке, как у брокера',
+      !!app.querySelector('.psec-side .pgoal'), 'pgoal в side');
+
+    // Каждый раздел что-то рисует, а не падает.
+    ['decide', 'risk', 'team', 'analytics'].forEach((k) => {
+      WS.store.pulseSection = k; WS.ui.render();
+      const body = doc.getElementById('app').querySelector('.psec-body');
+      const len = ((body || {}).textContent || '').replace(/\s+/g, ' ').trim().length;
+      check('Пульс руководителя · раздел «' + k + '» наполнен', len > 60, 'длина ' + len);
+    });
+
+    // Подсказки Консьержа говорят о работе руководителя, а не брокера.
+    WS.store.pulseSection = null;
+    WS.engine.closeThread && WS.engine.closeThread();
+    WS.router.go('concierge'); WS.ui.render();
+    const cgTxt = (doc.getElementById('app').textContent || '').replace(/\s+/g, ' ');
+    check('Консьерж руководителя · не предлагает чужую брокерскую работу',
+      !/Собрать КП по /.test(cgTxt) && !/по моим сделкам/.test(cgTxt),
+      cgTxt.slice(0, 120));
+    check('Консьерж руководителя · говорит, что видит отдел',
+      /отдел/.test(cgTxt), cgTxt.slice(0, 140));
+
+    WS.store.role = 'agent'; WS.store.pulseSection = null;
+    WS.router.go('concierge'); WS.ui.render();
+    const cgAgent = (doc.getElementById('app').textContent || '').replace(/\s+/g, ' ');
+    check('Консьерж брокера · по-прежнему про его собственную работу',
+      /ваши сделки/.test(cgAgent), cgAgent.slice(0, 120));
+
+    WS.store.role = wasRole; WS.store.pulseSection = null;
+    WS.router.go('start'); WS.ui.render();
+  }
+
+  /* ---- Согласования: стабильные ID, решение пишется в историю сделки ----
+     Старый код хранил согласования в MGR_APPROVALS с числовыми индексами: перестановка пунктов
+     сдвигала индексы, и apprDone переставал соответствовать реальности. Одобрение только
+     переключало статус — в историю сделки ничего не писалось. */
+  {
+    WS.storeApi.resetAll();
+    const appr = dd().approvals || [];
+    check('согласования перешли в data.approvals, MGR_APPROVALS удалён', appr.length >= 1 && appr.every((a) => typeof a.id === 'string'),
+      'записей: ' + appr.length);
+
+    check('Согласования · КП Игоря Лебедева удалён (у него нет активной сделки)',
+      !appr.some((a) => /Игорь Лебедев/.test(a.t || '')),
+      appr.map((a) => a.t).join(' | '));
+
+    // resolveApproval writes to the matching deal timeline
+    const first = appr[0];
+    const beforeLen = ((dd().dealTimeline || {})[first.dealId] || []).length;
+    WS.ui.resolveApproval(first.id, 'approve');
+    const afterLen = ((dd().dealTimeline || {})[first.dealId] || []).length;
+    check('Согласование · resolveApproval пишет запись в историю сделки',
+      afterLen > beforeLen, 'было ' + beforeLen + ' стало ' + afterLen);
+
+    check('Согласование · одобренное попадает в done-множество со строковым ID',
+      (WS.store.apprDone || []).includes(first.id), JSON.stringify(WS.store.apprDone));
+
+    check('Согласование · идемпотентность: повторный approve не пишет вторую запись',
+      ((dd().dealTimeline || {})[first.dealId] || []).length === afterLen, 'второй approve');
+    WS.ui.resolveApproval(first.id, 'approve');
+    check('Согласование · идемпотентность: повторный approve не пишет вторую запись',
+      ((dd().dealTimeline || {})[first.dealId] || []).length === afterLen, 'записей: ' + ((dd().dealTimeline || {})[first.dealId] || []).length);
+
+    WS.storeApi.resetAll();
+  }
+
+  /* ---- Выбор объекта подтверждается и оставляет след; КП не молчит о расхождении ----
+     Нажатие молча переписывало `offered.state`, и дальше расходились три вещи: сводка называла
+     прежний объект, КП оставалось собранным по старому набору, а в истории заявки не было ни
+     следа о том, когда и откуда взялся новый выбор. Проверено на Анне: после выбора Bay Central
+     сводка продолжала утверждать, что выбран Creekline. */
+  {
+    WS.storeApi.resetAll();
+    const r0 = (dd().requests || []).find((x) => x.id === 'r_anna');
+    const before = (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    const other = (r0.offered || []).find((o) => o.state !== 'selected');
+
+    WS.ui.reqObjState('r_anna', other.id, 'selected');
+    check('выбор · нажатие не меняет выбор молча, а спрашивает подтверждение',
+      !!doc.getElementById('selSrc') &&
+      (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id).join() === before.join(),
+      'выбрано ' + (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id).join(', '));
+
+    WS.ui.saveRequestSelection('r_anna', other.id, 'replace');
+    const after = (r0.offered || []).filter((o) => o.state === 'selected').map((o) => o.id);
+    check('выбор · подтверждение заменяет прежний выбор', after.length === 1 && after[0] === other.id,
+      before.join(',') + ' → ' + after.join(','));
+    check('выбор · записан источник', !!r0.selectionSource && !!r0.selectionConfirmedAt,
+      String(r0.selectionSource));
+    const tl = ((dd().requestTimeline || {})['r_anna'] || []).slice(-1)[0] || {};
+    check('выбор · в истории заявки появился след с источником',
+      /Выбран/.test(tl.text || '') && (tl.text || '').indexOf(r0.selectionSource) > 0, (tl.text || '').slice(0, 110));
+
+    // Отказ и возврат в «предложено» подтверждения не требуют — они ничего не обещают.
+    const third = (r0.offered || []).find((o) => o.id !== other.id);
+    WS.ui.closeModal();
+    WS.ui.reqObjState('r_anna', third.id, 'rejected');
+    check('выбор · отказ применяется сразу, без подтверждения',
+      ((r0.offered || []).find((o) => o.id === third.id) || {}).state === 'rejected' && !doc.getElementById('selSrc'),
+      String(((r0.offered || []).find((o) => o.id === third.id) || {}).state));
+
+    // КП расходится с текущим выбором — и говорит об этом.
+    check('КП · расхождение с текущим выбором обнаружено', !!WS.ui.reqKpDrift(r0), JSON.stringify(WS.ui.reqKpDrift(r0)));
+    WS.ui.requestCard('r_anna');
+    check('КП · о расхождении сказано на экране',
+      /разошлось с выбором/.test(appEl2().textContent || '') && /Пересоберите/.test(appEl2().textContent || ''),
+      (appEl2().textContent || '').slice(0, 60));
+
+    /* Кнопка «Создать сделку» рисовалась всегда, а проверка стояла внутри обработчика: когда
+       все выбранные объекты заняты действующими сделками, нажатие заканчивалось отпиской. */
+    const busy = (dd().requests || []).find((r) => (r.offered || []).some((o) => o.state === 'selected') &&
+      WS.ui.reqSelectedFree && !WS.ui.reqSelectedFree(r).length && r.kp && r.kp.formed);
+    if (busy) {
+      WS.ui.requestCard(busy.id);
+      check('КП · когда создавать нечего, кнопка не обещает сделку',
+        !appEl2().querySelector('[data-act="reqCreateDeal"]') &&
+        /уже в сделках/.test(appEl2().textContent || ''),
+        (appEl2().textContent || '').slice(0, 80));
+    } else {
+      // Строим случай сами: заявка с выбранным объектом, который уже лежит в её же сделке.
+      const r2 = (dd().requests || []).find((r) => r.kp && r.kp.formed && (r.offered || []).some((o) => o.state === 'selected'));
+      const selId = (r2.offered || []).filter((o) => o.state === 'selected')[0].id;
+      dd().deals.push({ id: 'd_probe_busy', clientId: r2.clientId, requestId: r2.id, agent: r2.assignee,
+        title: 'проба', funnel: r2.funnel, stage: 'prep', lots: [selId], objectId: selId, amount: 0 });
+      WS.ui.requestCard(r2.id);
+      check('КП · когда создавать нечего, кнопка не обещает сделку',
+        !appEl2().querySelector('[data-act="reqCreateDeal"]') &&
+        /уже в сделках/.test(appEl2().textContent || ''),
+        'свободных ' + WS.ui.reqSelectedFree(r2).length + ' · ' + (appEl2().textContent || '').slice(0, 70));
+      dd().deals = dd().deals.filter((x) => x.id !== 'd_probe_busy');
+    }
+    WS.storeApi.resetAll();
+  }
+
+  /* ---- Показ по сделке — связанная запись, а не строка в ленте ----
+     «Назначить показ» и «Записать событие» вызывали один обработчик `addEvent`: это была одна
+     кнопка, подписанная двумя способами. Показ получался заметкой — без объекта, исполнителя и
+     доступа, не попадал в календарь и не двигал следующий шаг. */
+  {
+    WS.storeApi.resetAll();
+    WS.ui.dealCard('d_anna');
+    const acts = [].slice.call(doc.querySelectorAll('#app [data-act]'))
+      .filter((b) => /Назначить показ|Записать событие/.test(b.textContent || ''))
+      .map((b) => (b.textContent || '').trim() + '→' + b.dataset.act);
+    check('показ · «назначить показ» и «записать событие» — разные действия',
+      acts.length === 2 && acts[0].indexOf(acts[0].split('→')[1]) &&
+      acts[0].split('→')[1] !== acts[1].split('→')[1], acts.join(' | '));
+
+    const before = (dd().events || []).length;
+    WS.ui.openDealShowForm('d_anna');
+    WS.ui.createDealShow('d_anna');
+    const made = (dd().events || []).slice(before);
+    const ev = made[0] || {};
+    check('показ · создан именно показ, а не заметка', made.length >= 1 && ev.kind === 'show', ev.kind || 'нет события');
+    check('показ · все связи проставлены',
+      ev.dealId === 'd_anna' && ev.clientId === 'c_anna' && !!ev.objectId && !!ev.executorId && !!ev.when,
+      JSON.stringify({ deal: ev.dealId, client: ev.clientId, obj: ev.objectId, exec: ev.executorId, when: ev.when }));
+    check('показ · спрошены исполнитель и доступ на объект',
+      !!ev.executorId && !!ev.access, JSON.stringify({ exec: ev.executorId, access: ev.access }));
+
+    const cal = (WS.ui.calendarActivities ? WS.ui.calendarActivities() : []).filter((x) => x.id === ev.id);
+    check('показ · виден в календаре', cal.length === 1, String(cal.length));
+    /* Различать надо на случае, где объект показа и «первый объект клиента» РАЗНЫЕ: у Анны они
+       совпадают, и проверка на ней прошла бы при любой из двух реализаций. Поэтому показ ставится
+       на заведомо другой объект — тогда старое поведение видно сразу. */
+    {
+      const other = (dd().objects || []).find((o) => o.id !== ev.objectId);
+      const probe = { id: 'e_probe_calobj', kind: 'show', status: 'planned', clientId: ev.clientId,
+        dealId: ev.dealId, requestId: ev.requestId, objectId: other.id, executor: 'Марина Волкова',
+        title: 'Показ · ' + other.name, when: 'сегодня 18:00' };
+      dd().events.push(probe);
+      const row = (WS.ui.calendarActivities() || []).filter((x) => x.id === probe.id)[0] || {};
+      check('показ · календарь берёт объект самого показа, а не первый объект клиента',
+        row.objectId === other.id,
+        'в календаре ' + String(row.objectId) + ', в показе ' + other.id +
+        ', первый объект клиента ' + String(WS.ui.objOfClient ? WS.ui.objOfClient(ev.clientId) : '—'));
+      dd().events = dd().events.filter((x) => x.id !== probe.id);
+    }
+    check('показ · один и тот же id виден в ленте сделки и в ленте заявки',
+      ((dd().dealTimeline || {})['d_anna'] || []).some((e) => e.eventId === ev.id) &&
+      ((dd().requestTimeline || {})[ev.requestId] || []).some((e) => e.eventId === ev.id),
+      'заявка ' + ev.requestId);
+    const d = (dd().deals || []).find((x) => x.id === 'd_anna');
+    check('показ · назначение не двигает стадию сделки — показ назначен, а не проведён',
+      d.stage === 'prep' && d.nextDue === ev.when, d.stage + ' / ' + d.nextDue);
+
+    // Календарная кнопка больше не запускает сценарий.
+    WS.router.go('shows');
+    const calBtn = [].slice.call(doc.querySelectorAll('#app button'))
+      .filter((b) => /Назначить показ/.test(b.textContent || ''));
+    check('показ · кнопка календаря не запускает демо-сценарий',
+      calBtn.length > 0 && calBtn.every((b) => !b.dataset.scn),
+      calBtn.map((b) => (b.dataset.act || '') + (b.dataset.scn ? ' scn=' + b.dataset.scn : '')).join(', ') || 'кнопки нет');
+    WS.storeApi.resetAll();
+  }
+
+  /* ---- Разбор входящего открывает саму запись, а не подходящий демо-сюжет ----
+     Кнопка «Разобрать» выбирала сценарий по типу обращения: у Sarah, написавшей по-английски
+     «1BR investment unit in JVC, budget ~1.3M», запускался S15 с чужим русским запросом про
+     1,5 млн, а у обращения с возможным дублем сценария не было вовсе — и «Разобрать» отдавало
+     пустой Консьерж без текста, канала, времени и повода. Оба случая проверены кликами на
+     опубликованном стенде. */
+  {
+    WS.storeApi.resetAll();
+    WS.router.go('requests');
+    const btns = [].slice.call(doc.querySelectorAll('#app [data-act="inboxTriage"]'));
+    check('входящие · кнопок разбора столько же, сколько обращений',
+      btns.length >= (dd().inbox || []).length, btns.length + ' против ' + (dd().inbox || []).length);
+    check('входящие · ни одна кнопка разбора не запускает сценарий',
+      btns.every((b) => !b.dataset.scn) && btns.every((b) => /^in_/.test(b.dataset.inbox || '')),
+      btns.map((b) => (b.dataset.inbox || '?') + (b.dataset.scn ? ' →' + b.dataset.scn : '')).join(', '));
+
+    // Sarah: её собственный текст, её собственный тред, никакого чужого сюжета.
+    WS.ui.openInboxTriage('in_night');
+    const th = WS.engine.activeThread();
+    const said = ((th && th.items) || []).map((m) => m.html || '').join(' ');
+    check('входящие · разбор Sarah открывает её тред', WS.engine.activeThreadId() === 'inbox:in_night',
+      String(WS.engine.activeThreadId()));
+    check('входящие · в треде её собственный текст, а не подставленный',
+      /1BR investment unit in JVC/.test(said) && !/1,5 млн|1 500 000/.test(said), said.slice(0, 120));
+    check('входящие · демо-тур при разборе не запускается', !WS.store.tour.active, JSON.stringify(WS.store.tour));
+
+    // Повторное открытие не задваивает исходное сообщение.
+    const n1 = ((WS.engine.activeThread() || {}).items || []).length;
+    WS.ui.openInboxTriage('in_night'); WS.ui.openInboxTriage('in_night');
+    check('входящие · повторный разбор не дублирует исходное сообщение',
+      ((WS.engine.activeThread() || {}).items || []).length === n1, 'было ' + n1 + ', стало ' +
+      ((WS.engine.activeThread() || {}).items || []).length);
+
+    // Дубль: кандидат ищется по существующим контактам, а не по латинице в кавычках.
+    const dupRec = (dd().inbox || []).find((x) => x.id === 'in_dup');
+    const cand = WS.ui.inboxDupCandidate(dupRec);
+    check('входящие · у обращения с дублем найден кандидат из контактов',
+      !!(cand && cand.id), cand ? cand.id + ' / ' + cand.name : 'не найден');
+    WS.ui.openInboxTriage('in_dup');
+    check('входящие · разбор дубля показывает сравнение с кандидатом',
+      /Похожий контакт/.test((doc.querySelector('#app .intriage') || {}).textContent || ''),
+      ((doc.querySelector('#app .intriage') || {}).textContent || '').slice(0, 100));
+
+    // Решение по дублю привязывает обращение к контакту по id и пишет в историю.
+    WS.ui.inboxDupDecide('in_dup', cand.id);
+    const after = (dd().inbox || []).find((x) => x.id === 'in_dup');
+    check('входящие · решение по дублю связывает запись по id и оставляет след',
+      after && after.clientId === cand.id && after.resolution === 'merged' &&
+      ((dd().contactTimeline || {})[cand.id] || []).some((e) => /опознано как тот же человек/.test(e.text || '')),
+      JSON.stringify({ clientId: after && after.clientId, resolution: after && after.resolution }));
+
+    // Несуществующее обращение не роняет экран.
+    let threw = false;
+    try { WS.ui.openInboxTriage('in_nope'); } catch (e) { threw = true; }
+    check('входящие · разбор несуществующего обращения не ломает стенд', !threw, String(threw));
+    WS.storeApi.resetAll();
+  }
+
+  /* ---- Сделка из заявки наследует ответственного ----
+     `reqCreateDeal()` не переносил `request.assignee` в `deal.agent`, и новая сделка приходила
+     в аналитику ничьей: выборка «сделки Марины» не находила то, что Марина сама и завела. */
+  {
+    /* Нужна заявка, у которой есть СВОБОДНЫЙ выбранный объект: если все выбранные уже заняты
+       действующими сделками, создавать нечего, и проверка мерила бы не то. */
+    const req = (dd().requests || []).find((r) => r.assignee && WS.ui.reqSelectedFree && WS.ui.reqSelectedFree(r).length);
+    if (req) {
+      const before = (dd().deals || []).map((d) => d.id);
+      WS.ui.reqCreateDeal(req.id);
+      const made = (dd().deals || []).filter((d) => before.indexOf(d.id) < 0);
+      check('заявка → сделка · ответственный унаследован от заявки',
+        made.length > 0 && made.every((d) => d.agent === req.assignee),
+        made.map((d) => d.id + ':' + d.agent).join(', ') + ' | ждали ' + req.assignee);
+      const roster = (dd().roster || []).map((x) => x.id);
+      check('заявка → сделка · ответственный есть в составе команды',
+        made.every((d) => roster.indexOf(d.agent) >= 0), made.map((d) => d.agent).join(', '));
+      made.forEach((d) => { dd().deals = dd().deals.filter((x) => x.id !== d.id); delete (dd().dealTimeline || {})[d.id]; });
+    } else {
+      check('заявка → сделка · ответственный унаследован от заявки', false, 'не нашлось заявки с выбранным объектом');
+    }
+  }
+
+  /* ---- Назначение лида меняет состояние записи, а не удаляет её ----
+     Прежний код делал `splice` по индексу отрисованного списка: очередь уменьшалась, но
+     обращение исчезало из `data.inbox` целиком, а с ним — входящая коммуникация из календаря
+     и из истории контакта. Проверено кликом на опубликованном стенде: пропадало `in_night`.
+     И адресация была по позиции в списке плюс имя агента, поэтому после любой пересортировки
+     кнопка меняла не ту запись. */
+  {
+    const nBefore = (dd().inbox || []).length;
+    const btn = doc.querySelector('#app [data-leadassign]');
+    WS.storeApi.setRole('manager'); WS.router.go('leads');
+    const b2 = doc.querySelector('#app [data-leadassign]');
+    const payload = b2 ? b2.dataset.leadassign : '';
+    check('распределение · кнопка адресует обращение и сотрудника по id, не позицией',
+      /^in_[a-z_]+~~u_[a-z]+$/.test(payload), payload || 'кнопки нет');
+
+    const queueBefore = doc.querySelectorAll('#app .lead-row').length;
+    if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const rec = (dd().inbox || []).find((x) => x.id === payload.split('~~')[0]);
+    check('распределение · назначение не удаляет обращение из данных',
+      (dd().inbox || []).length === nBefore && !!rec,
+      'было ' + nBefore + ', стало ' + (dd().inbox || []).length + ', запись ' + (rec ? 'на месте' : 'ПОТЕРЯНА'));
+    check('распределение · у обращения появился исполнитель',
+      !!(rec && rec.assignee), rec ? String(rec.assignee) : '—');
+    check('распределение · очередь при этом сократилась',
+      doc.querySelectorAll('#app .lead-row').length === queueBefore - 1,
+      'было строк ' + queueBefore + ', стало ' + doc.querySelectorAll('#app .lead-row').length);
+
+    // Повторное назначение тому же — ничего не ломает и не плодит записей.
+    if (b2) b2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    check('распределение · повторное назначение идемпотентно',
+      (dd().inbox || []).length === nBefore, String((dd().inbox || []).length));
+
+    // Несуществующие id не проходят.
+    const bad = WS.storeApi.assignInbox('in_nope', 'u_marina');
+    const bad2 = WS.storeApi.assignInbox(payload.split('~~')[0], 'u_nope');
+    check('распределение · несуществующие id отвергаются с причиной',
+      bad.ok === false && bad.reason === 'not_found' && bad2.ok === false,
+      JSON.stringify([bad, bad2]));
+    WS.storeApi.setRole('agent');
   }
 
   /* ---- Язык стенда: слова брокера, а не слова разработчика ----

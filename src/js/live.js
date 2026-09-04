@@ -1028,6 +1028,52 @@
   // The head goes in whether or not the first probe answered: it decides
   // readiness per call, and a failing call falls back on its own. Installing
   // only on a successful probe made one unlucky second at load permanent.
+  /* Выгрузка накопленного из браузера.
+
+     Стенограмма на сервере пишет только ЖИВЫЕ вызовы. Всё, что было до её включения,
+     и всё, на что отвечал офлайновый планировщик, существует в единственном экземпляре —
+     в localStorage того, кто работал. Стирается одним нажатием и не восстанавливается.
+
+     Отправляется ПО ИЗМЕНЕНИЮ, а не каждый раз: подпись содержимого сравнивается
+     с той, что ушла в прошлый раз. Ничего не менялось — сеть не трогается.
+     Ни одна ошибка здесь не имеет права помешать стенду запуститься. */
+  function contentHash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) { h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+    return String(h >>> 0) + '.' + str.length;
+  }
+  function uploadSnapshot(reason) {
+    try {
+      const url = configuredUrl();
+      if (!url || url === 'off' || typeof fetch !== 'function') return false;
+      const st = WS.store || {};
+      const threads = (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null;
+      const payload = {
+        threads: threads,
+        signals: st.signals || [],
+        feedback: st.feedback || [],
+        eventsPlayed: st.eventsPlayed || [],
+        role: st.role, view: st.view,
+        migratedKeys: st.migratedKeys || null,
+        build: (document.body && document.body.getAttribute('data-build')) || null,
+      };
+      const body = JSON.stringify(payload);
+      // Пустое рабочее место отправлять нечего.
+      const hasWork = (payload.signals.length || (threads && Object.keys(threads).length > 1));
+      if (!hasWork) return false;
+      const hash = contentHash(body);
+      if (st.snapSentHash === hash) return false;
+      fetch(url.replace(/\/+$/, '') + '/snapshot', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: reason || 'boot', hash: hash, payload: payload }),
+      }).then((r) => {
+        if (r && r.ok) { WS.store.snapSentHash = hash; if (WS.storeApi && WS.storeApi.save) WS.storeApi.save(); }
+      }).catch(() => { /* нет сети — попробуем в следующий раз */ });
+      return true;
+    } catch (e) { return false; }
+  }
+
   function install() {
     cfg.url = configuredUrl();
     if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') return false;
@@ -1093,7 +1139,7 @@
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
+    ask, probe, install, uploadSnapshot, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },

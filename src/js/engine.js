@@ -682,6 +682,12 @@
   }
 
   async function freeReply(text) {
+    /* inFlight is set for the duration of the call so the UI can disable the send
+       button. The guard itself lives in the UI click handlers (cgSend / cgDockSend /
+       cardSend in main.js), not here: engine-level blocking would also block test
+       harness calls that correctly send a second prompt while the first is still in
+       the delay(180) terminal flash. */
+    engine.inFlight = true;
     const threadId = engine.activeThreadId || 'general';
     ensureThread(threadId); engine.activeThreadId = threadId;
     // A scripted run waiting on a confirmation is not discarded just because a question
@@ -694,7 +700,10 @@
     await delay(500); if (!same()) return;
     // The request is kept as a research signal regardless of how it is answered —
     // what brokers actually type is the most useful thing this stand collects.
+    /* Запись сразу на диск: формулировка брокера — исследовательский след, а не черновик.
+       Ждать чужого save() значит терять его, если вкладку закроют до следующей правки данных. */
     (WS.store.signals || (WS.store.signals = [])).push(text);
+    if (WS.storeApi && WS.storeApi.save) WS.storeApi.save();
     /* What the wait is actually made of.
 
        Two steps and a timer said nothing about a call that can run a minute:
@@ -733,7 +742,7 @@
     const started = Date.now();
     let tick = 0;
     let at = 1;
-    const secs = () => Math.round((Date.now() - started) / 1000) + ' с';
+    const secs = () => { const e = Math.round((Date.now() - started) / 1000); return e > 0 ? e + ' с' : ''; };
     function note() {
       const web = trace.steps[at] === 'Ищу во внешних источниках';
       const list = web ? WEB_LOOK : LOOK;
@@ -764,17 +773,27 @@
         },
         onText: (partial) => {
           if (!same() || !partial) return;
-          // The first words are the last real event: the card gives way to the
-          // answer itself, so the beat has nothing left to keep alive.
           clearInterval(beat);
+          // Briefly show «Формулирую ответ» as active before the text lands, so the step
+          // is never a permanent fixture of the card that is never reached.
+          at = trace.steps.indexOf('Формулирую ответ');
+          if (at < 0) at = trace.steps.length - 1;
+          updateMsg(workMid, processCard(trace, at, false, false), threadId);
           updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж', esc(partial)), threadId);
         },
       });
     } finally {
-      // Every exit, including a throw: an interval left running would redraw
-      // the waiting card over the answer that replaced it.
       clearInterval(beat);
+      engine.inFlight = false;
     }
+    engine.inFlight = false;
+    // Flash the all-done card so the progress card reads as concluded,
+    // not as stuck mid-run. 180 ms is enough to register and not enough to
+    // intrude. The live (streaming) path ran onText and already replaced the
+    // card; updateMsg here just overwrites an already-replaced card, which is
+    // safe and produces the same brief done-flash.
+    updateMsg(workMid, processCard(trace, trace.steps.length, true, false), threadId);
+    await delay(180);
     // The reply is written back to the thread it was asked in, whether or not
     // the agent has since walked to another one — messages are addressed, so
     // this is safe, and returning early left a «Разбираю запрос» card there
@@ -792,7 +811,10 @@
     const known = (WS.store.data.clients || []).find((c) => lc.indexOf((c.name || '').split(' ')[0].toLowerCase()) >= 0);
     const ctx = known ? ' По <b>' + known.name + '</b> контекст подхватил.' : '';
     // log the free request as a research signal (what brokers actually ask)
+    /* Запись сразу на диск: формулировка брокера — исследовательский след, а не черновик.
+       Ждать чужого save() значит терять его, если вкладку закроют до следующей правки данных. */
     (WS.store.signals || (WS.store.signals = [])).push(text);
+    if (WS.storeApi && WS.storeApi.save) WS.storeApi.save();
     updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
       'Понял поручение.' + ctx + ' Подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
@@ -1145,7 +1167,7 @@
     startScenario(id, chainId);
   }
 
-  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply, inFlight: false,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     // Readable and settable: it is conversation state, and the deterministic

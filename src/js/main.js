@@ -79,10 +79,8 @@
     'g1': () => WS.engine.startScenario('G1'),
     'g2': () => WS.engine.startScenario('G2'),
     'g3': () => WS.engine.startScenario('G3'),
-    'разобрать входящее': () => WS.engine.startScenario('G1'),
     'подобрать объект': () => WS.engine.startScenario('G2'),
     'итоги показа': () => WS.engine.startScenario('G3'),
-    'ответить лиду': () => WS.engine.startScenario('S15'),
     'бриф к звонку': () => WS.engine.startScenario('S8'),
     'финмодель': () => WS.router.go('calc'),
     'оценка объекта': () => WS.router.go('valuation'),
@@ -176,9 +174,17 @@
     if (d.netsel) { store.netSel = d.netsel; return api.emit(); }
     if (d.nettype) { store.netType = d.nettype; return api.emit(); }
     if (d.navtoggle) { store.navHidden = store.navHidden || []; const i = store.navHidden.indexOf(d.navtoggle); if (i >= 0) store.navHidden.splice(i, 1); else store.navHidden.push(d.navtoggle); return api.emit(); }
-    if (d.leadassign) { const p = d.leadassign.split('~~'); const arr = store.data.inbox || []; const ix = +p[0]; if (ix >= 0 && ix < arr.length) arr.splice(ix, 1); api.toast('Заявка распределена: ' + (p[1] || 'агенту'), 'ok'); return api.emit(); }
-    if (d.approve) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.approve) < 0) store.apprDone.push(+d.approve); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
-    if (d.reject) { store.apprDone = store.apprDone || []; if (store.apprDone.indexOf(+d.reject) < 0) store.apprDone.push(+d.reject); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
+    if (d.leadassign) {
+      const p = d.leadassign.split('~~');
+      const res = api.assignInbox(p[0], p[1]);
+      if (!res.ok) { api.toast('Не удалось назначить: не найден ' + res.what); return api.emit(); }
+      if (WS.ui.closeModal) WS.ui.closeModal();
+      const who = ((store.data.roster || []).find((x) => x.id === p[1]) || {}).name || p[1];
+      api.toast(res.changed ? 'Обращение назначено: ' + who : 'Уже назначено: ' + who, 'ok');
+      return api.emit();
+    }
+    if (d.approve) { WS.ui.resolveApproval(d.approve, 'approve'); api.toast('Согласовано — зафиксировано в истории сделки', 'ok'); return api.emit(); }
+    if (d.reject) { WS.ui.resolveApproval(d.reject, 'reject'); api.toast('Отклонено — возвращено агенту'); return api.emit(); }
     if (d.objfilter) { store.objFilter = d.objfilter; return api.emit(); }
     if (d.clubcomm) { store.clubComm = d.clubcomm; return api.emit(); }
     if (d.clubreq) return WS.ui.openClubRequest(d.clubreq);
@@ -323,14 +329,26 @@
       case 'sendOwnerReport': WS.ui.sendOwnerReport(t.dataset.contract); break;
       case 'saveShowOutcome': WS.ui.saveShowOutcome(t.dataset.ev); break;
       case 'ocDictate': {
+        /* dictate(el) expects a DOM element, not a callback — el.value is where it
+           writes interim + final transcripts. Passing a callback set el.value to
+           undefined and the recognised text was lost. */
         const box = document.getElementById('ocText');
-        if (WS.voice && WS.voice.dictate) WS.voice.dictate((txt) => { if (box) box.value = txt; });
+        if (WS.voice && WS.voice.dictate) WS.voice.dictate(box || null);
         break;
       }
       case 'dayLine': store.dayView = 'line'; api.emit(); break;
       case 'sendSelection': WS.ui.sendSelection(t.dataset.inbox); break;
       case 'navBack': WS.router.back(); break;
       case 'about': WS.ui.openAbout(); break;
+      case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
+      case 'inboxAssign': WS.ui.openInboxAssign(t.dataset.inbox); break;
+      case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;
+      case 'createDealShow': WS.ui.createDealShow(t.dataset.deal); break;
+      case 'calShow': WS.ui.openCalendarShowPicker(); break;
+      case 'saveReqSel': WS.ui.saveRequestSelection(t.dataset.req, t.dataset.obj, t.dataset.mode); break;
+      case 'inboxDraftReply': WS.ui.openReplyDraft(t.dataset.inbox); break;
+      case 'inboxDupMerge': WS.ui.inboxDupDecide(t.dataset.inbox, t.dataset.cid); break;
+      case 'inboxDupNew': WS.ui.inboxDupDecide(t.dataset.inbox, null); break;
       case 'settings': WS.router.go('settings'); break;
       case 'profile': WS.router.go('profile'); break;
       case 'reset':
@@ -484,8 +502,11 @@
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }
-      case 'startSend': routePrompt(promptValue('startPrompt')); break;
-      case 'cgSend': routePrompt(promptValue('cgPrompt')); break;
+      /* UI-level duplicate-send guard: blocks the send button while the Concierge
+         is processing a request. routePrompt itself is not guarded so the test
+         harness can drive sequential calls directly. */
+      case 'startSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('startPrompt')); } break;
+      case 'cgSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('cgPrompt')); } break;
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
       // Раздел показывает возможности сеткой (их много, и их сравнивают) либо колодой
       // (их разбирают по одной, со смахиванием). Флаг называется тем, что означает.
@@ -494,9 +515,9 @@
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
-      case 'cgDockSend': WS.ui.sendFromDock(promptValue('cgDockPrompt')); break;
+      case 'cgDockSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromDock(promptValue('cgDockPrompt')); } break;
       // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
-      case 'cardSend': WS.ui.sendFromCard(); break;
+      case 'cardSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromCard(); } break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
       case 'cgWorkshop': store.cgWorkshopOpen = !store.cgWorkshopOpen; api.emit(); break;
       case 'cgRailToggle': store.cgRailOpen = !store.cgRailOpen; api.emit(); break;
@@ -769,6 +790,11 @@
     // second at load costs a retry rather than the session; and every failure
     // falls back to the offline planner, which answers the same questions.
     if (WS.live && WS.live.install) WS.live.install();
+    /* Спасение накопленного. Переписка живого брокера существует в одном экземпляре — в его
+       браузере, и раскатка новой сборки её не восстановит: она только не даёт её потерять.
+       Отправляется по изменению содержимого, так что офлайновые ответы, которых нет в
+       серверной стенограмме, тоже доезжают. Отложено, чтобы не занимать первый кадр. */
+    if (WS.live && WS.live.uploadSnapshot) setTimeout(() => WS.live.uploadSnapshot('boot'), 1500);
     /* Границы демо показываются САМИ при первом открытии: человек, которому прислали ссылку,
        занесёт палец над «Отправить» в первую минуту, а не после того, как найдёт справку. */
     if (!store.aboutSeen) { store.aboutSeen = true; api.save(); setTimeout(() => WS.ui.openAbout(), 700); }
