@@ -137,6 +137,9 @@
         shortlist: store.shortlist, podborClient: store.podborClient, docTab: store.docTab,
         // event layer + Concierge threads survive F5 (audit P0-6)
         eventsPlayed: store.eventsPlayed, feedback: store.feedback, dayStep: store.dayStep,
+        /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
+           стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
+        signals: store.signals,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -162,7 +165,24 @@
     store.eventsPlayed = p.eventsPlayed || [];
     store.feedback = p.feedback || [];
     store.dayStep = p.dayStep || 0;
+    store.signals = p.signals || [];
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
+    /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
+
+       Раньше любое изменение формы данных требовало поднять SCHEMA, а поднятая SCHEMA
+       выбрасывает ВСЁ сохранённое состояние — вместе с перепиской живого брокера, которая
+       существует в единственном экземпляре у него в браузере. Цена чистоты оказалась выше,
+       чем то, что она защищает.
+
+       Добавление НОВОЙ коллекции подъёма схемы не требует: чего в снимке нет —
+       берётся из свежих фикстур, что есть — не трогается. Поднимать SCHEMA теперь
+       нужно только когда ИЗМЕНИЛАСЬ форма СУЩЕСТВУЮЩЕЙ записи и старая читается неверно. */
+    const fresh = freshData();
+    const filled = [];
+    Object.keys(fresh).forEach((k) => {
+      if (store.data[k] === undefined || store.data[k] === null) { store.data[k] = fresh[k]; filled.push(k); }
+    });
+    if (filled.length) store.migratedKeys = filled;
     return true;
   }
 

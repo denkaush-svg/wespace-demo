@@ -700,7 +700,10 @@
     await delay(500); if (!same()) return;
     // The request is kept as a research signal regardless of how it is answered —
     // what brokers actually type is the most useful thing this stand collects.
+    /* Запись сразу на диск: формулировка брокера — исследовательский след, а не черновик.
+       Ждать чужого save() значит терять его, если вкладку закроют до следующей правки данных. */
     (WS.store.signals || (WS.store.signals = [])).push(text);
+    if (WS.storeApi && WS.storeApi.save) WS.storeApi.save();
     /* What the wait is actually made of.
 
        Two steps and a timer said nothing about a call that can run a minute:
@@ -808,7 +811,10 @@
     const known = (WS.store.data.clients || []).find((c) => lc.indexOf((c.name || '').split(' ')[0].toLowerCase()) >= 0);
     const ctx = known ? ' По <b>' + known.name + '</b> контекст подхватил.' : '';
     // log the free request as a research signal (what brokers actually ask)
+    /* Запись сразу на диск: формулировка брокера — исследовательский след, а не черновик.
+       Ждать чужого save() значит терять его, если вкладку закроют до следующей правки данных. */
     (WS.store.signals || (WS.store.signals = [])).push(text);
+    if (WS.storeApi && WS.storeApi.save) WS.storeApi.save();
     updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
       'Понял поручение.' + ctx + ' Подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
