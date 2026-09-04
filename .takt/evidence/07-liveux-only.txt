@@ -1,0 +1,11 @@
+  ok  app boots (WS.ui present)
+  ok  no window errors on boot
+  ok  live-ux · after ~3s on screen the card shows a real elapsed time (>= 2 с), not "0 с"
+  ok  live-ux · the waiting card is gone once the call resolves (replaced by the reply)
+  ok  live-ux · setup: thread B shows a real elapsed time while active
+  ok  live-ux · the ORIGINAL thread keeps ticking after switching away, not frozen
+  ok  live-ux · the reply is written back into the ORIGINAL (now background) thread
+  ok  no window errors after run
+
+checks: 8  passed: 8  FAILED: 0
+RC=0
