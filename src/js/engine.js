@@ -246,7 +246,10 @@
      where the delay is the call itself and the flag it sets is read only by the
      scripted player. Clicking it did nothing, which is the worst thing a
      control can do: it teaches that the buttons here are decoration. */
-  function processCard(step, activeIdx, done, skippable) {
+  /* `extra` is what belongs to a LIVE wait and to nothing else: what the server
+     said it accepted, and the button that stops it. The scripted player passes
+     four arguments and gets exactly the card it got before. */
+  function processCard(step, activeIdx, done, skippable, extra) {
     const rows = step.steps.map((s, i) => {
       let cls = 'step', ic = '';
       if (i < activeIdx || done) { cls += ' done'; ic = '<div class="dot">' + I('check') + '</div>'; }
@@ -261,7 +264,7 @@
     return '<div class="msg ai fadeup"><div class="who">' + I('sparkle', '') + ' Консьерж</div>' +
       '<div class="processing"><div class="icon-tile i-acc">' + I('sparkle') + '</div>' +
       '<div class="steps">' + rows + '</div></div>' +
-      (skip ? '<div style="margin-top:4px">' + skip + '</div>' : '') + '</div>';
+      (skip ? '<div style="margin-top:4px">' + skip + '</div>' : '') + (extra || '') + '</div>';
   }
 
   function previewCard(step, rejected, filled) {
@@ -555,9 +558,39 @@
   }
 
   // ---------- interaction handlers (delegated from main.js) ----------
+  /* The one control on a live waiting card that has to do something. «Пропустить
+     ожидание» above sets a flag the scripted player reads and a live call does
+     not — over a real request it was a button that taught the visitor the
+     buttons here are decoration. This closes the request instead. */
+  function cancelTurn(threadId) {
+    const turn = turns[threadId];
+    if (!turn || (turn.status !== 'preparing' && turn.status !== 'running')) return;
+    turn.status = 'cancelled';
+    turn.stage = 'cancelled';
+    if (turn.abortController) { try { turn.abortController.abort(); } catch (e) { /* already gone */ } }
+    if (turn.messageId) updateMsg(turn.messageId, cancelledCard(turn), threadId);
+  }
+  // Cancelling loses the wait, not the question.
+  function cancelledCard(turn) {
+    return msg('ai', I('sparkle', '') + ' Консьерж',
+      'Запрос отменён. Вопрос сохранён: «' + esc(turn.text) + '»' +
+      '<div class="qa-row" style="margin-top:10px">' +
+      '<button class="btn sm" data-eng="retryTurn" data-tid="' + esc(turn.threadId) + '">' +
+      I('replay') + 'Повторить</button></div>');
+  }
+  function retryTurn(threadId) {
+    const turn = turns[threadId];
+    if (!turn || turn.status !== 'cancelled') return;
+    delete turns[threadId];
+    if (engine.activeThreadId !== threadId) bindThread(threadId);
+    freeReply(turn.text);
+  }
+
   function handle(action, ds) {
     const s = engine.session;
     if (action === 'skip') { engine._skip = true; return; }
+    if (action === 'cancelTurn') { cancelTurn((ds && ds.tid) || engine.activeThreadId); return; }
+    if (action === 'retryTurn') { retryTurn((ds && ds.tid) || engine.activeThreadId); return; }
     if (!s) return;
     if (action === 'reject') {
       const i = +ds.i;
@@ -681,23 +714,66 @@
     engine.threads = clean;
   }
 
+  /* ---------- one wait per thread ----------
+
+     Busy used to be one flat boolean for the whole application, and it lived on
+     the internal engine object while the UI guard read the exported one — so it
+     blocked nothing in the browser, and where it did read it blocked every
+     conversation at once. Both halves of that are the same missing thing: state
+     that says WHICH thread is waiting, and on what.
+
+     The shape is the one the task names — everything about one turn in one
+     place, including the handle that stops it, so cancelling is a property of
+     the turn rather than a flag some other loop may or may not consult. */
+  const turns = {};
+  let turnSeq = 0;
+  function newTurn(threadId, text) {
+    const now = Date.now();
+    return {
+      id: 'turn_' + (++turnSeq) + '_' + threadId,
+      threadId: threadId,
+      status: 'preparing',      // preparing · running · cancelled · done · failed
+      stage: 'context_ready',   // context_ready · accepted · model_started · web · streaming
+      startedAt: now,
+      lastProgressAt: now,
+      mode: null,
+      depth: null,
+      abortController: null,
+      messageId: null,
+      text: String(text == null ? '' : text),
+    };
+  }
+  function threadBusy(threadId) {
+    const t = turns[threadId || engine.activeThreadId || 'general'];
+    return !!(t && (t.status === 'preparing' || t.status === 'running'));
+  }
+  function endTurn(turn, status) {
+    if (!turn) return;
+    turn.status = status || 'done';
+    // A cancelled turn is kept: «Повторить» needs the question back, and the
+    // thread is not busy any more either way. A settled one is dropped.
+    if (turn.status !== 'cancelled' && turns[turn.threadId] === turn) delete turns[turn.threadId];
+  }
+
   async function freeReply(text) {
-    /* inFlight is set for the duration of the call so the UI can disable the send
-       button. The guard itself lives in the UI click handlers (cgSend / cgDockSend /
-       cardSend in main.js), not here: engine-level blocking would also block test
-       harness calls that correctly send a second prompt while the first is still in
-       the delay(180) terminal flash. */
-    engine.inFlight = true;
+    /* The guard that refuses a second question lives in the UI handlers (the
+       send buttons and the Enter keys in main.js), not here: engine-level
+       blocking would also block test harness calls that correctly send a second
+       prompt while the first is still in the delay(180) terminal flash. What
+       lives here is the state that guard reads — one turn per thread, so a
+       thread that is waiting blocks itself and nothing else. */
     const threadId = engine.activeThreadId || 'general';
+    const turn = newTurn(threadId, text);
+    turns[threadId] = turn;
     ensureThread(threadId); engine.activeThreadId = threadId;
     // A scripted run waiting on a confirmation is not discarded just because a question
     // was typed: dropping it would strand the pending approval with no way back to it.
     if (engine.session && !engine.session.pending) engine.session = null;
     const same = () => engine.activeThreadId === threadId;
     if (!WS.store.cgDock) WS.router.go('concierge'); else if (WS.ui && WS.ui.renderCgDock) WS.ui.renderCgDock();
-    await delay(60); if (!same()) return;
+    await delay(60); if (!same()) { endTurn(turn); return; }
     pushText('me', chanIcon('text'), text, threadId);
-    await delay(500); if (!same()) return;
+    await delay(500); if (!same()) { endTurn(turn); return; }
     // The request is kept as a research signal regardless of how it is answered —
     // what brokers actually type is the most useful thing this stand collects.
     (WS.store.signals || (WS.store.signals = [])).push(text);
@@ -736,31 +812,73 @@
       () => 'сверяю, на какой момент величина',
       () => 'цена предложения и цена закрытых сделок — разные вещи',
     ];
-    const started = Date.now();
     let tick = 0;
     let at = 1;
-    const secs = () => { const e = Math.round((Date.now() - started) / 1000); return e > 0 ? e + ' с' : ''; };
+    const secs = () => { const e = Math.round((Date.now() - turn.startedAt) / 1000); return e > 0 ? e + ' с' : ''; };
     function note() {
       const web = trace.steps[at] === 'Ищу во внешних источниках';
       const list = web ? WEB_LOOK : LOOK;
       return list[tick % list.length]() + ' · ' + secs();
     }
+    /* What the server said it took, in the words the composer uses for the same
+       two controls — «принято» that does not say what was accepted is a spinner
+       with a caption. Shown only once the server has actually said it. */
+    const label = (fn, k) => (k && WS.ui && WS.ui[fn] ? WS.ui[fn](k) : '') || k || '';
+    const accepted = () => {
+      if (turn.stage !== 'accepted' && turn.stage !== 'model_started') return '';
+      const parts = [label('cgModeLabel', turn.mode), label('cgDepthLabel', turn.depth)].filter(Boolean);
+      return '<em class="note turn-note">' + esc('Нейросеть приняла запрос' +
+        (parts.length ? ' · ' + parts.join(' · ') : '')) + '</em>';
+    };
+    // The one control on this card that does something: it closes the stream,
+    // and the proxy's own `res.on('close')` stops the process behind it.
+    const controls = () => accepted() +
+      '<div class="turn-acts"><button class="skip" data-eng="cancelTurn" data-tid="' +
+      esc(threadId) + '">Отменить</button></div>';
+    // Nothing repaints a wait that is over: the beat and the stream both outlive
+    // a cancel by however long the call behind them takes to unwind, and either
+    // would put the progress card back over the cancelled one.
     const draw = () => {
+      if (turn.status !== 'running') return;
       trace.notes = [];
       trace.notes[at] = note();
-      updateMsg(workMid, processCard(trace, at, false, false), threadId);
+      updateMsg(turn.messageId, processCard(trace, at, false, false, controls()), threadId);
     };
     trace.notes[at] = note();
-    const workMid = pushMsg(processCard(trace, at, false, false), threadId);
-    // Slow enough to be read, quick enough that the card is never still.
-    const beat = setInterval(() => { if (!same()) return; tick++; draw(); }, 2200);
+    const workMid = pushMsg(processCard(trace, at, false, false, controls()), threadId);
+    turn.messageId = workMid;
+    turn.status = 'running';
+    /* A real handle on the request rather than a flag some other loop may or may
+       not consult: aborting closes the fetch, and the proxy stops the CLI
+       process on its own `res.on('close')`. Where the browser has no
+       AbortController the button still ends the wait on this side. */
+    turn.abortController = (typeof AbortController === 'function') ? new AbortController() : null;
+    /* Slow enough to be read, quick enough that the card is never still — and
+       counted from the turn's own start, so the thread that is waiting keeps
+       counting while the broker reads a different one. `same()` still gates
+       what the SCREEN does; it no longer gates the clock. */
+    const beat = setInterval(() => { tick++; draw(); }, 2200);
     // The live head streams; the offline one returns at once. Both land in the
     // same message, so the card simply fills in rather than being replaced.
     let reply;
     try {
       reply = await WS.agent.askAsync(text, {
-        onStage: (k) => {
-          if (!same() || k !== 'web') return;
+        signal: turn.abortController && turn.abortController.signal,
+        onStage: (ev) => {
+          // The transport used to hand over a bare key; a real stage carries what
+          // the server resolved with it, so both shapes are read here.
+          const st = (ev && typeof ev === 'object') ? ev : { k: ev };
+          const k = String(st.k || '');
+          turn.lastProgressAt = Date.now();
+          if (k === 'accepted' || k === 'model_started') {
+            turn.stage = k;
+            if (st.mode) turn.mode = st.mode;
+            if (st.depth) turn.depth = st.depth;
+            draw();
+            return;
+          }
+          if (k !== 'web') return;
+          turn.stage = 'web';
           // Only shown when it happened. A step that is always there, whether or
           // not the model went out, is back to being an animation.
           if (trace.steps.indexOf('Ищу во внешних источниках') < 0) {
@@ -769,7 +887,9 @@
           }
         },
         onText: (partial) => {
-          if (!same() || !partial) return;
+          if (!partial || turn.status !== 'running') return;
+          turn.stage = 'streaming';
+          turn.lastProgressAt = Date.now();
           clearInterval(beat);
           // Briefly show «Формулирую ответ» as active before the text lands, so the step
           // is never a permanent fixture of the card that is never reached.
@@ -781,9 +901,15 @@
       });
     } finally {
       clearInterval(beat);
-      engine.inFlight = false;
+      // The thread is free the moment the answer is in hand — before the 180 ms
+      // done-flash below, which is where the harness sends its next prompt.
+      if (turn.status !== 'cancelled') endTurn(turn, 'done');
     }
-    engine.inFlight = false;
+    /* Cancelled by hand. The offline planner may still have produced something
+       behind the abort — askAsync falls back on any failure, silently, by
+       design — and that is not what was asked for. The cancelled card, with the
+       question still in it, stays on screen. */
+    if (turn.status === 'cancelled') return;
     // Flash the all-done card so the progress card reads as concluded,
     // not as stuck mid-run. 180 ms is enough to register and not enough to
     // intrude. The live (streaming) path ran onText and already replaced the
@@ -1161,7 +1287,18 @@
     startScenario(id, chainId);
   }
 
-  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply, inFlight: false,
+  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+    /* «Занят» is a question about a THREAD, and it always was: a call running in
+       one conversation is no reason to refuse a question in another. The name
+       stays because it is what the send handlers ask, but it now answers for the
+       conversation on screen. Settable for the same reason `lastReply` is — a
+       harness has to be able to put a thread into that state. */
+    get inFlight() { return threadBusy(); },
+    set inFlight(v) {
+      const id = engine.activeThreadId || 'general';
+      if (v) { const t = turns[id] || newTurn(id, ''); t.status = 'running'; turns[id] = t; }
+      else if (turns[id]) delete turns[id];
+    },
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     // Readable and settable: it is conversation state, and the deterministic

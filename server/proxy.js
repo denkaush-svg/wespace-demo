@@ -910,6 +910,8 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
       cwd: CFG.workDir,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
+    // The process exists — from here the wait is the model's, not the queue's.
+    onStage('model_started');
 
     let out = '';        // text assembled from deltas
     let result = null;   // text from the final result event, if any
@@ -1223,13 +1225,21 @@ async function handleAsk(req, res) {
 
   const spec = resolveCall(body);
   const started = Date.now();
+  /* A stage is reported when it has happened, never before. The page cannot
+     infer either of the two below from the text arriving: that the call was
+     taken at all, and that a model is actually running behind it. Without them
+     a broker watching the Concierge cannot tell «taken» from «thinking» from
+     «stuck», and the card had to animate a guess instead. */
+  const stage = (k, extra) => { if (!aborted) send('stage', Object.assign({ k: k }, extra || {})); };
+  // Taken — with what the server RESOLVED, not what the browser asked for: an
+  // unknown mode falls back here, and the waiting card must name what will run.
+  stage('accepted', { mode: spec.mode, depth: spec.depth });
   // Listen on the RESPONSE, not the request: the request stream is already
   // finished the moment its body has been read, so its `close` fires long
   // before the visitor goes anywhere. The response closes when the connection
   // actually drops.
   const call = startCall(buildPrompt(body), (t) => { if (!aborted) send('delta', { t: t }); },
-    callTimeout(spec), MODES[spec.mode].external,
-    (k) => { if (!aborted) send('stage', { k: k }); });
+    callTimeout(spec), MODES[spec.mode].external, stage);
   res.on('close', () => { if (!res.writableEnded) call.cancel(); });
   try {
     const full = await call.promise;

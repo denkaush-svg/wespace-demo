@@ -112,6 +112,19 @@
 
   function promptValue(id) { const i = document.getElementById(id); const v = i ? i.value : ''; if (i) i.value = ''; return v; }
 
+  /* One rule, one place. The button and the Enter key are the same action, and
+     they were guarded in two editions: the four click branches checked whether
+     the Concierge was busy, the four key branches called straight through — so
+     the same second question was refused from the button and sent from the
+     keyboard. Busy is now asked per thread (WS.engine.inFlight answers for the
+     conversation on screen), so a wait in one thread no longer refuses a
+     question in another. routePrompt itself stays unguarded: the test harness
+     drives sequential calls through it directly. */
+  function send(fn) {
+    if (WS.engine.inFlight) return api.toast('Дождитесь ответа или отмените текущий запрос');
+    return fn();
+  }
+
   // ---- delegated click handler ----
   document.addEventListener('click', (e) => {
     const slot = e.target.closest('[data-showslot]');
@@ -502,11 +515,8 @@
         if (store.view === 'start') WS.engine.startScenario('G1');
         break;
       }
-      /* UI-level duplicate-send guard: blocks the send button while the Concierge
-         is processing a request. routePrompt itself is not guarded so the test
-         harness can drive sequential calls directly. */
-      case 'startSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('startPrompt')); } break;
-      case 'cgSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { routePrompt(promptValue('cgPrompt')); } break;
+      case 'startSend': send(() => routePrompt(promptValue('startPrompt'))); break;
+      case 'cgSend': send(() => routePrompt(promptValue('cgPrompt'))); break;
       case 'navRail': store.navRail = !store.navRail; api.emit(); break;
       // Раздел показывает возможности сеткой (их много, и их сравнивают) либо колодой
       // (их разбирают по одной, со смахиванием). Флаг называется тем, что означает.
@@ -515,9 +525,9 @@
       // Док открывается на том, что открыто: привязка к записи — в ui.js, рядом с тем, что знает,
       // какой экран сейчас на экране.
       case 'cgDock': WS.ui.toggleCgDock(); break;
-      case 'cgDockSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromDock(promptValue('cgDockPrompt')); } break;
+      case 'cgDockSend': send(() => WS.ui.sendFromDock(promptValue('cgDockPrompt'))); break;
       // Строка внизу карточки: текст уходит в панель поверх экрана, карточка остаётся на месте.
-      case 'cardSend': if (WS.engine.inFlight) { api.toast('Консьерж работает — подождите ответа'); } else { WS.ui.sendFromCard(); } break;
+      case 'cardSend': send(() => WS.ui.sendFromCard()); break;
       case 'cgDockOpenFull': store.cgDock = false; WS.ui.renderCgDock(); WS.router.go('concierge'); break;
       case 'cgWorkshop': store.cgWorkshopOpen = !store.cgWorkshopOpen; api.emit(); break;
       case 'cgRailToggle': store.cgRailOpen = !store.cgRailOpen; api.emit(); break;
@@ -609,10 +619,10 @@
       if (WS.router.back()) e.preventDefault();
       return;
     }
-    if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); routePrompt(promptValue('startPrompt')); }
-    if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); routePrompt(promptValue('cgPrompt')); }
-    if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); WS.ui.sendFromDock(promptValue('cgDockPrompt')); }
-    if (e.key === 'Enter' && e.target.id === 'cardPrompt') { e.preventDefault(); WS.ui.sendFromCard(); }
+    if (e.key === 'Enter' && e.target.id === 'startPrompt') { e.preventDefault(); send(() => routePrompt(promptValue('startPrompt'))); }
+    if (e.key === 'Enter' && e.target.id === 'cgPrompt') { e.preventDefault(); send(() => routePrompt(promptValue('cgPrompt'))); }
+    if (e.key === 'Enter' && e.target.id === 'cgDockPrompt') { e.preventDefault(); send(() => WS.ui.sendFromDock(promptValue('cgDockPrompt'))); }
+    if (e.key === 'Enter' && e.target.id === 'cardPrompt') { e.preventDefault(); send(() => WS.ui.sendFromCard()); }
     if (e.key === 'Enter' && e.target.id === 'dealChatPrompt') { e.preventDefault(); routePrompt(promptValue('dealChatPrompt')); }
     // Deal title inline edit: save on Enter, restore on Escape
     if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('deal-title-text')) {
