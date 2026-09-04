@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 12:34</title>
+  <title>WESPACE · сборка 14:29</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='12:34';
+    window.WS_BUILD='14:29';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -5346,6 +5346,9 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         shortlist: store.shortlist, podborClient: store.podborClient, docTab: store.docTab,
         // event layer + Concierge threads survive F5 (audit P0-6)
         eventsPlayed: store.eventsPlayed, feedback: store.feedback, dayStep: store.dayStep,
+        /* Сформулированные брокером запросы. Движок называет их самым полезным, что собирает
+           стенд, — и до сих пор терял их на каждой перезагрузке: в сохраняемом списке их не было. */
+        signals: store.signals, snapSentHash: store.snapSentHash,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -5371,7 +5374,25 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     store.eventsPlayed = p.eventsPlayed || [];
     store.feedback = p.feedback || [];
     store.dayStep = p.dayStep || 0;
+    store.signals = p.signals || [];
+    store.snapSentHash = p.snapSentHash || null;
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
+    /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
+
+       Раньше любое изменение формы данных требовало поднять SCHEMA, а поднятая SCHEMA
+       выбрасывает ВСЁ сохранённое состояние — вместе с перепиской живого брокера, которая
+       существует в единственном экземпляре у него в браузере. Цена чистоты оказалась выше,
+       чем то, что она защищает.
+
+       Добавление НОВОЙ коллекции подъёма схемы не требует: чего в снимке нет —
+       берётся из свежих фикстур, что есть — не трогается. Поднимать SCHEMA теперь
+       нужно только когда ИЗМЕНИЛАСЬ форма СУЩЕСТВУЮЩЕЙ записи и старая читается неверно. */
+    const fresh = freshData();
+    const filled = [];
+    Object.keys(fresh).forEach((k) => {
+      if (store.data[k] === undefined || store.data[k] === null) { store.data[k] = fresh[k]; filled.push(k); }
+    });
+    if (filled.length) store.migratedKeys = filled;
     return true;
   }
 
@@ -7031,7 +7052,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     await delay(500); if (!same()) return;
     // The request is kept as a research signal regardless of how it is answered —
     // what brokers actually type is the most useful thing this stand collects.
+    /* Запись сразу на диск: формулировка брокера — исследовательский след, а не черновик.
+       Ждать чужого save() значит терять его, если вкладку закроют до следующей правки данных. */
     (WS.store.signals || (WS.store.signals = [])).push(text);
+    if (WS.storeApi && WS.storeApi.save) WS.storeApi.save();
     /* What the wait is actually made of.
 
        Two steps and a timer said nothing about a call that can run a minute:
@@ -7139,7 +7163,10 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     const known = (WS.store.data.clients || []).find((c) => lc.indexOf((c.name || '').split(' ')[0].toLowerCase()) >= 0);
     const ctx = known ? ' По <b>' + known.name + '</b> контекст подхватил.' : '';
     // log the free request as a research signal (what brokers actually ask)
+    /* Запись сразу на диск: формулировка брокера — исследовательский след, а не черновик.
+       Ждать чужого save() значит терять его, если вкладку закроют до следующей правки данных. */
     (WS.store.signals || (WS.store.signals = [])).push(text);
+    if (WS.storeApi && WS.storeApi.save) WS.storeApi.save();
     updateMsg(workMid, msg('ai', I('sparkle') + ' Консьерж',
       'Понял поручение.' + ctx + ' Подготовлены близкие результаты — выберите, что собрать (демо, Wizard-of-Oz):' +
       '<div class="qa-row" style="margin-top:10px">' +
@@ -23001,6 +23028,52 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // The head goes in whether or not the first probe answered: it decides
   // readiness per call, and a failing call falls back on its own. Installing
   // only on a successful probe made one unlucky second at load permanent.
+  /* Выгрузка накопленного из браузера.
+
+     Стенограмма на сервере пишет только ЖИВЫЕ вызовы. Всё, что было до её включения,
+     и всё, на что отвечал офлайновый планировщик, существует в единственном экземпляре —
+     в localStorage того, кто работал. Стирается одним нажатием и не восстанавливается.
+
+     Отправляется ПО ИЗМЕНЕНИЮ, а не каждый раз: подпись содержимого сравнивается
+     с той, что ушла в прошлый раз. Ничего не менялось — сеть не трогается.
+     Ни одна ошибка здесь не имеет права помешать стенду запуститься. */
+  function contentHash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) { h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+    return String(h >>> 0) + '.' + str.length;
+  }
+  function uploadSnapshot(reason) {
+    try {
+      const url = configuredUrl();
+      if (!url || url === 'off' || typeof fetch !== 'function') return false;
+      const st = WS.store || {};
+      const threads = (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null;
+      const payload = {
+        threads: threads,
+        signals: st.signals || [],
+        feedback: st.feedback || [],
+        eventsPlayed: st.eventsPlayed || [],
+        role: st.role, view: st.view,
+        migratedKeys: st.migratedKeys || null,
+        build: (document.body && document.body.getAttribute('data-build')) || null,
+      };
+      const body = JSON.stringify(payload);
+      // Пустое рабочее место отправлять нечего.
+      const hasWork = (payload.signals.length || (threads && Object.keys(threads).length > 1));
+      if (!hasWork) return false;
+      const hash = contentHash(body);
+      if (st.snapSentHash === hash) return false;
+      fetch(url.replace(/\/+$/, '') + '/snapshot', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: reason || 'boot', hash: hash, payload: payload }),
+      }).then((r) => {
+        if (r && r.ok) { WS.store.snapSentHash = hash; if (WS.storeApi && WS.storeApi.save) WS.storeApi.save(); }
+      }).catch(() => { /* нет сети — попробуем в следующий раз */ });
+      return true;
+    } catch (e) { return false; }
+  }
+
   function install() {
     cfg.url = configuredUrl();
     if (!cfg.url || cfg.url === 'off' || typeof fetch !== 'function') return false;
@@ -23066,7 +23139,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   }
 
   WS.live = {
-    ask, probe, install, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
+    ask, probe, install, uploadSnapshot, digest, history, scope, pendingAction, shapeOf, allowed, configuredUrl, toReply, normBlocks, normReport, normSay, evidenceFor, evidenceFrom, noteFailure, disable, composer, langs, langOf, reportProse,
     get ready() { return cfg.ready; },
     get url() { return cfg.url; },
     get misses() { return cfg.misses; },
@@ -24174,6 +24247,11 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     // second at load costs a retry rather than the session; and every failure
     // falls back to the offline planner, which answers the same questions.
     if (WS.live && WS.live.install) WS.live.install();
+    /* Спасение накопленного. Переписка живого брокера существует в одном экземпляре — в его
+       браузере, и раскатка новой сборки её не восстановит: она только не даёт её потерять.
+       Отправляется по изменению содержимого, так что офлайновые ответы, которых нет в
+       серверной стенограмме, тоже доезжают. Отложено, чтобы не занимать первый кадр. */
+    if (WS.live && WS.live.uploadSnapshot) setTimeout(() => WS.live.uploadSnapshot('boot'), 1500);
     /* Границы демо показываются САМИ при первом открытии: человек, которому прислали ссылку,
        занесёт палец над «Отправить» в первую минуту, а не после того, как найдёт справку. */
     if (!store.aboutSeen) { store.aboutSeen = true; api.save(); setTimeout(() => WS.ui.openAbout(), 700); }
