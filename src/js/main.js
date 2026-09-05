@@ -121,7 +121,7 @@
      question in another. routePrompt itself stays unguarded: the test harness
      drives sequential calls through it directly. */
   function send(fn) {
-    if (WS.engine.inFlight) return api.toast('Дождитесь ответа или отмените текущий запрос');
+    if (WS.engine.inFlight) return api.toast(WS.engine.BUSY_HINT || 'Дождитесь ответа или отмените текущий запрос');
     return fn();
   }
 
@@ -280,7 +280,9 @@
     if (d.agnext != null) return WS.engine.agentNext(d.agnext);
     // Подсказка первого экрана — это тот же ввод, что и напечатанный руками, поэтому идёт
     // через общий разбор запроса, а не в обход него.
-    if (d.cgask) return routePrompt(d.cgask);
+    // …и через тот же отказ, что кнопка «Отправить»: подсказка, отправленная в занятый
+    // тред, заводила второй запрос в обход блокировки и перебивала карточку первого.
+    if (d.cgask) return send(() => routePrompt(d.cgask));
     if (d.agsay != null) return WS.voice.sayReply(d.agsay);
     if (d.dcedit) { const p = d.dcedit.split(':'); return WS.ui.openDealContactForm(p[0], +p[1]); }
     if (d.dcdel) { const p = d.dcdel.split(':'); return WS.ui.removeDealContact(p[0], +p[1]); }

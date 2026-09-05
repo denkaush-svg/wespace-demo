@@ -996,11 +996,17 @@
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
     const ran = { mode: done.mode || null, depth: done.depth || null,
-      doc: done.doc || null, chat: done.chat || null, docWhy: done.docWhy || null };
+      doc: done.doc || null, chat: done.chat || null, docWhy: done.docWhy || null,
+      // How long the call actually took, as the SERVER measured it (proxy.js
+      // stamps `ms` on its `done` event). Dropping it here meant the one number
+      // that says whether an answer took four seconds or ninety never left the
+      // transport: it could not be stored with the reply or shown in history.
+      ms: Number(done.ms) > 0 ? Number(done.ms) : null };
     const reply = toReply(done.say, done.plan || {}, ran);
     if (!reply) throw new Error('empty reply');
     reply.mode = ran.mode;
     reply.depth = ran.depth;
+    reply.ms = ran.ms;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;

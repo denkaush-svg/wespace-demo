@@ -412,6 +412,38 @@ async function stageChecks() {
   ok('even a call that answers in one shot was told it was accepted first',
     evs.some((e) => e.event === 'stage' && e.data && e.data.k === 'accepted'),
     'events=' + evs.map((e) => e.event).join(','));
+
+  /* «Запущена» has to mean the process is running, not that `spawn()` returned.
+     For a binary that does not exist `spawn()` returns a ChildProcess just the
+     same and the ENOENT lands a tick later on `error` — so announcing the stage
+     straight after the call showed a broken or missing CLI as «модель
+     запущена», with the failure arriving behind it. Here the CLI is a name
+     nothing can run: acceptance still arrives (the server did take the call),
+     model_started must not. */
+  {
+    refill();
+    const cliWas = CFG.cli;
+    const prefixWas = CFG.cliPrefix;
+    CFG.cli = 'wespace-proxy-command-that-does-not-exist';
+    CFG.cliPrefix = [];
+    try {
+      const r = await ask({ text: 'вопрос к несуществующему CLI' });
+      const e2 = events(r.body);
+      const stages = e2.filter((e) => e.event === 'stage').map((e) => e.data && e.data.k);
+      const err = e2.find((e) => e.event === 'error');
+      ok('a CLI that could not be launched is never reported as a running model',
+        stages.indexOf('model_started') < 0,
+        'stages=' + JSON.stringify(stages) + ' error=' + JSON.stringify(err && err.data));
+      ok('and the call that could not start is reported as an error, not as silence',
+        !!err && /spawn/.test(String((err.data && err.data.error) || '')),
+        JSON.stringify(err && err.data));
+      ok('acceptance is still announced — the server did take the call',
+        stages.indexOf('accepted') >= 0, 'stages=' + JSON.stringify(stages));
+    } finally {
+      CFG.cli = cliWas;
+      CFG.cliPrefix = prefixWas;
+    }
+  }
 }
 
 /* ---------- the smoke detector ----------

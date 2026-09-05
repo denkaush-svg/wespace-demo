@@ -910,9 +910,6 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
       cwd: CFG.workDir,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    // The process exists — from here the wait is the model's, not the queue's.
-    onStage('model_started');
-
     let out = '';        // text assembled from deltas
     let result = null;   // text from the final result event, if any
     let errBuf = '';
@@ -1044,6 +1041,14 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
       }
     });
     child.stderr.on('data', (c) => { errBuf += c.toString('utf8'); if (errBuf.length > 4000) errBuf = errBuf.slice(-4000); });
+    /* «Started» is reported by the runtime, not by the return of `spawn()`.
+       `spawn()` hands back a ChildProcess for a binary that does not exist
+       either — the ENOENT arrives a tick later, on `error`. Announcing the
+       stage right after the call therefore told the page «модель запущена» over
+       a process that never began: a probe with a nonexistent command got
+       `stages=["model_started"]` followed by `spawn:… ENOENT`. Node emits
+       `spawn` once the process is genuinely running, and only then. */
+    child.on('spawn', () => { if (!settled) onStage('model_started'); });
     child.on('error', (e) => finish(new Error('spawn:' + e.message)));
     child.on('close', (code) => {
       if (settled) return;

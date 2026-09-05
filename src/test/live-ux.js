@@ -130,6 +130,75 @@ setTimeout(async () => {
     WS.agent.setAsyncHead(null);
   }
 
+  /* ---- C: switching threads inside freeReply's own ~560 ms of staging must not
+           swallow the question. The two setup delays used to end the turn and
+           return if the broker had walked to another conversation by then: the
+           question was already in the history, the network call never fired,
+           and no waiting card and no error ever appeared. A probe caught it as
+           `calls=0 has_question=true has_wait=false`. Only a real-time test can
+           see it — the whole window is those two delays. ---- */
+  {
+    eng.openThread('probe:liveD', 'Live · D (уходим сразу)', 'sparkle');
+    WS.router.go('concierge');
+    let calls = 0; let settle;
+    WS.agent.setAsyncHead(() => { calls++; return new Promise((res) => { settle = res; }); });
+    type('вопрос, заданный перед уходом'); clickSend();
+    // Away inside the staging window, well before the 560 ms are up.
+    await wait(80);
+    eng.openThread('probe:liveE', 'Live · E', 'sparkle');
+    WS.router.go('concierge');
+    await wait(1200); // past freeReply's delay(60)+delay(500)
+
+    const dHtml = storedHtml('probe:liveD');
+    const dAll = ((WS.engine.threadList() || []).find((x) => x.id === 'probe:liveD') || {}).items || [];
+    const dText = dAll.map((m) => m.html).join(' ');
+    check('live-ux · a question asked just before switching threads still reaches the network',
+      calls === 1, 'calls=' + calls);
+    check('live-ux · and the question it belongs to is not left standing alone in its thread',
+      dText.indexOf('заданный перед уходом') >= 0 && /Разбираю запрос|Смотрю рабочее место/.test(dHtml),
+      'last card=' + dHtml.slice(0, 160));
+    check('live-ux · and that thread reads as busy, so a second question is refused',
+      WS.engine.threadList().length > 0 && dAll.length >= 2, 'items=' + dAll.length);
+
+    if (settle) settle({ kind: 'answer', text: 'готово Д', evidence: [], next: [] });
+    await wait(400);
+    check('live-ux · the answer lands back in the thread the question was asked in',
+      storedHtml('probe:liveD').indexOf('готово Д') >= 0, storedHtml('probe:liveD').slice(0, 160));
+    eng.closeThread('probe:liveD'); eng.closeThread('probe:liveE');
+    WS.agent.setAsyncHead(null);
+  }
+
+  /* ---- D: the wait has to end even when nobody ends it. `askAsync` resolves or
+           falls back to the offline planner; it does not time out. A stream that
+           simply stops — dropped socket, restarted proxy, phone changing network
+           — left the await pending for the life of the page: the turn stayed
+           `running` and its thread refused every further question forever. The
+           real ceiling is 135 s (just above the proxy's 120 s silence limit);
+           it is settable so it can be observed in under two. ---- */
+  {
+    eng.openThread('probe:liveF', 'Live · F (сторож)', 'sparkle');
+    WS.router.go('concierge');
+    const was = eng.watchdogMs;
+    eng.watchdogMs = 900;
+    let seenSignal = null;
+    WS.agent.setAsyncHead((t, opts) => { seenSignal = opts && opts.signal; return new Promise(() => {}); });
+    type('вопрос, на который никто не ответит'); clickSend();
+    await wait(2400); // past the 560 ms staging + the 900 ms watchdog
+    const fHtml = storedHtml('probe:liveF');
+    check('live-ux · a stream that never ends is closed by the client watchdog',
+      WS.engine.inFlight === false, 'inFlight=' + WS.engine.inFlight);
+    check('live-ux · and the request behind it is actually aborted, not just forgotten',
+      !!seenSignal && seenSignal.aborted === true, 'aborted=' + (seenSignal && seenSignal.aborted));
+    check('live-ux · and the card says so and offers to send the question again',
+      /не пришёл/i.test(fHtml) && /Повторить/.test(fHtml) && fHtml.indexOf('никто не ответит') >= 0,
+      fHtml.slice(0, 200));
+    check('live-ux · the default ceiling sits above the proxy\'s own silence limit (120 с)',
+      was > 120000, 'watchdogMs=' + was);
+    eng.watchdogMs = was;
+    eng.closeThread('probe:liveF');
+    WS.agent.setAsyncHead(null);
+  }
+
   check('no window errors after run', errors.length === 0, errors.join('; '));
   report();
 }, 800);

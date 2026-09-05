@@ -3626,6 +3626,57 @@ setTimeout(async () => {
         Q.reset();
       }
 
+      /* How long the call actually took. The proxy stamps `ms` on its `done`
+         event (server/proxy.js: `send('done', { …, ms: Date.now() - started })`)
+         and the transport lifted mode/depth/lang off that same event and left
+         `ms` behind — so the one number that says whether an answer took four
+         seconds or ninety died in `readStream` and could never be stored with
+         the reply or shown in history. */
+      {
+        Q.reset();
+        const realFetch = win.fetch;
+        /* jsdom ships neither TextEncoder nor TextDecoder on the window, and the
+           transport decodes its stream with the latter — so without this the
+           SSE reader cannot be exercised here at all. Both are node's own, and
+           both are standard in every browser this stand runs in. */
+        const hadDecoder = Object.prototype.hasOwnProperty.call(win, 'TextDecoder');
+        const decoderWas = win.TextDecoder;
+        win.TextDecoder = TextDecoder;
+        const enc = new TextEncoder();
+        const sse = (chunks) => ({
+          ok: true,
+          body: {
+            getReader: () => {
+              let i = 0;
+              return { read: () => Promise.resolve(i < chunks.length
+                ? { done: false, value: enc.encode(chunks[i++]) }
+                : { done: true }) };
+            },
+          },
+        });
+        win.fetch = (url) => {
+          if (/\/health$/.test(String(url))) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+          return Promise.resolve(sse([
+            'event: stage\ndata: {"k":"accepted","mode":"plain","depth":"quick"}\n\n',
+            'event: delta\ndata: {"t":"Ответ по существу."}\n\n',
+            'event: done\ndata: ' + JSON.stringify({ say: 'Ответ по существу.', plan: {},
+              ms: 4321, mode: 'plain', depth: 'quick' }) + '\n\n',
+          ]));
+        };
+        L.resetForTest();
+        let timedErr = null;
+        const timed = await L.ask('сколько это заняло').then((r) => r, (e) => { timedErr = String(e && e.message || e); return null; });
+        check('live · how long the call took travels with the reply, not dropped in transport',
+          !!timed && timed.ms === 4321, 'ms=' + (timed && timed.ms) + ' err=' + timedErr);
+        check('live · and what answered still travels with it',
+          !!timed && timed.mode === 'plain' && timed.depth === 'quick',
+          'mode=' + (timed && timed.mode) + ' depth=' + (timed && timed.depth));
+        win.fetch = realFetch;
+        if (hadDecoder) win.TextDecoder = decoderWas; else delete win.TextDecoder;
+        L.resetForTest();
+        Q.reset();
+      }
+
       // Counting must not itself become a failure: an unknown name is recorded,
       // not thrown, because this runs inside the path that answers a visitor.
       Q.reset();
@@ -4068,6 +4119,189 @@ setTimeout(async () => {
       if (settle) settle({ kind: 'answer', text: 'готово', evidence: [], next: [] });
       await waitPastFlash();
       eng.closeThread('probe:turnAccept');
+      WS.agent.setAsyncHead(null);
+    }
+
+    /* ---------- step-9 fixes: what the cross-model review found ----------
+       Each block below pins one defect that the checks above walk past. They
+       are written against the same real send paths, for the same reason. */
+
+    // ---- what the server accepted must not vanish when the model goes to the web.
+    //      `web` is precisely the point in a long call where the broker most
+    //      wants to know which mode and depth are running. ----
+    {
+      eng.openThread('probe:turnWeb', 'Турн · web', 'sparkle');
+      WS.router.go('concierge');
+      let stageFn; let settle;
+      WS.agent.setAsyncHead((t, opts) => { stageFn = opts && opts.onStage; return new Promise((res) => { settle = res; }); });
+      type('вопрос про внешние источники'); clickSend();
+      await waitPastSetup();
+      // The stage line, isolated from the step labels around it: `turn-note` is
+      // the one element on the card that reports what the SERVER said.
+      const stageNote = () => { const n = doc.querySelector('#chat .turn-note'); return n ? (n.textContent || '') : ''; };
+      // Everything after the stage sentence is the mode/depth tail.
+      const tail = (s) => s.split(' · ').slice(1).join(' · ');
+      if (typeof stageFn === 'function') {
+        stageFn({ k: 'accepted', mode: 'roi', depth: 'deep' });
+        const atAccepted = stageNote();
+        stageFn({ k: 'model_started' });
+        const atStarted = stageNote();
+        stageFn({ k: 'web' });
+        const atWeb = stageNote();
+        check('turn-state · setup: the accepted mode/depth is on the card at «accepted»',
+          !!tail(atAccepted) && /roi|инвест/i.test(atAccepted), 'note=' + atAccepted);
+        check('turn-state · the accepted mode/depth survives the model going out to the web',
+          !!tail(atWeb) && tail(atWeb) === tail(atAccepted),
+          'accepted=«' + atAccepted + '» web=«' + atWeb + '»');
+        // The two stages are two different facts and used to read as one sentence.
+        check('turn-state · «принят» and «модель работает» are not the same line on the card',
+          atStarted !== atAccepted && /работает/i.test(atStarted),
+          'accepted=«' + atAccepted + '» started=«' + atStarted + '»');
+        check('turn-state · the card names the stage that actually happened, web included',
+          /внешние источники/i.test(atWeb) && !/внешние источники/i.test(atStarted),
+          'started=«' + atStarted + '» web=«' + atWeb + '»');
+      } else {
+        check('turn-state · stage callback available for the web-stage check', false);
+      }
+      if (settle) settle({ kind: 'answer', text: 'готово', evidence: [], next: [] });
+      await waitPastFlash();
+      eng.closeThread('probe:turnWeb');
+      WS.agent.setAsyncHead(null);
+    }
+
+    // ---- a general reset that leaves the request running is not a reset: the
+    //      stand looks empty while an invisible call still holds one of the
+    //      proxy's two slots, and its answer lands in a thread that is gone. ----
+    {
+      eng.openThread('probe:turnReset', 'Турн · сброс', 'sparkle');
+      WS.router.go('concierge');
+      let seenSignal = null; let settle;
+      WS.agent.setAsyncHead((t, opts) => { seenSignal = opts && opts.signal; return new Promise((res) => { settle = res; }); });
+      type('вопрос, который переживёт сброс'); clickSend();
+      await waitPastSetup();
+      check('turn-state · setup: the live call was handed an abort signal',
+        !!seenSignal && seenSignal.aborted === false, 'signal=' + !!seenSignal);
+      check('turn-state · setup: the thread is busy before the reset', WS.engine.inFlight === true,
+        'inFlight=' + WS.engine.inFlight);
+      eng.reset();
+      check('turn-state · a general reset aborts the request that was still running',
+        !!seenSignal && seenSignal.aborted === true,
+        'aborted=' + (seenSignal && seenSignal.aborted));
+      check('turn-state · and the thread state is cleared with it, not left busy',
+        WS.engine.inFlight === false, 'inFlight=' + WS.engine.inFlight);
+      if (settle) settle({ kind: 'answer', text: 'поздний ответ', evidence: [], next: [] });
+      await waitPastFlash();
+      WS.agent.setAsyncHead(null);
+      WS.router.go('concierge');
+    }
+
+    // ---- the follow-up chip under an older answer is the same act as typing a
+    //      question, and it went straight to freeReply with no guard at all: the
+    //      second turn overwrote the first, and the first card's «Отменить»
+    //      then cancelled the SECOND request while the first held its slot. ----
+    /* These two run against the REAL freeReply and count the head, not the
+       stub: the acceptance criterion is numeric and about the network — «the
+       number of outgoing requests does not grow». Stubbing `eng.freeReply`
+       cannot see this path at all (the guard sits inside the engine, before the
+       internal freeReply), and a stub that is never called looks identical
+       whether the guard exists or not. */
+    const headCounter = () => {
+      let calls = 0; const settles = [];
+      WS.agent.setAsyncHead(() => { calls++; return new Promise((res) => { settles.push(res); }); });
+      return {
+        count: () => calls,
+        settleAll: () => { const s = settles.splice(0); s.forEach((f) => f({ kind: 'answer', text: 'готово', evidence: [], next: [] })); },
+      };
+    };
+    {
+      eng.openThread('probe:turnChip', 'Турн · чип', 'sparkle');
+      WS.router.go('concierge');
+      const head = headCounter();
+      // Register a real reply so the chip resolves the way a rendered card's does.
+      eng.agentCard({ kind: 'answer', text: 'первый ответ', evidence: [],
+        next: [{ label: 'уточнить', ask: 'а что по срокам' }] }, 'probeChipMid');
+      type('первый вопрос'); clickSend();
+      await waitPastSetup();
+      check('turn-state · setup: exactly one request is in flight after the first send',
+        head.count() === 1, 'requests=' + head.count());
+      eng.agentNext('probeChipMid:0');
+      await waitPastSetup();
+      check('turn-state · a follow-up chip in a busy thread must not start a second request',
+        head.count() === 1, 'requests=' + head.count());
+      check('turn-state · and the thread is still waiting on the FIRST request, not a replacement',
+        WS.engine.inFlight === true, 'inFlight=' + WS.engine.inFlight);
+      head.settleAll();
+      await waitPastFlash();
+      eng.agentNext('probeChipMid:0');
+      await waitPastSetup();
+      check('turn-state · and the same chip asks normally once the thread is free',
+        head.count() === 2, 'requests=' + head.count());
+      head.settleAll();
+      await waitPastFlash();
+      eng.closeThread('probe:turnChip');
+      WS.agent.setAsyncHead(null);
+    }
+
+    /* ---- the floor under that guard. `freeReply` is deliberately unguarded —
+       the retry button and the harness call straight in — and it used to
+       overwrite `turns[threadId]` while the first request was still running.
+       That orphaned the first AbortController: the first call kept its proxy
+       concurrency slot, the card's «Отменить» addressed the SECOND call, and
+       the thread read as free with a request still in flight. ---- */
+    {
+      eng.openThread('probe:turnReplace', 'Турн · замена', 'sparkle');
+      WS.router.go('concierge');
+      const signals = []; const settles = [];
+      WS.agent.setAsyncHead((t, opts) => { signals.push(opts && opts.signal); return new Promise((res) => { settles.push(res); }); });
+      type('первый вопрос'); clickSend();
+      await waitPastSetup();
+      check('turn-state · setup: one request is running and nothing is aborted',
+        signals.length === 1 && !!signals[0] && signals[0].aborted === false,
+        'signals=' + signals.length);
+      // The unguarded door: what «Повторить» and the harness use.
+      eng.freeReply('второй вопрос, в обход интерфейса');
+      await waitPastSetup();
+      check('turn-state · a turn that replaces a running one closes the request it replaces',
+        !!signals[0] && signals[0].aborted === true, 'first aborted=' + (signals[0] && signals[0].aborted));
+      check('turn-state · and the replacement is the request the thread now holds',
+        signals.length === 2 && !!signals[1] && signals[1].aborted === false,
+        'signals=' + signals.length + ' second aborted=' + (signals[1] && signals[1].aborted));
+      settles.splice(0).forEach((f) => f({ kind: 'answer', text: 'готово', evidence: [], next: [] }));
+      await waitPastFlash();
+      eng.closeThread('probe:turnReplace');
+      WS.agent.setAsyncHead(null);
+    }
+
+    // ---- the first-screen suggestion (data-cgask) took the same unguarded path,
+    //      straight into routePrompt. Driven as a real click, like the others. ----
+    {
+      eng.openThread('probe:turnCgask', 'Турн · подсказка', 'sparkle');
+      WS.router.go('concierge');
+      const head = headCounter();
+      // Hung off <body>, not off #chat: the click handler is delegated on the
+      // document, and a re-render of #chat would detach the button mid-block.
+      const btn = doc.createElement('button');
+      btn.setAttribute('data-cgask', 'подсказка первого экрана');
+      btn.textContent = 'подсказка';
+      doc.body.appendChild(btn);
+      type('первый вопрос'); clickSend();
+      await waitPastSetup();
+      check('turn-state · setup: exactly one request is in flight before the suggestion is clicked',
+        head.count() === 1, 'requests=' + head.count());
+      btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await waitPastSetup();
+      check('turn-state · a first-screen suggestion in a busy thread must not start a second request',
+        head.count() === 1, 'requests=' + head.count());
+      head.settleAll();
+      await waitPastFlash();
+      btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await waitPastSetup();
+      check('turn-state · and the suggestion still asks normally once the thread is free',
+        head.count() === 2, 'requests=' + head.count());
+      head.settleAll();
+      await waitPastFlash();
+      if (btn.parentNode) btn.parentNode.removeChild(btn);
+      eng.closeThread('probe:turnCgask');
       WS.agent.setAsyncHead(null);
     }
   } else {
