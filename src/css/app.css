@@ -2912,3 +2912,26 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   text-transform: uppercase; color: var(--mut); }
 .fp-row--warn { color: var(--stop); }
 @media (max-width: 560px) { .fp-row { flex-direction: column; gap: 2px; } .fp-k { width: auto; } }
+
+/* Питч по проекту. Фото сверху, ведущая фраза крупно, факты — таблицей с источником
+   у каждой строки: питч, который нельзя подтвердить по строке, это реклама, а отвечает
+   за неё перед клиентом брокер лично. */
+.pitch { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.pitch-photo { height: 168px; background-size: cover; background-position: center; }
+.pitch-body { padding: 16px 18px 18px; }
+.pitch-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--mut); }
+.pitch-title { margin: 5px 0 2px; font-size: 19px; font-weight: 800; color: var(--ink); line-height: 1.25; }
+.pitch-price { font-size: 16px; font-weight: 800; color: var(--acc-deep); margin-bottom: 12px; }
+.pitch-lead { margin: 0 0 5px; font-size: 14px; line-height: 1.5; color: var(--ink); font-weight: 600; }
+.pitch-src { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--mut); margin-bottom: 14px; }
+.pitch-src svg { width: 12px; height: 12px; flex: none; }
+.pitch-rows { display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 9px; overflow: hidden; }
+.pitch-row { display: grid; grid-template-columns: 132px 1fr 128px; gap: 10px; padding: 9px 12px;
+  background: var(--surface); font-size: 12.5px; align-items: baseline; }
+.pitch-k { font-weight: 700; color: var(--ink); }
+.pitch-v { color: var(--ink); line-height: 1.4; }
+.pitch-from { font-size: 10.5px; color: var(--faint); text-align: right; }
+@media (max-width: 620px) {
+  .pitch-row { grid-template-columns: 1fr; gap: 2px; }
+  .pitch-from { text-align: left; }
+}

@@ -1015,7 +1015,27 @@
     // The prose is the fallback: with no shape declared, it is the whole answer.
     const head = body ? (r.text ? '<p class="an-lead">' + esc(r.text) + '</p>' : '') : esc(r.text);
     return msg('ai', I('sparkle') + ' Консьерж',
-      head + body + modeNote(r) + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
+      sourceBadge(r) + head + body + modeNote(r) + sayBtn(r, mid) + evChips(r.evidence) + nextChips(r.next));
+  }
+  /* Кто ответил — модель или офлайновый планировщик.
+
+     Пометка `source` появилась в данных раньше, но на экран не выводилась — и два
+     независимых разбора назвали это главным дефектом одними и теми же словами: брокер
+     спрашивает разбор, получает шаблон и думает, что это ответ модели. Молчаливое
+     понижение качества хуже честного отказа: про отказ он узнаёт сразу.
+
+     Живой ответ НЕ помечается: это норма, а значок на каждом ответе перестанут читать. */
+  function sourceBadge(r) {
+    if (!r || r.source !== 'offline') return '';
+    const why = String(r.fallbackReason || '');
+    const human = /standdown/.test(why) ? 'связь срывалась, ждём восстановления'
+      : /daily|cap/.test(why) ? 'исчерпан дневной лимит'
+      : /busy/.test(why) ? 'все каналы заняты'
+      : /no_live_head/.test(why) ? 'живая модель не подключена'
+      : 'связи с моделью нет';
+    return '<div class="an-src">' + I('warn') +
+      '<span><b>Автономный режим</b> — ' + human +
+      '. Отвечаю по данным без разбора: числа верные, суждений не будет.</span></div>';
   }
   function proposalCard(p) {
     const lines = (p.lines || []).map((l) =>

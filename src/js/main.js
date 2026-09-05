@@ -113,23 +113,21 @@
     'бриф к звонку': () => WS.engine.startScenario('S8'),
     'финмодель': () => WS.router.go('calc'),
     'оценка объекта': () => WS.router.go('valuation'),
-    'собери оффер': () => { const id = needRequest('оффер'); if (id) WS.ui.openRequestOffer(id); },
-    'собери подборку': () => { const id = needRequest('подборка'); if (id) WS.ui.openRequestOffer(id); },
-    'собери топ-3': () => { const id = needRequest('подборка'); if (id) WS.ui.openRequestOffer(id); },
-    'отправь оффер клиенту': () => { const id = needRequest('оффер'); if (id) WS.ui.openRequestOffer(id); },
-    'покажи планировку': () => {
-      const id = hereObject();
-      if (!id) return api.toast('Откройте объект — планировка строится по нему', 'warn');
-      WS.ui.openFloorplan(id);
-    },
-    'планировка': () => {
-      const id = hereObject();
-      if (!id) return api.toast('Откройте объект — планировка строится по нему', 'warn');
-      WS.ui.openFloorplan(id);
-    },
+    'собери оффер': () => { const id = hereRequest(); return id ? WS.ui.openRequestOffer(id) : WS.ui.pickRequestFor('reqOffer', 'По какой заявке?'); },
+    'собери подборку': () => { const id = hereRequest(); return id ? WS.ui.openRequestOffer(id) : WS.ui.pickRequestFor('reqOffer', 'По какой заявке?'); },
+    'собери топ-3': () => { const id = hereRequest(); return id ? WS.ui.openRequestOffer(id) : WS.ui.pickRequestFor('reqOffer', 'По какой заявке?'); },
+    'отправь оффер клиенту': () => { const id = hereRequest(); return id ? WS.ui.openRequestOffer(id) : WS.ui.pickRequestFor('reqOffer', 'По какой заявке?'); },
+    /* Нет контекста — спрашиваем, а не отказываем: голосом команду не повторяют, её бросают. */
+    'покажи планировку': () => { const id = hereObject(); return id ? WS.ui.openFloorplan(id) : WS.ui.pickObjectFor('floorplan', 'Планировка какого объекта?'); },
+    'собери питч': () => { const id = hereObject(); return id ? WS.ui.openPitch(id) : WS.ui.pickObjectFor('pitch', 'Питч по какому объекту?'); },
+    'питч': () => { const id = hereObject(); return id ? WS.ui.openPitch(id) : WS.ui.pickObjectFor('pitch', 'Питч по какому объекту?'); },
+    'планировка': () => { const id = hereObject(); return id ? WS.ui.openFloorplan(id) : WS.ui.pickObjectFor('floorplan', 'Планировка какого объекта?'); },
     'собери кп': () => { const id = needRequest('КП'); if (id) WS.ui.reqFormKp(id); },
-    'рассылка': () => { const id = hereObject(); WS.ui.openPromotion(id || (store.data.objects[0] || {}).id); },
-    'сделать рассылку': () => { const id = hereObject(); WS.ui.openPromotion(id || (store.data.objects[0] || {}).id); },
+    /* Здесь стоял откат на objects[0] — первый объект в базе. Брокер говорит «рассылка»,
+       не открыв объект, и система молча готовит рассылку по чужому лоту — клиент получает
+       офис вместо квартиры. Команда без адресата должна сказать об этом, а не угадывать. */
+    'рассылка': () => { const id = hereObject(); return id ? WS.ui.openPromotion(id) : WS.ui.pickObjectFor('promo', 'Рассылка по какому объекту?'); },
+    'сделать рассылку': () => { const id = hereObject(); return id ? WS.ui.openPromotion(id) : WS.ui.pickObjectFor('promo', 'Рассылка по какому объекту?'); },
   };
   function routePrompt(text) {
     const t = (text || '').toLowerCase().trim().replace(/[.!?…]+$/, '');
@@ -390,6 +388,8 @@
       case 'inboxAssign': WS.ui.openInboxAssign(t.dataset.inbox); break;
       case 'reqOffer': WS.ui.openRequestOffer(t.dataset.req); break;
       case 'floorplan': WS.ui.openFloorplan(t.dataset.obj); break;
+      case 'pitch': WS.ui.openPitch(t.dataset.obj); break;
+      case 'promo': WS.ui.openPromotion(t.dataset.obj); break;
       case 'copyFloorplan': WS.ui.copyFloorplan(t.dataset.obj); break;
       case 'sendReqOffer': WS.ui.sendRequestOffer(t.dataset.req); break;
       case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;

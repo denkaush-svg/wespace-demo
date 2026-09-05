@@ -136,11 +136,22 @@
          price and quoting a rumour — and the object under Viktor's live booking
          is exactly that. Sending the price without its verification let the
          Concierge propose a booking on data the stand itself marks as stale. */
+      /* До этого модели уезжал ЦЕННИК, а не объект: цена, метраж, спальни, район.
+         На вопрос «как продавать этот юнит и кому он подходит» ответить было НЕЧЕМ — всё,
+         что отличает эту квартиру от соседней, оставалось в базе. Модель честно собирала
+         таблицы сравнения — единственное, на что ей хватало данных.
+
+          идёт ОТДЕЛЬНЫМ ключом с таким именем нарочно: это авторский
+         маркетинговый текст, а не измеренный факт, и выдавать его за проверенное нельзя. */
       объекты: take('objects', (o) => ({
         id: o.id, название: o.name, район: o.area, цена: o.price, площадь: o.size,
         спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
         проверка: o.verified, проверено_когда: o.checkedAt,
         тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
+        план_оплаты: o.paymentPlan, сервисный_сбор: o.serviceCharge, эскроу: o.escrow,
+        занятость: o.occupancy, чем_подходит: o.match,
+        характеристики: o.attrs || null,
+        описание_со_слов_продавца: o.usp || null,
       })),
       // Заявка стала главной сущностью стенда: под ней живут предложенные
       // объекты, выбор клиента и КП. Раньше сюда уходил только бюджет, а

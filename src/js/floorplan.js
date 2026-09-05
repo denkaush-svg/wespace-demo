@@ -95,7 +95,8 @@
     const rooms = layoutFor(o && o.br, size);
     const W = 520, H = 360;
     const PAD = 26;
-    const iw = W - PAD * 2, ih = H - PAD * 2 - 54;
+    // Место внизу занято подписями и полосой оговорки — комнаты на неё наезжать не должны.
+    const iw = W - PAD * 2, ih = H - PAD * 2 - 68;
     const bs = blocks(rooms, iw, ih);
     const view = (o.attrs && o.attrs.view) || '';
     const viewLabel = view === 'city' ? 'город' : view === 'sea' ? 'море'
@@ -138,8 +139,11 @@
         '" font-family="system-ui,sans-serif">' + esc(sub) + '</text>' +
       /* Подпись уезжает вместе с картинкой. Клиент, которому её переслали, обязан видеть,
          что это не обмерный чертёж, — иначе схема начнёт жить как документ. */
-      '<text x="' + (W - PAD) + '" y="' + (H - 20) + '" text-anchor="end" font-size="9" fill="' + C.acc +
-        '" font-family="system-ui,sans-serif">Схема по площади и составу комнат · не чертёж застройщика</text>' +
+      /* Подпись была 9px в углу — на телефоне, куда картинку и перешлют, это нечитаемо.
+         Оговорка, которую не видно, равносильна её отсутствию. Теперь полоса во всю ширину. */
+      '<rect x="0" y="' + (H - 15) + '" width="' + W + '" height="15" fill="' + C.acc + '"/>' +
+      '<text x="' + (W / 2) + '" y="' + (H - 4.5) + '" text-anchor="middle" font-size="11" font-weight="600" fill="#fff"' +
+        ' font-family="system-ui,sans-serif">Схема по площади и составу комнат · не чертёж застройщика</text>' +
       '</svg>';
   }
 

@@ -8635,6 +8635,33 @@ setTimeout(async () => {
       (doc.getElementById('modal').innerHTML.match(/sel-card/g) || []).length === 3,
       'карточек ' + ((doc.getElementById('modal').innerHTML.match(/sel-card/g) || []).length));
 
+    /* Питч по проекту: каждая строка подписана источником — иначе это реклама,
+       а отвечать за неё перед клиентом будет брокер лично. */
+    WS.ui.closeModal();
+    WS.ui.openPitch('o_creekline');
+    const ph = doc.getElementById('modal').innerHTML;
+    const pt = ph.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    check('питч · ведёт тем, чем лот отличается, и помечает источник',
+      /канал|единственн/.test(pt) && /Со слов продавца/.test(pt), pt.slice(0, 90));
+    check('питч · у каждого факта назван источник',
+      (ph.match(/pitch-from/g) || []).length >= 4, 'строк ' + ((ph.match(/pitch-from/g) || []).length));
+
+    /* Команда без адресата брала ПЕРВЫЙ объект из базы: брокер говорит «рассылка»,
+       и клиент получает офис вместо квартиры. Угадывать тут нельзя. */
+    WS.ui.closeModal();
+    WS.store.view = 'start'; WS.store.objectId = null;
+    if (WS.engine.closeThread) WS.engine.closeThread();
+    /* Прежде команда без адресата молча брала ПЕРВЫЙ объект из базы. Потом она стала
+       отказывать тостом — честно, но бесполезно: голосом команду не повторяют, её бросают.
+       Сейчас она СПРАШИВАЕТ, по какому объекту, и ни одного не выбирает за брокера. */
+    WS.router.routePrompt('рассылка');
+    const pk = doc.getElementById('modal');
+    const pkt = (pk.innerHTML || '').replace(/<[^>]+>/g, ' ');
+    check('голос · команда без адресата спрашивает, а не подставляет сама',
+      pk.classList.contains('show') && /какому объекту/i.test(pkt) &&
+      (pk.innerHTML.match(/data-act="promo"/g) || []).length > 1,
+      pkt.slice(0, 70));
+
     WS.ui.closeModal();
     WS.storeApi.resetAll();
   }

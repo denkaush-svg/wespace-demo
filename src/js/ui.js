@@ -1594,6 +1594,99 @@
      просит планировку, её нет под рукой, и она ищется руками по ботам с брошюрами.
      Окно даёт схему из наших же чисел И говорит, чего в нём нет, — чтобы брокер знал,
      что можно нести клиенту, а что ещё запрашивать у застройщика. */
+  /* Питч по проекту.
+
+     Брокер описал это так: вышел проект, по нему пришла информация — нужен красивый,
+     грамотный, неперегруженный питч, который потом уходит в рассылку. До этого в стенде
+     была только рассылка партнёрам — совсем другой жанр.
+
+     Питч собирается ИЗ ПОЛЕЙ проекта, а не сочиняется: каждая строка имеет источник
+     в данных, и то, что взято со слов продавца, помечено как слова продавца. Питч,
+     который нельзя подтвердить по строке, — это реклама, а за рекламу отвечает брокер лично. */
+  function pitchLines(o) {
+    const dv = insDeviation(o);
+    const m = insIndexFor(o) || {};
+    const out = [];
+    if (o.developer) out.push({ k: 'Застройщик', v: o.developer, src: 'карточка объекта' });
+    if (o.handover) out.push({ k: 'Сдача', v: o.handover, src: 'карточка объекта' });
+    if (o.paymentPlan) out.push({ k: 'План оплаты', v: o.paymentPlan, src: 'карточка объекта' });
+    if (o.escrow) out.push({ k: 'Защита денег', v: o.escrow, src: 'карточка объекта' });
+    if (dv) {
+      out.push({ k: 'Цена метра', src: 'срез рынка · ' + (m.basis || 'иллюстративно'),
+        v: WS.AED(dv.per) + ' — ' + (dv.pct === 0 ? 'вровень со срезом ' + dv.area
+          : (dv.pct > 0 ? 'на ' + dv.pct + '% выше' : 'на ' + Math.abs(dv.pct) + '% ниже') + ' среза ' + dv.area) });
+    }
+    if (m.доходностьПроцент) {
+      out.push({ k: 'Доходность района', v: String(m.доходностьПроцент).replace('.', ',') + '%',
+        src: 'срез рынка · ' + (m.basis || 'иллюстративно') });
+    }
+    if (o.serviceCharge) out.push({ k: 'Обслуживание', v: o.serviceCharge, src: 'карточка объекта' });
+    return out;
+  }
+  function openPitch(objId) {
+    const o = (D().objects || []).find((x) => x.id === objId);
+    if (!o) { WS.storeApi.toast('Объект не найден: ' + objId); return; }
+    const lines = pitchLines(o);
+    const ph = (WS.photos && WS.photos[o.id]) || '';
+    /* Первая фраза — не перечисление характеристик, а то, чем этот лот отличается
+       от соседнего. Если отличия в данных нет — питч говорит об этом, а не сочиняет. */
+    const lead = o.usp
+      ? '<p class="pitch-lead">' + escAttr(o.usp) + '</p>' +
+        '<div class="pitch-src">' + I('shield') + 'Со слов продавца — мы это не проверяли</div>'
+      : '<div class="match" style="margin:0 0 12px">' + I('warn') +
+        '<span>В карточке нет описания, чем этот лот отличается от соседних. Без него питч будет пересказом характеристик — запросите у застройщика или допишите сами.</span></div>';
+    const rows = lines.map((l) =>
+      '<div class="pitch-row"><span class="pitch-k">' + escAttr(l.k) + '</span>' +
+      '<span class="pitch-v">' + escAttr(l.v) + '</span>' +
+      '<span class="pitch-from">' + escAttr(l.src) + '</span></div>').join('');
+    openModal('Питч · ' + escAttr(o.project || o.name),
+      '<div class="pitch">' +
+        (ph ? '<div class="pitch-photo" style="background-image:url(' + ph + ')"></div>' : '') +
+        '<div class="pitch-body">' +
+          '<div class="pitch-eyebrow">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + o.size + ' м²</div>' +
+          '<h3 class="pitch-title">' + escAttr(o.name) + '</h3>' +
+          '<div class="pitch-price">' + WS.AED(o.price) + '</div>' +
+          lead +
+          '<div class="pitch-rows">' + rows + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="rw-prov" style="margin-top:12px">' + I('radar') +
+        'Каждая строка подписана источником. Строки без источника в питч не попадают — за них перед клиентом отвечать вам.</div>',
+      '<button class="btn primary" data-promo="' + escAttr(o.id) + '">' + I('send') + 'В рассылку</button>' +
+      '<button class="btn" data-act="floorplan" data-obj="' + escAttr(o.id) + '">' + I('layers') + 'Планировка</button>' +
+      '<button class="btn" data-act="closeModal">Закрыть</button>', { wide: true });
+  }
+  /* Команда без адресата отказывала тостом: брокер говорит «питч» из общего экрана
+     и получает отказ вместо вопроса «по какому?». Голосом команду не повторяют — её бросают. */
+  function pickObjectFor(act, title) {
+    const objs = (D().objects || []).filter((o) => o.availability !== 'sold').slice(0, 12);
+    if (!objs.length) { WS.storeApi.toast('В базе нет объектов'); return; }
+    const rows = objs.map((o) => '<button class="feed-row" style="width:100%;text-align:left" data-act="' +
+      escAttr(act) + '" data-obj="' + escAttr(o.id) + '">' +
+      '<div class="fi i-acc">' + I('building') + '</div>' +
+      '<div class="ft"><div class="t">' + escAttr(o.name) + '</div>' +
+      '<div class="m">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + WS.AED(o.price) + '</div></div>' +
+      I('arrowRight') + '</button>').join('');
+    openModal(title || 'По какому объекту?',
+      '<div class="feed">' + rows + '</div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
+  function pickRequestFor(act, title) {
+    const rs = (D().requests || []).filter((r) => reqStage(r) !== 'closed').slice(0, 12);
+    if (!rs.length) { WS.storeApi.toast('Открытых заявок нет'); return; }
+    const rows = rs.map((r) => {
+      const c = (D().clients || []).find((x) => x.id === r.clientId) || {};
+      return '<button class="feed-row" style="width:100%;text-align:left" data-act="' +
+        escAttr(act) + '" data-req="' + escAttr(r.id) + '">' +
+        '<div class="fi i-acc">' + I('target') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(r.title) + '</div>' +
+        '<div class="m">' + escAttr(c.name || '') + (r.budget ? ' · ' + WS.AED(r.budget) : '') + '</div></div>' +
+        I('arrowRight') + '</button>';
+    }).join('');
+    openModal(title || 'По какой заявке?',
+      '<div class="feed">' + rows + '</div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>');
+  }
   function openFloorplan(objId) {
     const o = (D().objects || []).find((x) => x.id === objId);
     if (!o) { WS.storeApi.toast('Объект не найден: ' + objId); return; }
@@ -9518,6 +9611,7 @@
     return '<div class="obj-actrow">' +
       '<button class="btn sm" data-valobj="' + o.id + '">' + I('calc') + 'Оценить</button>' +
       '<button class="btn sm" data-act="floorplan" data-obj="' + o.id + '">' + I('layers') + 'Планировка</button>' +
+      '<button class="btn sm" data-act="pitch" data-obj="' + o.id + '">' + I('sparkle') + 'Собрать питч</button>' +
       '<button class="btn sm" data-promo="' + o.id + '">' + I('send') + 'Продвигать</button>' +
       '<button class="btn sm" data-shortlist="' + o.id + '"' + (inSl ? ' style="border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink)"' : '') + '>' + I(inSl ? 'check' : 'star') + (inSl ? 'В подборке' : 'В подборку') + '</button>' +
       '</div>';
@@ -12421,6 +12515,56 @@
   }
 
   // ---------------- ПРОДВИЖЕНИЕ ОБЪЕКТА (действие из карточки: AI-рассылка партнёрам сети) ----------------
+  /* Что реально можно приложить к рассылке по этому объекту — и чего нет. Второе важнее:
+     брокер должен знать, что ещё запросить у застройщика до отправки. */
+  function promoAttachments(o) {
+    const have = [
+      { k: 'plan', t: 'Схема планировки', m: 'строится по площади и составу комнат', on: !!(WS.floorplan && o.size) },
+      { k: 'pay', t: 'План оплаты', m: o.paymentPlan || 'у объекта не заполнен', on: !!o.paymentPlan },
+      { k: 'photo', t: 'Фотография объекта', m: 'из карточки', on: !!(WS.photos && WS.photos[o.id]) },
+      { k: 'card', t: 'Карточка объекта', m: 'цена, метраж, сдача, сервисный сбор', on: true },
+    ];
+    /* Недоступное вложение рисовалось тем же чекбоксом, только бледнее, — и читалось как
+       «можно включить». Чего нет в системе — то не выбор, а отсутствие, и выглядеть оно
+       должно иначе: замок вместо квадрата и причина рядом. */
+    const rows = have.map((a) => (a.on
+      ? '<label class="feed-row" style="cursor:pointer">' +
+        '<input type="checkbox" checked style="margin:0 10px 0 0;accent-color:var(--acc)">' +
+        '<div class="ft"><div class="t">' + escAttr(a.t) + '</div><div class="m">' + escAttr(a.m) + '</div></div></label>'
+      : '<div class="feed-row att-off">' +
+        '<div class="fi i-mut">' + I('lock') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(a.t) + '</div>' +
+        '<div class="m">нечего приложить — ' + escAttr(a.m) + '</div></div>' +
+        '<span class="badge">нет в системе</span></div>')).join('');
+    /* Брошюры застройщика в системе нет и взяться ей неоткуда — об этом говорится прямо,
+       а не молчанием в списке. */
+    return '<div class="feed">' + rows + '</div>' +
+      '<div class="match" style="margin-top:9px">' + I('warn') +
+      '<span>Брошюры застройщика и обмерного чертежа в системе нет — их запрашивают у застройщика отдельно.</span></div>';
+  }
+  /* Кому из клиентов этот объект вообще имеет смысл посылать — и кому нельзя. Проверка
+     согласия — та же общая, что у любой адресной отправки, а не своя отдельная. */
+  function promoClients(o) {
+    const fits = (D().clients || []).filter((c) =>
+      (c.areas || []).indexOf(o.area) >= 0 ||
+      (c.budget && Math.abs((o.price || 0) - c.budget) <= c.budget * 0.25));
+    if (!fits.length) return '<div style="font-size:12px;color:var(--faint);padding:6px 0">Под этот объект подходящих клиентов в базе нет</div>';
+    const audit = WS.audience.calculateAudience(fits.map((c) => ({ id: c.id, clientId: c.id, channel: c.channel })));
+    const okIds = (audit.allowed || []).map((x) => x.clientId || x.id);
+    const rows = fits.map((c) => {
+      const ok = okIds.indexOf(c.id) >= 0;
+      const ex = (audit.excluded || []).find((x) => (x.clientId || x.id) === c.id);
+      const why = ok ? ((c.areas || []).join(', ') || 'по бюджету') : ((ex && ex.reason) || 'нельзя писать');
+      return '<label class="feed-row" style="cursor:' + (ok ? 'pointer' : 'default') + ';opacity:' + (ok ? '1' : '.55') + '">' +
+        '<input type="checkbox" ' + (ok ? 'checked' : 'disabled') + ' style="margin:0 10px 0 0;accent-color:var(--acc)">' +
+        '<div class="ft"><div class="t">' + escAttr(c.name) + '</div><div class="m">' + escAttr(why) + '</div></div>' +
+        (ok ? '' : '<span class="badge stop">' + I('lock') + 'исключён</span>') + '</label>';
+    }).join('');
+    const nOut = (audit.excluded || []).length;
+    return '<div class="feed">' + rows + '</div>' +
+      (nOut ? '<div class="match" style="margin-top:9px">' + I('shield') +
+        '<span>Исключено ' + nOut + ' — без действующего согласия адресная отправка невозможна. Это отказ самого клиента, а не настройка.</span></div>' : '');
+  }
   function openPromotion(objId) {
     const o = (D().objects.find((x) => x.id === objId)) || D().objects[0];
     const ph = WS.photos && (WS.photos[o.id] || WS.photos.o_creekline);
@@ -12466,6 +12610,15 @@
           dxSec('doc', 'Сообщение для рассылки', '<span style="font-size:11px;color:var(--mut);font-weight:500">Консьерж · можно править</span>', '<textarea id="promoMsg" class="promo-msg">' + msg + '</textarea>') +
           dxSec('star', 'Креативы для соцсетей', '', '<div class="promo-creatives">' + creatives + '<button class="btn sm ghost" data-act="cgFeatureStub">' + I('plus') + 'Свой креатив</button></div>') +
           dxSec('users', 'Получатели в партнёрской сети', '', '<div class="feed">' + recipRows + '</div>') +
+          /* Рассылка шла ТОЛЬКО партнёрам. Брокер говорил про клиентов: «рассылка такому-то,
+             такому-то клиенту». Клиенты — другое дело, чем партнёры: адресная отправка без
+             согласия запрещена, и список ОБЯЗАН показывать, кого и почему исключили,
+             а не молча его сокращать. */
+          dxSec('mail', 'Получатели среди клиентов', '', promoClients(o)) +
+          /* Вложения. Брокер просил именно этого: «текст и брошюра, текст и payment plan».
+             Список собирается из того, что у стенда ЕСТЬ на самом деле, и называет, чего нет.
+             Показать галку «брошюра застройщика», которой нет, — обещать то, что не уйдёт. */
+          dxSec('layers', 'Вложения', '', promoAttachments(o)) +
         '</div>' +
         '<div class="promo-col">' +
           dxSec('send', 'Каналы продвижения', '', '<div class="feed">' + channelRows + '</div>') +
@@ -13091,7 +13244,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
