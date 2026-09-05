@@ -75,6 +75,35 @@
   // лучший ROI?" matched /объект/ and opened a selection screen, and anything mentioning
   // доходность opened the calculator. Questions are for the Concierge; these are only
   // the spoken equivalents of the buttons already on screen.
+  /* Запись, на которой брокер стоит. Ярлык без контекста бесполезен: «собери оффер»
+     должен действовать на ТУ заявку, которая открыта, а не спрашивать «по какой». */
+  function hereRequest() {
+    if (store.view === 'requestDetail' && store.requestId) return store.requestId;
+    const t = String((WS.engine.activeThreadId && WS.engine.activeThreadId()) || '');
+    if (t.indexOf('request:') === 0) return t.slice(8);
+    if (t.indexOf('deal:') === 0) {
+      const d = (store.data.deals || []).find((x) => x.id === t.slice(5));
+      if (d && d.requestId) return d.requestId;
+    }
+    return null;
+  }
+  function hereObject() {
+    if (store.view === 'objectDetail' && store.objectId) return store.objectId;
+    const t = String((WS.engine.activeThreadId && WS.engine.activeThreadId()) || '');
+    if (t.indexOf('object:') === 0) return t.slice(7);
+    const rid = hereRequest();
+    const r = rid ? (store.data.requests || []).find((x) => x.id === rid) : null;
+    const sel = r && (r.offered || []).filter((o) => o.state === 'selected')[0];
+    return sel ? sel.id : null;
+  }
+  function needRequest(what) {
+    const id = hereRequest();
+    if (!id) { api.toast('Откройте заявку — ' + what + ' собирается по ней', 'warn'); return null; }
+    return id;
+  }
+  /* Фразы, которые работают БЕЗ модели — голосом и в одно нажатие. Дубайский брокер
+     сказал прямо: «если можно надиктовать голосом — вообще топ, время экономит уйму». До этого
+     ни одной его задачи в списке не было, и без живой модели голос не делал ничего. */
   const PROMPT_SHORTCUTS = {
     'g1': () => WS.engine.startScenario('G1'),
     'g2': () => WS.engine.startScenario('G2'),
@@ -84,6 +113,23 @@
     'бриф к звонку': () => WS.engine.startScenario('S8'),
     'финмодель': () => WS.router.go('calc'),
     'оценка объекта': () => WS.router.go('valuation'),
+    'собери оффер': () => { const id = needRequest('оффер'); if (id) WS.ui.openRequestOffer(id); },
+    'собери подборку': () => { const id = needRequest('подборка'); if (id) WS.ui.openRequestOffer(id); },
+    'собери топ-3': () => { const id = needRequest('подборка'); if (id) WS.ui.openRequestOffer(id); },
+    'отправь оффер клиенту': () => { const id = needRequest('оффер'); if (id) WS.ui.openRequestOffer(id); },
+    'покажи планировку': () => {
+      const id = hereObject();
+      if (!id) return api.toast('Откройте объект — планировка строится по нему', 'warn');
+      WS.ui.openFloorplan(id);
+    },
+    'планировка': () => {
+      const id = hereObject();
+      if (!id) return api.toast('Откройте объект — планировка строится по нему', 'warn');
+      WS.ui.openFloorplan(id);
+    },
+    'собери кп': () => { const id = needRequest('КП'); if (id) WS.ui.reqFormKp(id); },
+    'рассылка': () => { const id = hereObject(); WS.ui.openPromotion(id || (store.data.objects[0] || {}).id); },
+    'сделать рассылку': () => { const id = hereObject(); WS.ui.openPromotion(id || (store.data.objects[0] || {}).id); },
   };
   function routePrompt(text) {
     const t = (text || '').toLowerCase().trim().replace(/[.!?…]+$/, '');
@@ -342,6 +388,10 @@
       case 'about': WS.ui.openAbout(); break;
       case 'inboxTriage': WS.ui.openInboxTriage(t.dataset.inbox); break;
       case 'inboxAssign': WS.ui.openInboxAssign(t.dataset.inbox); break;
+      case 'reqOffer': WS.ui.openRequestOffer(t.dataset.req); break;
+      case 'floorplan': WS.ui.openFloorplan(t.dataset.obj); break;
+      case 'copyFloorplan': WS.ui.copyFloorplan(t.dataset.obj); break;
+      case 'sendReqOffer': WS.ui.sendRequestOffer(t.dataset.req); break;
       case 'openDealShow': WS.ui.openDealShowForm(t.dataset.deal); break;
       case 'createDealShow': WS.ui.createDealShow(t.dataset.deal); break;
       case 'calShow': WS.ui.openCalendarShowPicker(); break;

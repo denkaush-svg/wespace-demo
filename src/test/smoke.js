@@ -8556,6 +8556,89 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Сценарии дубайского брокера ----
+     Живой агент назвал, что бы отдавал Консьержу: топ-3 из листингов оффером клиенту,
+     планировку юнита картинкой, и чтобы всё это шло голосом в одно нажатие. */
+  {
+    WS.storeApi.resetAll();
+
+    /* Подборка ранжировалась по НАШЕЙ комиссии и уходила клиенту как рекомендация.
+       Порядок теперь строится по выгоде покупателя и каждая составляющая объяснима. */
+    const anna = dd().clients.find((c) => c.id === 'c_anna');
+    const picks = WS.ui.replyPicks(anna);
+    check('подбор · топ-3, а не два', picks.length === 3, 'подобрано ' + picks.length);
+    const scored = picks.map((o) => WS.ui.clientValue(o, anna).score);
+    check('подбор · порядок по выгоде клиента, по убыванию',
+      scored.every((v, i) => i === 0 || scored[i - 1] >= v), scored.map((x) => Math.round(x)).join(' ≥ '));
+    /* Главная гарантия: комиссия НЕ решает порядок. Если бы решала, самый
+       дорогой по вознаграждению всегда стоял бы первым. */
+    const byComm = picks.slice().sort((a, b) =>
+      (b.price * (b.commissionPct || 0)) - (a.price * (a.commissionPct || 0)));
+    check('подбор · наша комиссия не определяет порядок для клиента',
+      picks.length < 2 || picks[0].id !== byComm[0].id ||
+      WS.ui.clientValue(picks[0], anna).score >= WS.ui.clientValue(picks[1], anna).score,
+      'первый по выгоде: ' + picks[0].name + ', первый по комиссии: ' + byComm[0].name);
+    check('подбор · каждый объект объясняет, почему он здесь',
+      picks.every((o) => (WS.ui.clientValueWhy(o, anna) || '').length > 8),
+      picks.map((o) => WS.ui.clientValueWhy(o, anna)).join(' | ').slice(0, 120));
+
+    /* Оффер собирался ТОЛЬКО от входящего письма. Брокер работает из заявки. */
+    WS.ui.closeModal();
+    WS.ui.openRequestOffer('r_anna');
+    const om = doc.getElementById('modal');
+    const oh = om.innerHTML;
+    const ot = oh.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    check('оффер · собирается прямо из заявки',
+      om.classList.contains('show') && (oh.match(/sel-card/g) || []).length > 0,
+      'карточек ' + ((oh.match(/sel-card/g) || []).length));
+    check('оффер · есть то, на чём клиент решает',
+      /План оплаты/.test(ot) && /Почему в подборке/.test(ot) && /Описание объекта/.test(ot),
+      ot.slice(0, 100));
+    /* Два явных требования брокера: без контактов и без водяных знаков. */
+    check('оффер · без контактов агентства и без водяных знаков',
+      !/\+971|@harbourkey/.test(ot) && !/demo-wm/.test(oh), ot.slice(0, 80));
+
+    /* Пустой случай — тот, на который брокер и попал: 2,6 млн в Downtown, а инвентаря нет.
+       Документ обязан сказать об этом, а не притворяться подборкой. */
+    const empty = (dd().requests || []).find((r) => r.clientId === 'c_partner');
+    if (empty) {
+      WS.ui.closeModal();
+      WS.ui.openRequestOffer(empty.id);
+      const et = (doc.getElementById('modal').innerHTML || '').replace(/<[^>]+>/g, ' ');
+      check('оффер · пустой инвентарь назван пустым, с партнёрским выходом',
+        /Свободных объектов/.test(et) && /партнёр/i.test(et), et.slice(0, 90));
+    }
+
+    /* Планировки не было вовсе. Схема строится из наших же чисел и ОБЯЗАНА говорить,
+       что она не чертёж: картинка уедет клиенту и начнёт жить как документ. */
+    WS.ui.closeModal();
+    WS.ui.openFloorplan('o_creekline');
+    const fh = doc.getElementById('modal').innerHTML;
+    check('планировка · схема рисуется', /<svg/.test(fh) && (fh.match(/м²/g) || []).length >= 3,
+      'подписей с метражом ' + ((fh.match(/м²/g) || []).length));
+    check('планировка · оговорка стоит НА КАРТИНКЕ, а не рядом',
+      /<svg[\s\S]*не чертёж застройщика[\s\S]*<\/svg>/.test(fh), 'подпись внутри svg');
+    check('планировка · сказано и чего в ней НЕТ',
+      /Чего здесь нет/.test(fh.replace(/<[^>]+>/g, ' ')), 'блок пропусков');
+
+    /* Голосом и в одно нажатие — брокер назвал это условием, при котором будут пользоваться.
+       До этого ни одной его задачи в списке фраз не было. */
+    const sc = WS.router.promptShortcuts();
+    check('голос · задачи брокера понимаются без модели',
+      ['собери оффер', 'покажи планировку', 'собери кп'].every((p) => sc.indexOf(p) >= 0),
+      sc.filter((x) => /оффер|планировк|кп/i.test(x)).join(', '));
+
+    WS.ui.closeModal();
+    WS.store.view = 'requestDetail'; WS.store.requestId = 'r_anna';
+    WS.router.routePrompt('собери оффер');
+    check('голос · ярлык действует на ОТКРЫТУЮ запись, а не спрашивает «по какой»',
+      (doc.getElementById('modal').innerHTML.match(/sel-card/g) || []).length === 3,
+      'карточек ' + ((doc.getElementById('modal').innerHTML.match(/sel-card/g) || []).length));
+
+    WS.ui.closeModal();
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Происхождение ответа и сквозные ключи ----
      Ответ модели и ответ офлайнового планировщика были неразличимы — ни для брокера,
      ни в исследовании. Замер качества на таких данных мерит смесь причин. */

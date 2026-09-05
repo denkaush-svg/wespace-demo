@@ -2893,3 +2893,22 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   font-size: 12.5px; font-weight: 550; cursor: pointer; }
 .cg-about:hover { color: var(--ink); border-color: var(--ink-20, var(--line)); }
 .cg-about svg { width: 15px; height: 15px; flex: none; }
+
+/* Строка «чем этот юнит отличается» в документе подборки. Это авторское описание объекта,
+   а не измеренная величина, поэтому она не выглядит как факт в ряду фактов: своя подпись,
+   приглушённый фон, отдельный блок под таблицей характеристик. */
+.sel-usp { margin: 8px 0 0; padding: 9px 11px; background: var(--surface-2); border-radius: 9px;
+  font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+.sel-usp-k { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--mut); margin-bottom: 3px; }
+
+/* Схема планировки. Картинка занимает всю ширину окна, под ней — из чего собрана и
+   чего в ней нет: вторая строка важнее первой, она решает, что брокер понесёт клиенту. */
+.fp-wrap { display: flex; justify-content: center; padding: 4px 0 12px; }
+.fp-wrap svg { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+.fp-note { display: flex; flex-direction: column; gap: 6px; }
+.fp-row { display: flex; gap: 10px; font-size: 12.5px; line-height: 1.45; align-items: baseline; }
+.fp-k { flex: none; width: 118px; font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--mut); }
+.fp-row--warn { color: var(--stop); }
+@media (max-width: 560px) { .fp-row { flex-direction: column; gap: 2px; } .fp-k { width: auto; } }
