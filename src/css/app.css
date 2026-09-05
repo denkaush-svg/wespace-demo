@@ -2935,3 +2935,10 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .pitch-row { grid-template-columns: 1fr; gap: 2px; }
   .pitch-from { text-align: left; }
 }
+
+/* Строка «видно только вам» под КП: то, что зарабатываем мы, брокер видеть должен,
+   а клиент — нет. Раньше комиссия стояла колонкой в самом документе. */
+.kp-internal { display: flex; gap: 7px; align-items: flex-start; margin-top: 12px; padding: 9px 12px;
+  background: var(--surface-2); border: 1px dashed var(--line); border-radius: 9px;
+  font-size: 11.5px; line-height: 1.45; color: var(--mut); }
+.kp-internal svg { width: 13px; height: 13px; flex: none; margin-top: 1px; }

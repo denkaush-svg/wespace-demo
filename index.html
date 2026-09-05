@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:27</title>
+  <title>WESPACE · сборка 17:54</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:27';
+    window.WS_BUILD='17:54';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -3087,6 +3087,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
   .pitch-row { grid-template-columns: 1fr; gap: 2px; }
   .pitch-from { text-align: left; }
 }
+
+/* Строка «видно только вам» под КП: то, что зарабатываем мы, брокер видеть должен,
+   а клиент — нет. Раньше комиссия стояла колонкой в самом документе. */
+.kp-internal { display: flex; gap: 7px; align-items: flex-start; margin-top: 12px; padding: 9px 12px;
+  background: var(--surface-2); border: 1px dashed var(--line); border-radius: 9px;
+  font-size: 11.5px; line-height: 1.45; color: var(--mut); }
+.kp-internal svg { width: 13px; height: 13px; flex: none; margin-top: 1px; }
 
 
 /* ============================================================
@@ -16603,24 +16610,36 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // КП as a client-facing document — objects with cost + net yield + commission, then the terms.
   // Shared by the live request КП and the deal's frozen snapshot.
   function kpDocBody(cliName, subtitle, objs, terms, note) {
+    /* Здесь стояла колонка «Комиссия» — НАШ процент, напечатанный в документе,
+       который читает КЛИЕНТ. Та же ошибка, что была в подборке, только откровеннее:
+       там комиссия решала порядок, здесь она просто напечатана. На её месте — то, на чём
+       покупатель решает: срок сдачи или готовность. Комиссия остаётся брокеру — отдельной
+       строкой под документом, помеченной как внутренняя. */
     const rows = objs.map((o) => {
       const ny = reqKpNetYield(o);
+      const ready = o.segment === 'off-plan' ? (o.handover || 'строится') : (o.occupancy || 'готово');
       return '<tr><td>' + o.name + '</td><td>' + o.area + '</td><td class="num">' + WS.AED(o.price) + '</td>' +
         '<td class="num">' + (ny != null ? (ny * 100).toFixed(1) + '%' : '—') + '</td>' +
-        '<td class="num">' + (o.commissionPct ? o.commissionPct + '%' : '—') + '</td></tr>';
+        '<td class="num">' + escAttr(ready) + '</td></tr>';
     }).join('');
+    // Что зарабатываем мы — видит только брокер, и это прямо написано рядом.
+    const ourFee = objs.reduce((sum, o) => sum + (o.price || 0) * ((o.commissionPct || 0) / 100), 0);
+    const feeLine = ourFee
+      ? '<div class="kp-internal">' + I('eye') + 'Видно только вам: вознаграждение по этому набору — ' +
+        WS.AED(Math.round(ourFee)) + '. В документ, который уйдёт клиенту, эта строка не попадает.</div>'
+      : '';
     const total = objs.reduce((s, o) => s + (o.price || 0), 0);
     return '<div class="kp-doc">' +
       '<div class="kp-doc-head"><div><div class="kp-doc-to">Коммерческое предложение</div>' +
       '<div class="kp-doc-cli">' + cliName + ' · ' + subtitle + '</div></div>' +
       '<span class="badge demo">' + I('lock') + 'DEMO</span></div>' +
       (note ? '<div class="kp-doc-note">' + I('lock') + note + '</div>' : '') +
-      '<div class="kp-tblwrap"><table class="kp-tbl"><thead><tr><th>Объект</th><th>Район</th><th class="num">Стоимость</th><th class="num">Доходность</th><th class="num">Комиссия</th></tr></thead>' +
+      '<div class="kp-tblwrap"><table class="kp-tbl"><thead><tr><th>Объект</th><th>Район</th><th class="num">Стоимость</th><th class="num">Доходность</th><th class="num">Готовность</th></tr></thead>' +
       '<tbody>' + rows + '</tbody>' +
       '<tfoot><tr><td colspan="2">Итого · ' + objs.length + ' об.</td><td class="num">' + WS.AED(total) + '</td><td class="num">—</td><td class="num">—</td></tr></tfoot></table></div>' +
       '<div class="kp-doc-terms"><div class="kp-doc-terms-h">Условия</div>' +
       '<div>Форма оплаты: <b>' + (terms.paymentForm || '—') + '</b> · НДС: <b>' + (terms.vat ? '5%' : 'не облагается') + '</b> · Срок: <b>' + (terms.horizon || '—') + '</b></div>' +
-      (terms.funding ? '<div>Финансирование: <b>' + terms.funding + '</b></div>' : '') + '</div></div>';
+      (terms.funding ? '<div>Финансирование: <b>' + terms.funding + '</b></div>' : '') + '</div>' + feeLine + '</div>';
   }
   function openReqKp(id) {
     const r = requestById(id); if (!r) return;

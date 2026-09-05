@@ -8451,24 +8451,36 @@
   // КП as a client-facing document — objects with cost + net yield + commission, then the terms.
   // Shared by the live request КП and the deal's frozen snapshot.
   function kpDocBody(cliName, subtitle, objs, terms, note) {
+    /* Здесь стояла колонка «Комиссия» — НАШ процент, напечатанный в документе,
+       который читает КЛИЕНТ. Та же ошибка, что была в подборке, только откровеннее:
+       там комиссия решала порядок, здесь она просто напечатана. На её месте — то, на чём
+       покупатель решает: срок сдачи или готовность. Комиссия остаётся брокеру — отдельной
+       строкой под документом, помеченной как внутренняя. */
     const rows = objs.map((o) => {
       const ny = reqKpNetYield(o);
+      const ready = o.segment === 'off-plan' ? (o.handover || 'строится') : (o.occupancy || 'готово');
       return '<tr><td>' + o.name + '</td><td>' + o.area + '</td><td class="num">' + WS.AED(o.price) + '</td>' +
         '<td class="num">' + (ny != null ? (ny * 100).toFixed(1) + '%' : '—') + '</td>' +
-        '<td class="num">' + (o.commissionPct ? o.commissionPct + '%' : '—') + '</td></tr>';
+        '<td class="num">' + escAttr(ready) + '</td></tr>';
     }).join('');
+    // Что зарабатываем мы — видит только брокер, и это прямо написано рядом.
+    const ourFee = objs.reduce((sum, o) => sum + (o.price || 0) * ((o.commissionPct || 0) / 100), 0);
+    const feeLine = ourFee
+      ? '<div class="kp-internal">' + I('eye') + 'Видно только вам: вознаграждение по этому набору — ' +
+        WS.AED(Math.round(ourFee)) + '. В документ, который уйдёт клиенту, эта строка не попадает.</div>'
+      : '';
     const total = objs.reduce((s, o) => s + (o.price || 0), 0);
     return '<div class="kp-doc">' +
       '<div class="kp-doc-head"><div><div class="kp-doc-to">Коммерческое предложение</div>' +
       '<div class="kp-doc-cli">' + cliName + ' · ' + subtitle + '</div></div>' +
       '<span class="badge demo">' + I('lock') + 'DEMO</span></div>' +
       (note ? '<div class="kp-doc-note">' + I('lock') + note + '</div>' : '') +
-      '<div class="kp-tblwrap"><table class="kp-tbl"><thead><tr><th>Объект</th><th>Район</th><th class="num">Стоимость</th><th class="num">Доходность</th><th class="num">Комиссия</th></tr></thead>' +
+      '<div class="kp-tblwrap"><table class="kp-tbl"><thead><tr><th>Объект</th><th>Район</th><th class="num">Стоимость</th><th class="num">Доходность</th><th class="num">Готовность</th></tr></thead>' +
       '<tbody>' + rows + '</tbody>' +
       '<tfoot><tr><td colspan="2">Итого · ' + objs.length + ' об.</td><td class="num">' + WS.AED(total) + '</td><td class="num">—</td><td class="num">—</td></tr></tfoot></table></div>' +
       '<div class="kp-doc-terms"><div class="kp-doc-terms-h">Условия</div>' +
       '<div>Форма оплаты: <b>' + (terms.paymentForm || '—') + '</b> · НДС: <b>' + (terms.vat ? '5%' : 'не облагается') + '</b> · Срок: <b>' + (terms.horizon || '—') + '</b></div>' +
-      (terms.funding ? '<div>Финансирование: <b>' + terms.funding + '</b></div>' : '') + '</div></div>';
+      (terms.funding ? '<div>Финансирование: <b>' + terms.funding + '</b></div>' : '') + '</div>' + feeLine + '</div>';
   }
   function openReqKp(id) {
     const r = requestById(id); if (!r) return;
