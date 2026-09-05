@@ -3660,7 +3660,7 @@ setTimeout(async () => {
             'event: stage\ndata: {"k":"accepted","mode":"plain","depth":"quick"}\n\n',
             'event: delta\ndata: {"t":"Ответ по существу."}\n\n',
             'event: done\ndata: ' + JSON.stringify({ say: 'Ответ по существу.', plan: {},
-              ms: 4321, mode: 'plain', depth: 'quick' }) + '\n\n',
+              ms: 4321, model: 'claude-test-model', mode: 'plain', depth: 'quick' }) + '\n\n',
           ]));
         };
         L.resetForTest();
@@ -3671,6 +3671,32 @@ setTimeout(async () => {
         check('live · and what answered still travels with it',
           !!timed && timed.mode === 'plain' && timed.depth === 'quick',
           'mode=' + (timed && timed.mode) + ' depth=' + (timed && timed.depth));
+        /* The same drop, one field over: the `done` event names the model that
+           answered and the transport built its `ran` object without it, so the
+           reply could not say what produced it. */
+        check('live · which model answered travels with the reply too, not dropped in transport',
+          !!timed && timed.model === 'claude-test-model', 'model=' + (timed && timed.model));
+        /* The stage event travels WHOLE, not as a bare key with two known fields
+           lifted off it. The server announces its own silence limit on
+           `accepted` (server/proxy.js) and the page arms that turn's watchdog
+           from it — a transport that forwarded only `k`/`mode`/`depth` would
+           leave the page on its hardcoded ceiling and kill live calls on a
+           server told to wait longer. */
+        const stages = [];
+        win.fetch = (url) => {
+          if (/\/health$/.test(String(url))) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+          return Promise.resolve(sse([
+            'event: stage\ndata: {"k":"accepted","mode":"plain","depth":"quick","stallMs":180000}\n\n',
+            'event: delta\ndata: {"t":"Ответ."}\n\n',
+            'event: done\ndata: ' + JSON.stringify({ say: 'Ответ.', plan: {}, mode: 'plain', depth: 'quick' }) + '\n\n',
+          ]));
+        };
+        L.resetForTest();
+        await L.ask('что сервер сказал о своём лимите', { onStage: (ev) => stages.push(ev) }).then((r) => r, () => null);
+        const acc = stages.find((e) => e && e.k === 'accepted');
+        check('live · the server\'s own silence limit reaches the page with the acceptance',
+          !!acc && acc.stallMs === 180000, 'stages=' + JSON.stringify(stages));
+
         win.fetch = realFetch;
         if (hadDecoder) win.TextDecoder = decoderWas; else delete win.TextDecoder;
         L.resetForTest();
@@ -4095,6 +4121,120 @@ setTimeout(async () => {
       eng.closeThread('probe:turnCancel');
       WS.agent.setAsyncHead(null);
     }
+
+    /* ---- and the cancel has to HOLD once the answer arrives behind it.
+       `askAsync` never rejects — an aborted live call falls through to the
+       offline planner and resolves with something, silently, by design — so the
+       reply for a question the visitor withdrew comes back a moment after the
+       card said «Запрос отменён». The one thing standing between that reply and
+       the cancelled card is the `turn.status === 'cancelled'` check after the
+       race in freeReply; without it the answer overwrites the cancellation and
+       the button reads as decoration. Driven through the real path: the card's
+       own button, the delegated data-eng handler, engine.handle → cancelTurn. ---- */
+    {
+      eng.openThread('probe:turnCancelLate', 'Турн · поздний ответ после отмены', 'sparkle');
+      WS.router.go('concierge');
+      let settle = null; let seenSignal = null;
+      WS.agent.setAsyncHead((t, opts) => { seenSignal = opts && opts.signal; return new Promise((res) => { settle = res; }); });
+      type('вопрос, который отменят на полпути'); clickSend();
+      await waitPastSetup();
+      const cancelOn = () => {
+        const c = doc.getElementById('chat');
+        return [].slice.call(c ? c.querySelectorAll('button') : []).find((b) => /отменить/i.test(b.textContent || ''));
+      };
+      const cancelBtn = cancelOn();
+      check('turn-state · setup: the waiting card and its cancel button are up',
+        !!cancelBtn && typeof settle === 'function', 'button=' + !!cancelBtn + ' head called=' + (typeof settle === 'function'));
+      if (cancelBtn) cancelBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      check('turn-state · setup: the click closes the request and frees the thread',
+        WS.engine.inFlight === false && !!seenSignal && seenSignal.aborted === true,
+        'inFlight=' + WS.engine.inFlight + ' aborted=' + (seenSignal && seenSignal.aborted));
+      // The answer the model was already producing lands AFTER the cancel.
+      if (settle) settle({ kind: 'answer', text: 'ОТВЕТ_ПОСЛЕ_ОТМЕНЫ', evidence: [], next: [] });
+      await waitPastFlash();
+      await waitPastFlash();
+      const afterChat = doc.getElementById('chat');
+      const afterText = afterChat ? (afterChat.textContent || '') : '';
+      check('turn-state · a reply that finishes after «Отменить» never lands on the card',
+        afterText.indexOf('ОТВЕТ_ПОСЛЕ_ОТМЕНЫ') < 0, 'card text: ' + afterText.slice(-240));
+      check('turn-state · and the card still reads as cancelled, with the question kept and a way to resend',
+        /отмен[её]н/i.test(afterText) && /Повторить/.test(afterText)
+          && afterText.indexOf('отменят на полпути') >= 0,
+        'card text: ' + afterText.slice(-240));
+      check('turn-state · and the thread is not put back into waiting by that late reply',
+        WS.engine.inFlight === false, 'inFlight=' + WS.engine.inFlight);
+      eng.closeThread('probe:turnCancelLate');
+      WS.agent.setAsyncHead(null);
+    }
+
+    /* ---- the client watchdog and the server's silence limit are ONE contract,
+       and the client's half used to be a constant. The page waits slightly
+       longer than the server does on purpose, so the server's own verdict wins
+       whenever there is one — but WESPACE_PROXY_STALL_MS is set at runtime, and
+       a server told to wait longer than the page's constant had its perfectly
+       live calls killed from the browser, with a connection error shown for a
+       call that was fine. The server now announces its limit on `accepted`
+       (server/proxy.js), and the turn arms its watchdog from that. ---- */
+    {
+      eng.openThread('probe:turnStall', 'Турн · лимит сервера', 'sparkle');
+      WS.router.go('concierge');
+      const ceilingWas = eng.watchdogMs;
+      // A ceiling short enough to be observed in under two seconds; the real one
+      // is 135 s and no test can wait it out.
+      eng.watchdogMs = 700;
+      let stageFn = null; let settle = null; let seenSignal = null;
+      WS.agent.setAsyncHead((t, opts) => {
+        stageFn = opts && opts.onStage; seenSignal = opts && opts.signal;
+        return new Promise((res) => { settle = res; });
+      });
+      type('вопрос к серверу, который ждёт дольше страницы'); clickSend();
+      await waitPastSetup();
+      check('turn-state · setup: the stage callback is in hand before the ceiling is reached',
+        typeof stageFn === 'function' && WS.engine.inFlight === true,
+        'stage=' + typeof stageFn + ' inFlight=' + WS.engine.inFlight);
+      if (typeof stageFn === 'function') stageFn({ k: 'accepted', mode: 'plain', depth: 'quick', stallMs: 20000 });
+      await new Promise((r) => setTimeout(r, 1100)); // well past the 700 ms default ceiling
+      check('turn-state · a turn adopts the silence limit the server announced instead of its own default ceiling',
+        WS.engine.inFlight === true && !!seenSignal && seenSignal.aborted === false,
+        'inFlight=' + WS.engine.inFlight + ' aborted=' + (seenSignal && seenSignal.aborted));
+      if (settle) settle({ kind: 'answer', text: 'готово', evidence: [], next: [] });
+      await waitPastFlash();
+      eng.watchdogMs = ceilingWas;
+      eng.closeThread('probe:turnStall');
+      WS.agent.setAsyncHead(null);
+    }
+
+    // ---- and an older server that announces nothing leaves the page on its own
+    //      ceiling: the fallback is the behaviour, not an accident. ----
+    {
+      eng.openThread('probe:turnStallNone', 'Турн · сервер молчит о лимите', 'sparkle');
+      WS.router.go('concierge');
+      const ceilingWas = eng.watchdogMs;
+      eng.watchdogMs = 700;
+      let stageFn = null; let seenSignal = null;
+      WS.agent.setAsyncHead((t, opts) => {
+        stageFn = opts && opts.onStage; seenSignal = opts && opts.signal;
+        return new Promise(() => {});
+      });
+      type('вопрос к серверу, который про лимит не сказал'); clickSend();
+      await waitPastSetup();
+      // Accepted, in the shape an older proxy sends it: no limit announced.
+      if (typeof stageFn === 'function') stageFn({ k: 'accepted', mode: 'plain', depth: 'quick' });
+      await new Promise((r) => setTimeout(r, 1100));
+      const noneHtml = (doc.getElementById('chat') || {}).textContent || '';
+      check('turn-state · with no announced limit the turn still ends on the page\'s own ceiling',
+        WS.engine.inFlight === false && !!seenSignal && seenSignal.aborted === true,
+        'inFlight=' + WS.engine.inFlight + ' aborted=' + (seenSignal && seenSignal.aborted));
+      check('turn-state · and that end is said plainly, with the question kept',
+        /не пришёл/i.test(noneHtml) && /Повторить/.test(noneHtml), 'card text: ' + noneHtml.slice(-200));
+      eng.watchdogMs = ceilingWas;
+      eng.closeThread('probe:turnStallNone');
+      WS.agent.setAsyncHead(null);
+    }
+
+    // ---- and the fallback is the number the contract was written around. ----
+    check('turn-state · the default ceiling still sits above the proxy\'s own default silence limit (120 с)',
+      eng.watchdogMs > 120000, 'watchdogMs=' + eng.watchdogMs);
 
     // ---- acceptance is meant to carry mode/depth so the card can show them,
     //      not just a spinner (acceptance criterion: "the accepted server

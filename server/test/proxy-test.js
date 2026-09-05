@@ -404,6 +404,29 @@ async function stageChecks() {
     !!acc && acc.data.mode === expect.mode && acc.data.depth === expect.depth,
     JSON.stringify(acc && acc.data) + ' expected mode=' + expect.mode + ' depth=' + expect.depth);
 
+  /* And it carries this server's own silence limit. The page keeps its watchdog
+     above that number, and it used to be a constant on the page: raising
+     WESPACE_PROXY_STALL_MS past it made the browser kill calls this server still
+     considered alive. The announced value has to be the one actually in force,
+     not the default — so it is checked against a changed setting too. */
+  ok('acceptance also says how long this server will wait on silence',
+    !!acc && acc.data.stallMs === CFG.stallMs,
+    JSON.stringify(acc && acc.data) + ' expected stallMs=' + CFG.stallMs);
+  {
+    refill();
+    const stallWas = CFG.stallMs;
+    CFG.stallMs = stallWas + 60000;
+    try {
+      const r = await ask({ text: 'вопрос при поднятом лимите тишины' });
+      const a2 = events(r.body).find((e) => e.event === 'stage' && e.data && e.data.k === 'accepted');
+      ok('and it announces the limit in force, not the compiled-in default',
+        !!a2 && a2.data.stallMs === CFG.stallMs,
+        JSON.stringify(a2 && a2.data) + ' expected stallMs=' + CFG.stallMs);
+    } finally {
+      CFG.stallMs = stallWas;
+    }
+  }
+
   // A short question still gets the courtesy of "accepted" — this is not
   // conditional on the reply being long enough to make a spinner worthwhile.
   refill();

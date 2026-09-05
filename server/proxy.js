@@ -1238,7 +1238,12 @@ async function handleAsk(req, res) {
   const stage = (k, extra) => { if (!aborted) send('stage', Object.assign({ k: k }, extra || {})); };
   // Taken — with what the server RESOLVED, not what the browser asked for: an
   // unknown mode falls back here, and the waiting card must name what will run.
-  stage('accepted', { mode: spec.mode, depth: spec.depth });
+  /* The silence limit travels with it. The page keeps its own watchdog above
+     this number so the server's verdict always wins; hardcoding it there meant
+     raising WESPACE_PROXY_STALL_MS above the page's constant made the page kill
+     calls this server still considered alive. Announced on acceptance because
+     that is the first thing the server says, before any model text. */
+  stage('accepted', { mode: spec.mode, depth: spec.depth, stallMs: CFG.stallMs });
   // Listen on the RESPONSE, not the request: the request stream is already
   // finished the moment its body has been read, so its `close` fires long
   // before the visitor goes anywhere. The response closes when the connection

@@ -1001,12 +1001,18 @@
       // stamps `ms` on its `done` event). Dropping it here meant the one number
       // that says whether an answer took four seconds or ninety never left the
       // transport: it could not be stored with the reply or shown in history.
-      ms: Number(done.ms) > 0 ? Number(done.ms) : null };
+      ms: Number(done.ms) > 0 ? Number(done.ms) : null,
+      // WHICH model answered, as the server names it (proxy.js stamps `model` on
+      // the same `done` event). Left behind here for the same reason `ms` was:
+      // the reply arrived with no way to say what produced it, so a run on a
+      // different model looked identical to a run on the configured one.
+      model: done.model ? String(done.model) : null };
     const reply = toReply(done.say, done.plan || {}, ran);
     if (!reply) throw new Error('empty reply');
     reply.mode = ran.mode;
     reply.depth = ran.depth;
     reply.ms = ran.ms;
+    reply.model = ran.model;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;

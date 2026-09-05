@@ -799,6 +799,10 @@
      own limit on purpose, so the server's message wins whenever there is one
      and this only ever fires when nothing is coming at all. */
   let watchdogMs = 135000;
+  /* How far above the server's limit «slightly above» is. The default ceiling is
+     exactly the default limit plus this, and a server that announces a different
+     limit gets the same margin rather than a second hardcoded number. */
+  const WATCHDOG_MARGIN_MS = 15000;
 
   async function freeReply(text) {
     /* The guard that refuses a second question lives in the UI handlers (the
@@ -956,14 +960,27 @@
        server that is alive always gets to speak first. */
     let watchdogFired = false;
     let watchdogTimer = null;
+    /* Re-armable, because the limit this has to stay above belongs to the SERVER
+       and the server only says what it is once the call has been accepted. The
+       constant below is the fallback for an older proxy, or a transport that
+       does not carry the number — not the truth about the running server. */
+    let armWatchdog = null;
     const watchdog = new Promise((_, reject) => {
-      watchdogTimer = setTimeout(() => {
+      const armedAt = Date.now();
+      const fire = () => {
         if (turn.status !== 'running') return;
         watchdogFired = true;
         turn.stage = 'failed';
         if (turn.abortController) { try { turn.abortController.abort(); } catch (e) { /* already gone */ } }
         reject(new Error('watchdog'));
-      }, watchdogMs);
+      };
+      // Deadlines are counted from the same instant whenever they are set, so
+      // re-arming mid-call moves the end of the wait rather than adding to it.
+      armWatchdog = (ms) => {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = setTimeout(fire, Math.max(0, ms - (Date.now() - armedAt)));
+      };
+      armWatchdog(watchdogMs);
     });
     // The live head streams; the offline one returns at once. Both land in the
     // same message, so the card simply fills in rather than being replaced.
@@ -981,6 +998,16 @@
             turn.stage = k;
             if (st.mode) turn.mode = st.mode;
             if (st.depth) turn.depth = st.depth;
+            /* The server's own silence limit, when it announces one. Kept ABOVE
+               it by the same margin the default was built with — a server
+               configured to wait longer than this page does used to have its
+               live calls killed from here, and the visitor was shown a
+               connection error for a call the server considered perfectly
+               fine. Only ever raises the ceiling: a short server limit is about
+               SILENCE, while this one counts the whole call, so lowering to it
+               would cut a call that is streaming normally. */
+            const stall = Number(st.stallMs);
+            if (stall > 0 && armWatchdog) armWatchdog(Math.max(watchdogMs, stall + WATCHDOG_MARGIN_MS));
             draw();
             return;
           }
