@@ -115,11 +115,16 @@
       address: 'Business Bay, Creekline Residences, Tower B, Unit 1208', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '12 мая 2026',
       trakheesi: 'ok', madmoun: 'ok',
-      attrs: { view: 'city', floor: 12, floors: 34, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
+      /* Вид — canal, а не city. Юнит 1208 стоит в корпусе B, а описание ниже говорит,
+         что именно там 1BR выходят на канал. Расхождение нашла модель на живом прогоне
+         и честно велела не обещать канал до подтверждения — правильное поведение,
+         но само расхождение было случайным, а не задуманным. Задуманное расхождение
+         в стенде есть и помечено полем `расхождение` у заявки. */
+      attrs: { view: 'canal', floor: 12, floors: 34, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
       match: 'Business Bay, в бюджете, проверенная доступность, инвестиционный профиль.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Creekline Residences · Tower B',
       handover: 'Q4 2026', paymentPlan: '10% бронь · 40% в стройку · 50% на сдаче',
-      serviceCharge: '16 AED/фт²·год', escrow: 'Escrow DLD · ADCB', occupancy: null,
+      serviceCharge: '16 AED/фт²·год', escrow: 'Эскроу-счёт проекта в ADCB, надзор RERA', occupancy: null,
       usp: 'Корпус B — единственный в проекте, где 1BR выходят на канал, а не во внутренний двор. С 12-го этажа вид не перекрывается соседней башней: ниже девятого он уже закрыт.' },
     { id: 'o_palmcourt', name: 'Palm Court Residence, Unit 704', source: 'club',
       sourceLabel: 'Клубный эксклюзив', area: 'JVC', price: 1690000, size: 95, br: '1BR+',
@@ -140,7 +145,7 @@
       match: 'Dubai Creek Harbour, у верхней границы бюджета. Проверка доступности устарела.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Bayline Terraces · Dubai Creek Harbour',
       handover: 'Q2 2027', paymentPlan: '20% бронь · 40% в стройку · 40% post-handover (2 года)',
-      serviceCharge: '18 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null,
+      serviceCharge: '18 AED/фт²·год', escrow: 'Эскроу-счёт проекта в Mashreq, надзор RERA', occupancy: null,
       usp: 'Post-handover 40% на два года после ключей: покупатель заходит в Creek Harbour, оплатив до сдачи 60%, и гасит остаток уже с арендного потока.' },
     // Два смежных блока в одном комплексе: продаются одним договором, и это единственная на стенде
     // живая иллюстрация правила «один ЖК — один договор, сколько бы лотов в нём ни было».
@@ -175,7 +180,7 @@
       match: 'Business Bay, в бюджете, вид на канал, свободен под сделку.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Bay Central Tower',
       handover: 'Q2 2027', paymentPlan: '20% бронь · 40% в стройку · 40% на сдаче',
-      serviceCharge: '17 AED/фт²·год', escrow: 'Escrow DLD · Mashreq', occupancy: null,
+      serviceCharge: '17 AED/фт²·год', escrow: 'Эскроу-счёт проекта в Mashreq, надзор RERA', occupancy: null,
       usp: 'Единственная линия в проекте, где окна выходят на канал, а не на Al Khail Road: шум с трассы — первая причина отказа арендаторов в Business Bay, и здесь её нет.' },
     { id: 'o_bbloft', name: 'Bay Loft Residences, Unit 1105', source: 'agency',
       sourceLabel: 'Инвентарь агентства', area: 'Business Bay', price: 1390000, size: 68, br: '1BR',
