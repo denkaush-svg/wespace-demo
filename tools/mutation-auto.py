@@ -228,6 +228,22 @@ def main():
         shutil.copy(os.path.join(backup, f), os.path.join(ROOT, f))
     subprocess.run(['node', 'src/build.js'], cwd=ROOT, capture_output=True)
 
+    # Результат пишется В ФАЙЛ, а не только в вывод: при фоновом запуске
+    # перехват обрезается до хвоста, и счёт пойманных теряется — ровно это
+    # случилось на первом полном прогоне.
+    import json as _json
+    _out = os.path.join(ROOT, 'tools', 'mutation-report.json')
+    io.open(_out, 'w', encoding='utf-8').write(_json.dumps({
+        'base': base, 'behaviour_only': behaviour, 'full_suite': full,
+        'caught': caught,
+        'survived': [{'file': p, 'line': l, 'code': t, 'mutation': d}
+                     for p, l, t, d in survived],
+        'anchor_fail': [{'file': p, 'line': l, 'mutation': d, 'matches': n}
+                        for p, l, d, n in anchor_fail],
+    }, ensure_ascii=False, indent=1))
+    print('')
+    print('отчёт: tools/mutation-report.json')
+
     total = caught + len(survived)
     print('\n' + '=' * 70)
     print('Поймано ' + str(caught) + ' из ' + str(total) +

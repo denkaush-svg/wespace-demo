@@ -8556,6 +8556,118 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Что нашёл АВТОМАТИЧЕСКИЙ мутационный прогон по диффу ----
+
+     Ручной список мутаций составлял автор исправлений — экзамен из вопросов, к которым
+     готовились. Прогон по фактическому диффу нашёл то, куда автор не подумал смотреть:
+     самые поздние по времени возможности — оффер от заявки, вложения, получатели
+     рассылки. Два из выживших — пути СОГЛАСИЯ: блокировку отправки можно было
+     удалить целиком, и ни один тест бы не заметил. */
+  {
+    WS.storeApi.resetAll();
+
+    /* 1. Отправка оффера без действующего согласия невозможна. Это отказ самого
+       клиента, а не настройка, и обходить его нельзя никаким путём. */
+    const noConsent = (dd().clients || []).find((c) => c.consent === false);
+    if (noConsent) {
+      const rNo = (dd().requests || []).find((r) => r.clientId === noConsent.id) ||
+        (function () {
+          const r = { id: 'r_probe_noconsent', clientId: noConsent.id, title: 'проба',
+            createdAt: 'сегодня', channel: 'whatsapp', offered: [], assignee: 'u_marina' };
+          dd().requests.push(r);
+          return r;
+        })();
+      const beforeTl = ((dd().requestTimeline || {})[rNo.id] || []).length;
+      const said = [];
+      const origToast = WS.storeApi.toast;
+      WS.storeApi.toast = (m) => { said.push(String(m)); };
+      WS._sel = { req: rNo.id, ids: ['o_creekline'] };
+      WS.ui.sendRequestOffer(rNo.id);
+      WS.storeApi.toast = origToast;
+      const afterTl = ((dd().requestTimeline || {})[rNo.id] || []).length;
+      check('согласие · оффер не уходит клиенту без согласия',
+        afterTl === beforeTl && said.length > 0 && /невозможна|нельзя|соглас/i.test(said.join(' ')),
+        'записей ' + beforeTl + '\u2192' + afterTl + ' · ' + (said[0] || 'МОЛЧА'));
+      dd().requests = (dd().requests || []).filter((x) => x.id !== 'r_probe_noconsent');
+    }
+
+    /* А при действующем согласии — уходит и оставляет след в истории заявки. */
+    {
+      const before = ((dd().requestTimeline || {})['r_anna'] || []).length;
+      WS._sel = { req: 'r_anna', ids: ['o_creekline'] };
+      WS.ui.sendRequestOffer('r_anna');
+      const after = ((dd().requestTimeline || {})['r_anna'] || []).slice(before);
+      check('согласие · с действующим согласием оффер уходит и пишется в историю',
+        after.length === 1 && /Подборка отправлена/.test(after[0].text || ''),
+        (after[0] || {}).text || 'ничего не записано');
+      /* Состав берётся из ЗАМОРОЖЕННОГО списка именно ЭТОЙ заявки: иначе в историю
+         ляжет набор из чужого окна, открытого перед этим. */
+      WS._sel = { req: 'r_igor', ids: ['o_baycentral'] };
+      const b2 = ((dd().requestTimeline || {})['r_anna'] || []).length;
+      WS.ui.sendRequestOffer('r_anna');
+      const a2 = ((dd().requestTimeline || {})['r_anna'] || []).slice(b2);
+      check('оффер · состав берётся только из своей заявки, а не из чужого окна',
+        a2.length === 1 && !/Bay Central/.test(a2[0].text || ''),
+        (a2[0] || {}).text || 'ничего');
+    }
+
+    /* 2. Получатели рассылки: без согласия — исключён и подписан причиной,
+       а не тихо выброшен из списка. */
+    if (noConsent) {
+      const objForList = (dd().objects || []).find((o) =>
+        (noConsent.areas || []).indexOf(o.area) >= 0) || (dd().objects || [])[0];
+      const html = WS.ui.promoClients ? WS.ui.promoClients(objForList) : '';
+      const txt = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      check('рассылка · без согласия контакт помечен исключённым',
+        html.indexOf(noConsent.name) < 0 || (/исключён/.test(txt) && /disabled/.test(html)),
+        txt.slice(0, 110));
+      /* У каждой строки должна быть ПРИЧИНА — и у допущенного (почему подходит),
+         и у исключённого (почему нельзя). Список без причин — это требование
+         верить на слово, а решение отправки принимает брокер. */
+      const rows = (html.match(/<div class="ft">[\s\S]*?<\/div>\s*<\/div>/g) || []);
+      const withWhy = rows.filter((r) => (r.match(/class="m">([^<]*)</) || ['', ''])[1].trim().length > 2);
+      check('рассылка · у каждого получателя названа причина',
+        rows.length > 0 && withWhy.length === rows.length,
+        'строк ' + rows.length + ', с причиной ' + withWhy.length);
+      check('рассылка · сказано, что это отказ клиента, а не настройка',
+        html.indexOf(noConsent.name) < 0 || /отказ самого клиента/.test(txt), txt.slice(-110));
+    }
+
+    /* 3. Исполнитель показа берётся из РОСТЕРА, а не из тройки TEAM: агент,
+       ведущий сделку, мог не иметь строки в списке, и браузер выбирал первого. */
+    {
+      const dOmar = (dd().deals || []).find((d) => d.agent === 'u_omar');
+      if (dOmar) {
+        WS.ui.closeModal();
+        WS.ui.openDealShowForm(dOmar.id);
+        const opts = [].slice.call(doc.querySelectorAll('#dsExec option')).map((o) => o.value);
+        check('показ · в списке исполнителей есть агент самой сделки',
+          opts.indexOf('u_omar') >= 0, opts.join(', '));
+        const sel = doc.querySelector('#dsExec option[selected]');
+        check('показ · по умолчанию выбран он же, а не первый из списка',
+          !!sel && sel.value === 'u_omar', sel ? sel.value : 'ничего не выбрано');
+        WS.ui.closeModal();
+      }
+    }
+
+    /* 4. Уже отобранное брокером важнее свежего подбора: пересобирать его
+       алгоритмом значит тихо выбросить его работу. */
+    {
+      const rA = (dd().requests || []).find((r) => r.id === 'r_anna');
+      const offeredIds = (rA.offered || []).map((o) => o.id);
+      WS.ui.closeModal();
+      WS.ui.openRequestOffer('r_anna');
+      const shown = (WS._sel && WS._sel.ids) || [];
+      check('оффер · берёт то, что брокер уже отобрал, а не подбирает заново',
+        offeredIds.length > 0 && shown.length === offeredIds.length &&
+        shown.every((id) => offeredIds.indexOf(id) >= 0),
+        'в заявке ' + offeredIds.join(',') + ' · в окне ' + shown.join(','));
+      WS.ui.closeModal();
+    }
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Три исправления, которые мутационная проверка нашла НЕЗАКРЕПЛЁННЫМИ ----
 
      Их можно было сломать целиком, и весь набор оставался зелёным. Та же болезнь, что
