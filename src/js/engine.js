@@ -788,16 +788,23 @@
     const keep = turn.status === 'cancelled' || turn.status === 'failed';
     if (!keep && turns[turn.threadId] === turn) delete turns[turn.threadId];
   }
-  /* How long the page waits before it stops believing the stream.
+  /* How long the page waits IN SILENCE before it stops believing the stream.
 
-     The server gives up on a silent call at `WESPACE_PROXY_STALL_MS` (120 s by
-     default, server/proxy.js), and it says so on the wire. A connection that
-     dies below that — a dropped socket, a proxy restart, a phone changing
-     network — never delivers that verdict, and `askAsync` has nothing of its
-     own to time out on: the turn would sit at `running` for the rest of the
-     session, with the thread blocked behind it. Set slightly ABOVE the server's
-     own limit on purpose, so the server's message wins whenever there is one
-     and this only ever fires when nothing is coming at all. */
+     This is a silence limit, not a deadline for the answer: it is counted from
+     the last thing that arrived (`turn.lastProgressAt`), so a call that keeps
+     streaming is never cut, however long it runs. That is the same shape the
+     server uses — `WESPACE_PROXY_STALL_MS` (120 s by default, server/proxy.js)
+     resets on every event, and the whole-call ceiling there is a separate
+     number (`WESPACE_PROXY_TIMEOUT_MS`).
+
+     The server gives up on a silent call at its own limit and says so on the
+     wire. A connection that dies below that — a dropped socket, a proxy
+     restart, a phone changing network — never delivers that verdict, and
+     `askAsync` has nothing of its own to time out on: the turn would sit at
+     `running` for the rest of the session, with the thread blocked behind it.
+     Set slightly ABOVE the server's own silence limit on purpose, so the
+     server's message wins whenever there is one and this only ever fires when
+     nothing is coming at all. */
   let watchdogMs = 135000;
   /* How far above the server's limit «slightly above» is. The default ceiling is
      exactly the default limit plus this, and a server that announces a different
@@ -960,13 +967,14 @@
        server that is alive always gets to speak first. */
     let watchdogFired = false;
     let watchdogTimer = null;
-    /* Re-armable, because the limit this has to stay above belongs to the SERVER
-       and the server only says what it is once the call has been accepted. The
-       constant below is the fallback for an older proxy, or a transport that
-       does not carry the number — not the truth about the running server. */
+    /* The limit in force right now, and the two things that move it: the SERVER
+       announcing its own silence limit once the call is accepted, and every
+       event that proves the stream is alive. The constant above is the fallback
+       for an older proxy, or a transport that does not carry the number — not
+       the truth about the running server. */
+    let silenceMs = watchdogMs;
     let armWatchdog = null;
     const watchdog = new Promise((_, reject) => {
-      const armedAt = Date.now();
       const fire = () => {
         if (turn.status !== 'running') return;
         watchdogFired = true;
@@ -974,14 +982,28 @@
         if (turn.abortController) { try { turn.abortController.abort(); } catch (e) { /* already gone */ } }
         reject(new Error('watchdog'));
       };
-      // Deadlines are counted from the same instant whenever they are set, so
-      // re-arming mid-call moves the end of the wait rather than adding to it.
+      /* Counted from the LAST thing that arrived, not from the call's start.
+         Anchoring it to the start made this a whole-call deadline: an answer
+         that streamed for longer than the limit was killed from the page
+         mid-stream and the visitor was shown a connection error for a call that
+         was arriving perfectly well. Called with a number it also adopts that
+         number as the limit; called with none it simply pushes the deadline
+         out by the limit already in force. */
       armWatchdog = (ms) => {
+        const n = Number(ms);
+        if (n > 0) silenceMs = n;
         clearTimeout(watchdogTimer);
-        watchdogTimer = setTimeout(fire, Math.max(0, ms - (Date.now() - armedAt)));
+        watchdogTimer = setTimeout(fire, silenceMs);
       };
       armWatchdog(watchdogMs);
     });
+    /* One place for «something arrived»: the field the turn exposes and the
+       deadline that reads it move together, so no future event can update one
+       and forget the other. */
+    const progress = () => {
+      turn.lastProgressAt = Date.now();
+      if (armWatchdog) armWatchdog();
+    };
     // The live head streams; the offline one returns at once. Both land in the
     // same message, so the card simply fills in rather than being replaced.
     let reply;
@@ -993,21 +1015,20 @@
           // the server resolved with it, so both shapes are read here.
           const st = (ev && typeof ev === 'object') ? ev : { k: ev };
           const k = String(st.k || '');
-          turn.lastProgressAt = Date.now();
+          progress();
           if (k === 'accepted' || k === 'model_started') {
             turn.stage = k;
             if (st.mode) turn.mode = st.mode;
             if (st.depth) turn.depth = st.depth;
-            /* The server's own silence limit, when it announces one. Kept ABOVE
-               it by the same margin the default was built with — a server
-               configured to wait longer than this page does used to have its
-               live calls killed from here, and the visitor was shown a
-               connection error for a call the server considered perfectly
-               fine. Only ever raises the ceiling: a short server limit is about
-               SILENCE, while this one counts the whole call, so lowering to it
-               would cut a call that is streaming normally. */
+            /* The server's own silence limit, when it announces one, plus the
+               margin the default was built with. Both sides now measure the
+               same thing — silence — so the announced number is simply adopted:
+               the page stays exactly one margin more patient than the server,
+               which is what makes the server's own verdict arrive first and
+               win. The constant is only the fallback for a server that says
+               nothing. */
             const stall = Number(st.stallMs);
-            if (stall > 0 && armWatchdog) armWatchdog(Math.max(watchdogMs, stall + WATCHDOG_MARGIN_MS));
+            if (stall > 0 && armWatchdog) armWatchdog(stall + WATCHDOG_MARGIN_MS);
             draw();
             return;
           }
@@ -1023,7 +1044,9 @@
         onText: (partial) => {
           if (!partial || turn.status !== 'running') return;
           turn.stage = 'streaming';
-          turn.lastProgressAt = Date.now();
+          // Text arriving is the strongest proof the stream is alive: the wait
+          // starts over from here, so a long answer is never cut mid-sentence.
+          progress();
           clearInterval(beat);
           // Briefly show «Формулирую ответ» as active before the text lands, so the step
           // is never a permanent fixture of the card that is never reached.

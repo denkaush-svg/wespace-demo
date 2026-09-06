@@ -4232,6 +4232,51 @@ setTimeout(async () => {
       WS.agent.setAsyncHead(null);
     }
 
+    /* ---- and the limit is about SILENCE, not about how long an answer may
+       take. The server is built that way and says so — `WESPACE_PROXY_STALL_MS`
+       resets on every event, and server/test/proxy-test.js asserts «a call that
+       keeps streaming is left alone though it runs well past that window». The
+       page counted the whole call instead, from the instant it began: an answer
+       that streamed for longer than the ceiling was killed from the browser
+       mid-stream, and the visitor was shown «Ответ не пришёл — соединение
+       оборвалось» for a stream that was arriving perfectly well. ---- */
+    {
+      eng.openThread('probe:turnStream', 'Турн · длинный поток', 'sparkle');
+      WS.router.go('concierge');
+      const ceilingWas = eng.watchdogMs;
+      eng.watchdogMs = 700;
+      let textFn = null; let settle = null; let seenSignal = null;
+      WS.agent.setAsyncHead((t, opts) => {
+        textFn = opts && opts.onText; seenSignal = opts && opts.signal;
+        return new Promise((res) => { settle = res; });
+      });
+      type('вопрос, ответ на который приходит долго и по частям'); clickSend();
+      await waitPastSetup();
+      check('turn-state · setup: the streaming callback is in hand before the ceiling is reached',
+        typeof textFn === 'function' && WS.engine.inFlight === true,
+        'text=' + typeof textFn + ' inFlight=' + WS.engine.inFlight);
+      // Six chunks 250 ms apart: 1,5 s of unbroken streaming against a 700 ms
+      // ceiling. No gap is anywhere near the limit, so nothing here is silence.
+      let acc = '';
+      for (let i = 1; i <= 6; i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        acc += 'часть ' + i + '. ';
+        if (typeof textFn === 'function') textFn(acc);
+      }
+      const streamHtml = (doc.getElementById('chat') || {}).textContent || '';
+      check('turn-state · a turn that keeps streaming past the ceiling is left alone, not cut',
+        WS.engine.inFlight === true && !!seenSignal && seenSignal.aborted === false,
+        'inFlight=' + WS.engine.inFlight + ' aborted=' + (seenSignal && seenSignal.aborted));
+      check('turn-state · and no failure card is shown for a stream that is arriving',
+        !/не пришёл/i.test(streamHtml) && streamHtml.indexOf('часть 6.') >= 0,
+        'card text: ' + streamHtml.slice(-200));
+      if (settle) settle({ kind: 'answer', text: 'готово', evidence: [], next: [] });
+      await waitPastFlash();
+      eng.watchdogMs = ceilingWas;
+      eng.closeThread('probe:turnStream');
+      WS.agent.setAsyncHead(null);
+    }
+
     // ---- and the fallback is the number the contract was written around. ----
     check('turn-state · the default ceiling still sits above the proxy\'s own default silence limit (120 с)',
       eng.watchdogMs > 120000, 'watchdogMs=' + eng.watchdogMs);
