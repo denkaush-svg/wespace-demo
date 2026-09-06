@@ -62,7 +62,20 @@ commit          # and: merge-base --is-ancestor 88c4a8e HEAD → YES
 
 The correct base is `88c4a8e`, which is what both `00-intent.md:4` and `00-granica.txt` say. The role was handed the wrong SHA in its dispatch (lead's error, carried over from the ledger), detected that it did not resolve, and substituted the correct one on its own rather than proceeding against a broken base or silently diffing against nothing — which is the behaviour the core role text asks for and the reason this step is worth its cost.
 
-**Blast radius: none, verified.** No review in this run was actually performed against the wrong base: Codex at step 7 reported `git diff --check 88c4a8e..HEAD` (correct base), the lead's step-9 verification used working-tree-vs-HEAD diffs (base-independent), and step 10 used `88c4a8e`. The wrong SHA sat in the ledger and in one dispatch prompt without ever reaching a diff. It is recorded here because a later reader would otherwise take `base_sha` as authoritative.
+**Blast radius on the REVIEWS: none, verified.** No review in this run was actually performed against the wrong base: Codex at step 7 reported `git diff --check 88c4a8e..HEAD` (correct base), the lead's step-9 verification used working-tree-vs-HEAD diffs (base-independent), and step 10 used `88c4a8e`. The wrong SHA sat in the ledger and in one dispatch prompt without ever reaching a diff.
+
+**CORRECTION — the claim above was originally written as «blast radius: none», full stop. That was too strong, and running the tooling's own check falsified it.** `takt.py check` reports:
+
+```
+~ граница правки: начальный коммит прогона не записан либо git не отвечает — сверить границу не с чем
+```
+`[проверено прогоном: `takt.py check`]`
+
+The harness gate that verifies the edit stayed inside `00-granica.txt` reads `base_sha` to do its diff. With an unresolvable SHA it cannot diff, so **the border gate was silently inert for the entire run**. Border compliance in this run was established only by people and models reading files — never once by the machine, though the ledger reads as though it was.
+
+That is the finding of the first order here, and it is about the harness rather than the code: one wrong string in the `init` entry disables a gate, the disabling is reported as «проверить не удалось» rather than as a failure, and nothing surfaces it until someone runs `check` by hand at the end of the run. A gate that silently does nothing is worse than an absent one, because the journal still shows the step as taken.
+
+Recorded as a correction rather than an edit-in-place on purpose: a claim that was published and then falsified is itself evidence about the run, and quietly rewriting it would be the exact failure this protocol exists to prevent.
 
 ## Lead's own verification of this step
 - Re-ran the base-SHA check myself rather than taking the role's word for it — commands and outputs quoted above; the role's claim is correct.
