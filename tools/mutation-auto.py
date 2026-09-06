@@ -178,6 +178,18 @@ def main():
     print()
     sys.stdout.flush()
 
+    # Два прогона в одном рабочем дереве затирают друг друга: второй замерит базу
+    # в момент, когда первый держит мутацию, и объявит её красной. Ровно это здесь
+    # и случилось. Грязное src/js — либо чужой прогон, либо несохранённая работа;
+    # и то и другое делает результат бессмысленным.
+    dirty = subprocess.run(['git', 'status', '--porcelain', '--', 'src/js/'],
+                           cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    if dirty:
+        print(u'src/js \u043d\u0435 \u0441\u043e\u0432\u043f\u0430\u0434\u0430\u0435\u0442 \u0441 \u043a\u043e\u043c\u043c\u0438\u0442\u043e\u043c \u2014 \u043f\u0440\u043e\u0433\u043e\u043d \u043e\u0442\u043c\u0435\u043d\u0451\u043d.')
+        print(u'\u041b\u0438\u0431\u043e \u0438\u0434\u0451\u0442 \u0434\u0440\u0443\u0433\u043e\u0439 \u043c\u0443\u0442\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u0439 \u043f\u0440\u043e\u0433\u043e\u043d, \u043b\u0438\u0431\u043e \u0435\u0441\u0442\u044c \u043d\u0435\u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0435 \u043f\u0440\u0430\u0432\u043a\u0438:')
+        print(dirty[:400])
+        return 2
+
     backup = tempfile.mkdtemp(prefix='automut_')
     files = sorted(set(c[0] for c in cands))
     for f in files:
