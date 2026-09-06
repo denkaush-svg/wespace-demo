@@ -11,6 +11,7 @@
     "shots:kit": "node src/test/kit-shots.js",
     "test": "node src/test/smoke.js && node src/test/acceptance-audience.js && node src/test/acceptance-incident-consent.js && node src/test/upgrade-preserves-state.js && node src/test/snapshot-upload.js",
     "test:smoke": "node src/test/smoke.js",
+    "mutation": "py -X utf8 tools/mutation-check.py",
     "shots": "node src/test/shots.js",
     "layout": "node src/test/chat-layout.js",
     "agent": "node src/test/agent-shot.js",

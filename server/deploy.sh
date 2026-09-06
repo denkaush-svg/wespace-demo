@@ -82,6 +82,29 @@ fi
 REMOTE
 )
 
+# Расхождение репозитория и живого сервера — молчаливая мина.
+#
+# Правки промпта и записи следов делались НА СЕРВЕРЕ, а deploy.sh заливает версию
+# ИЗ РЕПОЗИТОРИЯ. Один такой запуск стёр бы стенограмму обращений и приёмник
+# снимков, не сказав ни слова: служба поднялась бы, health ответил бы ok, и
+# пропажу заметили бы через недели по пустому файлу.
+#
+# Поэтому перед заливкой сравниваем. Расходятся — деплой останавливается и
+# показывает, чем именно, а решение принимает человек.
+REMOTE_PROXY=$(ssh "$HOST" 'cat ~/wespace-proxy/proxy.js 2>/dev/null' || true)
+if [ -n "$REMOTE_PROXY" ]; then
+  LOCAL_SUM=$(tr -d '\r' < "$HERE/proxy.js" | sha256sum | cut -d' ' -f1)
+  REMOTE_SUM=$(printf '%s' "$REMOTE_PROXY" | tr -d '\r' | sha256sum | cut -d' ' -f1)
+  if [ "$LOCAL_SUM" != "$REMOTE_SUM" ]; then
+    echo "!! На сервере ДРУГОЙ proxy.js — заливка затрёт его." >&2
+    echo "   Различий строк: $(printf '%s' "$REMOTE_PROXY" | tr -d '\r' | diff - <(tr -d '\r' < "$HERE/proxy.js") | grep -c '^[<>]')" >&2
+    echo "   Сначала сверьте:  ssh $HOST 'cat ~/wespace-proxy/proxy.js' > /tmp/vps.js && diff /tmp/vps.js $HERE/proxy.js" >&2
+    echo "   Затем либо перенесите серверные правки в репозиторий, либо запустите с FORCE=1." >&2
+    [ "${FORCE:-0}" = "1" ] || exit 3
+    echo "   FORCE=1 — заливаю поверх." >&2
+  fi
+fi
+
 tar -cz -C "$HERE" proxy.js run.sh | ssh "$HOST" "$REMOTE_SCRIPT"
 
 echo

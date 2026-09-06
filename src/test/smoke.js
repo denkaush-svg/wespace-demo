@@ -8556,6 +8556,78 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Три исправления, которые мутационная проверка нашла НЕЗАКРЕПЛЁННЫМИ ----
+
+     Их можно было сломать целиком, и весь набор оставался зелёным. Та же болезнь, что
+     у мёртвой защиты от двойной отправки: проверялось НАЛИЧИЕ кода, а не то, что он
+     срабатывает. Проверка, проходящая на сломанном коде, — это галочка, а не гарантия. */
+  {
+    WS.storeApi.resetAll();
+
+    /* 1. Офлайновый ответ должен быть ВИДЕН брокеру на экране, а не только помечен
+       в данных. И Codex, и второй критик назвали молчаливое понижение главным дефектом. */
+    const offCard = WS.engine.answerCard
+      ? WS.engine.answerCard({ kind: 'answer', text: 'Ответ без модели', source: 'offline',
+          fallbackReason: 'no_live_head', blocks: [], next: [] }, 'm_probe_off')
+      : '';
+    check('происхождение · офлайновый ответ помечен В РАЗМЕТКЕ, а не только в данных',
+      /an-src/.test(offCard) && /Автономный режим/.test(offCard),
+      offCard ? offCard.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 90) : 'answerCard не экспортирован');
+    check('происхождение · причина отката названа человечески',
+      /модель не подключена|связи с моделью нет|лимит|заняты/.test(offCard),
+      offCard.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 110));
+    /* Живой ответ помечаться НЕ должен: значок на каждом ответе перестают читать. */
+    const liveCard = WS.engine.answerCard
+      ? WS.engine.answerCard({ kind: 'answer', text: 'Ответ модели', source: 'live', blocks: [], next: [] }, 'm_probe_live')
+      : '';
+    check('происхождение · живой ответ не помечается',
+      !!liveCard && !/an-src/.test(liveCard), 'live без полосы');
+
+    /* 2. Озвучка: Intl в ru-RU разделяет разряды неразрывным пробелом, и синтезатор
+       читает три разных числа. Проверяется РЕЗУЛЬТАТ преобразования, а не его наличие. */
+    /* В строке нарочно есть и AED ПОСЛЕ числа, и AED БЕЗ числа перед ним: это два
+       разных правила, и прежняя проверка задевала только первое — второе можно было
+       удалить целиком, и набор оставался зелёным. */
+    const spoken = WS.voice && WS.voice.forSpeech
+      ? WS.voice.forSpeech(WS.AED(20228000) + ' · 16 AED/фт² · 5% · 82 м² · цена указана в AED')
+      : '';
+    check('озвучка · разряды склеены в одно число',
+      /20228000/.test(spoken), spoken.slice(0, 70));
+    check('озвучка · валюта словом, в согласии с числом',
+      /дирхам/.test(spoken) && !/\bAED\b/.test(spoken), spoken.slice(0, 70));
+    check('озвучка · единицы не читаются символами',
+      /процентов/.test(spoken) && /квадратных метров/.test(spoken), spoken.slice(-60));
+
+    /* 3. Разделы Пульса у руководителя СВОИ. Прежняя проверка смотрела на заголовки
+       корешков и проходила даже с брокерским списком ключей: тело падало на items[0]
+       и рисовало «Требует решения» в любом случае. Проверяем САМ СПИСОК ключей
+       и то, что переключение раздела действительно меняет содержание. */
+    const wasR = WS.store.role;
+    WS.store.role = 'manager'; WS.store.pulseSection = null;
+    const mgrKeys = WS.ui.pulseSectionList ? WS.ui.pulseSectionList() : [];
+    check('Пульс руководителя · ключи разделов его собственные',
+      mgrKeys.join(',') === 'decide,risk,team,analytics', mgrKeys.join(','));
+    WS.store.role = 'agent';
+    const agKeys = WS.ui.pulseSectionList ? WS.ui.pulseSectionList() : [];
+    check('Пульс брокера · ключи не смешались с руководительскими',
+      agKeys.join(',') === 'day,prospects,insights,analytics', agKeys.join(','));
+    // Переключение должно менять СОДЕРЖАНИЕ, а не только подсветку корешка.
+    WS.store.role = 'manager';
+    const seen = {};
+    ['decide', 'risk', 'team'].forEach((k) => {
+      WS.store.pulseSection = k;
+      WS.router.go('start'); WS.ui.render();
+      const b = doc.getElementById('app').querySelector('.psec-body');
+      seen[k] = ((b || {}).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    });
+    check('Пульс руководителя · разделы дают РАЗНОЕ содержание',
+      seen.decide !== seen.risk && seen.risk !== seen.team && seen.decide !== seen.team,
+      Object.keys(seen).map((k) => k + '=' + seen[k].slice(0, 24)).join(' | '));
+    WS.store.role = wasR; WS.store.pulseSection = null;
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Сценарии дубайского брокера ----
      Живой агент назвал, что бы отдавал Консьержу: топ-3 из листингов оффером клиенту,
      планировку юнита картинкой, и чтобы всё это шло голосом в одно нажатие. */

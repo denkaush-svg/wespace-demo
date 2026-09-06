@@ -1187,7 +1187,10 @@
     startScenario(id, chainId);
   }
 
-  WS.engine = { startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+  // answerCard наружу: пометку «ответил не модель» надо проверять в РАЗМЕТКЕ,
+  // а не в данных: мутационная проверка показала, что без этого полосу можно
+  // убрать целиком и ни один тест не упадёт.
+  WS.engine = { answerCard, startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     pushMsg, updateMsg, pushText, escape: esc,
     agentConfirm, agentCancel, agentNext, agentCard, reportOpen, reportSave, replyFor,
     // Readable and settable: it is conversation state, and the deterministic
