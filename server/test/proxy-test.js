@@ -369,6 +369,106 @@ async function modelChecks() {
   budgetChecks();
 }
 
+/* ---------- the wait, made observable ----------
+
+   The browser shows one spinner for the whole call today, and the only stage
+   the server ever announces is 'web' — everything else (accepted, the model
+   actually starting) is invisible, so a broker watching the Concierge cannot
+   tell «taken» from «thinking» from «stuck». These checks encode the new
+   stage contract from the intent: accepted arrives before any model text,
+   model_started arrives after acceptance, and acceptance carries the
+   mode/depth the server actually resolved — the acceptance criterion is
+   literally «the accepted server mode/depth is visible». None of this exists
+   in server/proxy.js yet: onStage is called only for 'web' (grep confirms
+   it), so every check below is expected to fail against the current code. */
+async function stageChecks() {
+  const P = require('../proxy.js');
+  refill();
+  let res = await ask({ text: 'вопрос про стадии', mode: 'roi', depth: 'deep' });
+  let evs = events(res.body);
+  const acceptedIdx = evs.findIndex((e) => e.event === 'stage' && e.data && e.data.k === 'accepted');
+  const startedIdx = evs.findIndex((e) => e.event === 'stage' && e.data && e.data.k === 'model_started');
+  const firstDeltaIdx = evs.findIndex((e) => e.event === 'delta');
+  const shape = evs.map((e) => e.event + (e.data && e.data.k ? ':' + e.data.k : '')).join(',');
+
+  ok('the server announces acceptance, and before any model text arrives',
+    acceptedIdx >= 0 && (firstDeltaIdx < 0 || acceptedIdx < firstDeltaIdx),
+    'events=' + shape);
+  ok('the server announces the model actually starting, after acceptance and no later than the first text',
+    startedIdx >= 0 && startedIdx > acceptedIdx && (firstDeltaIdx < 0 || startedIdx <= firstDeltaIdx),
+    'events=' + shape);
+
+  const expect = P.resolveCall({ mode: 'roi', depth: 'deep' });
+  const acc = evs.find((e) => e.event === 'stage' && e.data && e.data.k === 'accepted');
+  ok('acceptance carries the mode/depth the server actually resolved, not just a bare «waiting»',
+    !!acc && acc.data.mode === expect.mode && acc.data.depth === expect.depth,
+    JSON.stringify(acc && acc.data) + ' expected mode=' + expect.mode + ' depth=' + expect.depth);
+
+  /* And it carries this server's own silence limit. The page keeps its watchdog
+     above that number, and it used to be a constant on the page: raising
+     WESPACE_PROXY_STALL_MS past it made the browser kill calls this server still
+     considered alive. The announced value has to be the one actually in force,
+     not the default — so it is checked against a changed setting too. */
+  ok('acceptance also says how long this server will wait on silence',
+    !!acc && acc.data.stallMs === CFG.stallMs,
+    JSON.stringify(acc && acc.data) + ' expected stallMs=' + CFG.stallMs);
+  {
+    refill();
+    const stallWas = CFG.stallMs;
+    CFG.stallMs = stallWas + 60000;
+    try {
+      const r = await ask({ text: 'вопрос при поднятом лимите тишины' });
+      const a2 = events(r.body).find((e) => e.event === 'stage' && e.data && e.data.k === 'accepted');
+      ok('and it announces the limit in force, not the compiled-in default',
+        !!a2 && a2.data.stallMs === CFG.stallMs,
+        JSON.stringify(a2 && a2.data) + ' expected stallMs=' + CFG.stallMs);
+    } finally {
+      CFG.stallMs = stallWas;
+    }
+  }
+
+  // A short question still gets the courtesy of "accepted" — this is not
+  // conditional on the reply being long enough to make a spinner worthwhile.
+  refill();
+  res = await ask({ text: 'да' }, 'plain');
+  evs = events(res.body);
+  ok('even a call that answers in one shot was told it was accepted first',
+    evs.some((e) => e.event === 'stage' && e.data && e.data.k === 'accepted'),
+    'events=' + evs.map((e) => e.event).join(','));
+
+  /* «Запущена» has to mean the process is running, not that `spawn()` returned.
+     For a binary that does not exist `spawn()` returns a ChildProcess just the
+     same and the ENOENT lands a tick later on `error` — so announcing the stage
+     straight after the call showed a broken or missing CLI as «модель
+     запущена», with the failure arriving behind it. Here the CLI is a name
+     nothing can run: acceptance still arrives (the server did take the call),
+     model_started must not. */
+  {
+    refill();
+    const cliWas = CFG.cli;
+    const prefixWas = CFG.cliPrefix;
+    CFG.cli = 'wespace-proxy-command-that-does-not-exist';
+    CFG.cliPrefix = [];
+    try {
+      const r = await ask({ text: 'вопрос к несуществующему CLI' });
+      const e2 = events(r.body);
+      const stages = e2.filter((e) => e.event === 'stage').map((e) => e.data && e.data.k);
+      const err = e2.find((e) => e.event === 'error');
+      ok('a CLI that could not be launched is never reported as a running model',
+        stages.indexOf('model_started') < 0,
+        'stages=' + JSON.stringify(stages) + ' error=' + JSON.stringify(err && err.data));
+      ok('and the call that could not start is reported as an error, not as silence',
+        !!err && /spawn/.test(String((err.data && err.data.error) || '')),
+        JSON.stringify(err && err.data));
+      ok('acceptance is still announced — the server did take the call',
+        stages.indexOf('accepted') >= 0, 'stages=' + JSON.stringify(stages));
+    } finally {
+      CFG.cli = cliWas;
+      CFG.cliPrefix = prefixWas;
+    }
+  }
+}
+
 /* ---------- the smoke detector ----------
 
    The endpoint is public and the subscription is shared. A door was one answer;
@@ -661,6 +761,44 @@ async function guardChecks() {
       freed, 'inFlight=' + state.inFlight + ' was=' + before);
   }
 
+  /* Stronger than the counter above: the acceptance criterion is "frees the
+     server's concurrency slot", i.e. a REAL follow-up call gets to run, not
+     merely that a number resets. This is what a Cancel button has to buy —
+     res.on('close') -> call.cancel() already exists in handleAsk today, so
+     unlike the stage checks above this one is expected to PASS against the
+     current code; it earns its place by being the one thing this task's
+     mutation pass has to prove, not by being new. */
+  {
+    refill();
+    const conWas = CFG.concurrency;
+    CFG.concurrency = 1;
+    process.env.FAKE_CLI_MODE = 'slow';
+    const before = state.inFlight;
+    await new Promise((resolve) => {
+      const r = http.request({ host: '127.0.0.1', port: PORT, method: 'POST', path: '/ask',
+        headers: { 'content-type': 'application/json' } }, () => {});
+      r.on('error', () => {});
+      r.write(JSON.stringify({ text: 'отменяемый вопрос' }));
+      r.end();
+      setTimeout(() => { r.destroy(); resolve(); }, 350);
+    });
+    // Wait for the close to be noticed (as the existing test above does), THEN
+    // make exactly one follow-up call — repeated calls here would themselves
+    // trip the per-IP burst guard and produce a false failure unrelated to
+    // concurrency at all.
+    let freed = false;
+    for (let i = 0; i < 40 && !freed; i++) {
+      await new Promise((r2) => setTimeout(r2, 50));
+      freed = state.inFlight === before;
+    }
+    refill();
+    const res2 = await ask({ text: 'после отмены' }, 'ok');
+    ok('cancelling one call lets the very next one actually run, not just reset a counter',
+      freed && res2.status === 200 && /event: done/.test(res2.body),
+      'freed=' + freed + ' status=' + res2.status);
+    CFG.concurrency = conWas;
+  }
+
   refill();
   const tWas = CFG.callTimeoutMs;
   CFG.callTimeoutMs = 700;
@@ -711,6 +849,7 @@ async function guardChecks() {
   try {
     await httpChecks();
     await modelChecks();
+    await stageChecks();
     await guardChecks();
   } finally {
     server.close();

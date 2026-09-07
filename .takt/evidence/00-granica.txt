@@ -1,0 +1,14 @@
+# Граница правки. Один путь в строке, # начинает примечание.
+# Файлы взяты дословно из плана 2026-09-02 (Task 7), сверены с текущим деревом
+# на base_sha 88c4a8e — все перечисленные файлы существуют.
+
+src/js/engine.js
+src/js/live.js
+src/js/ui.js
+src/js/main.js
+src/css/app.css
+server/proxy.js
+src/test/smoke.js
+server/test/proxy-test.js
+src/test/live-ux.js
+package.json

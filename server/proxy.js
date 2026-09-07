@@ -1062,7 +1062,6 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
       cwd: CFG.workDir,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-
     let out = '';        // text assembled from deltas
     let result = null;   // text from the final result event, if any
     let errBuf = '';
@@ -1194,6 +1193,14 @@ function startCall(prompt, onDelta, timeoutMs, external, onStage) {
       }
     });
     child.stderr.on('data', (c) => { errBuf += c.toString('utf8'); if (errBuf.length > 4000) errBuf = errBuf.slice(-4000); });
+    /* «Started» is reported by the runtime, not by the return of `spawn()`.
+       `spawn()` hands back a ChildProcess for a binary that does not exist
+       either — the ENOENT arrives a tick later, on `error`. Announcing the
+       stage right after the call therefore told the page «модель запущена» over
+       a process that never began: a probe with a nonexistent command got
+       `stages=["model_started"]` followed by `spawn:… ENOENT`. Node emits
+       `spawn` once the process is genuinely running, and only then. */
+    child.on('spawn', () => { if (!settled) onStage('model_started'); });
     child.on('error', (e) => finish(new Error('spawn:' + e.message)));
     child.on('close', (code) => {
       if (settled) return;
@@ -1419,13 +1426,26 @@ async function handleAsk(req, res) {
 
   const spec = resolveCall(body);
   const started = Date.now();
+  /* A stage is reported when it has happened, never before. The page cannot
+     infer either of the two below from the text arriving: that the call was
+     taken at all, and that a model is actually running behind it. Without them
+     a broker watching the Concierge cannot tell «taken» from «thinking» from
+     «stuck», and the card had to animate a guess instead. */
+  const stage = (k, extra) => { if (!aborted) send('stage', Object.assign({ k: k }, extra || {})); };
+  // Taken — with what the server RESOLVED, not what the browser asked for: an
+  // unknown mode falls back here, and the waiting card must name what will run.
+  /* The silence limit travels with it. The page keeps its own watchdog above
+     this number so the server's verdict always wins; hardcoding it there meant
+     raising WESPACE_PROXY_STALL_MS above the page's constant made the page kill
+     calls this server still considered alive. Announced on acceptance because
+     that is the first thing the server says, before any model text. */
+  stage('accepted', { mode: spec.mode, depth: spec.depth, stallMs: CFG.stallMs });
   // Listen on the RESPONSE, not the request: the request stream is already
   // finished the moment its body has been read, so its `close` fires long
   // before the visitor goes anywhere. The response closes when the connection
   // actually drops.
   const call = startCall(buildPrompt(body), (t) => { if (!aborted) send('delta', { t: t }); },
-    callTimeout(spec), MODES[spec.mode].external,
-    (k) => { if (!aborted) send('stage', { k: k }); });
+    callTimeout(spec), MODES[spec.mode].external, stage);
   res.on('close', () => { if (!res.writableEnded) call.cancel(); });
   try {
     const full = await call.promise;

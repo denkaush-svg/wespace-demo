@@ -879,10 +879,10 @@
 
   // ---------- transport ----------
 
-  async function stream(text, onText, onStage) {
+  async function stream(text, onText, onStage, signal) {
     let res;
     try {
-      res = await fetchAsk(text);
+      res = await fetchAsk(text, signal);
     } catch (e) {
       /* Nothing was accepted on the other side. That is not a guess: the
          proxy's `daily_used` rises on every ACCEPTED request, before the model
@@ -897,9 +897,14 @@
     return readStream(res, onText, onStage);
   }
 
-  function fetchAsk(text) {
+  /* The signal is the only way a visitor can end a call that is running: closing
+     the fetch closes the response, and the proxy stops the CLI process on its
+     own `res.on('close')`. Without it the «Отменить» button could stop the
+     waiting card and nothing else — the model kept the concurrency slot. */
+  function fetchAsk(text, signal) {
     return fetch(cfg.url.replace(/\/+$/, '') + '/ask', {
       method: 'POST',
+      signal: signal || undefined,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(Object.assign({ text: text, digest: digest(), history: history(), scope: scope(),
         // На что смотрит агент прямо сейчас. Без этого «а по этой сделке что?» приходило без
@@ -939,8 +944,12 @@
           // The plan rides at the end of the same text; show only what precedes it.
           if (onText) onText(raw.split('```')[0].trim());
         } else if (ev[1] === 'stage') {
-          // Something happened server-side that the arriving text does not show.
-          if (onStage && data && data.k) onStage(String(data.k));
+          /* Something happened server-side that the arriving text does not show.
+             The whole event travels, not just its key: `accepted` carries the
+             mode and depth the server actually resolved, and a card that says
+             «принято» without saying what was accepted is a spinner with a
+             caption. */
+          if (onStage && data && data.k) onStage(data);
         } else if (ev[1] === 'done') {
           done = data;
         } else if (ev[1] === 'error') {
@@ -986,16 +995,20 @@
        proxy's counters establish rather than assume. A failure after the server
        has the call is left alone: the model may already have run, and the
        shared five-hour window is exactly what all these guards protect. */
+    const signal = opts && opts.signal;
     let done;
     try {
-      done = await stream(text, opts && opts.onText, opts && opts.onStage);
+      done = await stream(text, opts && opts.onText, opts && opts.onStage, signal);
     } catch (e) {
+      // A call the visitor ended is not a call that never reached the server.
+      // Retrying it would be the stand re-asking a question that was withdrawn.
+      if (signal && signal.aborted) throw e;
       if (e && e.reached === false) {
         note('retry_no_reach');
         // A moment for a handover to settle. Retrying into the same dead second
         // is not a second attempt, it is the same one twice.
         await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
-        done = await stream(text, opts && opts.onText, opts && opts.onStage);
+        done = await stream(text, opts && opts.onText, opts && opts.onStage, signal);
       } else {
         throw e;
       }
@@ -1003,11 +1016,23 @@
     // What actually answered, as the server resolved it — not what the page
     // hoped it had asked for. An id it does not know falls back over there.
     const ran = { mode: done.mode || null, depth: done.depth || null,
-      doc: done.doc || null, chat: done.chat || null, docWhy: done.docWhy || null };
+      doc: done.doc || null, chat: done.chat || null, docWhy: done.docWhy || null,
+      // How long the call actually took, as the SERVER measured it (proxy.js
+      // stamps `ms` on its `done` event). Dropping it here meant the one number
+      // that says whether an answer took four seconds or ninety never left the
+      // transport: it could not be stored with the reply or shown in history.
+      ms: Number(done.ms) > 0 ? Number(done.ms) : null,
+      // WHICH model answered, as the server names it (proxy.js stamps `model` on
+      // the same `done` event). Left behind here for the same reason `ms` was:
+      // the reply arrived with no way to say what produced it, so a run on a
+      // different model looked identical to a run on the configured one.
+      model: done.model ? String(done.model) : null };
     const reply = toReply(done.say, done.plan || {}, ran);
     if (!reply) throw new Error('empty reply');
     reply.mode = ran.mode;
     reply.depth = ran.depth;
+    reply.ms = ran.ms;
+    reply.model = ran.model;
     cfg.misses = 0;
     cfg.served += 1;      // lets a test tell which head actually spoke
     return reply;
