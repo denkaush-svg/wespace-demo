@@ -4048,7 +4048,54 @@ setTimeout(async () => {
       eng.freeReply = () => { calls++; WS.engine.inFlight = true; resolvers.push(() => { WS.engine.inFlight = false; }); };
       return { count: () => calls, settleAll: () => resolvers.forEach((f) => f()) };
     };
-    const waitPastSetup = () => new Promise((r) => setTimeout(r, 750)); // > freeReply's delay(60)+delay(500)
+    /* Waiting for freeReply's staging to be OVER, not for a number of
+       milliseconds to elapse. The staging (engine.js: delay(60) → pushText →
+       delay(500) → the waiting card → askAsync → the async head) costs ~605 ms
+       of real timers on an idle machine; measured on a loaded one it runs
+       769–1114 ms, so the fixed 750 ms sleep this replaces returned BEFORE the
+       card existed and before the head had been called — whichever check came
+       next then read a card that was not up yet. Raising the number is not the
+       fix either: it fails again on a slower machine, and the three blocks
+       below set `eng.watchdogMs = 700`, a ceiling armed the moment staging ends,
+       which a long sleep would sail straight past.
+
+       The signal is the async head being invoked. It is the LAST thing staging
+       does, in the same synchronous stretch as the waiting card being pushed
+       (engine.js pushes the card, then calls askAsync, which calls the head
+       before its first await) — so «the head has been called» means the card is
+       up, the turn is `running` and the request is out. Counted here by
+       wrapping setAsyncHead once for this whole block, so every block below
+       keeps installing its own head exactly as it did. */
+    let headCalls = 0;
+    const realSetAsyncHead = WS.agent.setAsyncHead;
+    WS.agent.setAsyncHead = function (fn) {
+      return realSetAsyncHead(typeof fn === 'function'
+        ? function () { headCalls++; return fn.apply(this, arguments); }
+        : fn);
+    };
+    /* The cap is an upper bound on a HANG, not a budget: reaching it means the
+       request never went out, and the caller's own check then fails on the
+       state it reads — the suite reports a failure instead of waiting forever. */
+    const SETUP_CAP_MS = 15000;
+    const waitPastSetup = async () => {
+      const was = headCalls;
+      const until = Date.now() + SETUP_CAP_MS;
+      while (headCalls === was && Date.now() < until) await new Promise((r) => setTimeout(r, 5));
+      // One more turn of the loop so the synchronous tail behind the head call
+      // (the card's own repaint) has landed before the caller reads the DOM.
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    /* The two checks that assert a request did NOT start have no condition to
+       wait for — only a window to outlast. Instead of a fixed number this
+       re-runs freeReply's own timer chain from HERE: started later than the
+       engine's chain and stretched by exactly the same machine load, it cannot
+       finish earlier than an identical chain that started before it, so the
+       forbidden request would already have gone out by the time this returns. */
+    const waitOutSetup = async () => {
+      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 500));
+      for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    };
     const waitPastFlash = () => new Promise((r) => setTimeout(r, 220)); // > freeReply's own 180ms post-reply delay
 
     // ---- the existing click guard already blocks a second Send in a busy thread ----
@@ -4410,7 +4457,7 @@ setTimeout(async () => {
       check('turn-state · setup: exactly one request is in flight after the first send',
         head.count() === 1, 'requests=' + head.count());
       eng.agentNext('probeChipMid:0');
-      await waitPastSetup();
+      await waitOutSetup();
       check('turn-state · a follow-up chip in a busy thread must not start a second request',
         head.count() === 1, 'requests=' + head.count());
       check('turn-state · and the thread is still waiting on the FIRST request, not a replacement',
@@ -4474,7 +4521,7 @@ setTimeout(async () => {
       check('turn-state · setup: exactly one request is in flight before the suggestion is clicked',
         head.count() === 1, 'requests=' + head.count());
       btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-      await waitPastSetup();
+      await waitOutSetup();
       check('turn-state · a first-screen suggestion in a busy thread must not start a second request',
         head.count() === 1, 'requests=' + head.count());
       head.settleAll();
@@ -4489,6 +4536,9 @@ setTimeout(async () => {
       eng.closeThread('probe:turnCgask');
       WS.agent.setAsyncHead(null);
     }
+    // The head counter belongs to this block alone: the stand is handed back
+    // with the real installer, so nothing downstream runs against a wrapper.
+    WS.agent.setAsyncHead = realSetAsyncHead;
   } else {
     check('turn-state · concierge composer is reachable for testing', false);
   }
