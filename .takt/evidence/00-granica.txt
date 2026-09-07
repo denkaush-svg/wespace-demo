@@ -1,14 +1,9 @@
-# Граница правки. Один путь в строке, # начинает примечание.
-# Файлы взяты дословно из плана 2026-09-02 (Task 7), сверены с текущим деревом
-# на base_sha 88c4a8e — все перечисленные файлы существуют.
+# Граница правки Task 8. Один путь в строке, `#` — примечание.
+# Список взят из плана, за вычетом файла, которого в репозитории нет
+# (src/test/acceptance-broker-flows.js — см. 00-intent.md, раздел о расхождении).
 
-src/js/engine.js
-src/js/live.js
-src/js/ui.js
-src/js/main.js
-src/css/app.css
-server/proxy.js
-src/test/smoke.js
-server/test/proxy-test.js
-src/test/live-ux.js
-package.json
+src/js/engine.js       # треды: создание, выбор, запрет очистки треда сущности
+src/js/ui.js           # подписи в списках, описания глубин, атрибуты доступности
+src/js/main.js         # обработчики кнопок диалога и режимов
+src/css/app.css        # видимый фокус и размещение описания глубины
+src/test/smoke.js      # приёмочные проверки: сюда, раз acceptance-broker-flows.js нет
