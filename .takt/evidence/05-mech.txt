@@ -1,9 +1,9 @@
-npm test && npm run test:proxy
+=== npm test ===
 
 > wespace-demo@1.0.0 test
-> node src/test/smoke.js && node src/test/acceptance-audience.js && node src/test/acceptance-incident-consent.js
+> node src/test/smoke.js && node src/test/acceptance-audience.js && node src/test/acceptance-incident-consent.js && node src/test/upgrade-preserves-state.js && node src/test/snapshot-upload.js
 
-checks: 1954  passed: 1954  FAILED: 0
+checks: 2074  passed: 2074  FAILED: 0
 
 ======================================================================
 
@@ -100,141 +100,33 @@ SUMMARY
 ================================================================================
 
 
-> wespace-demo@1.0.0 test:proxy
-> node server/test/proxy-test.js
+СНИМОК СНЯТ: ключ "wespace_demo_state", схема 27, размер 87 КБ
+СТАРЫЙ СНИМОК: без approvals, без signals — как у брокера сейчас
 
-  OK  splitReply separates narration from plan
-  OK  the envelope keeps only the fields the contract names
-  OK  and keeps the ones it does
-  OK  splitReply keeps a reply that has no plan
-  OK  a broken plan costs the controls, not the reply
-  OK  a non-object plan is refused
-  OK  a field the contract does not have is counted, not only dropped
-  OK  an answer that came back with no plan at all is counted
-  OK  and so is one whose plan would not parse
-  OK  a digest that had to be shortened is counted
-  OK  and one that fits is not
-  OK  an unfinished instruction reaches the prompt
-  OK  and carries the operation as it was sent
-  OK  and sits above the question it is about to be answered by
-  OK  no unfinished instruction, no section
-  OK  a half-formed one is dropped rather than half-quoted
-  OK  and a giant one is clipped, not forwarded whole
-  OK  the question is clipped to its ceiling
-  OK  the digest reaches the prompt
-  OK  history is labelled by speaker
-  OK  the last answer keeps its table
-  OK  and its comparison
-  OK  the conversation says what it is about
-  OK  a turn without shape is unchanged
-  OK  a malformed shape cannot break the prompt
-  OK  the history window matches what the page sends
-  OK  rules precede the data they describe
-  OK  data is fenced and named as data
-  OK  the spoken form is part of the contract
-  OK  the rules forbid typing numbers into blocks
-  OK  and point at the schema it must query by
-  OK  and say what an unbacked table costs
-  OK  an oversized digest is clipped
-  OK  an oversized digest stays valid JSON
-  OK  it is shortened by dropping list tails, not by cutting a record
-  OK  and it says what was left out
-  OK  a digest that fits is passed through untouched
-  OK  the current stand fits with room to spare
-  OK  the data block in the prompt is parseable JSON
-  OK  and it admits the list was shortened
-  OK  the funnel the stand runs on is in the rules
-  OK  the screens it may name are enumerated
-  OK  a feed entry may be filed against a request, and not against an object
-  OK  the address bucket stops at its burst
-  OK  a different address is unaffected
-  OK  server tools are taken out of the session
-  OK  no MCP servers are loaded
-  OK  health answers
-  OK  an unknown path is refused
-  OK  the page origin is allowed
-  OK  an unknown origin gets no permission
-  OK  an unknown origin is refused, not merely unreadable
-  OK  an empty question is refused before the model
-  OK  an oversized body is refused
-  OK  the answer streams in pieces
-  OK  the stream ends with the assembled reply
-  OK  the plan arrives parsed
-  OK  and carries none of what left the contract
-  OK  the narration is free of the fenced block
-  OK  a model that dies mid-sentence is a failure, not a short answer
-  OK  a reply sent whole is not doubled
-  OK  a reply carried on both channels is not doubled
-  OK  a reply with no plan still lands
-  OK  a failing model reports an error rather than silence
-  OK  a failed call flagged as "success" is still an error
-  OK  the auth message never reaches the visitor as an answer
-  OK  the instructions are composed here, not by the browser
-  OK  what the browser sent arrives fenced as data
-  OK  a known mode and depth are taken
-  OK  an unknown one falls back rather than passing through
-  OK  and a mode that is not a string is refused
-  OK  the chosen mode reaches the model as its own section
-  OK  an analysis mode is told not to start changes itself
-  OK  and told to carry out one it is given
-  OK  and the depth asks for what it says on the control
-  OK  a writing mode is told the other thing
-  OK  a mode without the outside says so
-  OK  a mode with it gets the rules for using it
-  OK  and is warned about the difference that matters here
-  OK  a fetched page is framed as data, not as instructions
-  OK  search is handed to the CLI only when the mode allows it
-  OK  and it is not denied in the same breath
-  OK  a call that searches is allowed more time than one that does not
-  OK  what the broker pinned reaches the model as narrowing
-  OK  an attachment is handed over as the empty prop it is
-  OK  and the list of them is bounded
-  OK  a deeper answer is allowed longer
-  OK  but never past the ceiling
-  OK  a change instructed from an analysis mode is not cut out
-  OK  and the same holds in a working mode
-  OK  and the answer says which mode actually ran
-  OK  an unknown mode is reported as the one that replaced it
-  OK  a known language is taken
-  OK  an unknown one falls back rather than passing through
-  OK  a document with no language of its own follows the chat
-  OK  and nothing sent at all is still a language
-  OK  the document language reaches the model as its own section
-  OK  with the reason, so it reads as a fact and not as a whim
-  OK  and the chat language stated separately from it
-  OK  and the model told the choice is not its own
-  OK  the recipient travels as a clipped value, not as an instruction
-  OK  the answer says which document language actually ran
-  OK  below the threshold nothing is said
-  OK  and the week is counted
-  OK  at ninety per cent one message goes out
-  OK  it says how much of what
-  OK  and admits the budget is ours, not the subscription’s
-  OK  it says what to do if the count grew on its own
-  OK  ninety-five speaks once more, and ninety does not repeat itself
-  OK  and then it stops talking
-  OK  a day older than the window is not counted
-  OK  and is dropped from the file
-  OK  the count survives a restart
-  OK  with no token the alert is simply off, not an error
-  OK  the server announces acceptance, and before any model text arrives
-  OK  the server announces the model actually starting, after acceptance and no later than the first text
-  OK  acceptance carries the mode/depth the server actually resolved, not just a bare «waiting»
-  OK  even a call that answers in one shot was told it was accepted first
-  OK  the switch file takes the live head down
-  OK  the daily ceiling refuses further calls
-  OK  a flood from one address is throttled
-  OK  a made-up forwarding header does not buy a fresh bucket
-  OK  and the caller was counted under one address, not many
-  OK  concurrent calls cannot slip past the cap together
-  OK  the slot is handed back afterwards
-  OK  calls beyond the concurrency cap are refused
-  OK  a client that walks away frees the slot instead of holding it
-  OK  cancelling one call lets the very next one actually run, not just reset a counter
-  OK  a hung model is cut off by the timeout
-  OK  a call that goes quiet is cut by the silence guard, not by the ceiling
-  OK  and the message says what arrived, not just how much text
-  OK  a call that keeps streaming is left alone though it runs well past that window
+=== ЧТО С НАКОПЛЕННЫМ ПОСЛЕ РАСКАТКИ ===
+  ✓ снимок принят, а не отброшен как несовместимый
+  ✓ правка брокера в данных цела
+  ✓ роль и флаги сохранились
+  ✓ переписка с Консьержем уцелела
+  ✓ новая коллекция approvals до-заполнена из фикстур
+  ✓ до-заполнение запротоколировано
+  ✓ все экраны рисуются на старом снимке, в обеих ролях
+  ✓ запросы брокера теперь переживают перезагрузку
+
+Итог: 8 прошло, 0 провалилось
+отправок после первой попытки: 1
+  причина      : probe
+  подпись      : 3483667735.5024
+  запросы      : ["как продавать Creekline 1208","кому подходит этот объект"]
+  вопрос в треде: ЕСТЬ
+  размер       : 5 КБ
+отправок после второй попытки (ничего не менялось): 1
+отправок после изменения: 2
+
+ИТОГ: отправляет по изменению, не спамит
+NPM_TEST_RC=0
+
+=== proxy ===
 
 all proxy checks passed
 RC=0
