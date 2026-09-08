@@ -448,6 +448,9 @@
       case 'clearShortlist': store.shortlist = []; api.toast('Подборка очищена'); api.emit(); break;
       case 'newTask': WS.ui.openNewTask(t.dataset.kind); break;
       case 'newThread': WS.ui.openNewThread(); break;
+      // Единственное действие, которое действительно заводит разговор. Идентификатор
+      // сюда не передаётся — тред сущности этим путём не открывается и не очищается.
+      case 'newGeneralThread': WS.ui.closeModal(); WS.engine.newGeneralThread(); break;
       case 'cgFeature': WS.ui.openCgFeature(t.dataset.feat); break;
       case 'exportDeals': api.toast('Экспорт .xlsx сформирован из фикстур (демо-скачивание)', 'ok'); break;
       case 'auditLog': WS.ui.openAuditLog(); break;
