@@ -1,122 +1,22 @@
-=== npm test ===
+Механическая сверка Task 8. Категория tests, состав объявлен в .takt/commands.json.
+Команда, как она объявлена, дословно:
 
-> wespace-demo@1.0.0 test
-> node src/test/smoke.js && node src/test/acceptance-audience.js && node src/test/acceptance-incident-consent.js && node src/test/upgrade-preserves-state.js && node src/test/snapshot-upload.js
+    npm test && npm run test:proxy
 
-checks: 2074  passed: 2074  FAILED: 0
-
-======================================================================
-
-ACCEPTANCE TEST RESULTS
+Ниже — вывод каждой её половины, снятый отдельным вызовом, чтобы код возврата
+каждой был виден сам по себе, а не поглощён цепочкой.
+Категории lint и types в этом репозитории не заведены — третий исход.
 
 ======================================================================
 
-PRECONDITIONS (9/9 passed)
-
-✓ PRECOND: app boots (WS.ui present)
-✓ PRECOND: no window errors on boot
-✓ PRECOND: clients exist in fixtures
-✓ PRECOND: deals exist in fixtures
-✓ PRECOND: no-consent contact exists (c_noconsent)
-✓ PRECOND: sendOffer handler exists
-✓ PRECOND: openPromotion handler exists
-✓ PRECOND: openDealKp handler exists
-✓ PRECOND: openClubPost handler exists
-
-======================================================================
-
-ACCEPTANCE TESTS (21/21 passed)
-
-✓ audience module exported via WS.audience
-✓ calculateAudience function exists
-✓ result has suitable array
-✓ result has excluded array
-✓ excluded items have reason field
-✓ c_noconsent: excluded from suitable list
-✓ c_noconsent: appears in excluded list
-✓ c_noconsent: exclusion reason is exactly "нет согласия"
-✓ inheritance · participant with consenting client is suitable
-✓ inheritance · participant with non-consenting client is excluded
-✓ sendOffer path: blocks send when contact excluded from audience
-✓ promoSend: hardcoded ~9200 constant removed from promotion composer
-✓ promotion composer: shown count matches audience calculation
-✓ promoSend: shows count of excluded contacts
-✓ sendOffer path: verified by test 11
-✓ promoSend path: calls calculateAudience
-✓ kpSend path: calls calculateAudience
-✓ netMsg path: calls calculateAudience
-✓ clubPostSend path: calls calculateAudience
-✓ exclusion reasons are enumerated (getExclusionReasons exported)
-✓ exclusion reasons include "нет согласия"
-
-======================================================================
-
-SUMMARY
-  Preconditions: 9 passed, 0 failed
-  Acceptance:    21 passed, 0 failed
-  Total:         30 checks, 0 failed
-
-======================================================================
-
-
-================================================================================
-
-ACCEPTANCE TEST RESULTS — Incident: Role-Based Consent Inheritance
-
-================================================================================
-
-PRECONDITIONS (6/6 passed)
-
-✓ PRECOND: app boots (WS.ui present)
-✓ PRECOND: no window errors on boot
-✓ PRECOND: clients exist in fixtures
-✓ PRECOND: deals exist in fixtures
-✓ PRECOND: ROLE_GROUPS dictionary exists
-✓ PRECOND: audience module exists
-
-================================================================================
-
-ACCEPTANCE TESTS (11/11 passed)
-
-✓ Test 1.1: participant from other side without card is EXCLUDED when main client consents
-✓ Test 1.2: exclusion reason distinguishes from "no consent"
-✓ Test 1.3: reason indicates consent belongs to another person or different side
-✓ Test 2.1: participant from broker side without card is EXCLUDED when main client consents
-✓ Test 2.2: broker side exclusion reason is distinguishable
-✓ Test 3a: client-side participant without card is SUITABLE when main client consents
-✓ Test 3b: client-side participant without card is EXCLUDED when main client does NOT consent
-✓ Test 4: reason for other-side exclusion must NOT be "нет согласия"
-✓ Test 5.1: mixed batch - client side is suitable
-✓ Test 5.2: mixed batch - other side is excluded
-✓ Test 5.3: mixed batch - broker side is excluded
-
-================================================================================
-
-SUMMARY
-  Preconditions: 6 passed, 0 failed
-  Acceptance:    11 passed, 0 failed
-  Total:         17 checks, 0 failed
-
-================================================================================
-
-
-СНИМОК СНЯТ: ключ "wespace_demo_state", схема 27, размер 87 КБ
-СТАРЫЙ СНИМОК: без approvals, без signals — как у брокера сейчас
-
-=== ЧТО С НАКОПЛЕННЫМ ПОСЛЕ РАСКАТКИ ===
-  ✓ снимок принят, а не отброшен как несовместимый
-  ✓ правка брокера в данных цела
-  ✓ роль и флаги сохранились
-  ✓ переписка с Консьержем уцелела
-  ✓ новая коллекция approvals до-заполнена из фикстур
-  ✓ до-заполнение запротоколировано
+$ npm test
   ✓ все экраны рисуются на старом снимке, в обеих ролях
   ✓ запросы брокера теперь переживают перезагрузку
 
 Итог: 8 прошло, 0 провалилось
 отправок после первой попытки: 1
   причина      : probe
-  подпись      : 3483667735.5024
+  подпись      : 670236234.5024
   запросы      : ["как продавать Creekline 1208","кому подходит этот объект"]
   вопрос в треде: ЕСТЬ
   размер       : 5 КБ
@@ -126,7 +26,8 @@ SUMMARY
 ИТОГ: отправляет по изменению, не спамит
 NPM_TEST_RC=0
 
-=== proxy ===
+$ npm run test:proxy
+  OK  a call that keeps streaming is left alone though it runs well past that window
 
 all proxy checks passed
-RC=0
+TEST_PROXY_RC=0
