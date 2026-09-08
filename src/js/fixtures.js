@@ -99,11 +99,15 @@
       note: 'Документ в подготовке (S4).', phone: '+971 55 •••• ••28 (DEMO)' },
     { id: 'c_partner', name: 'Karim Aziz', residency: 'non-resident', visaGoal: true, payment: 'cash', nameDat: 'Karim Aziz', nameGen: 'Karim Aziz', tag: 's6', lang: 'EN', channel: 'whatsapp', consent: true, consentAt: '30 марта 2026', consentUntil: '30 марта 2027', ctype: 'investor',
       contactKind: 'buyer', interest: 'live', objTypes: ['apart'],
-      goal: 'Резиденция в Downtown для семьи', budget: 2600000, areas: ['Downtown'], horizon: '1–2 месяца',
+      goal: 'Резиденция в Downtown для семьи', budget: 2600000, areas: ['Downtown Dubai'], horizon: '1–2 месяца',
       note: 'Требуется подключение клубного партнёра (S6).', phone: '+971 50 •••• ••63 (DEMO)' },
     { id: 'c_owner', name: 'Сергей Орлов', residency: 'resident', visaGoal: false, payment: 'cash', nameDat: 'Сергею Орлову', nameGen: 'Сергея Орлова', tag: 'own', lang: 'RU', channel: 'email', consent: true, consentAt: '09 мая 2026', consentUntil: '09 мая 2027', ctype: 'owner',
       contactKind: 'owner', interest: 'develop', objTypes: ['office', 'gab'],
-      goal: 'Реализовать офисный блок в DIFC', budget: 12000000, areas: ['DIFC'], horizon: '3–6 месяцев',
+      goal: 'Реализовать офисный блок в DIFC', budget: 12000000, /* Palm Jumeirah добавлен нарочно: объектов у нас там нет ни одного,
+         и на этом стоит разбор «спрос там, где у нас нет инвентаря». Закрыв Downtown,
+         мы убрали единственный такой разрыв — а у брокера они есть всегда, и именно
+         из них рождается co-broking. */
+        areas: ['DIFC', 'Palm Jumeirah'], horizon: '3–6 месяцев',
       note: 'Управляющий портфелем Altura Capital. Собственник со стороны продажи — отдаёт блок на эксклюзив.',
       phone: '+971 4 401 9900 (DEMO)' },
   ];
@@ -136,6 +140,49 @@
       segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Palm Court Residence · District 12',
       handover: null, paymentPlan: null, serviceCharge: '14 AED/фт²·год', escrow: null, occupancy: 'Свободна (vacant)',
       usp: 'Клубный эксклюзив: юнита нет на порталах. Клиенту не с чем сравнить построчно и некуда уйти торговаться — торг идёт с нами, а не между двадцатью агентами по одному объявлению.' },
+    /* Три лота заведены ПО СТЕНОГРАММЕ, а не по вкусу. Живой дубайский брокер за
+       три дня задал четыре вопроса, и три из них упёрлись в пустой инвентарь: двухспальных
+       не было ни одного, Downtown не было вовсе, метража около 110 м² не было, и вида
+       на море тоже. Стенд каждый раз ответил честно — и каждый раз ничем не помог.
+
+       Что добавлять, решала стенограмма обращений, а не представление о том, какая база
+       должна быть красивой. Без записи следов этих трёх лотов не существовало бы. */
+    { id: 'o_downtown2br', name: 'Boulevard Heights, Unit 2104', source: 'agency',
+      sourceLabel: 'Инвентарь агентства', area: 'Downtown Dubai', price: 2590000, size: 88, br: '2BR',
+      address: 'Downtown Dubai, Boulevard Heights, Tower 2, Unit 2104', commissionPct: 2,
+      availability: 'available', verified: 'verified', checkedAt: '5 сент 2026',
+      trakheesi: 'ok', madmoun: 'ok',
+      attrs: { view: 'city', floor: 21, floors: 38, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
+      match: 'Downtown, две спальни, в бюджете до 2,6 млн, готовое.',
+      segment: 'resale', developer: 'Emaar Properties', project: 'Boulevard Heights · Downtown',
+      handover: null, paymentPlan: null, serviceCharge: '19 AED/фт²·год', escrow: null,
+      occupancy: 'Свободна (vacant)',
+      usp: 'Окна выходят на бульвар, а не на Sheikh Zayed: шума трассы нет, а до метро Burj Khalifa семь минут пешком. С 21-го этажа виден фонтан, но не сама башня — это честнее говорить сразу.' },
+
+    { id: 'o_marinasea', name: 'Marina Vista, Unit 1806', source: 'club',
+      sourceLabel: 'Клубный эксклюзив', area: 'Dubai Marina', price: 2880000, size: 112, br: '2BR',
+      address: 'Dubai Marina, Marina Vista, Unit 1806', commissionPct: 2,
+      availability: 'available', verified: 'verified', checkedAt: '3 сент 2026',
+      trakheesi: 'ok', madmoun: 'ok',
+      attrs: { view: 'sea', floor: 18, floors: 44, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
+      match: 'Две спальни, вид на море, около 1200 фт².',
+      segment: 'resale', developer: 'Emaar Properties', project: 'Marina Vista · Dubai Marina',
+      handover: null, paymentPlan: null, serviceCharge: '21 AED/фт²·год', escrow: null,
+      occupancy: 'Свободна (vacant)',
+      usp: 'Угловая планировка: море видно из гостиной и из обеих спален, а не только с балкона. Школа и два садика в пределах километра, супермаркет в соседней башне.' },
+
+    { id: 'o_jvc2br', name: 'Bloom Gardens, Unit 512', source: 'agency',
+      sourceLabel: 'Инвентарь агентства', area: 'JVC', price: 1890000, size: 104, br: '2BR',
+      address: 'Jumeirah Village Circle, Bloom Gardens, Unit 512', commissionPct: 2,
+      availability: 'available', verified: 'verified', checkedAt: '4 сент 2026',
+      trakheesi: 'ok', madmoun: 'ok',
+      attrs: { view: 'park', floor: 5, floors: 12, floorBand: 'mid', finish: 'new', demand: 'mid', prestige: 'mid', metro: false },
+      match: 'Две спальни под семью, самое дешёвое содержание.',
+      segment: 'resale', developer: 'Nakheel', project: 'Bloom Gardens · JVC',
+      handover: null, paymentPlan: null, serviceCharge: '13 AED/фт²·год', escrow: null,
+      occupancy: 'Сдана до июня 2027',
+      usp: 'Самый низкий сервисный сбор среди наших двухспальных — 13 против 19 в Downtown и 21 в Marina. Но квартира сдана до июня 2027: въехать самому не получится, доход идёт с первого дня.' },
+
     { id: 'o_bayline', name: 'Bayline Terraces, Unit 1603', source: 'import',
       sourceLabel: 'Импорт застройщика', area: 'Dubai Creek Harbour', price: 1950000, size: 88, br: '1BR',
       address: 'Dubai Creek Harbour, Bayline Terraces, Unit 1603', commissionPct: 2.5,
@@ -251,6 +298,21 @@
   // зафиксированный снимок. `perM2` — средняя цена сделок за 12 месяцев; `yieldTypical` — чистая
   // доходность на вложенное по той же модели, что считает карточка, иначе сравнение врёт.
   const AREAS = {
+    /* Два района добавлены вместе с инвентарём в них: справочник держит те, где у нас
+       есть объекты, и из него же проецируется срез рынка. Величины взяты такие же,
+       какие срез уже называл для этих районов, — два экрана не должны спорить о цене метра. */
+    'Downtown Dubai': {
+      perM2: 31500, priceYoY: 6, rentYoY: 4, yieldTypical: 5.4, dom: 58,
+      tenant: 'Руководители и долгие командировки, часто с семьёй. Снимают надолго и торгуются мало.',
+      driver: 'Адрес сам по себе и пешая доступность башни с торговым центром. Нового строится мало.',
+      risk: 'Самая высокая цена метра из наших районов при доходности ниже средней: покупают ради адреса, а не ради аренды.',
+    },
+    'Dubai Marina': {
+      perM2: 25400, priceYoY: 7, rentYoY: 6, yieldTypical: 6.1, dom: 45,
+      tenant: 'Экспаты среднего звена и краткосрочная аренда. Спрос ровный круглый год.',
+      driver: 'Море и набережная в пешей доступности, метро и трамвай. Самый ликвидный из наших районов.',
+      risk: 'Застройка плотная: вид на море легко перекрывается соседней башней — линию вида проверяют на месте.',
+    },
     'Business Bay': {
       perM2: 21400, priceYoY: 9, rentYoY: 6, yieldTypical: 5.1, dom: 41,
       tenant: 'Сотрудники DIFC и Downtown. Снимают на год, чаще без семьи, съезжают при смене работы.',
@@ -440,7 +502,7 @@
     { id: 'r_karim', clientId: 'c_partner', title: 'Резиденция в Downtown через партнёра', createdAt: '14 мая', channel: 'whatsapp',
       funnel: 'cross', interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: 'u_yusef',
       dealType: 'Кросс-продажи', objectType: 'Квартира', bedrooms: '2BR', goal: 'Покупка резиденции', budget: 2600000,
-      areas: ['Downtown'], horizon: '1–3 месяца',
+      areas: ['Downtown Dubai'], horizon: '1–3 месяца',
       assignee: 'u_lina', leadStatus: 'Квалифицирован', temperature: 'warm', nextContact: 'завтра, 11:30',
       funding: 'Cash 100% · KYC фонда ✓',
       offered: [], kp: { formed: false },
@@ -533,7 +595,7 @@
     { id: 'r_karim_cross', clientId: 'c_partner', title: 'Апартаменты Downtown через клубного партнёра', createdAt: '25 апреля', channel: 'whatsapp',
       funnel: 'cross', interest: 'Покупка', paymentForm: '100% оплата', vat: true, source: 'Клуб', partnerAgent: 'u_yusef',
       dealType: 'Кросс-продажи', objectType: 'Квартира', bedrooms: '2BR', goal: 'Инвестиция под аренду', budget: 3100000,
-      areas: ['Downtown'], horizon: null,
+      areas: ['Downtown Dubai'], horizon: null,
       assignee: 'u_lina', leadStatus: 'Закрыта', temperature: 'warm', nextContact: '—',
       funding: 'Cash 100% · KYC фонда ✓',
       offered: [], kp: { formed: true, at: '28 апреля', objectIds: [] },
@@ -571,7 +633,7 @@
     { id: 'r_karim_sale', clientId: 'c_partner', title: 'Апартаменты в Downtown до 2,6 млн', createdAt: '12 мая',
       channel: 'whatsapp', interest: 'Покупка', paymentForm: 'Наличные', vat: false, source: 'Клуб',
       partnerAgent: null, funnel: 'sale', dealType: 'Продажа · вторичка', objectType: 'Квартира',
-      bedrooms: '2 BR', goal: 'Проживание', budget: 2600000, areas: ['Downtown'],
+      bedrooms: '2 BR', goal: 'Проживание', budget: 2600000, areas: ['Downtown Dubai'],
       horizon: '1–2 месяца', assignee: 'u_omar', leadStatus: 'Показ назначен', temperature: 'hot',
       nextContact: '15 мая', funding: 'Подтв. средств ✓', offered: [],
       note: 'Показ назначен через партнёра — своего инвентаря в Downtown нет.' },

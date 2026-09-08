@@ -891,7 +891,9 @@
         const pass = all.filter((o) => (o.price || 0) >= VISA_THRESHOLD);
         const flats = pass.filter((o) => oppTypeOf(o) !== 'office');
         return flats.length
-          ? 'Визовый порог из нашего инвентаря проходят ' + pass.length + ' ' +
+          /* Заголовок растёт вместе с инвентарём: на двенадцати объектах он укладывался
+             в предел, на пятнадцати вышел за него. Формулировка короче, числа те же. */
+          ? 'В визовый порог проходят ' + pass.length + ' ' +
             plural(pass.length, 'объект', 'объекта', 'объектов') + ', из них ' + flats.length + ' — квартиры'
           : 'Визовый порог из нашего инвентаря проходят только офисы';
       },
@@ -1527,7 +1529,7 @@
        на просмотр, это ровно тот сочинённый факт, которого мы избегаем везде. Где своего
        снимка нет — карта во всю ширину: она у каждого объекта настоящая. */
     const ph = (WS.photos && WS.photos[o.id]) || '';
-    const mp = (WS.maps && WS.maps[o.id]) || '';
+    const mp = WS.mapFor ? WS.mapFor(o) : ((WS.mapFor ? WS.mapFor(o) : (WS.maps && WS.maps[o.id])) || '');
     const perM = o.size ? Math.round(o.price / o.size) : 0;
     const dvLine = dv
       ? WS.AED(dv.per) + ' за м² · ' + (dv.pct === 0 ? 'вровень со срезом ' + dv.area
@@ -1884,7 +1886,7 @@
   }
   function dayPlaceOf(it) {
     const o = it.objectId ? oppObject(it.objectId) : null;
-    if (o) return { area: o.area, addr: o.address || o.name, map: (WS.maps || {})[o.id] || '' };
+    if (o) return { area: o.area, addr: o.address || o.name, map: (WS.mapFor ? WS.mapFor(o) : (WS.maps || {})[o.id]) || '' };
     const d = it.dealId ? (D().deals || []).find((x) => x.id === it.dealId) : null;
     const o2 = d && d.objectId ? oppObject(d.objectId) : null;
     if (o2) return { area: o2.area, addr: o2.address || o2.name, map: (WS.maps || {})[o2.id] || '' };
@@ -9633,7 +9635,7 @@
   // frame by construction (see maps.js), so it needs no per-object offset. Falls back to the flat
   // panel if an object has no map baked in.
   function objMap(o) {
-    const img = (WS.maps || {})[o.id];
+    const img = (WS.mapFor ? WS.mapFor(o) : (WS.maps || {})[o.id]);
     const canvas = img
       ? '<div class="obj-map-canvas has-img"><img src="' + img + '" alt="Карта: ' + escAttr(o.area) + '" loading="lazy">' +
         '<span class="obj-map-marker"></span>' +

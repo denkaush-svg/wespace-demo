@@ -167,3 +167,86 @@
 
   WS.floorplan = { svg: svg, dataUrl: dataUrl, layoutFor: layoutFor, note: note };
 })(window.WS = window.WS || {});
+
+/* ============================================================
+   Схема района — на случай, когда у объекта нет запечённой карты.
+
+   Карты в maps.js — настоящие тайлы OpenStreetMap вокруг реальных координат,
+   запечённые в файл. Для нового объекта такой карты просто нет, и подставлять
+   чужую нельзя: карта соседнего дома, выданная за этот, — сочинённый факт
+   ровно того рода, которого стенд избегает везде.
+
+   Поэтому здесь рисуется СХЕМА: район назван, положение внутри него не
+   показано, и подпись об этом стоит на самой картинке — она уедет вместе с
+   изображением, куда бы его ни переслали. Тот же приём, что у планировки.
+   ============================================================ */
+(function (WS) {
+  'use strict';
+
+  const C = { bg: '#eef1ea', land: '#e2e7dc', water: '#cfdbe4', line: '#b9c2ad',
+              ink: '#2c2a26', mut: '#7d8473', acc: '#c8721f' };
+
+  // Есть ли у района вода — влияет только на то, как читается схема.
+  const WATERY = ['Marina', 'Creek', 'Bay', 'Palm', 'Beach', 'Harbour'];
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function districtSvg(area) {
+    const W = 420, H = 260, BAR = 15;
+    const wet = WATERY.some((w) => String(area || '').indexOf(w) >= 0);
+    // Кварталы рисуются от имени района — одинаковый район даёт одинаковую схему,
+    // и она не мигает между перерисовками.
+    let seed = 0;
+    String(area || '').split('').forEach((ch) => { seed = (seed * 31 + ch.charCodeAt(0)) | 0; });
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+
+    let blocks = '';
+    for (let i = 0; i < 22; i++) {
+      const x = Math.round(rnd() * (W - 60)) + 10;
+      const y = Math.round(rnd() * (H - BAR - 70)) + 10;
+      const w = 18 + Math.round(rnd() * 42);
+      const h = 12 + Math.round(rnd() * 30);
+      blocks += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
+        '" fill="' + C.land + '" stroke="' + C.line + '" stroke-width="1"/>';
+    }
+    const water = wet
+      ? '<path d="M0,' + (H - BAR - 46) + ' Q' + (W / 3) + ',' + (H - BAR - 78) + ' ' + (W / 2) + ',' +
+        (H - BAR - 44) + ' T' + W + ',' + (H - BAR - 52) + ' L' + W + ',' + (H - BAR) + ' L0,' + (H - BAR) +
+        ' Z" fill="' + C.water + '"/>'
+      : '';
+
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W +
+      '" height="' + H + '" role="img" aria-label="Схема района: ' + esc(area) + '">' +
+      '<rect width="' + W + '" height="' + H + '" fill="' + C.bg + '"/>' + blocks + water +
+      '<text x="14" y="' + (H - BAR - 12) + '" font-size="15" font-weight="800" fill="' + C.ink +
+        '" font-family="system-ui,sans-serif">' + esc(area) + '</text>' +
+      '<rect x="0" y="' + (H - BAR) + '" width="' + W + '" height="' + BAR + '" fill="' + C.acc + '"/>' +
+      '<text x="' + (W / 2) + '" y="' + (H - 4.5) + '" text-anchor="middle" font-size="10.5" ' +
+        'font-weight="600" fill="#fff" font-family="system-ui,sans-serif">' +
+        'Схема района · положение объекта не показано</text>' +
+      '</svg>';
+  }
+
+  function districtUrl(area) {
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(districtSvg(area));
+  }
+
+  /* Единая точка получения карты объекта. Код спрашивает ЗДЕСЬ, а не лезет в
+     WS.maps напрямую: иначе новый объект молча остаётся без картинки, и это
+     замечает не тест, а брокер на показе. */
+  function mapFor(o) {
+    if (!o) return '';
+    const baked = (WS.maps && WS.maps[o.id]) || '';
+    return baked || districtUrl(o.area);
+  }
+  function mapIsExact(o) {
+    return !!(o && WS.maps && WS.maps[o.id]);
+  }
+
+  WS.districtMap = { svg: districtSvg, url: districtUrl };
+  WS.mapFor = mapFor;
+  WS.mapIsExact = mapIsExact;
+})(window.WS = window.WS || {});

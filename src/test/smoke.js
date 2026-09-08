@@ -1158,7 +1158,14 @@ setTimeout(async () => {
   {
     const objs = dd().objects || [];
     objs.forEach((o) => {
-      check('map · ' + o.id + ' — картинка карты есть', !!(WS.maps || {})[o.id]);
+      /* Требуется не ЗАПЕЧЁННАЯ картинка, а ЧЕСТНАЯ. У нового объекта тайлов нет,
+         а подставить карту соседнего дома значит выдать чужоё место за это. Поэтому
+         допускается схема района — но только такая, которая говорит на себе самой,
+         что положение объекта не показано. */
+      check('map · ' + o.id + ' — карта есть и честно помечена',
+        !!WS.mapFor(o) && (WS.mapIsExact(o) ||
+          decodeURIComponent(WS.mapFor(o)).indexOf('положение объекта не показано') >= 0),
+        WS.mapIsExact(o) ? 'точная' : 'схема без пометки');
     });
     WS.ui.objectCard(objs[0].id);
     const map = doc.querySelector('#app .obj-map-canvas');
@@ -9166,6 +9173,45 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Одно название района на весь стенд ----
+
+     У клиентов район назывался «Downtown», у объектов и среза рынка — «Downtown Dubai».
+     Подбор сравнивает строки точно, и запрос на Downtown не находил объект в Downtown
+     Dubai. Пока там не было инвентаря, расхождение было невидимым: оба пути вели к пустоте.
+
+     Проверка различает два разных случая, и это главное в ней:
+       ПРОБЕЛ ПОКРЫТИЯ — клиент просит район, которого у нас нет (Damac Hills).
+         Это норма и именно из этого рождается co-broking.
+       ОПЕЧАТКА — тот же район под двумя именами, одно из которых входит в другое.
+         Это дефект, и он тихий: поиск не падает, он просто ничего не находит. */
+  {
+    const known = [];
+    Object.keys(WS.AREAS || {}).forEach((a) => known.push(a));
+    (dd().market || []).forEach((m) => { if (m['\u0440\u0430\u0439\u043e\u043d']) known.push(m['\u0440\u0430\u0439\u043e\u043d']); });
+    (dd().objects || []).forEach((o) => { if (o.area) known.push(o.area); });
+    const KNOWN = known.filter((v, i) => known.indexOf(v) === i);
+
+    const asked = [];
+    (dd().clients || []).forEach((c) => (c.areas || []).forEach((a) => asked.push([a, c.name])));
+    (dd().requests || []).forEach((r) => (r.areas || []).forEach((a) => asked.push([a, 'заявка ' + r.id])));
+
+    /* Название, которое ВХОДИТ в известное (или наоборот), но не равно ему, —
+       это два имени одного района, а не два района. */
+    const typos = asked.filter(([a]) =>
+      KNOWN.indexOf(a) < 0 &&
+      KNOWN.some((k) => k !== a && (k.indexOf(a) === 0 || a.indexOf(k) === 0)));
+    check('районы · один район — одно название во всём стенде',
+      typos.length === 0,
+      typos.map(([a, who]) => '«' + a + '» у ' + who).join('; '));
+
+    /* А настоящие пробелы покрытия обязаны быть: без них не на чём показать
+       партнёрский путь. Закрыв Downtown, мы однажды убрали единственный. */
+    const objAreas = (dd().objects || []).map((o) => o.area);
+    const gaps = asked.filter(([a]) => a.indexOf('\u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d') < 0 && objAreas.indexOf(a) < 0);
+    check('районы · есть хотя бы один настоящий пробел покрытия',
+      gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
+  }
+
   /* ---- Сборы и пороги: число без происхождения не живёт ----
 
      Сначала эти тарифы стояли текстом в инструкции модели: на сервере, без источника,
@@ -9452,7 +9498,14 @@ setTimeout(async () => {
 
     /* Пустой случай — тот, на который брокер и попал: 2,6 млн в Downtown, а инвентаря нет.
        Документ обязан сказать об этом, а не притворяться подборкой. */
-    const empty = (dd().requests || []).find((r) => r.clientId === 'c_partner');
+    /* Заявка Карима была пустой, пока в Downtown не было объектов. Теперь они есть,
+       и проверять пустой случай надо на той заявке, где он настоящий: у Дмитрия район
+       не назван вовсе, и подбору не от чего оттолкнуться. */
+    const empty = (dd().requests || []).find((r) => {
+      const c = (dd().clients || []).find((x) => x.id === r.clientId);
+      return c && (WS.ui.replyPicks(c) || []).length === 0 &&
+        !(r.offered || []).length;
+    });
     if (empty) {
       WS.ui.closeModal();
       WS.ui.openRequestOffer(empty.id);
