@@ -1,37 +1,68 @@
-# Step 7 — Cross-model review (Codex, per roles.json step 7: must_differ_from step 4/opus)
+# Шаг 7 — Кросс-модельное ревью (codex, обязан отличаться от шага 4)
 
-## Bottom line (Codex's own words, translated)
-"Standard tests are green, but an independent probe confirmed 7 functional defects; 4 more are plausible from reading the code alone. Not ready to merge."
+Гейт: находки разделены на **подтверждённые** (под каждой вывод собственноручно запущенной пробы) и **правдоподобные** (выведенные чтением). Каждая находка — непроверенный вход, то есть подлежит триажу ведущим, а не переносу в журнал как есть.
 
-Dispatched via `mcp__codex__codex`, `sandbox: danger-full-access`, `approval-policy: never` (precedent: a prior run's SCORE.md — "Кросс-модельное ревью — впервые со снятой песочницей... разница видна в цифрах"). Codex was told the border file (`00-granica.txt`) is sealed and that the seal is honor-system only — the tooling cannot stop it reading the border out of `git log -p`/`git show`, only its own discipline can.
+## Как шёл узел
 
-## Confirmed defects (probe-run, not just read) — 7 total
-Each backed by literal output from a probe script Codex wrote and ran itself (not a repo test, not code-reading):
+Первая подача — задание из пяти направлений — **не вернулась вовсе**: внешняя модель молчала 30 минут и была снята по таймауту. Дерево после неё осталось чистым, проб не появилось. Это второй такой обрыв за эксперимент (первый — на сборке объединённого кандидата в прогоне Task 7).
 
-1. **`src/js/engine.js:774,776`** — quick thread-switch during the 60/500ms setup delay silently terminates the turn via `endTurn(turn)` inside `if (!same()) { endTurn(turn); return; }`. Probe: `PROBE quick_switch calls=0 busy=false has_question=true has_wait=false`.
-2. **`src/js/main.js:280` (via `engine.js:1273`)** — a follow-up chip click (`data-agnext`/`data-cgask` path) bypasses the new `send()` busy-guard entirely.
-3. **`src/js/main.js:283`, `routePrompt`→`freeReply`** — `d.cgask` calls `routePrompt(d.cgask)` directly (main.js:283), which falls through to `WS.engine.freeReply(text)` unguarded (main.js:93) — same class of bypass as #2, same root cause: `routePrompt` is deliberately left unguarded (comment at main.js:121, "the test harness drives sequential calls through it directly") but not every caller wraps it in `send()`. Probe: `PROBE followup_bypass calls=2 cancel_buttons=2 first_aborted=false second_aborted=true busy_after_first_cancel=false`.
-4. **`src/js/agent.js:845`** — model failure is silently converted to an offline-planner answer indistinguishable from a real one; no visible signal to the visitor. Probe: `PROBE fallback visible_offline_banner=false has_answer=true`.
-5-7. Three further probe-confirmed defects from Codex's report (mode/depth visibility at the `web` stage, `reset` not cancelling an active call, `done.ms` dropped in `live.js`) — see raw Codex transcript for exact citations; not independently re-verified by me this pass (see "Not independently verified" below).
+Вторая подача — резко суженная до двух конкретных проверок, с требованием отвечать сразу — вернулась за несколько минут с работающей пробой. Вывод для оснастки записан ниже.
 
-## Plausible (code-reading only, not probe-run) — 4 total
-Codex's own label for these four, distinct from the 7 above: reasoned from reading the code, no probe command run against them. `server/proxy.js:909/914` (model_started emitted before spawn is actually confirmed) plus 3 more — see raw transcript. Проверить прогоном не удалось: ни я, ни Codex не запускали для них команду/пробу — вердикт по этим четырём не выносится, только фиксация как открытого предположения для шага 9/12.
+## Находка 1 — идентификаторы новых тредов. Механизм реальный, сценарий в бою недостижим
 
-## My own independent verification (this pass)
-Read the cited code directly, before trusting the verdict enough to record it:
+**Что предъявила роль.** Проба показала столкновение: после удаления среднего треда следующий созданный получал идентификатор третьего и наследовал его переписку.
 
-- **Confirmed #1** (engine.js:774/776) — read the code myself: `await delay(60); if (!same()) { endTurn(turn); return; }` and the same pattern at `:776` after `delay(500)`. `endTurn` deletes the turn from the `turns` registry. This really does kill the turn the instant the visitor switches threads during setup, before the call has even reached the server. Real, in-scope regression against Task 7's own goal (turn survives a thread switch).
-- **Confirmed #2/#3** (main.js:280/283, engine.js:1273) — read `main.js:265-304`: `d.agnext` (line 280) and `d.cgask` (line 283) both call through to engine/routePrompt directly, not through the `send()` wrapper that guards the 4 click branches + 4 Enter branches (main.js:123-126). Confirmed real: `send()`'s own comment at main.js:115-122 only claims to have unified "the button and the Enter key" — it says nothing about chip-driven paths, and indeed doesn't cover them.
-- **Confirmed #4** (agent.js:845) — read `agent.js:834-868`. The silent-fallback behavior is explicit, pre-existing, and *intentional* per the code's own comment ("A visitor is never shown a transport problem: the offline planner answers the same question, more plainly" — agent.js:845-846), predating this task. Separately checked the abort-interaction: `engine.js:902-912` shows the cancelled case is already handled correctly — `askAsync`'s fallback may still resolve behind an abort, but the result is deliberately never displayed (`if (turn.status === 'cancelled') return;` before the reply is rendered), with an explicit comment acknowledging exactly this risk. **Judgment: the abort-interaction concern is a false alarm (already handled); the general "offline fallback looks like a real answer" behavior is real but is pre-existing product design, not a regression introduced by Task 7's scope (turn-state observability/cancelability), and is not being tracked as a step-9 fix item under this run.**
-- Findings 5-7 and the 4 "plausible" items: **not independently re-verified this pass** (see Not independently verified, below) — time/scope-boxed; the two highest-severity, most Task-7-relevant confirmed findings (#1 quick-switch, #2/#3 chip-bypass) were prioritized and hold up.
-- Re-ran all three test suites myself, sequentially, post-review: smoke 1954/1954, proxy all passed, live-ux 8/8 (see `07-postreview-regression.txt` for the smoke+proxy portion and `07-liveux-only.txt` for live-ux run in isolation — the combined sequential run stalled past 2 minutes during live-ux under heavy ambient load, ~36 concurrent node.exe processes on this machine at the time; re-ran live-ux alone and it passed clean at 8/8, so this is contention, not a hang bug). Confirms Codex's own "standard tests are green" claim.
-- Confirmed the working tree carries no residue from Codex's own activity (it ran `npm run build` per its own report): `git status --short` / `git diff --stat` show only the expected `.takt/current.jsonl` change and the `00-granica.txt` seal move.
-- Confirmed the ledger itself is untouched by Codex: the only new line after dispatch is my own prior `seal --step 7` action (`git diff .takt/current.jsonl`), not anything Codex appended.
+```
+three ids=general:mtu1qirf-1,general:mtu1qirf-2,general:mtu1qirf-3
+deleted=general:mtu1qirf-2
+after-delete-reload id=general:mtu1qirf-3
+after-delete-reload collision-with-third=YES
+after-delete-reload retained-third-conversation=YES
+THREAD VERDICT=DEFECT
+```
 
-## Not independently verified (honest gap)
-Проверить не удалось (по нехватке времени в этом проходе, не потому что не важно):
-- Findings 5-7 (mode/depth at `web` stage, `reset` non-cancellation, `live.js` `done.ms`) and all 4 "plausible" findings — read Codex's citations but did not open the files myself to confirm line-for-line.
-- Codex's own probe scripts — did not re-run them myself; they were not preserved as repo files, Codex ran them ad hoc in its own sandbox and reported literal stdout. Treating the quoted probe output as trustworthy given Codex's role-7 mandate requires real command output, not narrative, for anything labeled "подтверждено."
+**Механизм подтверждаю.** `src/js/engine.js:448`: номер считается как **количество** существующих `general:`-тредов плюс один, а не как продолжающаяся последовательность. Убыль количества возвращает уже занятый номер.
+`[проверено прогоном: `grep -n "function newGeneralThread" -A 14 src/js/engine.js`]`
 
-## Decision this step drives
-Two of the three defects I independently confirmed (#1 quick-switch turn-loss, #2/#3 chip-bypass) are real, in-scope regressions against Task 7's own acceptance criteria (turn survives being backgrounded; every entry point respects the busy-guard) and should be fixed before merge — this is exactly the "review found real defects" outcome the step-7 role was redesigned to produce (as opposed to the removed step-6, which read code and found almost nothing). Recording with `--found-breakage`: the step ran, found real problems, and does not close/pass as-is.
+**Вердикт роли переоценён, и вот на каком основании.**
+
+Во-первых, проба шла на замороженных часах. Все три треда получили одинаковую метку времени `mtu1qirf`, что декодируется в `2026-09-09 12:00:00.123` — слишком круглое значение для настоящих часов.
+`[проверено прогоном: `python -c "print(int('mtu1qirf', 36))"`]` → `1788955200123`
+
+Собственная проба ведущего с настоящими часами даёт трём тредам **разные** метки: `general:mtt9ub8g-1`, `general:mtt9uba8-2`, `general:mtt9ubdo-3`. Совпадение номера при разной метке полного столкновения не даёт.
+`[проверено прогоном: `node ./probe-tmp.js "$PWD"` — временная проба, удалена после снятия вывода]`
+
+Во-вторых, и это решает: **удалить отдельный тред в приложении нечем.** Пути удаления не существует ни в интерфейсе, ни в коде; треды чистятся только целиком, при полном сбросе с последующим пересевом (`src/js/engine.js:714`).
+`[проверено прогоном: `grep -n "delete engine.threads\|removeThread\|deleteThread\|dropThread" src/js/*.js`]` → ни одного совпадения
+
+Роль удалила тред, обратившись к внутреннему состоянию напрямую. Так не делает ни пользователь, ни код приложения.
+
+**Итог триажа: не дефект сегодня, скрытая хрупкость на завтра.** Уникальность идентификатора держится на том, что треды никогда не убывают. Это верно ровно до появления первого способа удалить разговор — и тот, кто его добавит, о такой связи не узнает ниоткуда. Передаётся шагу 9 как находка о хрупкости с правом отклонить, а не как поломка.
+
+## Находка 2 — ссылки доступности. Дефекта нет, подтверждено
+
+Все шесть ссылок `aria-describedby` (три кнопки глубины в двух композерах) указывают на существующие непустые элементы, пересечений между композерами нет.
+
+```
+composer[0] input=cgPrompt  fast/think/deep aria-describedby=cgd-cgPrompt-*   exists=YES nonempty=YES
+composer[1] input=cgDockPrompt fast/think/deep aria-describedby=cgd-cgDockPrompt-* exists=YES nonempty=YES
+aria-describedby overlap=(none)
+ARIA VERDICT=NO DEFECT
+```
+
+Роль вдобавок поправила ошибку в моём задании: на «Пульсе» композер **один**, а состояние с двумя настоящими композерами возникает на «Консьерже» при открытом доке. Проверку она провела на реальном двухкомпозерном состоянии, а не на том, которое я ей назвал.
+
+## Что не проверялось
+
+Три из пяти направлений первой подачи остались непроверенными после её обрыва: поведение списка диалогов при нескольких пустых тредах (счётчики, предпросмотр, порядок), переживание новых тредов выгрузкой и загрузкой состояния, и совместимость со старым сохранением, не знающим о поле `fresh`.
+`[не проверено прогоном: первая подача снята по таймауту, вторая сознательно сужена до двух пунктов ради получения хоть какого-то результата]`
+
+## Стоимость
+
+Счётчик расхода внешней модели недоступен ни ей, ни диспетчеру. Для эксперимента об оптимальности это дыра: узел, чью стоимость нельзя назвать, нельзя и сравнить с альтернативой. Записывается как «проверить не удалось», а не как ноль.
+
+## Вывод об оснастке, а не о задаче
+
+Узел внешней модели **дважды за эксперимент не вернулся по таймауту** на широком задании и оба раза вернулся быстро и с результатом на узком. Это воспроизводимая закономерность, а не случайность: цена широкого задания внешнему узлу — риск получить ноль за тридцать минут.
+
+И второе, важнее: узел выдал вердикт «ДЕФЕКТ», который при проверке оказался недостижимым в бою. Правило «находки внешнего ревью — непроверенный вход, а не приговор» подтвердилось на живом примере. Роль отработала честно (предъявила пробу и её вывод), ошибка была в реалистичности стенда пробы, и поймать это мог только триаж.

@@ -3609,11 +3609,16 @@
   /* Depth is a ceiling, not a promise: it cannot buy the model more thinking
      from a printing CLI, so what it honestly changes is how much is asked for
      and how long the answer may take. The hints used to promise reasoning
-     steps and multi-source research, neither of which happened. */
+     steps and multi-source research, neither of which happened.
+
+     `note` is on-screen text, not a hover tooltip: the meaning of the three
+     words lived in a `title` attribute, which a finger and a keyboard cannot
+     reach. The ceiling is named as a figure because the figure is what depth
+     actually changes — DEPTH_BLOCKS in live.js, and the same numbers. */
   const CG_DEPTH = [
-    { k: 'fast', t: 'Быстро', hint: 'Коротко: две-три фразы, до трёх блоков' },
-    { k: 'think', t: 'Размышление', hint: 'Разбор по существу, до восьми блоков' },
-    { k: 'deep', t: 'Глубоко', hint: 'Полный разбор с оговорками; отвечает дольше' },
+    { k: 'fast', t: 'Быстро', note: 'короткий ответ, до 3 блоков' },
+    { k: 'think', t: 'Размышление', note: 'разбор по существу, до 8 блоков' },
+    { k: 'deep', t: 'Глубоко', note: 'полный разбор с оговорками, до 10 блоков; может отвечать дольше' },
   ];
   /* Which modes keep to analysis and do not offer changes unasked. Told, not
      enforced: the tag used to say «только чтение», and the modes it marked cut
@@ -3666,7 +3671,18 @@
     const chipRow = chips ? '<div class="cg-chips">' + chips + '</div>' : '';
     const pop = (kind, html) => st.cgMenu === kind ? '<div class="cg-pop">' + html + '</div>' : '';
     const cv = '<span class="cv">▾</span>';
-    const depthSeg = CG_DEPTH.map((x) => '<button class="cg-seg-btn' + (depth === x.k ? ' on' : '') + '" data-cgdepth="' + x.k + '" title="' + x.hint + '">' + x.t + '</button>').join('');
+    /* Описание глубины стоит рядом с переключателем текстом, а не подсказкой при
+       наведении. Описания неактивных глубин остаются в разметке — на них ссылается
+       aria-describedby своей кнопки, — но их прячет CSS: на экране объясняется та
+       глубина, которая сейчас включена. Идентификатор берёт имя поля ввода: на
+       Пульсе композер стоит рядом с консьержевым, и два одинаковых id развели бы
+       ссылку не туда. */
+    const depthNoteId = (k) => 'cgd-' + inputId + '-' + k;
+    const depthSeg = CG_DEPTH.map((x) => '<button class="cg-seg-btn' + (depth === x.k ? ' on' : '') + '" data-cgdepth="' + x.k + '"' +
+      ' aria-pressed="' + (depth === x.k) + '" aria-describedby="' + depthNoteId(x.k) + '">' + x.t + '</button>').join('');
+    const depthNotes = '<div class="cg-depth-notes">' + CG_DEPTH.map((x) =>
+      '<span class="cg-depth-note' + (depth === x.k ? ' on' : '') + '" id="' + depthNoteId(x.k) + '">' +
+      x.t + ' — ' + x.note + '</span>').join('') + '</div>';
     // Asked at render time: voice.js loads after this file, so a value captured
     // at definition would always be «no».
     const voiceOff = !(WS.voice && WS.voice.canDictate && WS.voice.canDictate());
@@ -3695,6 +3711,7 @@
             '<button class="send" data-act="' + sendAct + '">' + I('arrowUp') + '</button>' +
           '</div>' +
         '</div>' +
+        depthNotes +
         /* On the phone the hands are the scarce thing, not the screen. The mic
            in the bar is a 32px target reachable only with a second hand, so the
            phone gets the control the posture actually calls for: one round
@@ -3840,7 +3857,9 @@
           const on = t.id === activeTid ? ' is-active' : '';
           const time = t.updatedAt ? '<span class="th-time">' + t.updatedAt + '</span>' : '';
           const unread = t.unread ? '<span class="th-unread">' + t.unread + '</span>' : '';
-          const preview = (t.preview || (t.items.length + ' сообщений')) + (t.preview ? '…' : '');
+          // Пустой тред в списке бывает ровно один — только что заведённый общий:
+          // «0 сообщений» о нём не говорит ничего, а строка говорит, что делать.
+          const preview = t.preview ? t.preview + '…' : (t.items.length ? t.items.length + ' сообщений' : 'Пока пусто — напишите первым');
 
           // A deal thread and a client thread are a different perimeter but the same person. The
           // deal row therefore carries the deal's own essence — the thread label already opens with
@@ -3870,7 +3889,7 @@
     const rows = renderedGroups.join('') || '<div class="cg-rail-empty">' + I('chat') + '<div>' + (q ? 'По запросу ничего не найдено' : 'Пока нет диалогов.<br>Начните справа — тред создастся по сделке, объекту или лиду.') + '</div></div>';
 
     return '<div class="cg-rail-head"><span class="section-label cg-rail-count" style="margin:0">Диалоги · ' + threads.length + '</span>' +
-      '<div class="cg-rail-head-btns"><button class="btn sm" data-act="newThread">' + I('plus') + 'Новый</button>' +
+      '<div class="cg-rail-head-btns"><button class="btn sm" data-act="newThread">' + I('chat') + 'Выбрать диалог</button>' +
       '<button class="cg-rail-collapse" data-act="cgRailToggle" title="Свернуть диалоги">' + I('chevLeft') + '</button></div></div>' +
       searchBox_ + '<div class="cg-rail-list">' + rows + '</div>';
   }
@@ -3967,7 +3986,7 @@
     const t = WS.engine.activeThread() || { label: 'Диалог', icon: 'chat' };
     const tour = st.tour.active ? tourBar() : '';
     const bar = '<div class="thread-bar"><span class="thread-label">' + I(t.icon) + t.label + '</span>' +
-      '<button class="btn sm ghost" data-act="newThread" style="margin-left:auto">' + I('plus') + 'Новый</button></div>';
+      '<button class="btn sm ghost" data-act="newThread" style="margin-left:auto">' + I('chat') + 'Выбрать диалог</button></div>';
     /* Разговор по обращению открывается вместе с самой записью: кто, каким каналом, когда,
        что именно написал и в каком состоянии обращение. Без этой карточки «Разобрать» отдавало
        пустое поле ввода — брокеру приходилось помнить, что он вообще открыл. */
@@ -3978,17 +3997,28 @@
     return '<div class="cg-shell">' + bar + tour + triage +
       '<div class="concierge cg-thread"><div class="chat" id="chat"></div>' + dockPrompt() + '</div></div>';
   }
-  // "Новый диалог" — pick the entity the conversation is about.
+  /* Кнопка в списке ведёт в тред сущности, а тред сущности переоткрывается: ensureThread
+     возвращает по тому же id тот же объект со всей перепиской. Без подписи «Написать»
+     читается как «начать заново» — и брокер ждёт чистого листа там, где его не будет. */
+  function threadReuseNote(what) {
+    return '<span class="thread-reuse">Откроется существующий диалог по ' + what + '</span>';
+  }
+  /* Окно выбора, а не создания: у сделки, объекта и обращения диалог уже есть, и
+     список открывает его вместе со всей перепиской. Завести пустой разговор — это
+     отдельное действие внизу, с собственным идентификатором. */
   function openNewThread() {
     const dealOpts = D().deals.map((d) => { const c = D().clients.find((x) => x.id === d.clientId) || {}; return '<button class="btn" data-newthread="deal:' + d.id + '" data-tlabel="' + escAttr(c.name || d.title) + ' · сделка" data-ticon="users" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('users') + (c.name || d.title) + ' · ' + stageLabel(d.stage) + '</button>'; }).join('');
     const objOpts = D().objects.map((o) => '<button class="btn" data-newthread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('building') + o.name + '</button>').join('');
     const leadOpts = '<button class="btn" data-newthread="lead:sarah" data-tlabel="Sarah Mansour · ночной лид" data-ticon="moon" style="justify-content:flex-start;width:100%;margin-bottom:6px">' + I('moon') + 'Sarah Mansour · ночной лид</button>' +
       '<button class="btn" data-newthread="general" data-tlabel="Общий" data-ticon="sparkle" style="justify-content:flex-start;width:100%">' + I('sparkle') + 'Общий диалог</button>';
-    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём разговор? Выберите сделку, заявку или контакт — разговор привяжется к ним и будет виден из карточки.</p>' +
+    const body = '<p style="font-size:12.5px;color:var(--mut);margin-top:0">О чём разговор? У каждой сделки, объекта и заявки диалог уже существует — выбор из списка открывает его со всей перепиской, а не заводит пустой.</p>' +
       '<div class="section-label">Сделки</div>' + dealOpts +
       '<div class="section-label" style="margin-top:10px">Объекты</div>' + objOpts +
-      '<div class="section-label" style="margin-top:10px">Лиды и общее</div>' + leadOpts;
-    openModal('Новый диалог', body, '<button class="btn" data-act="closeModal">Отмена</button>');
+      '<div class="section-label" style="margin-top:10px">Лиды и общее</div>' + leadOpts +
+      '<div class="section-label" style="margin-top:14px">Завести пустой</div>' +
+      '<button class="btn" data-act="newGeneralThread" style="justify-content:flex-start;width:100%">' + I('plus') + 'Новый общий диалог</button>' +
+      '<p style="font-size:11.5px;color:var(--mut);margin:6px 0 0">Чистая переписка без привязки к записи. Переписку по сделке или объекту это не трогает.</p>';
+    openModal('Выбрать диалог', body, '<button class="btn" data-act="closeModal">Отмена</button>');
   }
   function tourBar() {
     const st = S();
@@ -6796,9 +6826,14 @@
     const list = (items || []).filter(Boolean);
     if (!list.length) return '';
     const icons = mode === 'icons';
-    const lbl = (a) => icons ? ' title="' + escAttr(a[1]) + '" aria-label="' + escAttr(a[1]) + '"' : '';
+    /* Пятый элемент действия — подпись рядом с кнопкой: чем она обернётся, если её нажать.
+       В режиме значков слова прячет CSS, поэтому там подпись уходит туда же, куда и само
+       слово, — в подсказку и в имя для диктора. */
+    const full = (a) => a[1] + (a[4] ? ' · ' + a[4] : '');
+    const lbl = (a) => icons ? ' title="' + escAttr(full(a)) + '" aria-label="' + escAttr(full(a)) + '"' : '';
     const act = (a, cls) => '<button class="qa-act' + cls + '" ' + a[2] + lbl(a) + '>' +
-      I(a[0]) + '<span>' + a[1] + '</span></button>';
+      I(a[0]) + '<span>' + a[1] + '</span></button>' +
+      (a[4] ? '<span class="qa-note">' + a[4] + '</span>' : '');
     const open = '<div class="qa-bar' + (icons ? ' qa-icons' : '') + '" role="group" aria-label="Действия">';
     const primary = list.filter((a) => a[3] === 'primary');
     const secondary = list.filter((a) => a[3] === 'secondary');
@@ -7078,7 +7113,8 @@
       '<span class="dcli-ch">' + I(chanMeta(ch)[0]) + '<span>' + (vals[ch] || '—') + '</span></span>').join('') + '</div>';
     const acts = '<div class="dcli-acts">' +
       '<button class="btn sm primary" data-act="callClient" data-cid="' + c.id + '">' + I('phone') + 'Позвонить</button>' +
-      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button></div>';
+      '<button class="btn sm" data-thread="' + (threadId || ('deal:' + d.id)) + '" data-tlabel="' + escAttr(c.name) + '" data-ticon="users">' + I('whatsapp') + 'Написать</button>' +
+      threadReuseNote('сделке') + '</div>';
     return dxSec('users', 'Клиент · связь', '', head + chans + acts);
   }
   // ---- Shared "now" cards (deal + request use the SAME treatment so related process cards don't
@@ -7988,7 +8024,7 @@
          документ собирался только от входящего письма, а заявка без письма оставалась без пути. */
       ['layers', 'Собрать оффер клиенту', 'data-act="reqOffer" data-req="' + r.id + '"', 'primary'],
       reqSelectedFree(r).length ? ['briefcase', 'Создать сделку', 'data-act="reqCreateDeal" data-req="' + r.id + '"', ''] : null,
-      c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', ''] : null,
+      c.id ? ['chat', 'Написать клиенту', 'data-thread="request:' + r.id + '" data-tlabel="' + escAttr(r.title) + '" data-ticon="mail"', '', 'откроется существующий диалог по заявке'] : null,
       ['pencil', 'Изменить запрос', 'data-act="editRequest" data-req="' + r.id + '"', ''],
       c.id ? ['users', 'Открыть контакт', 'data-client="' + c.id + '"', ''] : null,
     ];
@@ -9366,6 +9402,7 @@
                 : '<button class="btn sm" data-shortlist="' + o.id + '">' + I('star') + 'В подборку</button>') +
           '<button class="btn sm" data-obj="' + o.id + '">' + I('doc') + 'Документы</button>' +
           '<button class="btn sm" data-thread="object:' + o.id + '" data-tlabel="' + o.name + ' · объект" data-ticon="building">' + I('chat') + 'Чат по объекту</button>' +
+          threadReuseNote('объекту') +
         '</div>' +
       '</div>' +
       '<div class="obj-row__media obj-photo gen" style="' + photoStyle(o) + '">' + photo +

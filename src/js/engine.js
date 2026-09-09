@@ -439,13 +439,35 @@
     bindThread(threadId, label, icon);
     WS.router.go('concierge');
   }
+  /* Единственный способ завести НОВЫЙ разговор — и он не принимает идентификатора.
+     «Новый диалог» до сих пор открывал существующий: ensureThread возвращает тот же
+     объект по тому же id, а пункт «Общий диалог» вёл на постоянный `general` с посевом.
+     Раз имя сущности сюда не передаётся, очистить переписку по сделке под видом
+     нового диалога нечем — она часть истории записи, а не черновик поля ввода. */
+  function newGeneralThread() {
+    // Номер — продолжающаяся последовательность, а не счёт существующих тредов.
+    // Счёт возвращает уже занятый номер, как только набор убывает, а убыль достижима
+    // через загрузку снимка: importThreads отбрасывает треды неверной формы. Номер
+    // виден в подписи «Общий диалог · N», поэтому дубль номера — дубль имени в списке.
+    const n = Object.keys(engine.threads).reduce((max, k) => {
+      if (k.indexOf('general:') !== 0) return max;
+      const seq = parseInt(k.slice(k.lastIndexOf('-') + 1), 10);
+      return seq > max ? seq : max;
+    }, 0) + 1;
+    const t = bindThread('general:' + Date.now().toString(36) + '-' + n, 'Общий диалог · ' + n, 'sparkle');
+    // Пустой тред виден в списке, только если заведён намеренно: ensureThread плодит
+    // пустышки на каждом переходе по data-thread, и панель диалогов ими не засоряется.
+    t.fresh = true;
+    WS.router.go('concierge');
+    return t;
+  }
   function closeThread() { engine.activeThreadId = null; engine.session = null; WS.storeApi.emit(); }
   // Abort a running scene's live session if it matches (used by resetScene).
   function endSessionForScene(id) { if (engine.session && engine.session.scenarioId === id) { engine.session = null; } }
   function threadList() {
-    return Object.keys(engine.threads).map((k) => engine.threads[k]).filter((t) => t.items.length)
+    return Object.keys(engine.threads).map((k) => engine.threads[k]).filter((t) => t.items.length || t.fresh)
       .map((t) => Object.assign({}, t, {
-        preview: stripHtml(t.items[t.items.length - 1].html).slice(0, 68),
+        preview: t.items.length ? stripHtml(t.items[t.items.length - 1].html).slice(0, 68) : '',
         unread: Math.max(0, t.items.length - (t.seen || 0)),
       }));
   }
@@ -1532,7 +1554,7 @@
        срабатывала ни разу с момента, как была написана. Её починили геттером от
        внутреннего флага, а затем задача про состояние хода сделала занятость
        потредовой. Литерал сюда не возвращать. */
-    openThread, bindThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
+    openThread, newGeneralThread, bindThread, closeThread, endSessionForScene, threadList, activeThread, markSeen, seedThreads,
     pushEvent, aiMsg, exportThreads, importThreads,
     pendingAction, setPendingAction, clearPendingAction,
     activeThreadId: () => engine.activeThreadId,

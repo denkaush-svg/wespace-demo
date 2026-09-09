@@ -4554,6 +4554,226 @@ setTimeout(async () => {
   }
 
   // ============================================================
+  //  Task 8 — «Новый диалог» promises a fresh conversation and instead reopens
+  //  a stable entity thread: `openNewThread()` (ui.js:3980-3990) lists deals,
+  //  objects and leads with `data-newthread`, and every one of them — including
+  //  the "Общий диалог" option, `data-newthread="general"` — routes through
+  //  `WS.engine.openThread` → `ensureThread(id)` (engine.js:69-72, 438-441),
+  //  which returns the SAME thread object if `id` already exists. `deal:d_anna`
+  //  and the plain `general` id are both seeded with history (engine.js SEED,
+  //  91-128), so picking them a second time hands back an old conversation
+  //  under a button that says "new". Nothing here ever produces an empty
+  //  thread, and nothing on screen says the thing about to open already exists.
+  // ============================================================
+  {
+    eng.closeThread();
+    WS.router.go('concierge');
+
+    // ---- the launcher no longer promises "new" for a picker that reopens threads ----
+    const railBtn = doc.querySelector('[data-act="newThread"]');
+    check('диалоги · кнопка запуска списка диалогов называется «Выбрать диалог», а не «Новый» (приёмка: переименовать кнопку)',
+      !!railBtn && /Выбрать диалог/.test(railBtn.textContent || ''),
+      railBtn ? 'текст кнопки: «' + railBtn.textContent.trim() + '»' : 'кнопка data-act="newThread" не найдена');
+
+    // ---- the picker: title matches the button, and it is honest about reuse ----
+    WS.ui.openNewThread();
+    let modalEl = doc.querySelector('#modal .modal');
+    let modalText = modalEl ? (modalEl.textContent || '') : '';
+    check('диалоги · окно выбора называется «Выбрать диалог», а не «Новый диалог»',
+      !!modalEl && /Выбрать диалог/.test(modalText) && !/Новый диалог/.test(modalText),
+      modalEl ? 'заголовок: «' + ((modalEl.querySelector('h3') || {}).textContent || '') + '»' : 'окно не открылось');
+    check('диалоги · окно честно говорит, что выбор из списка открывает СУЩЕСТВУЮЩИЙ диалог, а не заводит новый (приёмка: подписать в списках)',
+      /существ/i.test(modalText),
+      'слова «существ...» рядом со списком нет: ' + modalText.slice(0, 220));
+
+    // ---- a genuinely separate action: a brand new, empty, uniquely-identified thread ----
+    let newGeneralBtn = [].slice.call(doc.querySelectorAll('button'))
+      .find((b) => /Новый общий диалог/i.test(b.textContent || ''));
+    check('диалоги · есть отдельное действие «Новый общий диалог» (не то же самое, что переиспользуемый «Общий диалог»)',
+      !!newGeneralBtn, 'кнопка с текстом «Новый общий диалог» нигде на экране не найдена');
+
+    let firstGeneralId = null;
+    if (newGeneralBtn) {
+      newGeneralBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      firstGeneralId = WS.engine.activeThreadId();
+      check('диалоги · «Новый общий диалог» заводит тред с уникальным id вида general:<uuid>, а не общий «general»',
+        /^general:.+/.test(String(firstGeneralId)) && firstGeneralId !== 'general',
+        'activeThreadId=' + firstGeneralId);
+      const t1 = WS.engine.threadList().find((t) => t.id === firstGeneralId);
+      check('диалоги · «Новый общий диалог» открывает пустой тред (приёмка: дословно из плана)',
+        !!t1 && (t1.items || []).length === 0,
+        t1 ? 'items=' + t1.items.length : 'тред ' + firstGeneralId + ' не найден в threadList()');
+
+      // ---- and it must not, as a side effect, wipe an entity thread's own history ----
+      const annaBefore = (WS.engine.threadList().find((t) => t.id === 'deal:d_anna') || {}).items || [];
+      check('диалоги · setup: тред сделки Анны уже несёт историю из посева фикстур',
+        annaBefore.length > 0, 'items=' + annaBefore.length);
+
+      WS.ui.openNewThread();
+      const newGeneralBtn2 = [].slice.call(doc.querySelectorAll('button'))
+        .find((b) => /Новый общий диалог/i.test(b.textContent || ''));
+      if (newGeneralBtn2) newGeneralBtn2.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      const secondGeneralId = WS.engine.activeThreadId();
+      check('диалоги · повторное «Новый общий диалог» заводит ДРУГОЙ пустой тред, а не переоткрывает первый',
+        !!newGeneralBtn2 && secondGeneralId !== firstGeneralId && /^general:.+/.test(String(secondGeneralId)),
+        firstGeneralId + ' vs ' + secondGeneralId);
+      const annaAfter = (WS.engine.threadList().find((t) => t.id === 'deal:d_anna') || {}).items || [];
+      check('диалоги · тред сделки Анны нельзя очистить действием «новый диалог» (приёмка: переписка по сделке — часть истории записи)',
+        annaAfter.length === annaBefore.length && annaAfter.length > 0,
+        'до=' + annaBefore.length + ' после=' + annaAfter.length);
+
+      // ---- нумерация не должна держаться на том, что набор тредов не убывает ----
+      // Находка 1 шага 7: номер считался как КОЛИЧЕСТВО существующих general-тредов
+      // плюс один, поэтому убыль набора возвращала уже занятый номер. Убыль достижима
+      // не только удалением (его в приложении нет): importThreads отбрасывает треды
+      // неверной формы, то есть набор после загрузки снимка бывает меньше того, что
+      // уже пронумеровали. Номер виден пользователю в подписи «Общий диалог · N».
+      const snapshotBefore = WS.engine.exportThreads();
+      const shrunk = WS.engine.exportThreads();
+      const generalKeys = Object.keys(shrunk).filter((k) => k.indexOf('general:') === 0);
+      if (generalKeys.length >= 2) {
+        const droppedKey = generalKeys[0];
+        delete shrunk[droppedKey];
+        WS.engine.importThreads(shrunk);
+        const survivingLabels = Object.keys(WS.engine.exportThreads())
+          .filter((k) => k.indexOf('general:') === 0)
+          .map((k) => String((WS.engine.exportThreads()[k] || {}).label || ''));
+        WS.engine.newGeneralThread();
+        const grownId = WS.engine.activeThreadId();
+        const grownLabel = String((WS.engine.exportThreads()[grownId] || {}).label || '');
+        check('диалоги · после убыли набора новый общий диалог получает свободный номер, а не занятый (находка 7.1: номер считался количеством)',
+          !!grownLabel && survivingLabels.indexOf(grownLabel) === -1,
+          'выпал ' + droppedKey + '; уцелевшие подписи [' + survivingLabels.join(' | ') + ']; новая подпись «' + grownLabel + '»');
+      } else {
+        check('диалоги · после убыли набора новый общий диалог получает свободный номер, а не занятый (находка 7.1)',
+          false, 'сценарий не воспроизводим: general-тредов ' + generalKeys.length + ', нужно ≥2');
+      }
+      // Состояние возвращается на место: дальше по файлу идут проверки, которым
+      // нужен исходный набор тредов, а не остатки этого зонда.
+      WS.engine.importThreads(snapshotBefore);
+    } else {
+      check('диалоги · «Новый общий диалог» открывает пустой тред (приёмка: дословно из плана)',
+        false, 'кнопки «Новый общий диалог» нет — сценарий не воспроизводим');
+      check('диалоги · тред сделки Анны нельзя очистить действием «новый диалог»',
+        false, 'кнопки «Новый общий диалог» нет — сценарий не воспроизводим');
+    }
+
+    // ---- picking an entity from the (renamed) picker still returns ITS real history ----
+    WS.ui.openNewThread();
+    modalEl = doc.querySelector('#modal .modal');
+    const annaOpt = modalEl && [].slice.call(modalEl.querySelectorAll('[data-newthread]'))
+      .find((b) => /Анна/.test(b.textContent || ''));
+    check('диалоги · в списке сделок окна есть карточка сделки Анны (setup)',
+      !!annaOpt, modalEl ? 'опций data-newthread: ' + modalEl.querySelectorAll('[data-newthread]').length : 'окно не открылось');
+    if (annaOpt) {
+      annaOpt.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      const tid = WS.engine.activeThreadId();
+      check('диалоги · «Выбрать диалог → сделка Анны» открывает именно её тред (приёмка: дословно из плана)',
+        tid === 'deal:d_anna', 'activeThreadId=' + tid);
+      const th = WS.engine.threadList().find((t) => t.id === tid);
+      check('диалоги · и возвращает её настоящую историю, а не пустой лист (приёмка: дословно из плана)',
+        !!th && th.items.length > 0, th ? 'items=' + th.items.length : 'тред не найден');
+    }
+    WS.ui.closeModal();
+  }
+
+  // ============================================================
+  //  Task 8 — lists that hand a broker straight into an entity's thread never
+  //  say what is about to happen. "Написать" on a deal (ui.js:7079), "Чат по
+  //  объекту" on an object row (ui.js:9366) and "Написать клиенту" on a
+  //  request (ui.js:7989) all carry `data-thread="…"`, which — same as above —
+  //  reopens whatever thread already exists for that id. Nothing next to any
+  //  of these buttons says so.
+  // ============================================================
+  {
+    const dealWithClient = dd().deals.find((d) => d.clientId);
+    if (dealWithClient) {
+      WS.ui.dealCard(dealWithClient.id);
+      const writeBtn = doc.querySelector('[data-thread="deal:' + dealWithClient.id + '"]');
+      const scope = writeBtn ? (writeBtn.closest('.dcli-acts') || writeBtn.parentElement) : null;
+      check('карточка сделки · рядом с «Написать» сказано, что откроется существующий диалог, а не новый (приёмка: подписать в списках)',
+        !!scope && /существ/i.test(scope.textContent || ''),
+        scope ? scope.textContent : 'кнопка «Написать» (data-thread="deal:...") не найдена');
+    } else {
+      check('карточка сделки · есть сделка с привязанным клиентом, чтобы проверить подпись у «Написать»', false, 'сделок с clientId нет');
+    }
+
+    WS.router.go('objects');
+    const objBtn = doc.querySelector('.obj-row__acts [data-thread^="object:"]');
+    const objScope = objBtn ? (objBtn.closest('.obj-row__acts') || objBtn.parentElement) : null;
+    check('список объектов · рядом с «Чат по объекту» сказано про существующий диалог (приёмка: подписать в списках)',
+      !!objScope && /существ/i.test(objScope.textContent || ''),
+      objScope ? objScope.textContent.slice(0, 200) : 'кнопка «Чат по объекту» не найдена в списке объектов');
+
+    const reqWithClient = (dd().requests || []).find((r) => r.clientId);
+    if (reqWithClient) {
+      WS.ui.requestCard(reqWithClient.id);
+      const reqBtn = doc.querySelector('[data-thread="request:' + reqWithClient.id + '"]');
+      const reqScope = reqBtn ? (reqBtn.closest('.qa-bar') || reqBtn.parentElement) : null;
+      check('карточка заявки · рядом с «Написать клиенту» сказано про существующий диалог (приёмка: подписать в списках)',
+        !!reqScope && /существ/i.test(reqScope.textContent || ''),
+        reqScope ? reqScope.textContent.slice(0, 200) : 'кнопка «Написать клиенту» не найдена на карточке заявки');
+    } else {
+      check('карточка заявки · есть заявка с привязанным клиентом, чтобы проверить подпись у «Написать клиенту»', false, 'заявок с clientId нет');
+    }
+    WS.router.go('concierge');
+  }
+
+  // ============================================================
+  //  Task 8 — the three depths ("Быстро"/"Размышление"/"Глубоко", CG_DEPTH in
+  //  ui.js:3611-3614) explain themselves only through a `title` attribute
+  //  (ui.js:3667) — a tooltip that needs a mouse hover a touch screen cannot
+  //  produce and that a screen reader does not announce on focus. No
+  //  aria-pressed marks which one is active, no aria-describedby ties a button
+  //  to its own meaning, so "что значат эти три слова" has no answer without
+  //  a mouse sitting still over the right spot.
+  // ============================================================
+  {
+    const cgDepthWas = WS.store.cgDepth;
+    eng.openThread('probe:depthUI', 'Глубина · доступность', 'sparkle');
+    WS.router.go('concierge');
+    const composerText = () => { const c = doc.querySelector('.prompt.composer') || doc.querySelector('.composer'); return c ? (c.textContent || '') : ''; };
+
+    const cases = [
+      ['fast', /Быстро\s*[—-]\s*коротк[а-я]*\s*ответ,?\s*до\s*3\s*блок/i],
+      ['think', /Размышление\s*[—-]\s*разбор по существу,?\s*до\s*8\s*блок/i],
+      ['deep', /Глубоко\s*[—-]\s*полный разбор с оговорками,?\s*до\s*10\s*блок[а-я]*[\s\S]*доль/i],
+    ];
+    cases.forEach((c) => {
+      const k = c[0]; const re = c[1];
+      WS.store.cgDepth = k;
+      WS.router.go('concierge');
+      const txt = composerText();
+      check('глубина · описание активной глубины «' + k + '» видно как текст рядом с переключателем, а не только по наведению (приёмка: 390px без наведения)',
+        re.test(txt), txt ? txt.slice(0, 260) : 'композер не найден');
+    });
+
+    // ---- aria wiring on the three toggle buttons themselves ----
+    WS.store.cgDepth = 'think';
+    WS.router.go('concierge');
+    const btns = [].slice.call(doc.querySelectorAll('[data-cgdepth]'));
+    check('глубина · переключатель отрисован тремя кнопками data-cgdepth (setup)',
+      btns.length === 3, 'найдено кнопок: ' + btns.length);
+    if (btns.length === 3) {
+      btns.forEach((b) => {
+        const k = b.getAttribute('data-cgdepth');
+        const shouldBeOn = k === 'think';
+        check('глубина · aria-pressed кнопки «' + k + '» отражает, активна ли она (приёмка: aria-pressed кнопкам режимов)',
+          b.getAttribute('aria-pressed') === String(shouldBeOn),
+          'aria-pressed=' + b.getAttribute('aria-pressed') + ' (ожидали «' + shouldBeOn + '»)');
+        const describedId = b.getAttribute('aria-describedby');
+        const target = describedId ? doc.getElementById(describedId) : null;
+        check('глубина · кнопка «' + k + '» несёт aria-describedby на реально существующий элемент с описанием (приёмка: aria-describedby кнопкам режимов)',
+          !!target && (target.textContent || '').trim().length > 0,
+          describedId ? (target ? 'элемент есть: «' + (target.textContent || '').slice(0, 60) + '»' : 'id указан, элемента с таким id нет: ' + describedId) : 'атрибута aria-describedby нет');
+      });
+    }
+    WS.store.cgDepth = cgDepthWas;
+    eng.closeThread('probe:depthUI');
+    WS.router.go('concierge');
+  }
+
+  // ============================================================
   //  Language. The one parameter of a document nobody computed. The prompt
   //  bound the language of the CHAT reply and told the model of the file only
   //  that it goes to the client without them — recipient named, language not.
