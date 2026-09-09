@@ -190,6 +190,24 @@ def main():
         print(dirty[:400])
         return 2
 
+    # Проверка чистоты на СТАРТЕ не спасает: мешает работе не запуск, а тот,
+    # кто правит файлы в СЕРЕДИНЕ прогона. Именно так критик увидел живую
+    # мутацию, принял её за дефект, «починил» — и загрязнил весь прогон.
+    #
+    # Замок виден со стороны: любой, кто собрался трогать src/, может спросить
+    # файл tools/.mutation-lock и узнать, что дерево сейчас не в своём виде.
+    lock = os.path.join(ROOT, 'tools', '.mutation-lock')
+    if os.path.exists(lock):
+        try:
+            held = io.open(lock, encoding='utf-8').read().strip()
+        except Exception:
+            held = '?'
+        print(u'\u0417\u0430\u043c\u043e\u043a \u0437\u0430\u043d\u044f\u0442 \u2014 \u043f\u0440\u043e\u0433\u043e\u043d \u043e\u0442\u043c\u0435\u043d\u0451\u043d. \u0423\u0436\u0435 \u0438\u0434\u0451\u0442: ' + held)
+        print(u'\u0415\u0441\u043b\u0438 \u0442\u043e\u0442 \u043f\u0440\u043e\u0433\u043e\u043d \u0443\u043c\u0435\u0440 \u2014 \u0443\u0434\u0430\u043b\u0438\u0442\u0435 tools/.mutation-lock \u0438 \u043f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 git status.')
+        return 2
+    io.open(lock, 'w', encoding='utf-8').write(
+        base + u' \u00b7 ' + str(len(cands)) + u' \u043c\u0443\u0442\u0430\u0446\u0438\u0439 \u00b7 pid ' + str(os.getpid()))
+
     backup = tempfile.mkdtemp(prefix='automut_')
     files = sorted(set(c[0] for c in cands))
     for f in files:
@@ -201,6 +219,29 @@ def main():
         return 1
 
     survived, anchor_fail, caught = [], [], 0
+    current = [None]  # файл, в котором ПРЯМО СЕЙЧАС стоит мутация
+
+    def restore_all():
+        """Вернуть всё на место и снять замок — на ЛЮБОМ выходе."""
+        for f2 in files:
+            try:
+                shutil.copy(os.path.join(backup, f2), os.path.join(ROOT, f2))
+            except OSError:
+                pass
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+    import atexit
+    import signal
+    atexit.register(restore_all)
+    try:
+        signal.signal(signal.SIGTERM, lambda *_: (restore_all(), sys.exit(130)))
+        signal.signal(signal.SIGINT, lambda *_: (restore_all(), sys.exit(130)))
+    except (ValueError, AttributeError):
+        pass
+
     for i, (path, ln, text, desc, new) in enumerate(cands, 1):
         p = os.path.join(ROOT, path)
         src = io.open(p, encoding='utf-8').read()
@@ -227,6 +268,10 @@ def main():
     for f in files:
         shutil.copy(os.path.join(backup, f), os.path.join(ROOT, f))
     subprocess.run(['node', 'src/build.js'], cwd=ROOT, capture_output=True)
+    try:
+        os.remove(lock)
+    except OSError:
+        pass
 
     # Результат пишется В ФАЙЛ, а не только в вывод: при фоновом запуске
     # перехват обрезается до хвоста, и счёт пойманных теряется — ровно это
