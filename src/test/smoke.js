@@ -4614,6 +4614,36 @@ setTimeout(async () => {
       check('диалоги · тред сделки Анны нельзя очистить действием «новый диалог» (приёмка: переписка по сделке — часть истории записи)',
         annaAfter.length === annaBefore.length && annaAfter.length > 0,
         'до=' + annaBefore.length + ' после=' + annaAfter.length);
+
+      // ---- нумерация не должна держаться на том, что набор тредов не убывает ----
+      // Находка 1 шага 7: номер считался как КОЛИЧЕСТВО существующих general-тредов
+      // плюс один, поэтому убыль набора возвращала уже занятый номер. Убыль достижима
+      // не только удалением (его в приложении нет): importThreads отбрасывает треды
+      // неверной формы, то есть набор после загрузки снимка бывает меньше того, что
+      // уже пронумеровали. Номер виден пользователю в подписи «Общий диалог · N».
+      const snapshotBefore = WS.engine.exportThreads();
+      const shrunk = WS.engine.exportThreads();
+      const generalKeys = Object.keys(shrunk).filter((k) => k.indexOf('general:') === 0);
+      if (generalKeys.length >= 2) {
+        const droppedKey = generalKeys[0];
+        delete shrunk[droppedKey];
+        WS.engine.importThreads(shrunk);
+        const survivingLabels = Object.keys(WS.engine.exportThreads())
+          .filter((k) => k.indexOf('general:') === 0)
+          .map((k) => String((WS.engine.exportThreads()[k] || {}).label || ''));
+        WS.engine.newGeneralThread();
+        const grownId = WS.engine.activeThreadId();
+        const grownLabel = String((WS.engine.exportThreads()[grownId] || {}).label || '');
+        check('диалоги · после убыли набора новый общий диалог получает свободный номер, а не занятый (находка 7.1: номер считался количеством)',
+          !!grownLabel && survivingLabels.indexOf(grownLabel) === -1,
+          'выпал ' + droppedKey + '; уцелевшие подписи [' + survivingLabels.join(' | ') + ']; новая подпись «' + grownLabel + '»');
+      } else {
+        check('диалоги · после убыли набора новый общий диалог получает свободный номер, а не занятый (находка 7.1)',
+          false, 'сценарий не воспроизводим: general-тредов ' + generalKeys.length + ', нужно ≥2');
+      }
+      // Состояние возвращается на место: дальше по файлу идут проверки, которым
+      // нужен исходный набор тредов, а не остатки этого зонда.
+      WS.engine.importThreads(snapshotBefore);
     } else {
       check('диалоги · «Новый общий диалог» открывает пустой тред (приёмка: дословно из плана)',
         false, 'кнопки «Новый общий диалог» нет — сценарий не воспроизводим');
