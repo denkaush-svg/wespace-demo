@@ -10342,6 +10342,260 @@ setTimeout(async () => {
       /Карточка сделки/.test(onCard) && onCard.indexOf('не переспрашивая') > 0, onCard.slice(0, 160));
   }
 
+  /* ============================================================================================
+     Task 12 — проверка целостности данных (.takt/evidence/00-intent.md).
+     Сама проверка живёт отдельным модулем src/test/validate-data-graph.js — его пишет другая роль
+     на шаге 4. Здесь — приёмочные тесты на то, каким этот модуль обязан быть, плюс несколько
+     прямых проверок инвариантов, которые не нуждаются в модуле и бьют по реальным данным/UI уже
+     сейчас. Модуль ещё не существует: require ниже гарантированно падает, и каждая проверка,
+     завязанная на него, обязана падать по этой же причине — внятно, а не обвалом всего набора.
+     ============================================================================================ */
+  {
+    let validateDataGraph = null;
+    let vdgErr = null;
+    try {
+      // eslint-disable-next-line global-require
+      const mod = require('./validate-data-graph');
+      validateDataGraph = (typeof mod === 'function') ? mod
+        : (mod && typeof mod.validateDataGraph === 'function') ? mod.validateDataGraph : null;
+      if (!validateDataGraph) vdgErr = 'модуль найден, но не экспортирует функцию (typeof module.exports=' + typeof mod + ')';
+    } catch (e) {
+      vdgErr = (e && e.message) || String(e);
+    }
+
+    const cloneData = () => JSON.parse(JSON.stringify(dd()));
+    const issuesMention = (issues, needle) => Array.isArray(issues) && issues.some((it) => JSON.stringify(it).indexOf(needle) >= 0);
+    // Каждая vc() — ОДНА именованная проверка. Если модуля нет, имя красится в красный с точной
+    // причиной; если модуль есть, testFn выполняется по-настоящему и красит то же имя сама.
+    function vc(name, testFn) {
+      if (!validateDataGraph) { check(name, false, 'validate-data-graph.js недоступен: ' + vdgErr); return; }
+      try { testFn(); } catch (e) { check(name, false, 'исключение из validateDataGraph: ' + ((e && e.message) || e)); }
+    }
+
+    WS.storeApi.resetAll();
+
+    // ---- контракт модуля ----
+    vc('validate-data-graph · подключается отдельно от набора и экспортирует функцию', () => {
+      check('validate-data-graph · подключается отдельно от набора и экспортирует функцию',
+        typeof validateDataGraph === 'function', typeof validateDataGraph);
+    });
+    vc('validate-data-graph · возвращает массив на подъёме фикстур', () => {
+      const issues = validateDataGraph(dd());
+      check('validate-data-graph · возвращает массив на подъёме фикстур', Array.isArray(issues), 'typeof=' + typeof issues);
+    });
+
+    // ---- пункт 1: не останавливается на первом расхождении ----
+    vc('validate-data-graph · находит оба расхождения за один прогон, не только первое', () => {
+      const data = cloneData();
+      data.deals[0] = Object.assign({}, data.deals[0], { clientId: 'zzz_bad_client_1' });
+      data.requests[0] = Object.assign({}, data.requests[0], { assignee: 'zzz_bad_agent_2' });
+      const issues = validateDataGraph(data);
+      const gotBoth = issuesMention(issues, 'zzz_bad_client_1') && issuesMention(issues, 'zzz_bad_agent_2');
+      check('validate-data-graph · находит оба расхождения за один прогон, не только первое',
+        Array.isArray(issues) && issues.length >= 2 && gotBoth,
+        'issues.length=' + (issues && issues.length) + ' both=' + gotBoth);
+    });
+
+    // ---- пункт 2: пять направлений внешних ключей ----
+    vc('FK · сделка → клиент: битая ссылка находится', () => {
+      const data = cloneData();
+      const d = data.deals.find((x) => x.stage !== 'lost' && x.stage !== 'won');
+      d.clientId = 'zzz_no_such_client';
+      const issues = validateDataGraph(data);
+      check('FK · сделка → клиент: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_client') || issuesMention(issues, d.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · сделка → заявка: битая ссылка находится', () => {
+      const data = cloneData();
+      const d = data.deals.find((x) => x.requestId);
+      d.requestId = 'zzz_no_such_request';
+      const issues = validateDataGraph(data);
+      check('FK · сделка → заявка: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_request') || issuesMention(issues, d.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · сделка → ответственный: битая ссылка находится', () => {
+      const data = cloneData();
+      const d = data.deals.find((x) => x.agent);
+      d.agent = 'zzz_no_such_agent';
+      const issues = validateDataGraph(data);
+      check('FK · сделка → ответственный: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_agent') || issuesMention(issues, d.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · сделка → объект/лоты: битая ссылка находится', () => {
+      const data = cloneData();
+      const d1 = data.deals.find((x) => x.objectId);
+      d1.objectId = 'zzz_no_such_object';
+      const d2 = data.deals.find((x) => Array.isArray(x.lots) && x.lots.length);
+      if (d2) d2.lots = d2.lots.concat(['zzz_no_such_lot']);
+      const issues = validateDataGraph(data);
+      const gotObj = issuesMention(issues, 'zzz_no_such_object') || issuesMention(issues, d1.id);
+      const gotLot = !d2 || issuesMention(issues, 'zzz_no_such_lot') || issuesMention(issues, d2.id);
+      check('FK · сделка → объект/лоты: битая ссылка находится',
+        gotObj && gotLot, 'objectId=' + gotObj + ' lots=' + gotLot);
+    });
+    vc('FK · заявка → клиент: битая ссылка находится', () => {
+      const data = cloneData();
+      const r = data.requests[0];
+      r.clientId = 'zzz_no_such_client';
+      const issues = validateDataGraph(data);
+      check('FK · заявка → клиент: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_client') || issuesMention(issues, r.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · заявка → исполнитель: битая ссылка находится', () => {
+      const data = cloneData();
+      const r = data.requests.find((x) => x.assignee);
+      r.assignee = 'zzz_no_such_assignee';
+      const issues = validateDataGraph(data);
+      check('FK · заявка → исполнитель: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_assignee') || issuesMention(issues, r.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · заявка → предложенные объекты: битая ссылка находится', () => {
+      const data = cloneData();
+      const r = data.requests.find((x) => Array.isArray(x.offered) && x.offered.length);
+      r.offered = r.offered.concat([{ id: 'zzz_no_such_offered', state: 'offered' }]);
+      const issues = validateDataGraph(data);
+      check('FK · заявка → предложенные объекты: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_offered') || issuesMention(issues, r.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · заявка → объекты КП: битая ссылка находится', () => {
+      const data = cloneData();
+      const r = data.requests.find((x) => x.kp && x.kp.formed && Array.isArray(x.kp.objectIds));
+      r.kp = Object.assign({}, r.kp, { objectIds: r.kp.objectIds.concat(['zzz_no_such_kp_object']) });
+      const issues = validateDataGraph(data);
+      check('FK · заявка → объекты КП: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_kp_object') || issuesMention(issues, r.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · событие → клиент/заявка/сделка/объект/исполнитель: битая ссылка находится', () => {
+      const data = cloneData();
+      const e1 = Object.assign({}, data.events[0], { clientId: 'zzz_no_such_client' });
+      data.events = data.events.slice(1).concat([e1]);
+      const issues = validateDataGraph(data);
+      check('FK · событие → клиент/заявка/сделка/объект/исполнитель: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_client') || issuesMention(issues, e1.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · согласование → исходная сущность (сделка/заявка): битая ссылка находится', () => {
+      const data = cloneData();
+      const a = data.approvals.find((x) => x.dealId) || data.approvals[0];
+      a.dealId = a.dealId ? 'zzz_no_such_deal' : a.dealId;
+      if (!a.dealId) a.requestId = 'zzz_no_such_request';
+      const issues = validateDataGraph(data);
+      check('FK · согласование → исходная сущность (сделка/заявка): битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_deal') || issuesMention(issues, 'zzz_no_such_request') || issuesMention(issues, a.id),
+        JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · согласование → инициатор: битая ссылка находится', () => {
+      const data = cloneData();
+      const a = data.approvals.find((x) => x.who);
+      a.who = 'zzz_no_such_initiator';
+      const issues = validateDataGraph(data);
+      check('FK · согласование → инициатор: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_initiator') || issuesMention(issues, a.id), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('FK · задача → клиент/заявка/сделка: битая ссылка находится', () => {
+      const data = cloneData();
+      const t1 = Object.assign({}, data.tasks[0], { clientId: 'zzz_no_such_client' });
+      data.tasks = data.tasks.slice(1).concat([t1]);
+      const issues = validateDataGraph(data);
+      check('FK · задача → клиент/заявка/сделка: битая ссылка находится',
+        issuesMention(issues, 'zzz_no_such_client') || issuesMention(issues, t1.id), JSON.stringify(issues).slice(0, 200));
+    });
+
+    // ---- пункт 3: рабочие инварианты, завязанные на модуль ----
+    // Известный заранее кандидат (00-intent.md, «Известное заранее»): r_viktor_rent — funnel
+    // 'rent' (физическая услуга, конкретный офис), kp.formed===true, objectIds=[]. Пустой набор
+    // документирован текстом заметки («свободных офисов в DIFC в инвентаре нет»), но нет явного
+    // маркера-исключения в самих данных. Тест принимает ЛЮБОЕ из двух честных решений реализации:
+    // либо валидатор репортит это как расхождение, либо фикстура получила явный маркер-исключение.
+    vc('инвариант · kp.formed=true с пустым objectIds на физической услуге объяснено или найдено', () => {
+      WS.storeApi.resetAll();
+      const issues = validateDataGraph(dd());
+      const r = (dd().requests || []).find((x) => x.id === 'r_viktor_rent');
+      const explained = !!(r && r.kp && (r.kp.emptyReason || r.kp.exception || r.kp.nonPhysical));
+      const flagged = issuesMention(issues, 'r_viktor_rent');
+      check('инвариант · kp.formed=true с пустым objectIds на физической услуге объяснено или найдено',
+        !!r && r.funnel === 'rent' && (r.kp.objectIds || []).length === 0 && (explained || flagged),
+        'explained=' + explained + ' flagged=' + flagged);
+    });
+  }
+
+  // ---- Task 12: прямые проверки инвариантов — не нуждаются в validate-data-graph.js, бьют по
+  // реальным данным и реальному UI уже сейчас. Каждая зелёная несёт мутацию тут же, в блоке. ----
+  {
+    WS.storeApi.resetAll();
+
+    // «У активной сделки есть ответственный» (пункт 3).
+    const activeDeals = () => (dd().deals || []).filter((d) => d.stage !== 'won' && d.stage !== 'lost');
+    const missing0 = activeDeals().filter((d) => !d.agent);
+    check('инвариант · у каждой активной сделки есть ответственный', missing0.length === 0, missing0.map((d) => d.id).join(', '));
+    {
+      const probe = activeDeals()[0];
+      const saved = probe.agent;
+      probe.agent = null;
+      const missing1 = activeDeals().filter((d) => !d.agent);
+      check('инвариант · та же проверка ловит сделку без ответственного (мутация)',
+        missing1.length === 1 && missing1[0].id === probe.id, missing1.map((d) => d.id).join(', '));
+      probe.agent = saved;
+      const missing2 = activeDeals().filter((d) => !d.agent);
+      check('инвариант · после восстановления ответственного снова чисто', missing2.length === 0, missing2.map((d) => d.id).join(', '));
+    }
+
+    // «Показ имеет when, objectId, clientId, status» (пункт 3) — на реально созданном показе,
+    // а не на фикстуре: createDealShow — тот же путь, что использует брокер.
+    {
+      WS.storeApi.resetAll();
+      WS.ui.openDealShowForm('d_anna');
+      WS.ui.createDealShow('d_anna');
+      const ev = (dd().events || []).slice(-1)[0];
+      const hasAll = !!ev && !!ev.when && !!ev.objectId && !!ev.clientId && !!ev.status;
+      check('инвариант · созданный показ несёт when/objectId/clientId/status', hasAll, JSON.stringify(ev));
+      if (ev) {
+        const saved = ev.status;
+        ev.status = undefined;
+        const stillHasAll = !!ev.when && !!ev.objectId && !!ev.clientId && !!ev.status;
+        check('инвариант · та же проверка ловит показ без status (мутация)', stillHasAll === false, 'stillHasAll=' + stillHasAll);
+        ev.status = saved;
+      }
+      WS.storeApi.resetAll();
+    }
+
+    // Пункт 6 — исторический конфликт не должен молча пропадать, когда заявка прорастает в сделку.
+    // conflicts хранится по r_karim (заявка); d_karim_cross — сделка, выросшая из r_karim. Блок
+    // расхождения в ui.js читается на карточке заявки (conflictBlock(r), правильный ключ) и
+    // ОТДЕЛЬНО на карточке сделки (conflictBlock(d) — ключ по d.id, которого в conflicts нет).
+    {
+      WS.storeApi.resetAll();
+      const cf = (dd().conflicts || {})['r_karim'];
+      WS.ui.dealCard('d_karim_cross');
+      WS.ui.setEntityTab('deal', 'd_karim_cross', 'params');
+      const html = doc.getElementById('app').innerHTML + (doc.getElementById('modal') ? doc.getElementById('modal').innerHTML : '');
+      check('целостность · исторический конфликт заявки виден и на выросшей из неё сделке, не пропадает молча',
+        !!cf && html.indexOf(cf.a) >= 0 && html.indexOf(cf.b) >= 0,
+        'conflict=' + JSON.stringify(cf) + ' a_видно=' + (!!cf && html.indexOf(cf.a) >= 0) + ' b_видно=' + (!!cf && html.indexOf(cf.b) >= 0));
+      WS.storeApi.resetAll();
+    }
+
+    // Пункт 4 — пользовательские подписи не содержат сырых id / значений перечислений. Смотрим
+    // только textContent (видимый текст), не innerHTML — data-атрибуты с внутренними id законны.
+    {
+      WS.storeApi.resetAll();
+      const IDLIKE = /\b(?:c|d|r|o|u|co|k|ap|in|e|t|m)_[a-z][a-z0-9_]{2,}\b/;
+      const ENUMLIKE = /\b(?:selected|rejected|offered|formed|confirmed|pending|planned)\b/;
+      const scan = (label) => {
+        const div = win.document.createElement('div');
+        div.innerHTML = doc.getElementById('app').innerHTML;
+        const text = div.textContent || '';
+        const idHit = IDLIKE.exec(text);
+        const enumHit = ENUMLIKE.exec(text);
+        check('подписи · ' + label + ' без сырых идентификаторов', !idHit, idHit ? idHit[0] : '');
+        check('подписи · ' + label + ' без сырых значений перечисления', !enumHit, enumHit ? enumHit[0] : '');
+      };
+      WS.ui.dealCard('d_anna'); scan('карточка сделки d_anna');
+      WS.ui.requestCard('r_anna'); scan('карточка заявки r_anna');
+      WS.ui.clientCard('c_anna'); scan('карточка клиента c_anna');
+      WS.storeApi.resetAll();
+    }
+  }
+
   /* ---- Стенд начинается с Консьержа, и «Сброс» возвращает туда же ----
      Ловушка в названиях: идентификатор экрана Пульса — `start`, и он читается как
      «стартовый», хотя стартовый экран у нас Консьерж. На этом уже поймались: «Сброс»

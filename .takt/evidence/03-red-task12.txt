@@ -1,0 +1,55 @@
+$ node src/test/smoke.js
+checks: 2131  passed: 2114  FAILED: 17
+
+--- failures ---
+  ✗ validate-data-graph · подключается отдельно от набора и экспортирует функцию  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ validate-data-graph · возвращает массив на подъёме фикстур  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ validate-data-graph · находит оба расхождения за один прогон, не только первое  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · сделка → клиент: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · сделка → заявка: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · сделка → ответственный: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · сделка → объект/лоты: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · заявка → клиент: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · заявка → исполнитель: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · заявка → предложенные объекты: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · заявка → объекты КП: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · событие → клиент/заявка/сделка/объект/исполнитель: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · согласование → исходная сущность (сделка/заявка): битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · согласование → инициатор: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ FK · задача → клиент/заявка/сделка: битая ссылка находится  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ инвариант · kp.formed=true с пустым objectIds на физической услуге объяснено или найдено  [validate-data-graph.js недоступен: Cannot find module './validate-data-graph'
+Require stack:
+- C:\Users\Lenovo\Documents\wespace-demo\.worktrees\takt-task12\src\test\smoke.js]
+  ✗ целостность · исторический конфликт заявки виден и на выросшей из неё сделке, не пропадает молча  [conflict={"field":"Бюджет","a":"≈ 2,0 млн (первое сообщение)","b":"до 2,6 млн (уточнение)","av":2000000,"bv":2600000,"chosen":"b","note":"Взято последнее уточнение; исходное значение сохранено."} a_видно=false b_видно=false]
+
+[node process exit code: 1 — captured separately, see report; the "[exited with code 0]" in the raw background-tool notification reflected the exit code of `tail`, not of `node`, because the first capture command was piped through `tail`]
