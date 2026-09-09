@@ -10516,6 +10516,51 @@ setTimeout(async () => {
         !!r && r.funnel === 'rent' && (r.kp.objectIds || []).length === 0 && (explained || flagged),
         'explained=' + explained + ' flagged=' + flagged);
     });
+
+    /* ---- сторожа шага 9 под находки 3 и 4 кросс-модельного ревью (.takt/evidence/07-review-task12.md) ----
+       Находка 3: битая коллекция роняла прогон исключением вместо списка находок.
+       Находка 4, тяжёлая: отсутствующая или неразобранная коллекция давала ПУСТОЙ список, то есть
+       «разрывов нет» было неотличимо от «проверить не удалось», а числовая ссылка молча попадала
+       в строковый идентификатор. Проверки ниже держат оба свойства: неразобранный вход обязан
+       называться, а пустой ответ — значить чистый граф и только это. */
+    vc('целостность · объект вместо коллекции даёт список находок, а не исключение', () => {
+      const issues = validateDataGraph({ clients: {} });
+      check('целостность · объект вместо коллекции даёт список находок, а не исключение',
+        Array.isArray(issues) && issues.length > 0 && issuesMention(issues, 'структура'),
+        JSON.stringify(issues).slice(0, 200));
+    });
+    vc('целостность · пустая запись внутри коллекции даёт находку, а не исключение', () => {
+      const issues = validateDataGraph({ deals: [null] });
+      check('целостность · пустая запись внутри коллекции даёт находку, а не исключение',
+        Array.isArray(issues) && issuesMention(issues, 'deals[0]'), JSON.stringify(issues).slice(0, 200));
+    });
+    vc('целостность · неразобранный вход отвечает «проверить не удалось», а не «разрывов нет»', () => {
+      const empty = validateDataGraph({});
+      const partial = validateDataGraph({ analytics: {} });
+      const nulls = validateDataGraph({ clients: [null] });
+      check('целостность · неразобранный вход отвечает «проверить не удалось», а не «разрывов нет»',
+        Array.isArray(empty) && empty.length > 0
+        && Array.isArray(partial) && partial.length > 0
+        && Array.isArray(nulls) && nulls.length > 0,
+        'пустой=' + (empty && empty.length) + ' частичный=' + (partial && partial.length) + ' с null=' + (nulls && nulls.length));
+    });
+    vc('целостность · числовая ссылка не проходит по строковому идентификатору', () => {
+      const data = cloneData();
+      const r = data.requests[0];
+      r.clientId = 123;
+      data.clients = data.clients.concat([{ id: '123', name: 'Зонд' }]);
+      const issues = validateDataGraph(data);
+      check('целостность · числовая ссылка не проходит по строковому идентификатору',
+        issuesMention(issues, '"ссылка":123'), JSON.stringify(issues).slice(0, 300));
+    });
+    // Обратная сторона того же сторожа: пустой ответ обязан оставаться достижимым на настоящих
+    // данных, иначе «проверить не удалось» просто заменило бы собой всякий ответ.
+    vc('целостность · на настоящих фикстурах список находок пуст', () => {
+      WS.storeApi.resetAll();
+      const issues = validateDataGraph(dd());
+      check('целостность · на настоящих фикстурах список находок пуст',
+        Array.isArray(issues) && issues.length === 0, JSON.stringify(issues).slice(0, 300));
+    });
   }
 
   // ---- Task 12: прямые проверки инвариантов — не нуждаются в validate-data-graph.js, бьют по
@@ -10571,6 +10616,72 @@ setTimeout(async () => {
       check('целостность · исторический конфликт заявки виден и на выросшей из неё сделке, не пропадает молча',
         !!cf && html.indexOf(cf.a) >= 0 && html.indexOf(cf.b) >= 0,
         'conflict=' + JSON.stringify(cf) + ' a_видно=' + (!!cf && html.indexOf(cf.a) >= 0) + ' b_видно=' + (!!cf && html.indexOf(cf.b) >= 0));
+      WS.storeApi.resetAll();
+    }
+
+    /* ---- сторожа шага 9 под находки 1 и 2 кросс-модельного ревью (.takt/evidence/07-review-task12.md) ----
+       Расхождение на сделке ищется среди заявок того же клиента. Три свойства этого поиска никем
+       не держались: собственное основание сделки должно побеждать порядок записей в массиве,
+       закрытая заявка не должна отдавать расхождение как действующее, и подпись не должна
+       утверждать про сегодняшний день больше, чем проверено.
+       Разметка карточки сделки собирается на вкладке «Параметры» — тот же путь, что у соседней
+       проверки выше. */
+    const dealHtml = (id) => {
+      WS.ui.dealCard(id);
+      WS.ui.setEntityTab('deal', id, 'params');
+      return doc.getElementById('app').innerHTML + (doc.getElementById('modal') ? doc.getElementById('modal').innerHTML : '');
+    };
+
+    // Находка 1. У c_partner четыре заявки; r_karim стоит в массиве РАНЬШЕ, чем r_karim_cross —
+    // собственное основание сделки d_karim_cross. Оба несут расхождение: побеждать обязано своё.
+    {
+      WS.storeApi.resetAll();
+      const data = dd();
+      const deal = (data.deals || []).find((x) => x.id === 'd_karim_cross');
+      const iOwn = (data.requests || []).findIndex((x) => x.id === 'r_karim_cross');
+      const iOther = (data.requests || []).findIndex((x) => x.id === 'r_karim');
+      data.conflicts['r_karim_cross'] = { field: 'Бюджет', a: 'ЗОНД-ОСНОВАНИЕ-A', b: 'ЗОНД-ОСНОВАНИЕ-B',
+        chosen: null, at: '25 апреля', note: 'Расхождение собственного основания сделки.' };
+      const other = (data.conflicts || {})['r_karim'];
+      const html = dealHtml('d_karim_cross');
+      check('расхождение · на сделке побеждает её собственное основание, а не порядок заявок в массиве',
+        !!deal && deal.requestId === 'r_karim_cross' && iOther >= 0 && iOther < iOwn
+        && html.indexOf('ЗОНД-ОСНОВАНИЕ-A') >= 0 && html.indexOf(other.a) < 0,
+        'основание=' + (deal && deal.requestId) + ' порядок: чужая=' + iOther + ' своя=' + iOwn
+        + ' своё_видно=' + (html.indexOf('ЗОНД-ОСНОВАНИЕ-A') >= 0) + ' чужое_видно=' + (html.indexOf(other.a) >= 0));
+      WS.storeApi.resetAll();
+    }
+
+    // Находка 2. Заявка клиента закрыта — её расхождение остаётся историей этой заявки и не
+    // переносится на новую сделку как действующее.
+    {
+      WS.storeApi.resetAll();
+      const data = dd();
+      const cf2 = (data.conflicts || {})['r_karim'];
+      const before = dealHtml('d_karim_cross');
+      const виднаДо = !!cf2 && before.indexOf(cf2.a) >= 0;
+      const r = (data.requests || []).find((x) => x.id === 'r_karim');
+      r.leadStatus = 'Закрыта';
+      r.closedAt = '15 мая';
+      const after = dealHtml('d_karim_cross');
+      check('расхождение · закрытая заявка клиента не выдаётся за действующее расхождение новой сделки',
+        виднаДо && after.indexOf(cf2.a) < 0 && after.indexOf(cf2.b) < 0,
+        'видно_до_закрытия=' + виднаДо + ' видно_после=' + (after.indexOf(cf2.a) >= 0 || after.indexOf(cf2.b) >= 0));
+      WS.storeApi.resetAll();
+    }
+
+    // Находка 2, вторая половина: подпись «расхождение до сих пор не снято» — утверждение о
+    // сегодняшнем дне. На r_karim значение уже выбрано (chosen='b'), то есть утверждение было
+    // просто неверным на настоящих данных стенда.
+    {
+      WS.storeApi.resetAll();
+      const cf3 = (dd().conflicts || {})['r_karim'];
+      const html = dealHtml('d_karim_cross');
+      check('расхождение · подпись не утверждает «не снято» там, где значение уже выбрано',
+        !!cf3 && (cf3.chosen === 'a' || cf3.chosen === 'b')
+        && html.indexOf(cf3.a) >= 0 && html.indexOf('до сих пор не снято') < 0,
+        'chosen=' + (cf3 && cf3.chosen) + ' карточка_видна=' + (!!cf3 && html.indexOf(cf3.a) >= 0)
+        + ' утверждение_есть=' + (html.indexOf('до сих пор не снято') >= 0));
       WS.storeApi.resetAll();
     }
 
