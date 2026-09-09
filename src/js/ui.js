@@ -6235,13 +6235,30 @@
       dealField('Агент-партнёр', d.partnerAgent ? agentName(d.partnerAgent) : '—', 'confirmed') +
       dealField('Рассматриваемые проекты', (d.consideredProjects || []).join(', ') || '—', 'confirmed');
   }
+  /* Расхождение записывается на той записи, которая полем владеет: бюджет называет клиент, и
+     запись висит на заявке. Работа при этом продолжается в СДЕЛКЕ, выросшей из этой заявки, —
+     а ключ по рисуемой записи прятал расхождение ровно там, где оно теперь и нужно: на карточке
+     заявки оно было видно, на сделке исчезало молча. Ищем сначала своё, потом — записанное на
+     заявке того же клиента, и обязательно говорим, откуда и от какого числа оно взято: иначе
+     карточка сделки выдаёт незакрытую историю за сегодняшний факт. */
+  function conflictSource(e) {
+    const cs = D().conflicts || {};
+    if (cs[e.id]) return { cf: cs[e.id], id: e.id, own: true };
+    if (!(D().deals || []).some((x) => x.id === e.id)) return null;
+    const r = (D().requests || []).find((x) => cs[x.id] && (x.id === e.requestId || x.clientId === e.clientId));
+    return r ? { cf: cs[r.id], id: r.id, own: false } : null;
+  }
   function conflictBlock(d) {
-    const cf = (D().conflicts || {})[d.id];
-    if (!cf) return '';
-    const opt = (key, val) => '<button class="cc-opt' + (cf.chosen === key ? ' on' : '') + '" data-conflict="' + d.id + ':' + key + '">' + val + (cf.chosen === key ? ' ' + I('check') : '') + '</button>';
+    const src = conflictSource(d);
+    if (!src) return '';
+    const cf = src.cf;
+    // Кнопка выбора пишет решение в ту запись, которая расхождением владеет, — иначе на сделке
+    // она бы искала расхождение под чужим ключом и не делала ничего.
+    const opt = (key, val) => '<button class="cc-opt' + (cf.chosen === key ? ' on' : '') + '" data-conflict="' + src.id + ':' + key + '">' + val + (cf.chosen === key ? ' ' + I('check') : '') + '</button>';
+    const from = src.own ? '' : ' Записано на заявке клиента' + (cf.at ? ', ' + cf.at : '') + ' — расхождение до сих пор не снято.';
     return '<div class="conflict-card"><div class="cc-h">' + I('warn') + 'Расхождение · ' + cf.field + '</div>' +
       '<div class="cc-opts">' + opt('a', cf.a) + '<span class="cc-vs">против</span>' + opt('b', cf.b) + '</div>' +
-      '<div class="cc-note">' + cf.note + ' Замена видна — оба значения сохранены.</div></div>';
+      '<div class="cc-note">' + cf.note + ' Замена видна — оба значения сохранены.' + from + '</div></div>';
   }
   function handoffBlock(d) {
     if (!d.partnerAgent) return '';
