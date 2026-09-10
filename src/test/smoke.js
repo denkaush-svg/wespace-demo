@@ -9393,6 +9393,129 @@ setTimeout(async () => {
 
   const appEl2 = () => doc.getElementById('app');
 
+  /* ---- Что назвал неизмеренным чистый мутационный прогон ----
+
+     По диффу с d087a5c поймано было 49% — против 21 из 21 на списке, который я
+     составлял сам. Разница и есть цена экзамена из своих же вопросов.
+
+     Два самых дорогих пробела закрываются здесь. */
+  {
+    WS.storeApi.resetAll();
+
+    /* 1. ENTER — основной способ отправки в стенде, и он не был измерен ни на
+       одной из четырёх строк ввода: можно было сломать любой обработчик целиком,
+       и весь набор оставался зелёным. Брокер набирает и жмёт Enter — это весь его ввод. */
+    /* Наблюдается РЕЗУЛЬТАТ, а не вызов подменённой функции: обработчики зовут
+       замкнутую в модуле routePrompt, и подмена WS.router.routePrompt её не перехватывает.
+       Зато promptValue() чистит поле — пустое поле и есть доказательство, что ввод взяли в работу.
+
+       Перед этим снимается зависший ход: send() справедливо отказывает, пока идёт
+       запрос, и в наборе от прежней проверки оставался ход в состоянии «готовится». */
+    if (WS.engine.cancelTurn) {
+      Object.keys((WS.engine.exportThreads && WS.engine.exportThreads()) || {})
+        .forEach((tid) => { try { WS.engine.cancelTurn(tid); } catch (e) { /* нечего отменять */ } });
+    }
+    check('ввод · перед проверкой нет идущего запроса',
+      !WS.engine.inFlight, 'inFlight=' + WS.engine.inFlight);
+
+    /* Два разных наблюдения, и их нельзя смешивать.
+
+       Первое: обработчик вообще привязан к этому полю — видно по defaultPrevented.
+       Второе: ввод действительно взят в работу — видно по тому, что поле очищено.
+       У cardPrompt второго нет: он читает ввод своим способом, не через promptValue.
+
+       И перед каждым снимается ход: после первого Enter запрос уже идёт, и send()
+       справедливо отказывает остальным — это работающая защита от двойной отправки,
+       а не дефект ввода. Проверять надо каждый путь на чистом состоянии. */
+    /* threadBusy() смотрит на АКТИВНЫЙ тред, а не на все подряд, поэтому
+       перебор тредов его не снимал. У движка есть свой сеттер — он и знает, что гасить. */
+    const clearAllTurns = () => {
+      try { WS.engine.inFlight = false; } catch (e) { /* нечего гасить */ }
+    };
+
+    const said = [];
+    const origToastIn = WS.storeApi.toast;
+    WS.storeApi.toast = (m) => { said.push(String(m)); };
+
+    [['startPrompt', true], ['cgPrompt', true], ['cgDockPrompt', true], ['cardPrompt', false]]
+      .forEach(([id, clears]) => {
+        clearAllTurns();
+        said.length = 0;
+        /* Если такое поле УЖЕ есть на экране — берём его, а не кладём второе
+           рядом. Иначе getElementById внутри обработчика найдёт ПЕРВОЕ — то, что рисует
+           стенд, — и очистит его, а моя проба останется нетронутой. Проверка тогда
+           меряет не тот элемент, на который смотрит. */
+        const existing = doc.getElementById(id);
+        const el = existing || doc.createElement('textarea');
+        if (!existing) { el.id = id; doc.body.appendChild(el); }
+        el.value = 'проба ввода';
+        const ev = new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        el.dispatchEvent(ev);
+        check('ввод · Enter в «' + id + '» перехвачен, а не ушёл в перевод строки',
+          ev.defaultPrevented, 'prevented=' + ev.defaultPrevented);
+        if (clears) {
+          /* Запрос от предыдущего Enter стартует асинхронно — уже после того, как
+             я сбросил состояние. Поэтому требование формулируется так, как оно звучит для брокера:
+             нажатие обязано ИЛИ взять ввод, ИЛИ сказать, почему нет. Молчаливое ничего —
+             единственный недопустимый исход, и именно его здесь и ловим. */
+          const taken = el.value === '';
+          const refused = said.some((m) => /дождитесь|отмените|идёт|занят/i.test(m));
+          check('ввод · «' + id + '» — либо ввод взят, либо сказано почему нет',
+            taken || refused,
+            'поле="' + el.value + '" · сказано: ' + (said.join(' | ') || 'МОЛЧА'));
+        }
+        if (!existing) el.remove(); else el.value = '';
+      });
+    WS.storeApi.toast = origToastIn;
+    clearAllTurns();
+
+    /* А обычная строка НЕ должна перехватываться: иначе любое поле в стенде
+       перестанет принимать перевод строки. */
+    {
+      const other = doc.createElement('textarea');
+      other.id = 'someOtherField';
+      other.value = 'текст';
+      doc.body.appendChild(other);
+      const ev2 = new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+      other.dispatchEvent(ev2);
+      check('ввод · в чужом поле Enter остаётся переводом строки',
+        !ev2.defaultPrevented && other.value === 'текст',
+        'prevented=' + ev2.defaultPrevented);
+      other.remove();
+    }
+
+    /* 2. СОСТОЯНИЕ ХОДА (Task 7) — отмена, повтор и конечный статус. Прогон
+       показал, что охранные условия можно обратить — и никто не заметит. Это значит,
+       что отмена могла бы срабатывать на завершённом ходе, а повтор — на идущем. */
+    if (WS.engine.turnState) {
+      const TID = 'general';
+      WS.engine.openThread(TID, 'Консьерж', 'sparkle');
+
+      if (WS.engine.cancelTurn) WS.engine.cancelTurn(TID);
+      const st0 = WS.engine.turnState(TID);
+      check('ход · без запроса активного хода нет',
+        !st0 || (st0.status !== 'preparing' && st0.status !== 'running'),
+        st0 ? String(st0.status) : 'нет хода');
+
+      /* Отмена того, чего не идёт, обязана быть безвредной и НЕ создавать
+         запись об отмене: иначе в ленте появляется «отменено» там, где ничего не было. */
+      const before = ((WS.engine.activeThread() || {}).items || []).length;
+      if (WS.engine.cancelTurn) WS.engine.cancelTurn(TID);
+      const after = ((WS.engine.activeThread() || {}).items || []).length;
+      check('ход · отмена без идущего хода ничего не пишет в ленту',
+        after === before, before + ' → ' + after);
+
+      check('ход · повтор без завершённого хода не запускает запрос',
+        (function () {
+          const n0 = ((WS.engine.activeThread() || {}).items || []).length;
+          if (WS.engine.retryTurn) WS.engine.retryTurn(TID);
+          return ((WS.engine.activeThread() || {}).items || []).length === n0;
+        })(), 'повтор на пустом треде');
+    }
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Отрицание заканчивается действием ----
      Три живых вопроса брокера из четырёх упёрлись в «у нас этого нет» без продолжения.
      Честное отрицание — половина ответа; вторая половина — что с этим делать. */

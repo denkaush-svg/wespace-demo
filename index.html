@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 13:20</title>
+  <title>WESPACE · сборка 17:14</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='13:20';
+    window.WS_BUILD='17:14';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -7436,6 +7436,13 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
      ожидание» above sets a flag the scripted player reads and a live call does
      not — over a real request it was a button that taught the visitor the
      buttons here are decoration. This closes the request instead. */
+  /* Состояние хода наружу. Мутационный прогон показал, что охранные условия
+     отмены и повтора можно обратить — и ни одна проверка не упадёт. Проверить это
+     можно, только видя статус со стороны. */
+  function turnState(threadId) {
+    const t = turns[threadId || engine.activeThreadId];
+    return t ? { status: t.status, threadId: t.threadId, startedAt: t.startedAt } : null;
+  }
   function cancelTurn(threadId) {
     const turn = turns[threadId];
     if (!turn || (turn.status !== 'preparing' && turn.status !== 'running')) return;
@@ -8365,7 +8372,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   // answerCard наружу: пометку «ответил не модель» надо проверять в РАЗМЕТКЕ,
   // а не в данных: мутационная проверка показала, что без этого полосу можно
   // убрать целиком и ни один тест не упадёт.
-  WS.engine = { answerCard, startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+  WS.engine = { answerCard, turnState, cancelTurn, retryTurn, startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     // The guarded door: everything a VISITOR clicks to ask something comes
     // through here, so the refusal cannot be forgotten at one of the four
     // call sites again. `freeReply` beside it stays unguarded for the harness.
@@ -10301,7 +10308,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
        на просмотр, это ровно тот сочинённый факт, которого мы избегаем везде. Где своего
        снимка нет — карта во всю ширину: она у каждого объекта настоящая. */
     const ph = (WS.photos && WS.photos[o.id]) || '';
-    const mp = WS.mapFor ? WS.mapFor(o) : ((WS.mapFor ? WS.mapFor(o) : (WS.maps && WS.maps[o.id])) || '');
+    const mp = (WS.mapFor ? WS.mapFor(o) : (WS.maps && WS.maps[o.id])) || '';
     const perM = o.size ? Math.round(o.price / o.size) : 0;
     const dvLine = dv
       ? WS.AED(dv.per) + ' за м² · ' + (dv.pct === 0 ? 'вровень со срезом ' + dv.area

@@ -1529,7 +1529,7 @@
        на просмотр, это ровно тот сочинённый факт, которого мы избегаем везде. Где своего
        снимка нет — карта во всю ширину: она у каждого объекта настоящая. */
     const ph = (WS.photos && WS.photos[o.id]) || '';
-    const mp = WS.mapFor ? WS.mapFor(o) : ((WS.mapFor ? WS.mapFor(o) : (WS.maps && WS.maps[o.id])) || '');
+    const mp = (WS.mapFor ? WS.mapFor(o) : (WS.maps && WS.maps[o.id])) || '';
     const perM = o.size ? Math.round(o.price / o.size) : 0;
     const dvLine = dv
       ? WS.AED(dv.per) + ' за м² · ' + (dv.pct === 0 ? 'вровень со срезом ' + dv.area

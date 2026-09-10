@@ -584,6 +584,13 @@
      ожидание» above sets a flag the scripted player reads and a live call does
      not — over a real request it was a button that taught the visitor the
      buttons here are decoration. This closes the request instead. */
+  /* Состояние хода наружу. Мутационный прогон показал, что охранные условия
+     отмены и повтора можно обратить — и ни одна проверка не упадёт. Проверить это
+     можно, только видя статус со стороны. */
+  function turnState(threadId) {
+    const t = turns[threadId || engine.activeThreadId];
+    return t ? { status: t.status, threadId: t.threadId, startedAt: t.startedAt } : null;
+  }
   function cancelTurn(threadId) {
     const turn = turns[threadId];
     if (!turn || (turn.status !== 'preparing' && turn.status !== 'running')) return;
@@ -1513,7 +1520,7 @@
   // answerCard наружу: пометку «ответил не модель» надо проверять в РАЗМЕТКЕ,
   // а не в данных: мутационная проверка показала, что без этого полосу можно
   // убрать целиком и ни один тест не упадёт.
-  WS.engine = { answerCard, startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
+  WS.engine = { answerCard, turnState, cancelTurn, retryTurn, startScenario, startChain, restartScene, advance, handle, mount, reset, freeReply,
     // The guarded door: everything a VISITOR clicks to ask something comes
     // through here, so the refusal cannot be forgotten at one of the four
     // call sites again. `freeReply` beside it stays unguarded for the harness.
