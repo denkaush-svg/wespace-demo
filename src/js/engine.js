@@ -1227,6 +1227,12 @@
     }
     return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
   }
+  /* Адрес пришёл извне и попадёт в href — значит, схема решается здесь, а не там.
+     Разрешён только https: всё остальное — от javascript: до data: — ссылкой не становится. */
+  function safeUrl(u) {
+    const s = String(u == null ? '' : u).trim();
+    return /^https:\/\/[^\s"'<>]+$/.test(s) ? s : '';
+  }
   function plural(n, forms) {
     const a = Math.abs(n) % 100; const b = a % 10;
     if (a > 10 && a < 20) return forms[2];
@@ -1260,6 +1266,43 @@
         return '<div class="an-tw"><table class="an-t">' +
           (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
           '<tbody>' + body + '</tbody></table></div>' + srcNote(b);
+      }
+      /* Найденное на стороннем портале. Форма у него своя, а не общая с нашими
+         карточками, именно потому, что это чужой лот: выгляди он как наш, его бы
+         отправили клиенту в первый же день. Ценность блока — не в том, что он показывает
+         объект, а в том, что он даёт брокеру телефон, по которому можно позвонить
+         и договориться о совместной сделке.
+
+         Без домена источника блок не показывается вовсе: найденное неизвестно где
+         неотличимо от выдуманного. Ссылка — только https: текст пришёл со сторонней
+         страницы, и схема в нём — такая же часть чужого ввода, как и всё остальное. */
+      if (t === 'find') {
+        if (!b.source) return '';
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8)
+          .filter((x) => x && (x.k || x.v))
+          .map((x) => '<div class="an-kv"><span class="k">' + esc(x.k) + '</span>' +
+            '<span class="v">' + esc(x.v) + '</span></div>').join('');
+        const c = b.contact || {};
+        const phone = String(c.phone || '').replace(/[^0-9+]/g, '');
+        const contact = (c.agency || c.name || phone) ?
+          '<div class="fnd-c">' + I('users') +
+            '<span class="fnd-who">' + esc(c.agency || c.name || '') +
+              (c.agency && c.name ? ' · ' + esc(c.name) : '') +
+              (c.permit ? '<i>разрешение ' + esc(c.permit) + '</i>' : '') + '</span>' +
+            (phone ? '<a class="btn sm" href="tel:' + esc(phone) + '">' + esc(c.phone) + '</a>' : '') +
+          '</div>' : '';
+        const url = safeUrl(b.url);
+        return '<div class="fnd">' +
+          '<div class="fnd-b">' + I('radar') + 'Найдено на портале · чужой лот</div>' +
+          '<div class="fnd-t">' + esc(b.title) + '</div>' +
+          (rows ? '<div class="an-kvs">' + rows + '</div>' : '') +
+          contact +
+          '<div class="fnd-s">' + esc(b.source) + (b.asOf ? ' · ' + esc(b.asOf) : '') +
+            (url ? ' · <a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">объявление</a>' : '') +
+          '</div>' +
+          '<div class="fnd-n">' + I('shield') +
+            'В нашу подборку и КП не идёт. Цена и доступность — со слов объявления, мы их не проверяли.' +
+          '</div></div>';
       }
       if (t === 'bars') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));

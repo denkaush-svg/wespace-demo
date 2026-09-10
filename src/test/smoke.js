@@ -9888,6 +9888,60 @@ setTimeout(async () => {
     check('происхождение · живой ответ не помечается',
       !!liveCard && !/an-src/.test(liveCard), 'live без полосы');
 
+    /* 1б. Находка с портала. Ценность блока — телефон, по которому брокер позвонит
+       в чужое агентство; опасность — что он же уйдёт клиенту как наше предложение.
+       Всё внутри него пришло со сторонней страницы через модель — чужой ввод целиком. */
+    const findBlock = {
+      t: 'find', source: 'propertyfinder.ae', asOf: '9 сентября 2026',
+      url: 'https://www.propertyfinder.ae/en/plp/buy/apartment-12345.html',
+      title: 'Marina Gate 2 \u00b7 2BR \u00b7 112 м\u00b2',
+      rows: [{ k: 'Цена', v: '2 750 000 AED' }, { k: 'Площадь', v: '112 м\u00b2 \u00b7 1206 sqft' }],
+      contact: { agency: 'XYZ Real Estate', name: 'Sara K.', phone: '+971 50 000 0000', permit: 'Trakheesi 71234567' },
+    };
+    const findCard = (b) => WS.engine.answerCard(
+      { kind: 'answer', text: 'Смотрел на площадках.', source: 'live', blocks: [b], next: [] }, 'm_probe_find');
+    const fh = findCard(findBlock);
+    const ft = fh.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+    check('находка · сразу видно, что лот чужой',
+      /чужой лот/.test(ft) && /Marina Gate 2/.test(ft), ft.slice(0, 110));
+
+    /* Ради чего всё затевалось: брокер звонит, не выходя со стенда. */
+    check('находка · телефон агентства набирается одним касанием',
+      /href="tel:\+971500000000"/.test(fh) && /XYZ Real Estate/.test(ft), 'есть tel:');
+
+    check('находка · названы источник, дата и разрешение на рекламу',
+      /propertyfinder\.ae/.test(ft) && /9 сентября 2026/.test(ft) && /Trakheesi 71234567/.test(ft),
+      ft.slice(-140));
+
+    check('находка · сказано, что в подборку и КП она не идёт',
+      /подборку и КП не идёт/.test(ft) && /не проверяли/.test(ft), ft.slice(-120));
+
+    /* Кнопки «отправить клиенту» на чужом лоте не должно быть вовсе:
+       нажатая один раз, она стоит штрафа за рекламу без разрешения. */
+    check('находка · отправить её клиенту не предлагается',
+      !/data-send|data-kp|Отправить клиенту|В подборку/.test(fh), 'без кнопки отправки');
+
+    /* Находка без домена неотличима от выдуманной — такую не показываем вовсе. */
+    const noSrc = findCard(Object.assign({}, findBlock, { source: '' }));
+    check('находка · без названного источника не показывается',
+      noSrc.indexOf('Marina Gate 2') < 0, noSrc.replace(/<[^>]+>/g, ' ').slice(0, 90));
+
+    /* Ссылка пришла со стороны и попадает в href — схему решаем мы, а не она. */
+    const badUrl = findCard(Object.assign({}, findBlock, { url: 'javascript:alert(1)' }));
+    check('находка · подложный адрес ссылкой не становится',
+      badUrl.indexOf('javascript:') < 0 && badUrl.indexOf('Marina Gate 2') >= 0,
+      'блок показан, ссылки нет');
+
+    /* Текст объявления — чужой ввод, а не разметка. */
+    const evil = findCard(Object.assign({}, findBlock, {
+      title: '<img src=x onerror=alert(1)>Tower',
+      contact: { agency: '<b>XYZ</b>', phone: '+971 50 111 2222' },
+    }));
+    check('находка · разметка из объявления остаётся текстом',
+      evil.indexOf('<img') < 0 && evil.indexOf('<b>XYZ') < 0 && /Tower/.test(evil),
+      'экранировано');
+
     /* 2. Озвучка: Intl в ru-RU разделяет разряды неразрывным пробелом, и синтезатор
        читает три разных числа. Проверяется РЕЗУЛЬТАТ преобразования, а не его наличие. */
     /* В строке нарочно есть и AED ПОСЛЕ числа, и AED БЕЗ числа перед ним: это два

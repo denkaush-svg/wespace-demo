@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 23:38</title>
+  <title>WESPACE · сборка 23:57</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='23:38';
+    window.WS_BUILD='23:57';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1232,6 +1232,24 @@ button { font-family: inherit; cursor: pointer; }
 .an-src.web { color: var(--ink-2); }
 /* Drawn at a revision the data has since left behind. */
 .an-src .moved { color: var(--warn); font-weight: 600; }
+/* Чужой лот с портала. Вид намеренно не такой, как у наших карточек. */
+.fnd { border: 1px solid var(--hair); border-left: 3px solid var(--warn); border-radius: var(--r-sm);
+  padding: 10px 11px; margin-bottom: 10px; background: var(--surface-2); }
+.fnd-b { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--warn); margin-bottom: 6px; }
+.fnd-b svg { width: 12px; height: 12px; }
+.fnd-t { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.fnd-c { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 9px;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-sm); margin-bottom: 7px; }
+.fnd-c svg { width: 13px; height: 13px; color: var(--mut); flex-shrink: 0; }
+.fnd-who { font-size: 12.5px; font-weight: 600; color: var(--ink); min-width: 0; }
+.fnd-who i { display: block; font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--faint); }
+.fnd-c .btn { margin-left: auto; font-variant-numeric: tabular-nums; }
+.fnd-s { font-size: 10.5px; font-weight: 600; color: var(--faint); }
+.fnd-s a { color: var(--acc); }
+.fnd-n { display: flex; align-items: flex-start; gap: 5px; margin-top: 7px; font-size: 11px;
+  line-height: 1.45; color: var(--mut); }
+.fnd-n svg { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; margin-top: 1px; }
 /* Which setting produced the answer — shown only when it was moved off default. */
 .an-mode { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px;
   color: var(--faint); font-weight: 600; }
@@ -8079,6 +8097,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     }
     return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
   }
+  /* Адрес пришёл извне и попадёт в href — значит, схема решается здесь, а не там.
+     Разрешён только https: всё остальное — от javascript: до data: — ссылкой не становится. */
+  function safeUrl(u) {
+    const s = String(u == null ? '' : u).trim();
+    return /^https:\/\/[^\s"'<>]+$/.test(s) ? s : '';
+  }
   function plural(n, forms) {
     const a = Math.abs(n) % 100; const b = a % 10;
     if (a > 10 && a < 20) return forms[2];
@@ -8112,6 +8136,43 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         return '<div class="an-tw"><table class="an-t">' +
           (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
           '<tbody>' + body + '</tbody></table></div>' + srcNote(b);
+      }
+      /* Найденное на стороннем портале. Форма у него своя, а не общая с нашими
+         карточками, именно потому, что это чужой лот: выгляди он как наш, его бы
+         отправили клиенту в первый же день. Ценность блока — не в том, что он показывает
+         объект, а в том, что он даёт брокеру телефон, по которому можно позвонить
+         и договориться о совместной сделке.
+
+         Без домена источника блок не показывается вовсе: найденное неизвестно где
+         неотличимо от выдуманного. Ссылка — только https: текст пришёл со сторонней
+         страницы, и схема в нём — такая же часть чужого ввода, как и всё остальное. */
+      if (t === 'find') {
+        if (!b.source) return '';
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8)
+          .filter((x) => x && (x.k || x.v))
+          .map((x) => '<div class="an-kv"><span class="k">' + esc(x.k) + '</span>' +
+            '<span class="v">' + esc(x.v) + '</span></div>').join('');
+        const c = b.contact || {};
+        const phone = String(c.phone || '').replace(/[^0-9+]/g, '');
+        const contact = (c.agency || c.name || phone) ?
+          '<div class="fnd-c">' + I('users') +
+            '<span class="fnd-who">' + esc(c.agency || c.name || '') +
+              (c.agency && c.name ? ' · ' + esc(c.name) : '') +
+              (c.permit ? '<i>разрешение ' + esc(c.permit) + '</i>' : '') + '</span>' +
+            (phone ? '<a class="btn sm" href="tel:' + esc(phone) + '">' + esc(c.phone) + '</a>' : '') +
+          '</div>' : '';
+        const url = safeUrl(b.url);
+        return '<div class="fnd">' +
+          '<div class="fnd-b">' + I('radar') + 'Найдено на портале · чужой лот</div>' +
+          '<div class="fnd-t">' + esc(b.title) + '</div>' +
+          (rows ? '<div class="an-kvs">' + rows + '</div>' : '') +
+          contact +
+          '<div class="fnd-s">' + esc(b.source) + (b.asOf ? ' · ' + esc(b.asOf) : '') +
+            (url ? ' · <a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">объявление</a>' : '') +
+          '</div>' +
+          '<div class="fnd-n">' + I('shield') +
+            'В нашу подборку и КП не идёт. Цена и доступность — со слов объявления, мы их не проверяли.' +
+          '</div></div>';
       }
       if (t === 'bars') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));

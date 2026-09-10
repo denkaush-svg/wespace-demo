@@ -1080,6 +1080,24 @@ button { font-family: inherit; cursor: pointer; }
 .an-src.web { color: var(--ink-2); }
 /* Drawn at a revision the data has since left behind. */
 .an-src .moved { color: var(--warn); font-weight: 600; }
+/* Чужой лот с портала. Вид намеренно не такой, как у наших карточек. */
+.fnd { border: 1px solid var(--hair); border-left: 3px solid var(--warn); border-radius: var(--r-sm);
+  padding: 10px 11px; margin-bottom: 10px; background: var(--surface-2); }
+.fnd-b { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--warn); margin-bottom: 6px; }
+.fnd-b svg { width: 12px; height: 12px; }
+.fnd-t { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.fnd-c { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 9px;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-sm); margin-bottom: 7px; }
+.fnd-c svg { width: 13px; height: 13px; color: var(--mut); flex-shrink: 0; }
+.fnd-who { font-size: 12.5px; font-weight: 600; color: var(--ink); min-width: 0; }
+.fnd-who i { display: block; font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--faint); }
+.fnd-c .btn { margin-left: auto; font-variant-numeric: tabular-nums; }
+.fnd-s { font-size: 10.5px; font-weight: 600; color: var(--faint); }
+.fnd-s a { color: var(--acc); }
+.fnd-n { display: flex; align-items: flex-start; gap: 5px; margin-top: 7px; font-size: 11px;
+  line-height: 1.45; color: var(--mut); }
+.fnd-n svg { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; margin-top: 1px; }
 /* Which setting produced the answer — shown only when it was moved off default. */
 .an-mode { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px;
   color: var(--faint); font-weight: 600; }
