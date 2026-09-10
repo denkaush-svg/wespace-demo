@@ -9618,6 +9618,72 @@ setTimeout(async () => {
       gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
   }
 
+  /* ---- Происхождение объекта решает, что с ним можно делать ----
+
+     Предусловие для внешнего поиска: пока все лоты наши, разница не видна,
+     и первый же портальный объект уйдёт клиенту как наше предложение. Цена ошибки —
+     реклама чужого юнита без разрешения: от 50 000 дирхамов с агентства. */
+  {
+    WS.storeApi.resetAll();
+
+    check('происхождение · весь инвентарь имеет известное происхождение',
+      (dd().objects || []).every((o) => !!WS.ui.objOrigin(o).label),
+      (dd().objects || []).filter((o) => !WS.ui.objOrigin(o).label).map((o) => o.id).join(', '));
+
+    check('происхождение · всё, что сейчас в базе, — наше и отправляемое',
+      (dd().objects || []).every((o) => WS.ui.objOurs(o) && WS.ui.objSendable(o)),
+      (dd().objects || []).filter((o) => !WS.ui.objOurs(o)).map((o) => o.id).join(', '));
+
+    /* Главное: чужой лот не просачивается в то, что увидит клиент.
+
+       Сравниваются ДВА ПРОГОНА ОДНОГО И ТОГО ЖЕ объекта — сначала как нашего,
+       потом как портального. Просто «его нет в подборке» ничего не доказывало бы:
+       подборка берёт тройку лучших, и объект может не попасть в неё по рангу, а не
+       по заслону. Именно так первая версия этих проверок и пережила снятие заслона.
+       Первое условие — «как наш попадает» — страхует проверку от самой себя. */
+    const anna = (dd().clients || []).find((c) => c.id === 'c_anna');
+    const probe = {
+      id: 'o_probe_portal', name: 'Portal Tower, Unit 999', source: 'agency',
+      area: (anna.areas || [])[0], price: Math.round((anna.budget || 2000000) * 0.9),
+      size: 200, br: '3BR', availability: 'available', verified: 'verified',
+      checkedAt: 'сегодня', commissionPct: 2, segment: 'resale', attrs: { view: 'city' },
+    };
+    dd().objects.push(probe);
+
+    const asOurs = (WS.ui.replyPicks(anna) || []).map((o) => o.id);
+    probe.source = 'portal';
+    const asPortal = (WS.ui.replyPicks(anna) || []).map((o) => o.id);
+
+    check('происхождение · портальный лот помечен как НЕ наш и НЕ отправляемый',
+      !WS.ui.objOurs(probe) && !WS.ui.objSendable(probe),
+      'наш: ' + WS.ui.objOurs(probe) + ' · отправляемый: ' + WS.ui.objSendable(probe));
+
+    check('происхождение · зонд годен: как наш он в подборку попадает',
+      asOurs.indexOf('o_probe_portal') >= 0, 'подобрано: ' + asOurs.join(', '));
+
+    check('происхождение · тот же лот с портала в подборку не попадает',
+      asPortal.indexOf('o_probe_portal') < 0, 'подобрано: ' + asPortal.join(', '));
+
+    /* Документ, который уйдёт клиенту, — конец той же цепочки, но проверяется
+       отдельно: именно там ошибка стоит штрафа за рекламу чужого лота. */
+    WS.ui.closeModal();
+    WS.ui.openRequestOffer('r_anna');
+    const offerHtml = doc.getElementById('modal').innerHTML;
+    check('происхождение · чужого лота нет и в документе оффера',
+      offerHtml.indexOf('Portal Tower') < 0, 'в документе');
+    WS.ui.closeModal();
+
+    /* А вот показать его БРОКЕРУ можно и нужно — ради этого внешний поиск
+       и затевается. Запрет касается только того, что уйдёт клиенту. */
+    const badge = WS.ui.originBadge(probe);
+    check('происхождение · брокеру чужой лот показывается с пометкой',
+      /портале/.test(badge) && /warn/.test(badge),
+      badge.replace(/<[^>]+>/g, ' ').trim());
+
+    dd().objects = (dd().objects || []).filter((o) => o.id !== 'o_probe_portal');
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Сборы и пороги: число без происхождения не живёт ----
 
      Сначала эти тарифы стояли текстом в инструкции модели: на сервере, без источника,
