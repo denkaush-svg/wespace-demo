@@ -9511,6 +9511,41 @@ setTimeout(async () => {
           if (WS.engine.retryTurn) WS.engine.retryTurn(TID);
           return ((WS.engine.activeThread() || {}).items || []).length === n0;
         })(), 'повтор на пустом треде');
+
+      /* На ПУСТОМ треде обе версии охраны ведут себя одинаково: выход срабатывает
+         по «хода нет», и условие про статус не проверяется вовсе. Именно поэтому
+         мутация охраны выживала. Различить их можно только на ходе, который ЕСТЬ
+         и уже завершён. Состояние строится открытыми средствами: запрос идёт → отмена. */
+      WS.engine.inFlight = true;
+      const running = WS.engine.turnState(TID);
+      check('ход · запрос в работе виден снаружи',
+        !!running && running.status === 'running', running ? running.status : 'нет хода');
+
+      WS.engine.cancelTurn(TID);
+      const cancelled = WS.engine.turnState(TID);
+      check('ход · отмена идущего запроса переводит его в «отменён»',
+        !!cancelled && cancelled.status === 'cancelled',
+        cancelled ? cancelled.status : 'ход исчез');
+
+      /* Вторая отмена обязана быть без последствий: иначе брокер, нажав дважды,
+         получает в ленте две записи об отмене одного и того же запроса. */
+      const nBefore = ((WS.engine.activeThread() || {}).items || []).length;
+      WS.engine.cancelTurn(TID);
+      const nAfter = ((WS.engine.activeThread() || {}).items || []).length;
+      const still = WS.engine.turnState(TID);
+      check('ход · повторная отмена уже отменённого ничего не меняет',
+        nAfter === nBefore && !!still && still.status === 'cancelled',
+        nBefore + '→' + nAfter + ' · статус ' + (still ? still.status : 'исчез'));
+
+      /* А повтор на ОТМЕНЁННОМ ходе ОБЯЗАН сработать — ради этого он и сделан.
+         Мутация охраны повтора делает выход безусловным, и кнопка перестаёт работать молча. */
+      WS.engine.retryTurn(TID);
+      const afterRetry = WS.engine.turnState(TID);
+      check('ход · повтор отменённого запроса снимает его с отмены',
+        !afterRetry || afterRetry.status !== 'cancelled',
+        afterRetry ? afterRetry.status : 'ход снят');
+
+      WS.engine.inFlight = false;
     }
 
     WS.storeApi.resetAll();
