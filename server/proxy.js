@@ -54,7 +54,9 @@ const CFG = {
   // the tests stand a fake CLI in front of the real one).
   cliPrefix: (process.env.WESPACE_PROXY_CLI_PREFIX || '').split(' ').filter(Boolean),
 
-  maxBody: 96 * 1024,
+  // Дайджест едет в теле запроса, поэтому потолок тела обязан быть выше его собственного:
+  // иначе поднятый дайджест будет отбит на входе и никто не поймёт почему.
+  maxBody: 256 * 1024,
   bodyTimeoutMs: Number(process.env.WESPACE_PROXY_BODY_TIMEOUT_MS || 8000),
   maxText: 1000,
   // Совпадает с тем, сколько отдаёт страница: раньше здесь стояло больше,
@@ -64,7 +66,15 @@ const CFG = {
   // A local CLI on a subscription: a bigger prompt costs latency, not money.
   // The old 8k ceiling sat right under the stand's own data — the entity model
   // grew and the digest was one fixture away from being cut in half.
-  maxDigestChars: 32 * 1024,
+  /* Вся база стенда — 43 КБ, а потолок стоял 32 КБ, и каждый ответ строился
+     по половине инвентаря. В стенограмме это видно дважды за семь вопросов: «показано
+     10 из 21» заявок, «показано 7 из 15» объектов. Модель честно оговаривалась, но
+     подбор по половине базы — это не подбор.
+
+     Потолок взят с запасом вчетверо: инвентарь собираются наполнять, и порог,
+     выставленный вплотную к сегодняшнему размеру, сломается снова и так же тихо.
+     Для модели это порядка 40 тысяч токенов при окне в 200 тысяч. */
+  maxDigestChars: 160 * 1024,
 
   /* Wall-clock is the WRONG primary guard for this, and the old numbers proved
      it: 75s base / 150s ceiling killed three of twelve hard scenarios at exactly
@@ -677,7 +687,10 @@ function fitDigest(obj, max) {
       if (len > worstLen) { worstLen = len; worst = k; }
     });
     if (!worst) break;
-    const keep = Math.max(1, Math.floor(out[worst].length / 2));
+    /* Шаг на десятую, а не вдвое: чтобы сэкономить одиннадцать килобайт, половинное
+       урезание выбрасывало половину инвентаря. Остальное так же: терять надо
+       ровно столько, сколько не влезло. */
+    const keep = Math.max(1, out[worst].length - Math.max(1, Math.ceil(out[worst].length / 10)));
     out[worst] = out[worst].slice(0, keep);
     cut[worst] = { показано: keep, всего: total[worst] };
     json = JSON.stringify(withNote());
