@@ -60,6 +60,7 @@
     const f = WS.fixtures;
     return {
       tenant: clone(f.tenant),
+      agency: clone(f.agency),
       users: clone(f.users),
       clients: clone(f.clients),
       objects: clone(f.objects),

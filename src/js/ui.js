@@ -1643,6 +1643,30 @@
      Питч собирается ИЗ ПОЛЕЙ проекта, а не сочиняется: каждая строка имеет источник
      в данных, и то, что взято со слов продавца, помечено как слова продавца. Питч,
      который нельзя подтвердить по строке, — это реклама, а за рекламу отвечает брокер лично. */
+  function pitchBlockReason(o) {
+    if (objOrigin(o).advertisable === false) {
+      return 'Это не наш лот (' + objOrigin(o).label +
+        ') — разрешение на рекламу выдано другому агентству.';
+    }
+    const miss = pitchMissing(o);
+    return 'Не заполнено: ' + miss.map((p) => p.k).join(', ') +
+      '. Объявление без этих номеров — штраф от 50 000 AED.';
+  }
+  function pitchPermitBlock(o) {
+    const rows = pitchPermits(o).map((p) => '<div class="pitch-row">' +
+      '<span class="pitch-k">' + escAttr(p.k) + '</span>' +
+      (p.v ? '<span class="pitch-v">' + escAttr(p.v) + '</span><span class="pitch-from">заполнено</span>'
+           : '<span class="pitch-v pitch-gap">нет</span><span class="pitch-from">' + escAttr(p.why) + '</span>') +
+      '</div>').join('');
+    const head = '<div class="section-label" style="margin:14px 0 6px">Разрешения на рекламу</div>';
+    const tail = pitchAdvertisable(o)
+      ? '<div class="rw-prov" style="margin-top:8px">' + I('shield') +
+        'Номера на месте — объявление можно публиковать.</div>'
+      : '<div class="match" style="margin:8px 0 0">' + I('warn') + '<span>' +
+        escAttr(pitchBlockReason(o)) + '</span></div>';
+    return head + '<div class="pitch-rows">' + rows + '</div>' + tail;
+  }
+
   function pitchLines(o) {
     const dv = insDeviation(o);
     const m = insIndexFor(o) || {};
@@ -1663,6 +1687,31 @@
     if (o.serviceCharge) out.push({ k: 'Обслуживание', v: o.serviceCharge, src: 'карточка объекта' });
     return out;
   }
+  /* Разрешения на рекламу — не заметка в свободном поле, а четыре поля, каждое из
+     которых либо заполнено, либо видно, что нет. Два относятся к лоту (разрешение
+     на рекламу и QR для проверки объявления), два — к нам самим (номер агентства
+     и номер брокера). Статус «получено» без номера в объявление не поставишь,
+     а именно номер проверяет регулятор. Штраф за объявление без него — от 50 000 дирхам. */
+  function pitchPermits(o) {
+    const me = (D().users || {})[S().role === 'manager' ? 'manager' : 'agent'] || {};
+    const ag = D().agency || {};
+    return [
+      { k: 'Разрешение на рекламу (Trakheesi)',
+        v: o.trakheesiNo || '', why: 'в процессе у застройщика — без номера публиковать нельзя' },
+      { k: 'QR проверки объявления (Madmoun)',
+        v: o.madmounNo || '', why: 'не выпущен — запросите вместе с разрешением' },
+      { k: 'Номер агентства (ORN)',
+        v: ag.orn || '', why: 'не заполнен в профиле агентства' },
+      { k: 'Номер брокера (BRN)',
+        v: me.brn || '', why: 'не заполнен в вашем профиле' },
+    ];
+  }
+  function pitchMissing(o) { return pitchPermits(o).filter((p) => !p.v); }
+  /* Рекламировать можно только своё и только с полным набором номеров. */
+  function pitchAdvertisable(o) {
+    return objOrigin(o).advertisable !== false && !pitchMissing(o).length;
+  }
+
   function openPitch(objId) {
     const o = (D().objects || []).find((x) => x.id === objId);
     if (!o) { WS.storeApi.toast('Объект не найден: ' + objId); return; }
@@ -1688,11 +1737,14 @@
           '<div class="pitch-price">' + WS.AED(o.price) + '</div>' +
           lead +
           '<div class="pitch-rows">' + rows + '</div>' +
+          pitchPermitBlock(o) +
         '</div>' +
       '</div>' +
       '<div class="rw-prov" style="margin-top:12px">' + I('radar') +
         'Каждая строка подписана источником. Строки без источника в питч не попадают — за них перед клиентом отвечать вам.</div>',
-      '<button class="btn primary" data-promo="' + escAttr(o.id) + '">' + I('send') + 'В рассылку</button>' +
+      (pitchAdvertisable(o)
+        ? '<button class="btn primary" data-promo="' + escAttr(o.id) + '">' + I('send') + 'В рассылку</button>'
+        : '<button class="btn" disabled title="' + escAttr(pitchBlockReason(o)) + '">' + I('shield') + 'Рассылка закрыта</button>') +
       '<button class="btn" data-act="floorplan" data-obj="' + escAttr(o.id) + '">' + I('layers') + 'Планировка</button>' +
       '<button class="btn" data-act="closeModal">Закрыть</button>', { wide: true });
   }
@@ -13555,7 +13607,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pitchPermits, pitchMissing, pitchAdvertisable, pitchBlockReason, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

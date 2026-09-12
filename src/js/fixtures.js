@@ -21,8 +21,13 @@
      an answer can say what it converted by. */
   const FX = { code: 'USD', perAED: 3.6725, basis: 'официальная привязка дирхама к доллару, с 1997 года' };
 
+  /* Кто мы с точки зрения регулятора. Без этого объявление публиковать нельзя:
+     ORN — номер агентства в RERA, BRN — номер самого брокера. Оба стоят в каждом
+     рекламном материале рядом с номером разрешения на конкретный лот. */
+  const agency = { name: 'Harbour Key Real Estate', orn: 'RERA ORN 28114' };
+
   const users = {
-    agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina',
+    agent:   { id: 'u_marina', name: 'Марина Волкова', role: 'Агент', init: 'МВ', photo: 'avatar_marina', brn: 'BRN 41782',
       // Closed book for the demo period, per horizon. `attribution` is agency-wide and carries no
       // agent split, so a personal goal must read the agent's own figures, not a slice of it.
       closedPeriod: { month: { commission: 186000, deals: 2 }, quarter: { commission: 430000, deals: 5 } },
@@ -121,7 +126,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'Business Bay', price: 1820000, size: 82, br: '1BR',
       address: 'Business Bay, Creekline Residences, Tower B, Unit 1208', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '12 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 207 401 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04113 (DEMO)',
       /* Вид — canal, а не city. Юнит 1208 стоит в корпусе B, а описание ниже говорит,
          что именно там 1BR выходят на канал. Расхождение нашла модель на живом прогоне
          и честно велела не обещать канал до подтверждения — правильное поведение,
@@ -137,7 +142,7 @@
       sourceLabel: 'Клубный эксклюзив', area: 'JVC', price: 1690000, size: 95, br: '1BR+',
       address: 'JVC, Palm Court Residence, District 12, Unit 704', commissionPct: 3,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
-      trakheesi: 'ok', madmoun: 'na',
+      trakheesi: 'ok', trakheesiNo: '71 214 402 (DEMO)', madmoun: 'na',
       attrs: { view: 'garden', floor: 7, floors: 18, floorBand: 'mid', finish: 'new', demand: 'mid', prestige: 'mid', metro: false },
       match: 'JVC, ниже бюджета, клубный эксклюзив, высокая доходность аренды.',
       segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Palm Court Residence · District 12',
@@ -154,7 +159,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'Downtown Dubai', price: 2590000, size: 88, br: '2BR',
       address: 'Downtown Dubai, Boulevard Heights, Tower 2, Unit 2104', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '5 сент 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 221 403 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04139 (DEMO)',
       attrs: { view: 'city', floor: 21, floors: 38, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
       match: 'Downtown, две спальни, в бюджете до 2,6 млн, готовое.',
       segment: 'resale', developer: 'Emaar Properties', project: 'Boulevard Heights · Downtown',
@@ -166,7 +171,7 @@
       sourceLabel: 'Клубный эксклюзив', area: 'Dubai Marina', price: 2880000, size: 112, br: '2BR',
       address: 'Dubai Marina, Marina Vista, Unit 1806', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '3 сент 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 228 404 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04152 (DEMO)',
       attrs: { view: 'sea', floor: 18, floors: 44, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
       match: 'Две спальни, вид на море, около 1200 фт².',
       segment: 'resale', developer: 'Emaar Properties', project: 'Marina Vista · Dubai Marina',
@@ -178,7 +183,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'JVC', price: 1890000, size: 104, br: '2BR',
       address: 'Jumeirah Village Circle, Bloom Gardens, Unit 512', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '4 сент 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 235 405 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04165 (DEMO)',
       attrs: { view: 'park', floor: 5, floors: 12, floorBand: 'mid', finish: 'new', demand: 'mid', prestige: 'mid', metro: false },
       match: 'Две спальни под семью, самое дешёвое содержание.',
       segment: 'resale', developer: 'Nakheel', project: 'Bloom Gardens · JVC',
@@ -203,7 +208,7 @@
       sourceLabel: 'Клубный эксклюзив', area: 'DIFC', price: 2050000, size: 112, br: 'Офис',
       address: 'DIFC, Gate District, Building 4, Level 12, Unit 1204', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 242 406 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04178 (DEMO)',
       attrs: { view: 'city', floor: 12, floors: 15, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
       match: 'DIFC, действующий арендатор, доход не прогнозный, а по договору.',
       segment: 'готовое · вторичка', developer: 'DIFC Authority', project: 'DIFC Gate District',
@@ -214,7 +219,7 @@
       sourceLabel: 'Клубный эксклюзив', area: 'DIFC', price: 2150000, size: 118, br: 'Офис',
       address: 'DIFC, Gate District, Building 4, Level 12, Unit 1206', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 249 407 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04191 (DEMO)',
       attrs: { view: 'city', floor: 12, floors: 15, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
       match: 'DIFC, смежный блок к 1204 — берутся вместе одним договором.',
       segment: 'готовое · вторичка', developer: 'DIFC Authority', project: 'DIFC Gate District',
@@ -225,7 +230,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'Business Bay', price: 1760000, size: 79, br: '1BR',
       address: 'Business Bay, Bay Central Tower, Unit 1907', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 256 408 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04204 (DEMO)',
       attrs: { view: 'water', floor: 19, floors: 41, floorBand: 'high', finish: 'new', demand: 'high', prestige: 'high', metro: true },
       match: 'Business Bay, в бюджете, вид на канал, свободен под сделку.',
       segment: 'off-plan', developer: 'Emaar Properties', project: 'Bay Central Tower',
@@ -236,7 +241,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'Business Bay', price: 1390000, size: 68, br: '1BR',
       address: 'Business Bay, Bay Loft Residences, Unit 1105', commissionPct: 5,
       availability: 'available', verified: 'verified', checkedAt: '12 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 263 409 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04217 (DEMO)',
       attrs: { view: 'city', floor: 11, floors: 28, finish: 'new', demand: 'high', prestige: 'mid', metro: true },
       match: 'Business Bay, свежая отделка, метро в пешей доступности — арендный спрос круглый год.',
       segment: 'готовое · аренда', developer: 'Meydan Group', project: 'Bay Loft Residences',
@@ -246,7 +251,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'JVC', price: 1150000, size: 58, br: '1BR',
       address: 'JVC, Bloom Heights, Tower A, Unit 412', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 270 410 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04230 (DEMO)',
       attrs: { view: 'garden', floor: 4, floors: 22, finish: 'new', demand: 'high', prestige: 'low', metro: false },
       match: 'JVC, самый низкий порог входа в инвентаре — сюда помещается почти любой бюджет.',
       segment: 'готовое · вторичка', developer: 'Bloom Holding', project: 'Bloom Heights',
@@ -256,7 +261,7 @@
       sourceLabel: 'Импорт застройщика', area: 'Dubai Creek Harbour', price: 1880000, size: 84, br: '1BR',
       address: 'Dubai Creek Harbour, Creek Rise, Tower 2, Unit 2703', commissionPct: 3,
       availability: 'available', verified: 'verified', checkedAt: '13 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 277 411 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04243 (DEMO)',
       attrs: { view: 'water', floor: 27, floors: 40, finish: 'new', demand: 'high', prestige: 'high', metro: false },
       match: 'Creek Harbour, вид на воду с 27-го этажа, в бюджете большинства запросов.',
       segment: 'готовое · вторичка', developer: 'Emaar Properties', project: 'Creek Rise',
@@ -266,7 +271,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'Business Bay', price: 2050000, size: 124, br: 'Офис',
       address: 'Business Bay, Prime Tower, Unit 906', commissionPct: 3,
       availability: 'available', verified: 'verified', checkedAt: '12 мая 2026',
-      trakheesi: 'ok', madmoun: 'ok',
+      trakheesi: 'ok', trakheesiNo: '71 284 412 (DEMO)', madmoun: 'ok', madmounNo: 'MD-04256 (DEMO)',
       attrs: { view: 'city', floor: 9, floors: 30, finish: 'shell', demand: 'mid', prestige: 'mid', metro: true },
       match: 'Business Bay, офис под отделку, метро рядом — типовой запрос собственника под сдачу.',
       segment: 'готовое · вторичка', developer: 'Meydan Group', project: 'Prime Tower',
@@ -286,7 +291,7 @@
       sourceLabel: 'Инвентарь агентства', area: 'JVC', price: 1240000, size: 74, br: '1BR',
       address: 'JVC, Park Terrace, District 14, Unit 903', commissionPct: 2,
       availability: 'available', verified: 'verified', checkedAt: '11 мая 2026',
-      trakheesi: 'ok', madmoun: 'na',
+      trakheesi: 'ok', trakheesiNo: '71 291 413 (DEMO)', madmoun: 'na',
       attrs: { view: 'park', floor: 9, floors: 16, floorBand: 'high', finish: 'standard', demand: 'mid', prestige: 'mid', metro: false },
       match: 'JVC, заметно ниже бюджета, окна в парк.',
       segment: 'готовое · вторичка', developer: 'Nakheel', project: 'Park Terrace · District 14',
@@ -1411,7 +1416,7 @@
 
   WS.fixtures = {
     version: 1, settings, outcomes,
-    DEMO_NOW, tenant, FX, users, roster, clients, objects, AREAS, refModel, market, TARIFFS,
+    DEMO_NOW, tenant, FX, agency, users, roster, clients, objects, AREAS, refModel, market, TARIFFS,
     deals, requests, tasks, events, inbox, approvals, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, INBOX_STAGES, INBOX_STAGE_LABELS, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,

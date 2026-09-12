@@ -1082,6 +1082,7 @@ button { font-family: inherit; cursor: pointer; }
 .an-src .moved { color: var(--warn); font-weight: 600; }
 /* Вторая единица площади: рядом, но явно вторая — два равновесных числа
    рядом читаются как две разные величины, а не как одна в двух единицах. */
+.pitch-gap { color: var(--warn); font-weight: 700; }
 .u2 { margin-left: 5px; font-size: .8em; font-weight: 600; color: var(--faint);
   white-space: nowrap; font-variant-numeric: tabular-nums; }
 

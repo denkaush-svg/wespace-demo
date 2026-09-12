@@ -9618,6 +9618,69 @@ setTimeout(async () => {
       gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
   }
 
+  /* ---- Питч как форма разрешений ----
+
+     Живой брокер трижды просил «собери питч для рассылки инвесторам». Питч
+     собирался, а разрешения на рекламу жили статусами без номеров — а регулятор
+     проверяет именно номер. Объявление без него — от 50 000 дирхам с агентства. */
+  {
+    WS.storeApi.resetAll();
+
+    check('питч · четыре поля: два про лот, два про нас',
+      (function () {
+        const p = WS.ui.pitchPermits((dd().objects || [])[0]);
+        return p.length === 4 && /Trakheesi/.test(p[0].k) && /Madmoun/.test(p[1].k) &&
+          /ORN/.test(p[2].k) && /BRN/.test(p[3].k);
+      })(), WS.ui.pitchPermits((dd().objects || [])[0]).map((p) => p.k).join(' | '));
+
+    /* Дифференциальная проверка: ОДИН лот с номерами и без них. Без первой
+       половины проверка доказывала бы только, что функция умеет говорить «нет». */
+    const ok = (dd().objects || []).find((o) => o.trakheesiNo && o.madmounNo);
+    check('питч · с полным набором номеров реклама разрешена',
+      !!ok && WS.ui.pitchAdvertisable(ok) && !WS.ui.pitchMissing(ok).length,
+      ok ? ok.id + ' · ' + ok.trakheesiNo : 'нет такого лота');
+
+    const stripped = Object.assign({}, ok, { trakheesiNo: '', madmounNo: '' });
+    check('питч · тот же лот без номеров рекламировать нельзя',
+      !WS.ui.pitchAdvertisable(stripped) && WS.ui.pitchMissing(stripped).length === 2,
+      WS.ui.pitchMissing(stripped).map((p) => p.k).join(', '));
+
+    /* Запрет без причины — просто сломанная кнопка. Причина называет и то,
+       чего не хватает, и цену ошибки. */
+    check('питч · запрет называет недостающее и цену ошибки',
+      /Trakheesi/.test(WS.ui.pitchBlockReason(stripped)) &&
+      /50 000/.test(WS.ui.pitchBlockReason(stripped)),
+      WS.ui.pitchBlockReason(stripped));
+
+    /* Чужой лот нельзя рекламировать даже с полным набором номеров:
+       разрешение выдано тому агентству, а не нам. */
+    const partner = Object.assign({}, ok, { source: 'partner' });
+    check('питч · партнёрский лот показать можно, рекламировать нет',
+      WS.ui.objSendable(partner) && !WS.ui.pitchAdvertisable(partner) &&
+      /другому агентству/.test(WS.ui.pitchBlockReason(partner)),
+      WS.ui.pitchBlockReason(partner));
+
+    /* И это видно НА ЭКРАНЕ, а не только в функции. */
+    const noPermit = (dd().objects || []).find((o) => !o.trakheesiNo);
+    WS.ui.closeModal();
+    WS.ui.openPitch(noPermit.id);
+    const html = doc.getElementById('modal').innerHTML;
+    check('питч · на экране рассылка закрыта, а не просто не работает',
+      /Рассылка закрыта/.test(html) && html.indexOf('data-promo="' + noPermit.id + '"') < 0 &&
+      /Разрешения на рекламу/.test(html), noPermit.id);
+    WS.ui.closeModal();
+
+    WS.ui.openPitch(ok.id);
+    const okHtml = doc.getElementById('modal').innerHTML;
+    check('питч · с номерами кнопка рассылки живая и номера видны',
+      okHtml.indexOf('data-promo="' + ok.id + '"') >= 0 &&
+      okHtml.indexOf(ok.trakheesiNo) >= 0 && /ORN/.test(okHtml) && /BRN/.test(okHtml),
+      ok.id);
+    WS.ui.closeModal();
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Модель видит БАЗУ ЦЕЛИКОМ ----
 
      В стенограмме за 9–12 сентября модель дважды сама сказала: «показано 10 из 21»
