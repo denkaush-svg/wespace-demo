@@ -2421,9 +2421,19 @@
   function oppHasLiveDeal(clientId) {
     return (D().deals || []).some((d) => d.clientId === clientId && !dealClosed(d) && !dealArchived(d));
   }
+  /* Единственная точка, из которой объекты попадают в подборку, КП и разборы
+     возможностей — то есть во всё, что видит клиент. Значит, и заслон здесь один.
+
+     Лот, найденный на портале, — чужой товар. Он годится, чтобы сориентироваться
+     и позвонить в то агентство, и НЕ годится, чтобы уйти клиенту как наше предложение:
+     цена в объявлении — цена предложения, доступность мы не проверяли, а разрешения
+     на рекламу у нас на него нет.
+
+     Фильтр стоит ИМЕННО здесь, а не в каждом документе порознь: восемь мест
+     с одним и тем же условием — это восемь возможностей забыть его в девятом. */
   function oppFreeObjects(claimed) {
     return (D().objects || []).filter((o) => o.availability === 'available' &&
-      !oppObjectBusy(o.id) && claimed.indexOf(o.id) < 0);
+      objSendable(o) && !oppObjectBusy(o.id) && claimed.indexOf(o.id) < 0);
   }
   function oppDays(n) { return n + ' ' + plural(n, 'день', 'дня', 'дней'); }
   /* Инвестору в квартиры нельзя предлагать офис. Отдельного поля типа у объекта нет, поэтому
@@ -7648,7 +7658,12 @@
 
     // 5. Что мешает — одна причина, самая дорогая. Счётчики сюда не попадают.
     if (!dealClosed(d)) {
-      const cf = (D().conflicts || {})[d.id];
+      // conflicts хранится по id владеющей записи (заявки), не по id сделки — тот же адрес
+      // поиска, что чинил conflictBlock (см. комментарий у conflictSource): прямой lookup по
+      // d.id молча не находил унаследованный конфликт, и приоритет «самая дорогая причина»
+      // решался так, будто конфликта нет.
+      const cfSrc = conflictSource(d);
+      const cf = cfSrc ? cfSrc.cf : null;
       const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
       const overdue = tasksOfDeal(d).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
       let block = '';
@@ -9389,7 +9404,7 @@
       : '<span class="badge warn">' + I('warn') + 'Проверка истекла · ' + o.checkedAt + '</span>';
     const tk = o.trakheesi === 'ok' ? '<span class="badge ok">' + I('shield') + 'Trakheesi' + '</span>' : '<span class="badge warn">' + I('clock') + 'Trakheesi в процессе</span>';
     const md = o.madmoun === 'ok' ? '<span class="badge ok">' + I('qr') + 'Madmoun QR' + '</span>' : '<span class="badge">' + I('qr') + 'Madmoun n/a</span>';
-    const src = '<span class="badge acc">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>';
+    const src = originBadge(o);
     const queued = o.queued ? '<span class="badge warn">' + I('clock') + 'В ручной очереди (S9)</span>' : '';
     const isNew = o._new ? '<span class="badge acc">' + I('sparkle') + 'новое · импорт</span>' : '';
     // always a real photo: object's own, else a sensible real default (never a synthetic render)
@@ -9413,7 +9428,7 @@
       : '<span class="badge warn">' + I('warn') + 'Проверка истекла · ' + o.checkedAt + '</span>';
     const tk = o.trakheesi === 'ok' ? '<span class="badge ok">' + I('shield') + 'Trakheesi</span>' : '<span class="badge warn">' + I('clock') + 'Trakheesi в процессе</span>';
     const md = o.madmoun === 'ok' ? '<span class="badge ok">' + I('qr') + 'Madmoun QR</span>' : '<span class="badge">' + I('qr') + 'Madmoun n/a</span>';
-    const src = '<span class="badge acc">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>';
+    const src = originBadge(o);
     const perM2 = WS.AED(Math.round(o.price / o.size)) + '/м²';
     const photoSrc = WS.photos && (WS.photos[o.id] || WS.photos.o_creekline);
     const photo = photoSrc ? '<img class="ophoto" src="' + photoSrc + '" alt="" loading="lazy">' : buildingSvg(o);
@@ -9777,6 +9792,47 @@
     return '<div class="obj-overview-grid"><div>' + leftCol + '</div>' + rightCol + '</div>';
   }
   // Object detail opens as a FULL PAGE in the working area (not a modal) — room for the rich two-column layout + map.
+  /* ==== Происхождение объекта — одно место вместо шести тернарников ==============
+
+     Раньше в шести местах стояло одно и то же:
+     `o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase'`.
+     Пока все три источника НАШИ, это безвредно. Как только появится внешний лот,
+     любое из шести мест, где про него забыли, покажет его как наш.
+
+     И главное: брокеру нужно знать не «откуда взялось», а ЧТО С ЭТИМ МОЖНО
+     ДЕЛАТЬ. Два разных вопроса, и второй стоит денег:
+       отправить клиенту — можно ли включать в подборку и КП;
+       рекламировать — нужно наше разрешение Trakheesi, а его на чужой лот нет.
+
+     Штраф за рекламу юнита без разрешения в Дубае — от 50 000 дирхамов, и платит
+     его агентство, а не тот, кто написал код. ==================================== */
+  const ORIGINS = {
+    agency:  { label: 'Инвентарь агентства', icon: 'briefcase', ours: true,  sendable: true,  advertisable: true },
+    club:    { label: 'Клубный эксклюзив',   icon: 'star',      ours: true,  sendable: true,  advertisable: true },
+    import:  { label: 'Импорт застройщика',  icon: 'download',  ours: true,  sendable: true,  advertisable: true },
+    /* Партнёрский лот можно показать клиенту — на то и соглашение, — но рекламировать
+       его от своего имени нельзя: разрешение выдано тому агентству. */
+    partner: { label: 'Партнёрский лот',   icon: 'users',     ours: false, sendable: true,  advertisable: false },
+    /* С портала — только для ориентира и звонка в то агентство. Ни в подборку,
+       ни в КП, ни в рассылку: это чужой товар, и цена в объявлении — цена предложения. */
+    portal:  { label: 'Найдено на портале', icon: 'radar',    ours: false, sendable: false, advertisable: false },
+  };
+  const ORIGIN_FALLBACK = ORIGINS.agency;
+
+  function objOrigin(o) {
+    return ORIGINS[(o && o.source) || ''] || ORIGIN_FALLBACK;
+  }
+  /* Можно ли этот лот вообще класть в то, что увидит клиент. Спрашивать надо
+     ЗДЕСЬ, а не вспоминать в каждом документе по отдельности. */
+  /* Спрашивается разрешение, а не отсутствие запрета: происхождение, для
+     которого никто не объявил, можно ли его отдавать клиенту, отдавать нельзя. */
+  function objSendable(o) { return objOrigin(o).sendable === true; }
+  function objOurs(o) { return objOrigin(o).ours !== false; }
+  function originBadge(o) {
+    const og = objOrigin(o);
+    return '<span class="badge ' + (og.ours ? 'acc' : 'warn') + '">' + I(og.icon) + escAttr(og.label) + '</span>';
+  }
+
   function objectCard(id) { S().objectId = id; WS.router.go('objectDetail'); }
   // Object detail = HERO pattern (parity with old CRM realty-detail): full-width photo on top with
   // overlaid title/address/key-params/materials, then description → big metrics → params+map → statuses → docs.
@@ -9830,7 +9886,7 @@
     return '<div class="ohero">' +
       '<img id="ogHero" class="ohero-img" src="' + bg + '" alt="">' +
       '<div class="ohero-scrim"></div>' +
-      '<span class="ohero-src">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>' +
+      '<span class="ohero-src">' + I(objOrigin(o).icon) + escAttr(objOrigin(o).label) + '</span>' +
       info + actions + nav +
       '<span class="ohero-cap">' + I('lock') + 'DEMO фото · ' + o.area + '</span>' +
       '</div>';
@@ -10198,7 +10254,7 @@
       const tone = s.pct >= 75 ? 'ok' : s.pct >= 50 ? 'warn' : '';
       const good = s.good.slice(0, 3).map((g) => '<span class="badge ok">' + I('check') + g + '</span>').join('');
       const bad = s.bad.slice(0, 2).map((g) => '<span class="badge">' + I('warn') + g + '</span>').join('');
-      const src = '<span class="badge acc">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>';
+      const src = originBadge(o);
       return '<div class="pod-row">' + thumb +
         '<div class="pod-main"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="ot" style="font-weight:700;color:var(--ink)">' + o.name + '</div><span class="match-score ' + tone + '">' + I('target') + 'Мэтч ' + s.pct + '</span></div>' +
         '<div style="font-size:12px;color:var(--mut);margin:2px 0 6px">' + o.area + ' · ' + o.br + ' · ' + WS.AED(o.price) + '</div>' +
@@ -13335,7 +13391,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

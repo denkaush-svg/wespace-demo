@@ -9618,6 +9618,72 @@ setTimeout(async () => {
       gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
   }
 
+  /* ---- Происхождение объекта решает, что с ним можно делать ----
+
+     Предусловие для внешнего поиска: пока все лоты наши, разница не видна,
+     и первый же портальный объект уйдёт клиенту как наше предложение. Цена ошибки —
+     реклама чужого юнита без разрешения: от 50 000 дирхамов с агентства. */
+  {
+    WS.storeApi.resetAll();
+
+    check('происхождение · весь инвентарь имеет известное происхождение',
+      (dd().objects || []).every((o) => !!WS.ui.objOrigin(o).label),
+      (dd().objects || []).filter((o) => !WS.ui.objOrigin(o).label).map((o) => o.id).join(', '));
+
+    check('происхождение · всё, что сейчас в базе, — наше и отправляемое',
+      (dd().objects || []).every((o) => WS.ui.objOurs(o) && WS.ui.objSendable(o)),
+      (dd().objects || []).filter((o) => !WS.ui.objOurs(o)).map((o) => o.id).join(', '));
+
+    /* Главное: чужой лот не просачивается в то, что увидит клиент.
+
+       Сравниваются ДВА ПРОГОНА ОДНОГО И ТОГО ЖЕ объекта — сначала как нашего,
+       потом как портального. Просто «его нет в подборке» ничего не доказывало бы:
+       подборка берёт тройку лучших, и объект может не попасть в неё по рангу, а не
+       по заслону. Именно так первая версия этих проверок и пережила снятие заслона.
+       Первое условие — «как наш попадает» — страхует проверку от самой себя. */
+    const anna = (dd().clients || []).find((c) => c.id === 'c_anna');
+    const probe = {
+      id: 'o_probe_portal', name: 'Portal Tower, Unit 999', source: 'agency',
+      area: (anna.areas || [])[0], price: Math.round((anna.budget || 2000000) * 0.9),
+      size: 200, br: '3BR', availability: 'available', verified: 'verified',
+      checkedAt: 'сегодня', commissionPct: 2, segment: 'resale', attrs: { view: 'city' },
+    };
+    dd().objects.push(probe);
+
+    const asOurs = (WS.ui.replyPicks(anna) || []).map((o) => o.id);
+    probe.source = 'portal';
+    const asPortal = (WS.ui.replyPicks(anna) || []).map((o) => o.id);
+
+    check('происхождение · портальный лот помечен как НЕ наш и НЕ отправляемый',
+      !WS.ui.objOurs(probe) && !WS.ui.objSendable(probe),
+      'наш: ' + WS.ui.objOurs(probe) + ' · отправляемый: ' + WS.ui.objSendable(probe));
+
+    check('происхождение · зонд годен: как наш он в подборку попадает',
+      asOurs.indexOf('o_probe_portal') >= 0, 'подобрано: ' + asOurs.join(', '));
+
+    check('происхождение · тот же лот с портала в подборку не попадает',
+      asPortal.indexOf('o_probe_portal') < 0, 'подобрано: ' + asPortal.join(', '));
+
+    /* Документ, который уйдёт клиенту, — конец той же цепочки, но проверяется
+       отдельно: именно там ошибка стоит штрафа за рекламу чужого лота. */
+    WS.ui.closeModal();
+    WS.ui.openRequestOffer('r_anna');
+    const offerHtml = doc.getElementById('modal').innerHTML;
+    check('происхождение · чужого лота нет и в документе оффера',
+      offerHtml.indexOf('Portal Tower') < 0, 'в документе');
+    WS.ui.closeModal();
+
+    /* А вот показать его БРОКЕРУ можно и нужно — ради этого внешний поиск
+       и затевается. Запрет касается только того, что уйдёт клиенту. */
+    const badge = WS.ui.originBadge(probe);
+    check('происхождение · брокеру чужой лот показывается с пометкой',
+      /портале/.test(badge) && /warn/.test(badge),
+      badge.replace(/<[^>]+>/g, ' ').trim());
+
+    dd().objects = (dd().objects || []).filter((o) => o.id !== 'o_probe_portal');
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Сборы и пороги: число без происхождения не живёт ----
 
      Сначала эти тарифы стояли текстом в инструкции модели: на сервере, без источника,
@@ -9821,6 +9887,60 @@ setTimeout(async () => {
       : '';
     check('происхождение · живой ответ не помечается',
       !!liveCard && !/an-src/.test(liveCard), 'live без полосы');
+
+    /* 1б. Находка с портала. Ценность блока — телефон, по которому брокер позвонит
+       в чужое агентство; опасность — что он же уйдёт клиенту как наше предложение.
+       Всё внутри него пришло со сторонней страницы через модель — чужой ввод целиком. */
+    const findBlock = {
+      t: 'find', source: 'propertyfinder.ae', asOf: '9 сентября 2026',
+      url: 'https://www.propertyfinder.ae/en/plp/buy/apartment-12345.html',
+      title: 'Marina Gate 2 \u00b7 2BR \u00b7 112 м\u00b2',
+      rows: [{ k: 'Цена', v: '2 750 000 AED' }, { k: 'Площадь', v: '112 м\u00b2 \u00b7 1206 sqft' }],
+      contact: { agency: 'XYZ Real Estate', name: 'Sara K.', phone: '+971 50 000 0000', permit: 'Trakheesi 71234567' },
+    };
+    const findCard = (b) => WS.engine.answerCard(
+      { kind: 'answer', text: 'Смотрел на площадках.', source: 'live', blocks: [b], next: [] }, 'm_probe_find');
+    const fh = findCard(findBlock);
+    const ft = fh.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+    check('находка · сразу видно, что лот чужой',
+      /чужой лот/.test(ft) && /Marina Gate 2/.test(ft), ft.slice(0, 110));
+
+    /* Ради чего всё затевалось: брокер звонит, не выходя со стенда. */
+    check('находка · телефон агентства набирается одним касанием',
+      /href="tel:\+971500000000"/.test(fh) && /XYZ Real Estate/.test(ft), 'есть tel:');
+
+    check('находка · названы источник, дата и разрешение на рекламу',
+      /propertyfinder\.ae/.test(ft) && /9 сентября 2026/.test(ft) && /Trakheesi 71234567/.test(ft),
+      ft.slice(-140));
+
+    check('находка · сказано, что в подборку и КП она не идёт',
+      /подборку и КП не идёт/.test(ft) && /не проверяли/.test(ft), ft.slice(-120));
+
+    /* Кнопки «отправить клиенту» на чужом лоте не должно быть вовсе:
+       нажатая один раз, она стоит штрафа за рекламу без разрешения. */
+    check('находка · отправить её клиенту не предлагается',
+      !/data-send|data-kp|Отправить клиенту|В подборку/.test(fh), 'без кнопки отправки');
+
+    /* Находка без домена неотличима от выдуманной — такую не показываем вовсе. */
+    const noSrc = findCard(Object.assign({}, findBlock, { source: '' }));
+    check('находка · без названного источника не показывается',
+      noSrc.indexOf('Marina Gate 2') < 0, noSrc.replace(/<[^>]+>/g, ' ').slice(0, 90));
+
+    /* Ссылка пришла со стороны и попадает в href — схему решаем мы, а не она. */
+    const badUrl = findCard(Object.assign({}, findBlock, { url: 'javascript:alert(1)' }));
+    check('находка · подложный адрес ссылкой не становится',
+      badUrl.indexOf('javascript:') < 0 && badUrl.indexOf('Marina Gate 2') >= 0,
+      'блок показан, ссылки нет');
+
+    /* Текст объявления — чужой ввод, а не разметка. */
+    const evil = findCard(Object.assign({}, findBlock, {
+      title: '<img src=x onerror=alert(1)>Tower',
+      contact: { agency: '<b>XYZ</b>', phone: '+971 50 111 2222' },
+    }));
+    check('находка · разметка из объявления остаётся текстом',
+      evil.indexOf('<img') < 0 && evil.indexOf('<b>XYZ') < 0 && /Tower/.test(evil),
+      'экранировано');
 
     /* 2. Озвучка: Intl в ru-RU разделяет разряды неразрывным пробелом, и синтезатор
        читает три разных числа. Проверяется РЕЗУЛЬТАТ преобразования, а не его наличие. */
@@ -10875,6 +10995,23 @@ setTimeout(async () => {
         && html.indexOf(cf3.a) >= 0 && html.indexOf('до сих пор не снято') < 0,
         'chosen=' + (cf3 && cf3.chosen) + ' карточка_видна=' + (!!cf3 && html.indexOf(cf3.a) >= 0)
         + ' утверждение_есть=' + (html.indexOf('до сих пор не снято') >= 0));
+      WS.storeApi.resetAll();
+    }
+
+    // Строка «Мешает» в справке по сделке (dealBriefSentences, ui.js) подозревалась в том же
+    // дефекте, что раньше был у conflictBlock: конфликт ищется по (D().conflicts||{})[d.id], а
+    // conflicts хранится по requestId владеющей заявки. d_karim_cross выросла из r_karim_cross,
+    // а сам конфликт числится на r_karim (более раннем запросе того же клиента) — ключ по d.id
+    // никогда не совпадает, и «Мешает» решает свой приоритет («одна причина, самая дорогая»)
+    // так, будто конфликта нет вовсе, хотя conflictSource(d) его находит.
+    {
+      WS.storeApi.resetAll();
+      const cf = (dd().conflicts || {})['r_karim'];
+      const brief = WS.ui.dealBrief('d_karim_cross');
+      const blockLine = brief.find((s) => s.indexOf('Мешает:') === 0) || '';
+      check('справка по сделке · «Мешает» видит конфликт заявки, а не молчит про него / не подменяет более дешёвой причиной',
+        !!cf && blockLine.indexOf('Бюджет') >= 0,
+        'conflict=' + JSON.stringify(cf) + ' строка_Мешает="' + blockLine + '"');
       WS.storeApi.resetAll();
     }
 

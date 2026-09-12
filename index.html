@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WESPACE · сборка 17:42</title>
+  <title>WESPACE · сборка 23:57</title>
   <meta name="description" content="WESPACE MVP демо-стенд — превью в палитре старого CRM, обогащённой глубиной.">
   <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
-    window.WS_BUILD='17:42';
+    window.WS_BUILD='23:57';
     window.__WS_STAGE='head';window.__WS_ERR=null;
     window.addEventListener('error',function(e){if(!window.__WS_ERR){var m=(e&&(e.message||(e.error&&e.error.message)))||'script error';if(e&&e.lineno){m+=' ('+e.lineno+':'+e.colno+')';}window.__WS_ERR=m;}});
     setTimeout(function(){var a=document.getElementById('app'),b=document.getElementById('bootmsg');if(a&&b){a.innerHTML='<div style="padding:20px;font:14px Manrope,-apple-system,sans-serif;color:#222;line-height:1.6"><b>Стенд не запустился.</b><br>Стадия: '+(window.__WS_STAGE||'—')+'<br>Ошибка: '+(window.__WS_ERR||'JavaScript отключён')+'</div>';}},2500);
@@ -1232,6 +1232,24 @@ button { font-family: inherit; cursor: pointer; }
 .an-src.web { color: var(--ink-2); }
 /* Drawn at a revision the data has since left behind. */
 .an-src .moved { color: var(--warn); font-weight: 600; }
+/* Чужой лот с портала. Вид намеренно не такой, как у наших карточек. */
+.fnd { border: 1px solid var(--hair); border-left: 3px solid var(--warn); border-radius: var(--r-sm);
+  padding: 10px 11px; margin-bottom: 10px; background: var(--surface-2); }
+.fnd-b { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--warn); margin-bottom: 6px; }
+.fnd-b svg { width: 12px; height: 12px; }
+.fnd-t { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.fnd-c { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 9px;
+  background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-sm); margin-bottom: 7px; }
+.fnd-c svg { width: 13px; height: 13px; color: var(--mut); flex-shrink: 0; }
+.fnd-who { font-size: 12.5px; font-weight: 600; color: var(--ink); min-width: 0; }
+.fnd-who i { display: block; font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--faint); }
+.fnd-c .btn { margin-left: auto; font-variant-numeric: tabular-nums; }
+.fnd-s { font-size: 10.5px; font-weight: 600; color: var(--faint); }
+.fnd-s a { color: var(--acc); }
+.fnd-n { display: flex; align-items: flex-start; gap: 5px; margin-top: 7px; font-size: 11px;
+  line-height: 1.45; color: var(--mut); }
+.fnd-n svg { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; margin-top: 1px; }
 /* Which setting produced the answer — shown only when it was moved off default. */
 .an-mode { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px;
   color: var(--faint); font-weight: 600; }
@@ -8079,6 +8097,12 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     }
     return '<div class="an-src">' + I('warn') + 'собрано моделью, не сверено с данными</div>';
   }
+  /* Адрес пришёл извне и попадёт в href — значит, схема решается здесь, а не там.
+     Разрешён только https: всё остальное — от javascript: до data: — ссылкой не становится. */
+  function safeUrl(u) {
+    const s = String(u == null ? '' : u).trim();
+    return /^https:\/\/[^\s"'<>]+$/.test(s) ? s : '';
+  }
   function plural(n, forms) {
     const a = Math.abs(n) % 100; const b = a % 10;
     if (a > 10 && a < 20) return forms[2];
@@ -8112,6 +8136,43 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
         return '<div class="an-tw"><table class="an-t">' +
           (head.length ? '<thead><tr>' + head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr></thead>' : '') +
           '<tbody>' + body + '</tbody></table></div>' + srcNote(b);
+      }
+      /* Найденное на стороннем портале. Форма у него своя, а не общая с нашими
+         карточками, именно потому, что это чужой лот: выгляди он как наш, его бы
+         отправили клиенту в первый же день. Ценность блока — не в том, что он показывает
+         объект, а в том, что он даёт брокеру телефон, по которому можно позвонить
+         и договориться о совместной сделке.
+
+         Без домена источника блок не показывается вовсе: найденное неизвестно где
+         неотличимо от выдуманного. Ссылка — только https: текст пришёл со сторонней
+         страницы, и схема в нём — такая же часть чужого ввода, как и всё остальное. */
+      if (t === 'find') {
+        if (!b.source) return '';
+        const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8)
+          .filter((x) => x && (x.k || x.v))
+          .map((x) => '<div class="an-kv"><span class="k">' + esc(x.k) + '</span>' +
+            '<span class="v">' + esc(x.v) + '</span></div>').join('');
+        const c = b.contact || {};
+        const phone = String(c.phone || '').replace(/[^0-9+]/g, '');
+        const contact = (c.agency || c.name || phone) ?
+          '<div class="fnd-c">' + I('users') +
+            '<span class="fnd-who">' + esc(c.agency || c.name || '') +
+              (c.agency && c.name ? ' · ' + esc(c.name) : '') +
+              (c.permit ? '<i>разрешение ' + esc(c.permit) + '</i>' : '') + '</span>' +
+            (phone ? '<a class="btn sm" href="tel:' + esc(phone) + '">' + esc(c.phone) + '</a>' : '') +
+          '</div>' : '';
+        const url = safeUrl(b.url);
+        return '<div class="fnd">' +
+          '<div class="fnd-b">' + I('radar') + 'Найдено на портале · чужой лот</div>' +
+          '<div class="fnd-t">' + esc(b.title) + '</div>' +
+          (rows ? '<div class="an-kvs">' + rows + '</div>' : '') +
+          contact +
+          '<div class="fnd-s">' + esc(b.source) + (b.asOf ? ' · ' + esc(b.asOf) : '') +
+            (url ? ' · <a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">объявление</a>' : '') +
+          '</div>' +
+          '<div class="fnd-n">' + I('shield') +
+            'В нашу подборку и КП не идёт. Цена и доступность — со слов объявления, мы их не проверяли.' +
+          '</div></div>';
       }
       if (t === 'bars') {
         const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6).filter((x) => x && isFinite(Number(x.value)));
@@ -11200,9 +11261,19 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
   function oppHasLiveDeal(clientId) {
     return (D().deals || []).some((d) => d.clientId === clientId && !dealClosed(d) && !dealArchived(d));
   }
+  /* Единственная точка, из которой объекты попадают в подборку, КП и разборы
+     возможностей — то есть во всё, что видит клиент. Значит, и заслон здесь один.
+
+     Лот, найденный на портале, — чужой товар. Он годится, чтобы сориентироваться
+     и позвонить в то агентство, и НЕ годится, чтобы уйти клиенту как наше предложение:
+     цена в объявлении — цена предложения, доступность мы не проверяли, а разрешения
+     на рекламу у нас на него нет.
+
+     Фильтр стоит ИМЕННО здесь, а не в каждом документе порознь: восемь мест
+     с одним и тем же условием — это восемь возможностей забыть его в девятом. */
   function oppFreeObjects(claimed) {
     return (D().objects || []).filter((o) => o.availability === 'available' &&
-      !oppObjectBusy(o.id) && claimed.indexOf(o.id) < 0);
+      objSendable(o) && !oppObjectBusy(o.id) && claimed.indexOf(o.id) < 0);
   }
   function oppDays(n) { return n + ' ' + plural(n, 'день', 'дня', 'дней'); }
   /* Инвестору в квартиры нельзя предлагать офис. Отдельного поля типа у объекта нет, поэтому
@@ -18168,7 +18239,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       : '<span class="badge warn">' + I('warn') + 'Проверка истекла · ' + o.checkedAt + '</span>';
     const tk = o.trakheesi === 'ok' ? '<span class="badge ok">' + I('shield') + 'Trakheesi' + '</span>' : '<span class="badge warn">' + I('clock') + 'Trakheesi в процессе</span>';
     const md = o.madmoun === 'ok' ? '<span class="badge ok">' + I('qr') + 'Madmoun QR' + '</span>' : '<span class="badge">' + I('qr') + 'Madmoun n/a</span>';
-    const src = '<span class="badge acc">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>';
+    const src = originBadge(o);
     const queued = o.queued ? '<span class="badge warn">' + I('clock') + 'В ручной очереди (S9)</span>' : '';
     const isNew = o._new ? '<span class="badge acc">' + I('sparkle') + 'новое · импорт</span>' : '';
     // always a real photo: object's own, else a sensible real default (never a synthetic render)
@@ -18192,7 +18263,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       : '<span class="badge warn">' + I('warn') + 'Проверка истекла · ' + o.checkedAt + '</span>';
     const tk = o.trakheesi === 'ok' ? '<span class="badge ok">' + I('shield') + 'Trakheesi</span>' : '<span class="badge warn">' + I('clock') + 'Trakheesi в процессе</span>';
     const md = o.madmoun === 'ok' ? '<span class="badge ok">' + I('qr') + 'Madmoun QR</span>' : '<span class="badge">' + I('qr') + 'Madmoun n/a</span>';
-    const src = '<span class="badge acc">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>';
+    const src = originBadge(o);
     const perM2 = WS.AED(Math.round(o.price / o.size)) + '/м²';
     const photoSrc = WS.photos && (WS.photos[o.id] || WS.photos.o_creekline);
     const photo = photoSrc ? '<img class="ophoto" src="' + photoSrc + '" alt="" loading="lazy">' : buildingSvg(o);
@@ -18556,6 +18627,47 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return '<div class="obj-overview-grid"><div>' + leftCol + '</div>' + rightCol + '</div>';
   }
   // Object detail opens as a FULL PAGE in the working area (not a modal) — room for the rich two-column layout + map.
+  /* ==== Происхождение объекта — одно место вместо шести тернарников ==============
+
+     Раньше в шести местах стояло одно и то же:
+     `o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase'`.
+     Пока все три источника НАШИ, это безвредно. Как только появится внешний лот,
+     любое из шести мест, где про него забыли, покажет его как наш.
+
+     И главное: брокеру нужно знать не «откуда взялось», а ЧТО С ЭТИМ МОЖНО
+     ДЕЛАТЬ. Два разных вопроса, и второй стоит денег:
+       отправить клиенту — можно ли включать в подборку и КП;
+       рекламировать — нужно наше разрешение Trakheesi, а его на чужой лот нет.
+
+     Штраф за рекламу юнита без разрешения в Дубае — от 50 000 дирхамов, и платит
+     его агентство, а не тот, кто написал код. ==================================== */
+  const ORIGINS = {
+    agency:  { label: 'Инвентарь агентства', icon: 'briefcase', ours: true,  sendable: true,  advertisable: true },
+    club:    { label: 'Клубный эксклюзив',   icon: 'star',      ours: true,  sendable: true,  advertisable: true },
+    import:  { label: 'Импорт застройщика',  icon: 'download',  ours: true,  sendable: true,  advertisable: true },
+    /* Партнёрский лот можно показать клиенту — на то и соглашение, — но рекламировать
+       его от своего имени нельзя: разрешение выдано тому агентству. */
+    partner: { label: 'Партнёрский лот',   icon: 'users',     ours: false, sendable: true,  advertisable: false },
+    /* С портала — только для ориентира и звонка в то агентство. Ни в подборку,
+       ни в КП, ни в рассылку: это чужой товар, и цена в объявлении — цена предложения. */
+    portal:  { label: 'Найдено на портале', icon: 'radar',    ours: false, sendable: false, advertisable: false },
+  };
+  const ORIGIN_FALLBACK = ORIGINS.agency;
+
+  function objOrigin(o) {
+    return ORIGINS[(o && o.source) || ''] || ORIGIN_FALLBACK;
+  }
+  /* Можно ли этот лот вообще класть в то, что увидит клиент. Спрашивать надо
+     ЗДЕСЬ, а не вспоминать в каждом документе по отдельности. */
+  /* Спрашивается разрешение, а не отсутствие запрета: происхождение, для
+     которого никто не объявил, можно ли его отдавать клиенту, отдавать нельзя. */
+  function objSendable(o) { return objOrigin(o).sendable === true; }
+  function objOurs(o) { return objOrigin(o).ours !== false; }
+  function originBadge(o) {
+    const og = objOrigin(o);
+    return '<span class="badge ' + (og.ours ? 'acc' : 'warn') + '">' + I(og.icon) + escAttr(og.label) + '</span>';
+  }
+
   function objectCard(id) { S().objectId = id; WS.router.go('objectDetail'); }
   // Object detail = HERO pattern (parity with old CRM realty-detail): full-width photo on top with
   // overlaid title/address/key-params/materials, then description → big metrics → params+map → statuses → docs.
@@ -18609,7 +18721,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     return '<div class="ohero">' +
       '<img id="ogHero" class="ohero-img" src="' + bg + '" alt="">' +
       '<div class="ohero-scrim"></div>' +
-      '<span class="ohero-src">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>' +
+      '<span class="ohero-src">' + I(objOrigin(o).icon) + escAttr(objOrigin(o).label) + '</span>' +
       info + actions + nav +
       '<span class="ohero-cap">' + I('lock') + 'DEMO фото · ' + o.area + '</span>' +
       '</div>';
@@ -18977,7 +19089,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
       const tone = s.pct >= 75 ? 'ok' : s.pct >= 50 ? 'warn' : '';
       const good = s.good.slice(0, 3).map((g) => '<span class="badge ok">' + I('check') + g + '</span>').join('');
       const bad = s.bad.slice(0, 2).map((g) => '<span class="badge">' + I('warn') + g + '</span>').join('');
-      const src = '<span class="badge acc">' + I(o.source === 'club' ? 'star' : o.source === 'import' ? 'download' : 'briefcase') + o.sourceLabel + '</span>';
+      const src = originBadge(o);
       return '<div class="pod-row">' + thumb +
         '<div class="pod-main"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="ot" style="font-weight:700;color:var(--ink)">' + o.name + '</div><span class="match-score ' + tone + '">' + I('target') + 'Мэтч ' + s.pct + '</span></div>' +
         '<div style="font-size:12px;color:var(--mut);margin:2px 0 6px">' + o.area + ' · ' + o.br + ' · ' + WS.AED(o.price) + '</div>' +
@@ -22114,7 +22226,7 @@ body.cg-open .cg-tab{ right:var(--cg-w); }
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

@@ -1,0 +1,2 @@
+src/js/ui.js
+src/test/smoke.js
