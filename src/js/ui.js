@@ -7970,6 +7970,53 @@
   // Full-width подбор with the status model + INLINE decision editing (pick / in-work / reject right
   // in the tile — no separate edit page). Under it the КП scenario: отметить выбранное → собрать КП
   // с доходностью/стоимостью/условиями → создать сделку.
+  /* Подходящий инвентарь под запрос считается тем же способом, каким объекты
+     подбираются клиенту, и через ту же точку — oppFreeObjects. Если считать по-разному,
+     экран скажет «ничего нет», а подборка тут же принесёт три варианта — и брокер
+     перестанет верить обоим. Допуск 5% по бюджету — оттуда же. */
+  function reqMatches(r) {
+    const areas = r.areas || [];
+    const b = Number(r.budget || 0);
+    return oppFreeObjects([]).filter((o) =>
+      (!areas.length || areas.indexOf(o.area) >= 0) &&
+      (!b || (o.price || 0) <= b * 1.05));
+  }
+  /* Запрос, под который нечего предложить, — самая ценная запись во всём стенде:
+     он говорит, чего не хватает в инвентаре и что именно идти добирать. До сих пор
+     он исчезал в пустом списке «объекты ещё не подобраны».
+
+     Считается незакрытым только то, где НИЧЕГО не предложено и предложить
+     нечего: если объекты уже показаны, работа идёт, и это не дыра в инвентаре. */
+  /* Инвентарь — ответ не на всякий запрос. Управление, эксклюзив и консалтинг —
+     это услуга по объекту, который уже есть у клиента: подбирать там нечего и не надо.
+     Аренда требует арендного фонда, которого в инвентаре нет вовсе — это одна дыра
+     на весь стенд, а не шесть строк в списке закупки.
+
+     Без этого разделения список получался из пяти запросов, из которых ни один
+     не требовал покупки лота: гонорар за юрпроверку сравнивался с ценой квартиры. */
+  /* Признак берётся из поля «интерес», а не из воронки: у воронки «cross» лежат и покупка
+     через партнёра, и fit-out офиса, то есть услуга. Воронка говорит, ЧЕРЕЗ КОГО идёт сделка,
+     интерес — ЧТО клиенту нужно, и инвентарь отвечает только на второе. */
+  function reqNeedsInventory(r) {
+    const what = String(r.interest || '');
+    if (what) return /покупк|инвест/i.test(what);
+    return (r.funnel || 'sale') === 'sale';
+  }
+
+  function unmetRequests() {
+    return (D().requests || []).filter((r) => {
+      if (!reqNeedsInventory(r)) return false;
+      if (!(r.areas || []).length && !r.budget) return false;
+      const st = reqStage(r);
+      if (st === 'lost' || st === 'closed') return false;
+      return !(r.offered || []).length && !reqMatches(r).length;
+    });
+  }
+  function reqGapLine(r) {
+    return [(r.areas || []).join(', ') || 'район не назван',
+      r.budget ? 'до ' + WS.AED(r.budget) : 'бюджет не назван'].join(' · ');
+  }
+
   function reqOffersStatusBlock(r) {
     const off = r.offered || [];
     const rows = off.map((o) => {
@@ -7993,9 +8040,31 @@
         '<div class="obj-mini-badges"><span class="badge ' + st.tone + '">' + I(st.icon) + st.label + '</span>' +
         '<span class="badge">' + I('money') + 'комиссия ' + (obj.commissionPct || '—') + '%</span></div>' + reason + '</div>' + seg + turnSeg + '</div>' +
         I('arrowRight') + '</div>';
-    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">объекты ещё не подобраны</div>';
+    }).join('') || reqEmptyOffers(r);
     const add = '<button class="btn xs" data-act="reqAddObject" data-req="' + r.id + '">' + I('plus') + 'Добавить</button>';
+    /* Пустой список говорит две разные вещи, и разница между ними — вся работа
+       брокера на ближайший час: либо подбор просто не сделан, либо его не из чего
+       делать. Прежняя формулировка называла оба случая одинаково. */
     return dxSec('building', 'Объекты подбора · ' + off.length, add, rows + reqKpActions(r));
+  }
+  function reqEmptyOffers(r) {
+    /* По услуге подбора нет и не должно быть: объект уже у клиента. */
+    if (!reqNeedsInventory(r)) {
+      const what = r.funnel === 'rent'
+        ? 'арендного фонда в инвентаре пока нет — подбор идёт вручную или с площадок'
+        : 'по этой услуге объекты не подбираются — объект уже у клиента';
+      return '<div style="font-size:12px;color:var(--faint);padding:6px 0">' + what + '</div>';
+    }
+    const n = reqMatches(r).length;
+    if (n) {
+      return '<div style="font-size:12px;color:var(--faint);padding:6px 0">' +
+        'объекты ещё не подобраны · в инвентаре подходящих ' + n + '</div>';
+    }
+    return '<div class="ws-flag" style="background:var(--warn-soft);border-color:var(--warn-line)">' +
+      I('radar') + ' <b>Под этот запрос в инвентаре ничего нет.</b> ' +
+      escAttr(reqGapLine(r)) + '. Запрос стоит у руководителя в списке «без инвентаря» — ' +
+      'это не пустой экран, а задача на закупку. ' +
+      'Консьерж может посмотреть, что стоит по нему на площадках.</div>';
   }
   // КП scenario, right in the objects block: собрать / открыть / пересобрать / создать сделку.
   // Selected objects not yet consumed by a deal — the actionable set for «Создать сделку» (a request
@@ -9319,8 +9388,46 @@
       '<div class="seg">' + [['all', 'Все'], ['sale', 'Покупка'], ['rent', 'Аренда']].map(([k, l]) => '<button class="' + ((st.objPurpose || 'all') === k ? 'on' : '') + '" data-objpurpose="' + k + '">' + l + '</button>').join('') + '</div>' +
       '<span class="df-sep"></span>' + srcChips + '</div>' +
       '<div class="obj-count section-label" style="margin-bottom:8px">Найдено: ' + objs.length + ' из ' + D().objects.length + '</div>' +
-      '<div class="obj-list">' + cards + '</div>';
+      (objs.length ? '<div class="obj-list">' + cards + '</div>' : objNothingFound());
   }
+  /* Ноль найденного — самый ценный экран во всём стенде и до сих пор самый
+     пустой: брокер сказал, чего хочет клиент, а стенд показал «Найдено: 0» и пустоту.
+     Именно здесь живой брокер три раза из четырёх уходил на сторонние площадки. */
+  function objQueryLine() {
+    const st = S();
+    const p = [];
+    if (st.objArea && st.objArea !== 'all') p.push(st.objArea);
+    if (st.objBr && st.objBr !== 'all') p.push(st.objBr);
+    if (st.objPrice && st.objPrice !== 'all') p.push('бюджет ' + st.objPrice);
+    if (st.objPurpose && st.objPurpose !== 'all') p.push(st.objPurpose === 'rent' ? 'аренда' : 'покупка');
+    if ((st.objSearch || '').trim()) p.push('«' + st.objSearch.trim() + '»');
+    return p.join(' · ');
+  }
+  function objNothingFound() {
+    const line = objQueryLine();
+    return '<div class="empty" style="padding:22px;text-align:left">' + I('radar') +
+      '<div style="font-weight:700;color:var(--ink);margin-bottom:4px">В инвентаре под это ничего нет</div>' +
+      '<div style="font-size:12.5px;color:var(--mut);margin-bottom:10px">' +
+      (line ? escAttr(line) + '. ' : '') +
+      'Пустой ответ — тоже результат: запишите его, и руководитель увидит, что добирать.</div>' +
+      '<div class="qa-row">' +
+      '<button class="btn sm primary" data-act="gapRecord">' + I('plus') + 'Записать нехватку</button>' +
+      '<button class="btn sm" data-cgask="' + escAttr('Посмотри на площадках, что есть: ' + (line || 'по этому запросу')) + '">' +
+      I('radar') + 'Посмотреть на площадках</button>' +
+      '</div></div>';
+  }
+  /* Запись — по нажатию, а не автоматом на каждое нажатие клавиши: автомат
+     завалит руководителя полунабранными строками, а нажатая кнопка несёт намерение. */
+  function gapRecord() {
+    const line = objQueryLine();
+    if (!line) return WS.storeApi.toast('Сначала задайте условия поиска — записывать пока нечего', 'warn');
+    const gaps = S().gaps || (S().gaps = []);
+    if (gaps.some((g) => g.line === line)) return WS.storeApi.toast('Такая нехватка уже записана', 'ok');
+    gaps.unshift({ line: line, at: WS.storeApi.clockLabel(), by: S().role || 'agent' });
+    WS.storeApi.save(); WS.storeApi.emit();
+    WS.storeApi.toast('Записано в нехватки инвентаря', 'ok');
+  }
+
   // List search + filter controls repaint their own subtree, the way bindObjects/refreshObjects do.
   function bindListSearch() {
     const wire = (id, key, refresh) => {
@@ -11343,7 +11450,26 @@
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">все агенты в норме</div>';
     const slaBlock = dxSec('warn', 'Вне норматива · ' + risky.length, '',
       '<div class="feed">' + slaRows + '</div>');
-    return apprBlock + leadBlock + slaBlock;
+    /* Руководителю это не жалоба агентов, а список закупки: каждая строка —
+       район и бюджет, под которые у агентства нечего показать. */
+    const unmet = unmetRequests();
+    const unmetRows = unmet.slice(0, 6).map((r) => {
+      const c = (D().clients || []).find((x) => x.id === r.clientId) || {};
+      return '<div class="feed-row" data-request="' + escAttr(r.id) + '" style="cursor:pointer">' +
+        '<div class="fi i-stop">' + I('radar') + '</div>' +
+        '<div class="ft"><div class="t">' + escAttr(r.title) + '</div>' +
+        '<div class="m">' + escAttr(reqGapLine(r)) +
+        (c.name ? ' · ' + escAttr(c.name) : '') + '</div></div>' + I('arrowRight') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">' +
+      'под каждый живой запрос в инвентаре есть что показать</div>';
+    const gapRows = (S().gaps || []).slice(0, 6).map((g) =>
+      '<div class="feed-row"><div class="fi i-stop">' + I('search') + '</div>' +
+      '<div class="ft"><div class="t">' + escAttr(g.line) + '</div>' +
+      '<div class="m">искали — не нашли · ' + escAttr(g.at || '') + '</div></div></div>').join('');
+    const gapCount = (S().gaps || []).length;
+    const unmetBlock = dxSec('radar', 'Нет инвентаря · ' + (unmet.length + gapCount), '',
+      '<div class="feed">' + unmetRows + gapRows + '</div>');
+    return apprBlock + leadBlock + unmetBlock + slaBlock;
   }
   /* «Сделки под риском» — аналог «Перспективных сделок», но с другой стороны: брокеру
      показывают, где можно заработать, руководителю — где деньги сейчас стоят. */
@@ -13386,7 +13512,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

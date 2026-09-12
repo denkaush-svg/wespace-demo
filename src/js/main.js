@@ -611,6 +611,7 @@
         api.toast('Коммерческое предложение отправлено клиенту', 'ok');
         break;
       }
+      case 'gapRecord': WS.ui.gapRecord(); break;
       case 'openXls': WS.ui.openXls(); break;
       case 'promoSend': {
         if (!WS || !WS.partners) {

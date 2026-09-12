@@ -9618,6 +9618,104 @@ setTimeout(async () => {
       gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
   }
 
+  /* ---- Запрос без инвентаря и записанная нехватка ----
+
+     Из четырёх вопросов, которые живой брокер задал стенду, три упёрлись в пустой
+     инвентарь — и ни один нигде не остался. Пустой ответ — тоже результат, и именно
+     он говорит, что идти добирать. */
+  {
+    WS.storeApi.resetAll();
+
+    /* Инвентарь отвечает только на покупку. Первый прогон этого раздела выдал
+       пять «незакрытых» запросов, и все пять оказались арендой, fit-out ом, управлением
+       и юрпроверкой: их «бюджет» — годовая аренда или гонорар, а сравнивался он
+       с ценами квартир. Руководитель получил бы список закупки из пяти строк,
+       в котором нечего закупать. */
+    const byId = (id) => (dd().requests || []).find((r) => r.id === id);
+    check('нет инвентаря · покупка требует инвентаря, услуга и аренда — нет',
+      WS.ui.reqNeedsInventory(byId('r_anna')) &&
+      !WS.ui.reqNeedsInventory(byId('r_lease')) &&
+      !WS.ui.reqNeedsInventory(byId('r_consult')) &&
+      !WS.ui.reqNeedsInventory(byId('r_fitout')),
+      'аренда/услуга/fit-out вне списка');
+
+    /* Дифференциальная проверка: ОДИН и тот же запрос дважды — когда инвентарь
+       его не закрывает и когда закрывает. Без второй половины проверка доказывала бы
+       лишь то, что функция возвращает непустой список. */
+    const probe = {
+      id: 'r_probe_gap', clientId: 'c_anna', title: 'Пентхаус на Palm', createdAt: 'сегодня',
+      channel: 'whatsapp', interest: 'Покупка', funnel: 'sale', objectType: 'Квартира',
+      budget: 900000, areas: ['Palm Jumeirah'], leadStatus: 'Квалифицирован',
+      assignee: 'u_marina', offered: [],
+    };
+    dd().requests.push(probe);
+
+    const unmetIds = () => WS.ui.unmetRequests().map((r) => r.id);
+    check('нет инвентаря · запрос без подходящего лота попадает в список',
+      unmetIds().indexOf('r_probe_gap') >= 0, 'список: ' + unmetIds().join(', '));
+
+    /* Тот же запрос после того, как подходящий лот в инвентаре появился. */
+    dd().objects.push({
+      id: 'o_probe_palm', name: 'Palm Probe, Unit 1', source: 'agency', area: 'Palm Jumeirah',
+      price: 850000, size: 90, br: '2BR', availability: 'available', verified: 'verified',
+      checkedAt: 'сегодня', commissionPct: 2, segment: 'resale', attrs: {},
+    });
+    check('нет инвентаря · появился лот — запрос уходит из списка',
+      unmetIds().indexOf('r_probe_gap') < 0 && WS.ui.reqMatches(probe).length === 1,
+      'список: ' + unmetIds().join(', '));
+
+    /* Чужой лот закрыть запрос не может: показать его клиенту нельзя,
+       а значит дыра в инвентаре никуда не делась. */
+    dd().objects = (dd().objects || []).map((o) =>
+      (o.id === 'o_probe_palm' ? Object.assign({}, o, { source: 'portal' }) : o));
+    check('нет инвентаря · лот с портала запрос не закрывает',
+      unmetIds().indexOf('r_probe_gap') >= 0, 'список: ' + unmetIds().join(', '));
+
+    /* Экран заявки говорит об этом вслух, а не показывает пустой список. */
+    WS.ui.requestCard('r_probe_gap');
+    const reqHtml = doc.getElementById('app').innerHTML;
+    check('нет инвентаря · экран заявки называет нехватку и условия',
+      /в инвентаре ничего нет/i.test(reqHtml) && reqHtml.indexOf('Palm Jumeirah') >= 0,
+      'экран заявки');
+
+    /* А по услуге такого упрёка быть не должно — подбирать там нечего. */
+    WS.ui.requestCard('r_consult');
+    const svcHtml = doc.getElementById('app').innerHTML;
+    check('нет инвентаря · по услуге нехватка не объявляется',
+      !/в инвентаре ничего нет/i.test(svcHtml) &&
+      /объекты не подбираются/i.test(svcHtml), 'экран услуги');
+
+    /* Поиск по инвентарю, вернувший ноль, — вторая дорога к той же дыре. */
+    dd().requests = (dd().requests || []).filter((r) => r.id !== 'r_probe_gap');
+    dd().objects = (dd().objects || []).filter((o) => o.id !== 'o_probe_palm');
+    WS.store.objArea = 'Palm Jumeirah'; WS.store.objSearch = '';
+    WS.router.go('objects');
+    const zeroHtml = doc.getElementById('app').innerHTML;
+    check('нет инвентаря · пустой поиск предлагает записать нехватку',
+      /Найдено: 0/.test(zeroHtml) && /data-act="gapRecord"/.test(zeroHtml) &&
+      zeroHtml.indexOf('Palm Jumeirah') >= 0, 'пустой поиск');
+
+    WS.ui.gapRecord();
+    check('нет инвентаря · нехватка записана с условиями поиска',
+      (WS.store.gaps || []).length === 1 && /Palm Jumeirah/.test((WS.store.gaps[0] || {}).line || ''),
+      JSON.stringify((WS.store.gaps || [])[0] || null));
+
+    /* Два нажатия подряд не должны давать две одинаковые строки у руководителя. */
+    WS.ui.gapRecord();
+    check('нет инвентаря · повторная запись не дублируется',
+      (WS.store.gaps || []).length === 1, 'записей: ' + (WS.store.gaps || []).length);
+
+    /* И руководитель это видит — иначе запись не работа, а кнопка. */
+    WS.store.role = 'manager'; WS.store.pulseSection = 'decide';
+    WS.router.go('start'); WS.ui.render();
+    const mgrHtml = doc.getElementById('app').innerHTML;
+    check('нет инвентаря · руководитель видит записанную нехватку',
+      /Нет инвентаря/.test(mgrHtml) && mgrHtml.indexOf('Palm Jumeirah') >= 0,
+      'раздел руководителя');
+
+    WS.store.role = 'agent'; WS.store.objArea = 'all'; WS.storeApi.resetAll();
+  }
+
   /* ---- Площадь читается в двух единицах сразу ----
 
      Дубайский брокер называет площадь в футах, даже говоря по-русски. Метры остаются

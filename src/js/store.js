@@ -157,6 +157,9 @@
         /* Решённые согласования. Без этого они возвращались в очередь после перезагрузки,
            а повторное решение дописывало в историю сделки вторую запись о том же самом. */
         apprDone: store.apprDone,
+        /* Записанные нехватки инвентаря. Они не выводятся из данных никак
+           иначе: это единственный след того, что брокер искал и не нашёл. */
+        gaps: store.gaps,
         threads: (WS.engine && WS.engine.exportThreads) ? WS.engine.exportThreads() : null,
       }));
     } catch (e) { /* ignore quota / private mode */ }
@@ -185,6 +188,7 @@
     store.signals = p.signals || [];
     store.snapSentHash = p.snapSentHash || null;
     store.apprDone = p.apprDone || [];
+    store.gaps = p.gaps || [];
     store.installId = p.installId || null;
     store._threads = p.threads || null; // imported by engine on boot (see main.js)
     /* ДО-ЗАПОЛНЕНИЕ, а не отбрасывание.
@@ -249,7 +253,7 @@
     store.navHidden = ['tasks']; store.setMenuOpen = false;
     store.netTab = 'contacts'; store.netSel = null; store.netSearch = ''; store.netType = 'all'; store.teamAgent = null;
     store.tasksDue = 'all'; store.tasksStatus = 'open';
-    store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSrc = 'all'; store.apprDone = [];
+    store.dealBudFrom = ''; store.dealBudTo = ''; store.dealSrc = 'all'; store.apprDone = []; store.gaps = [];
     if (WS.engine) WS.engine.reset && WS.engine.reset();
     save(); emit();
   }
