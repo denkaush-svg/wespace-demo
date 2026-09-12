@@ -9618,6 +9618,77 @@ setTimeout(async () => {
       gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
   }
 
+  /* ---- Обязательное и желательное ----
+
+     Главное здесь не ранжирование, а то, что брокер скажет клиенту первым.
+     Несовпавшее пожелание, названное заранее, — честный размен; оно же, обнаруженное
+     на показе, — возражение и два потерянных часа. */
+  {
+    WS.storeApi.resetAll();
+    const anna = (dd().clients || []).find((c) => c.id === 'c_anna');
+
+    check('требования · у клиента есть желательное, а не только обязательное',
+      WS.ui.wantsOf(anna).length >= 2, WS.ui.wantsOf(anna).join(', '));
+
+    /* Дифференциальная пара: один лот даёт желаемое, второй нет. Проверка
+       на одном бы прошла и при функции, возвращающей одно и то же всегда. */
+    const withSea = { id: 'o_w_sea', attrs: { view: 'sea', metro: true } };
+    const without = { id: 'o_w_none', attrs: { view: 'city', metro: false } };
+
+    check('требования · совпавшее и несовпавшее разводятся',
+      WS.ui.wantFit(withSea, anna).hit.length === 2 && !WS.ui.wantFit(withSea, anna).miss.length &&
+      !WS.ui.wantFit(without, anna).hit.length && WS.ui.wantFit(without, anna).miss.length === 2,
+      JSON.stringify(WS.ui.wantFit(without, anna)));
+
+    /* Несовпавшее НАЗЫВАЕТСЯ вслух — иначе разделение бессмысленно. */
+    check('требования · чего лот не даёт — сказано прямо',
+      /не даёт: /.test(WS.ui.wantLine(without, anna)) &&
+      /даёт: /.test(WS.ui.wantLine(withSea, anna)),
+      WS.ui.wantLine(without, anna));
+
+    /* Без пожеланий строка не появляется вовсе: пустое «не даёт:» читалось бы
+       как претензия к лоту, которой никто не высказывал. */
+    const noWants = (dd().clients || []).find((c) => !((c.wants || []).length));
+    check('требования · без пожеланий размен не объявляется',
+      !!noWants && WS.ui.wantLine(without, noWants) === '', 'пусто');
+
+    /* Пожелание поднимает, но не решает: лот вне района или вне бюджета
+       не попадёт в подборку, сколько бы пожеланий он ни закрывал. Это и есть
+       граница между обязательным и желательным. */
+    dd().objects.push({
+      id: 'o_w_over', name: 'Perfect But Pricey', source: 'agency', area: (anna.areas || [])[0],
+      /* Площадь нарочно огромна: цена за метр выходит вдвое ниже среза, и если
+         бюджет перестанет быть обязательным, лот встанет в подборке ПЕРВЫМ.
+         Первая версия зонда была просто дорогой и в тройку не попадала по рангу —
+         её отсутствие доказывало не заслон по бюджету, а собственную слабость. */
+      price: Math.round((anna.budget || 2000000) * 1.8), size: 400, br: '4BR',
+      availability: 'available', verified: 'verified', checkedAt: 'сегодня',
+      commissionPct: 2, segment: 'resale', attrs: { view: 'sea', metro: true, floorBand: 'high' },
+    });
+    const ids = (WS.ui.replyPicks(anna) || []).map((o) => o.id);
+    check('требования · желательное не перебивает бюджет',
+      ids.indexOf('o_w_over') < 0 && WS.ui.wantFit(
+        (dd().objects || []).find((o) => o.id === 'o_w_over'), anna).hit.length === 2,
+      'подобрано: ' + ids.join(', '));
+
+    /* А в пределах бюджета — поднимает: тот же лот с той же ценой,
+       отличающийся только видом, должен стоять выше. */
+    dd().objects = (dd().objects || []).filter((o) => o.id !== 'o_w_over');
+    const base = {
+      name: 'Twin', source: 'agency', area: (anna.areas || [])[0],
+      price: Math.round((anna.budget || 2000000) * 0.9), size: 95, br: '2BR',
+      availability: 'available', verified: 'verified', checkedAt: 'сегодня',
+      commissionPct: 2, segment: 'resale',
+    };
+    const plain = Object.assign({}, base, { id: 'o_twin_plain', attrs: { view: 'city', metro: false } });
+    const nice = Object.assign({}, base, { id: 'o_twin_nice', attrs: { view: 'sea', metro: true } });
+    check('требования · при равных деньгах желаемое поднимает лот',
+      WS.ui.clientValue(nice, anna).score > WS.ui.clientValue(plain, anna).score,
+      WS.ui.clientValue(nice, anna).score + ' против ' + WS.ui.clientValue(plain, anna).score);
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Запрос без инвентаря и записанная нехватка ----
 
      Из четырёх вопросов, которые живой брокер задал стенду, три упёрлись в пустой

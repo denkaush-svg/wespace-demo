@@ -1341,11 +1341,45 @@
     // Проверенность: неподтверждённую цену нельзя ставить первой в письме клиенту.
     const fresh = (o.verified === 'verified' ? 4 : o.verified === 'expired' ? -12 : 0) +
                   (o.availability === 'available' ? 3 : o.availability === 'stale' ? -8 : 0);
-    const score = priceEdge * 1.6 + yieldPct * 2.2 + fit + fresh;
-    return { score: score, priceEdge: priceEdge, yieldPct: yieldPct, fit: fit, fresh: fresh, dv: dv, area: m.район || o.area };
+    /* Совпавшее пожелание поднимает лот, несовпавшее не опускает: штраф вытеснил бы
+       из подборки варианты, которые по деньгам лучше всего остального. */
+    const wantHits = wantFit(o, c).hit.length;
+    const score = priceEdge * 1.6 + yieldPct * 2.2 + fit + fresh + wantHits * 5;
+    return { score: score, priceEdge: priceEdge, yieldPct: yieldPct, fit: fit, fresh: fresh, wantHits: wantHits, dv: dv, area: m.район || o.area };
   }
   /* Одной строкой — почему этот объект в подборке. Порядок без объяснения — это просьба
      верить на слово, а клиент спросит «почему именно эти» на первой же встрече. */
+  /* Обязательное и желательное — разные вещи, а подбор до сих пор знал только первое.
+     «До 2 млн» и «в Business Bay» — условия, без которых разговора нет. «Вид на море» и
+     «рядом метро» — пожелания: без них вариант всё равно годится.
+
+     Смысл разделения не в ранжировании, а в ТОМ, ЧТО БРОКЕР СКАЖЕТ ПЕРВЫМ.
+     Молча показанный лот без вида на море — это возражение на показе и потерянные
+     два часа; названный заранее — честный размен: зато в бюджете и с доходностью выше.
+
+     Пожелание НЕ штрафуется — его отсутствие не порок лота, а то, о чём надо сказать. */
+  const WANTS = {
+    sea: { label: 'вид на воду', test: (o) => /sea|water|canal/i.test(((o.attrs || {}).view) || '') },
+    green: { label: 'вид на зелёнь', test: (o) => /park|garden/i.test(((o.attrs || {}).view) || '') },
+    metro: { label: 'рядом метро', test: (o) => !!((o.attrs || {}).metro) },
+    high: { label: 'высокий этаж', test: (o) => ((o.attrs || {}).floorBand) === 'high' },
+    fresh: { label: 'новая отделка', test: (o) => ((o.attrs || {}).finish) === 'new' },
+    prestige: { label: 'престижный адрес', test: (o) => ((o.attrs || {}).prestige) === 'high' },
+  };
+  function wantsOf(c) { return ((c && c.wants) || []).filter((k) => WANTS[k]); }
+  function wantFit(o, c) {
+    const hit = [], miss = [];
+    wantsOf(c).forEach((k) => (WANTS[k].test(o) ? hit : miss).push(WANTS[k].label));
+    return { hit: hit, miss: miss };
+  }
+  /* Без пожеланий обе половины пусты, и строка получается пустой сама — отдельная
+     охрана на этот случай была лишним кодом и проверке не поддавалась. */
+  function wantLine(o, c) {
+    const w = wantFit(o, c);
+    return [w.hit.length ? 'даёт: ' + w.hit.join(', ') : '',
+      w.miss.length ? 'не даёт: ' + w.miss.join(', ') : ''].filter(Boolean).join(' · ');
+  }
+
   function clientValueWhy(o, c) {
     const v = clientValue(o, c);
     const parts = [];
@@ -1355,6 +1389,10 @@
     const b = Number((c && c.budget) || 0);
     if (b && (o.price || 0) <= b) parts.push('в бюджете, запас ' + WS.AED(b - o.price));
     if (o.verified === 'expired') parts.push('проверка просрочена');
+    /* Пожелания стоят ПОСЛЕДНИМИ и всегда обеими сторонами: то, чего лот
+       не даёт, важнее для разговора, чем то, что даёт. */
+    const wl = wantLine(o, c);
+    if (wl) parts.push(wl);
     return parts.join(' · ');
   }
 
@@ -13512,7 +13550,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,
