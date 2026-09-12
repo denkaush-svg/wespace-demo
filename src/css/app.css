@@ -1080,6 +1080,11 @@ button { font-family: inherit; cursor: pointer; }
 .an-src.web { color: var(--ink-2); }
 /* Drawn at a revision the data has since left behind. */
 .an-src .moved { color: var(--warn); font-weight: 600; }
+/* Вторая единица площади: рядом, но явно вторая — два равновесных числа
+   рядом читаются как две разные величины, а не как одна в двух единицах. */
+.u2 { margin-left: 5px; font-size: .8em; font-weight: 600; color: var(--faint);
+  white-space: nowrap; font-variant-numeric: tabular-nums; }
+
 /* Чужой лот с портала. Вид намеренно не такой, как у наших карточек. */
 .fnd { border: 1px solid var(--hair); border-left: 3px solid var(--warn); border-radius: var(--r-sm);
   padding: 10px 11px; margin-bottom: 10px; background: var(--surface-2); }

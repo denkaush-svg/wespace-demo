@@ -354,5 +354,29 @@
   WS.chains = chains;
   WS.chainById = (id) => chains.find((c) => c.id === id);
   WS.scenarioById = (id) => scenarios.find((s) => s.id === id);
+  /* Дубайский брокер называет площадь в футах, даже когда говорит по-русски:
+     в футах написано на каждом портале и так говорит продавец. Метры при этом
+     остаются языком договора и земельного департамента. Поэтому величина одна, а
+     читается сразу в двух единицах — иначе брокер пересчитывает в уме на собственном
+     экране, ровно ту работу, ради которой стенд и нужен.
+     Порядок следует языку: в русском ведут метры, в английском — футы. */
+  const SQFT_IN_M2 = 10.7639;
+  const sqft = (m2) => Math.round(Number(m2 || 0) * SQFT_IN_M2);
+  function area(m2, en) {
+    const m = Number(m2 || 0);
+    if (!m) return '—';
+    return en ? sqft(m) + ' sqft · ' + m + ' m²' : m + ' м² · ' + sqft(m) + ' sqft';
+  }
+  // Вторая единица приглушена и мельче: два равновесных числа рядом читаются как два разных.
+  function areaHtml(m2, en) {
+    const m = Number(m2 || 0);
+    if (!m) return '—';
+    return en ? sqft(m) + ' sqft<span class="u2">' + m + ' m²</span>'
+              : m + ' м²<span class="u2">' + sqft(m) + ' sqft</span>';
+  }
   WS.AED = AED;
+  WS.SQFT_IN_M2 = SQFT_IN_M2;
+  WS.sqft = sqft;
+  WS.area = area;
+  WS.areaHtml = areaHtml;
 })(window.WS = window.WS || {});

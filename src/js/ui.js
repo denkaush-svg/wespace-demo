@@ -1373,7 +1373,7 @@
     const en = String((c && c.lang) || 'RU').toUpperCase() === 'EN';
     const first = String((c && c.name) || '').split(' ')[0];
     const money = (o) => aedIn(o.price, en) + ' (' + aedIn(Math.round(o.price / o.size), en) + (en ? ' per m²)' : ' за м²)');
-    const line = (o) => '— ' + o.name + ' · ' + o.br + ' · ' + o.size + (en ? ' m² · ' : ' м² · ') + money(o);
+    const line = (o) => '— ' + o.name + ' · ' + o.br + ' · ' + WS.area(o.size, en) + ' · ' + money(o);
     if (en) {
       const body = [
         'Good morning, ' + first + '.',
@@ -1544,7 +1544,7 @@
       (mp ? '<div class="sel-map" style="background-image:url(' + mp + ')"><span class="sel-pin"></span></div>' : '') +
       '</div>' +
       '<div class="sel-body"><h4>' + escAttr(o.name) + '</h4>' +
-      '<div class="sel-sub">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + o.size + ' м²' +
+      '<div class="sel-sub">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + WS.areaHtml(o.size) +
         (o.developer ? ' · ' + escAttr(o.developer) : '') + '</div>' +
       selectionFact('Цена', '<b>' + WS.AED(o.price) + '</b>') +
       selectionFact('Цена метра', dvLine) +
@@ -1645,7 +1645,7 @@
       '<div class="pitch">' +
         (ph ? '<div class="pitch-photo" style="background-image:url(' + ph + ')"></div>' : '') +
         '<div class="pitch-body">' +
-          '<div class="pitch-eyebrow">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + o.size + ' м²</div>' +
+          '<div class="pitch-eyebrow">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + WS.areaHtml(o.size) + '</div>' +
           '<h3 class="pitch-title">' + escAttr(o.name) + '</h3>' +
           '<div class="pitch-price">' + WS.AED(o.price) + '</div>' +
           lead +
@@ -9408,7 +9408,7 @@
     return '<div class="obj-card' + (o._new ? ' is-new' : '') + '" data-obj="' + o.id + '"><div class="obj-photo gen" style="' + photoStyle(o) + '">' + photo +
       '<span class="demo-wm badge demo">' + I('lock') + 'DEMO фото</span>' +
       '<span class="photo-cap">' + o.area + '</span><span class="price">' + WS.AED(o.price) + '</span></div>' +
-      '<div class="obj-body"><div class="ot">' + o.name + '</div><div class="om">' + o.area + ' · ' + o.br + ' · ' + o.size + ' м²</div>' +
+      '<div class="obj-body"><div class="ot">' + o.name + '</div><div class="om">' + o.area + ' · ' + o.br + ' · ' + WS.areaHtml(o.size) + '</div>' +
       '<div class="obadges">' + isNew + src + vb + tk + md + queued + '</div>' +
       '<div class="match">' + I('target') + '<span>' + o.match + '</span></div>' +
       '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn sm" data-fin="' + o.id + '">' + I('money') + 'Доходность</button>' +
@@ -9438,11 +9438,11 @@
         '<div class="obj-row__stats">' +
           '<div class="ost"><span class="osv">' + WS.AED(o.price) + '</span><span class="osl">цена</span></div>' +
           '<div class="ost"><span class="osv">' + perM2 + '</span><span class="osl">за м²</span></div>' +
-          '<div class="ost"><span class="osv">' + o.size + ' м²</span><span class="osl">площадь</span></div>' +
+          '<div class="ost"><span class="osv">' + WS.areaHtml(o.size) + '</span><span class="osl">площадь</span></div>' +
         '</div>' +
         '<div class="obj-row__tags">' + src + '</div>' +
         '<div class="obj-row__desc">' + o.match + '</div>' +
-        '<div class="obj-row__fields">' + ofield('Район', o.area) + ofield('Тип', o.br + ' · ' + o.size + ' м²') + ofield('Метро', o.attrs && o.attrs.metro ? 'рядом' : '—') + '</div>' +
+        '<div class="obj-row__fields">' + ofield('Район', o.area) + ofield('Тип', o.br + ' · ' + WS.area(o.size)) + ofield('Метро', o.attrs && o.attrs.metro ? 'рядом' : '—') + '</div>' +
         '<div class="obj-row__badges">' + vb + tk + md + '</div>' +
         '<div class="obj-row__acts">' +
           '<button class="btn sm" data-fin="' + o.id + '">' + I('money') + 'Доходность</button>' +
@@ -9477,7 +9477,7 @@
     if (typeof a.floor !== 'number') return '—';
     return a.floor + (a.floors ? ' из ' + a.floors : '') + ' эт.';
   }
-  const SQFT = 10.7639;              // м² → фт², чтобы читать service charge в тех же единицах, в каких он продаётся
+  const SQFT = WS.SQFT_IN_M2;        // м² → фт², чтобы читать service charge в тех же единицах, в каких он продаётся
   function ru(n) { return String(n).replace('.', ','); }
   function objIsOff(o) { return /off-plan|оффплан/i.test(o.segment || ''); }
   function objPerM2(o) { return o.size ? Math.round(o.price / o.size) : null; }
@@ -9511,7 +9511,7 @@
     const off = objIsOff(o);
 
     // 1. What it is, in one line: type, size, where, which floor, what you see out of the window.
-    let one = (o.br || 'объект') + ' ' + (o.size ? o.size + ' м² ' : '') + 'в районе ' + o.area;
+    let one = (o.br || 'объект') + ' ' + (o.size ? WS.area(o.size) + ' ' : '') + 'в районе ' + o.area;
     if (typeof a.floor === 'number') one += ', ' + a.floor + '-й этаж';
     const view = VIEW_PHRASE[(o.attrs || {}).view];
     if (view) one += ', вид ' + view;
@@ -9748,7 +9748,7 @@
     const perM2 = o.size ? WS.AED(Math.round(o.price / o.size)) : '—';
     if (tab === 'specs') {
       return dxSec('building', 'Характеристики', '', '<div class="dfields">' +
-        dfPair('Район', o.area) + dfPair('Адрес', o.address) + dfPair('Класс', o.br) + dfPair('Площадь', o.size + ' м²') +
+        dfPair('Район', o.area) + dfPair('Адрес', o.address) + dfPair('Класс', o.br) + dfPair('Площадь', WS.area(o.size)) +
         dfPair('Цена за м²', perM2) + dfPair('Этаж', objFloor(o)) + dfPair('Отделка', objAttr(o, 'finish')) +
         dfPair('Вид', objAttr(o, 'view')) + dfPair('Спрос на рынке', objAttr(o, 'demand')) + dfPair('Престиж', objAttr(o, 'prestige')) +
         dfPair('Метро', (o.attrs && o.attrs.metro) ? 'рядом' : '—') + dfPair('Источник', o.sourceLabel) +
@@ -9769,7 +9769,7 @@
     const priceBlock = '<div class="obj-overview-price">' +
       '<div><div class="obj-overview-price-label">Цена</div><div class="obj-overview-price-val">' + WS.AED(o.price) + '</div></div>' +
       '<div><div class="obj-overview-price-label">За м²</div><div class="obj-overview-price-val">' + perM2 + '</div></div>' +
-      '<div><div class="obj-overview-price-label">Площадь</div><div class="obj-overview-price-val">' + o.size + ' м²</div></div>' +
+      '<div><div class="obj-overview-price-label">Площадь</div><div class="obj-overview-price-val">' + WS.areaHtml(o.size) + '</div></div>' +
       '</div>';
     const commHtml = objCommission(o);
     const pubHtml = objPublish(o);
@@ -9894,7 +9894,7 @@
     const m = [
       [WS.AED(o.price), 'общая цена', true],
       [perM2, 'цена за м²', false],
-      [o.size + ' м²', 'площадь', false],
+      [WS.areaHtml(o.size), 'площадь', false],
       [y ? String(y).replace('.', ',') + '%' : objFloor(o), y ? 'доходность (расчёт)' : 'этаж', false],
     ];
     const lead = (opts && opts.lead === false) ? '' :
@@ -11663,7 +11663,7 @@
     const objCards = objs.slice(1).map((o) => {
       const ny = objNetYield(o); const ph = WS.photos && (WS.photos[o.id] || WS.photos.o_creekline);
       return '<div class="ws-obj"><div class="ws-obj-ph" style="background-image:url(' + ph + ')"></div>' +
-        '<div style="flex:1"><div class="ws-obj-n">' + o.name + '</div><div class="ws-obj-m">' + o.area + ' · ' + o.br + ' · ' + o.size + ' м²</div>' +
+        '<div style="flex:1"><div class="ws-obj-n">' + o.name + '</div><div class="ws-obj-m">' + o.area + ' · ' + o.br + ' · ' + WS.areaHtml(o.size) + '</div>' +
         '<div class="prov" style="margin-top:5px"><span class="badge acc">' + I('money') + WS.AED(o.price) + '</span><span class="badge ok">' + I('trend') + 'чистая ' + WS.finance.pct(ny) + '</span></div></div></div>';
     }).join('');
     const chart = objs.length ? '<div class="section-label">Сравнение доходности · чистая</div>' + barChart(objs.map((o) => ({ label: o.name.split(',')[0], value: objNetYield(o), fmt: WS.finance.pct(objNetYield(o)), hot: objNetYield(o) >= 0.05 }))) : '';
@@ -11675,10 +11675,10 @@
       '<div class="ws-flag"><b>Флагман:</b> ' + (flag ? flag.name.split(',')[0] : '—') + ' — ROI ' + r.fmt.roi5 + ' за 5 лет, IRR ' + r.fmt.irr + '.</div>' + excl +
       wsDocFoot('Расчёт демонстрационный. Доступность подтверждается отдельно. WeSpace · BRN DEMO-0000.');
     openModal('Коммерческое предложение · ' + (client.name || ''), body,
-      '<div style="font-size:11.5px;color:var(--mut);width:100%;margin-bottom:2px">' + I('target') + ' Готово к отправке — проверьте и отправьте клиенту на подпись.</div>' +
+      '<div style="font-size:11.5px;color:var(--mut);width:100%;margin-bottom:2px">' + I('target') + ' Готово к отправке — проверьте и отправьте клиенту. Это предложение, а не договор: подпись будет на Form B или Form F.</div>' +
       '<button class="btn" data-act="closeModal">Закрыть</button>' +
       '<button class="btn" data-act="download">' + I('download') + 'Скачать PDF</button>' +
-      '<button class="btn primary" data-act="kpSend">' + I('arrowUp') + 'Отправить клиенту на подпись</button>', { wide: true });
+      '<button class="btn primary" data-act="kpSend">' + I('arrowUp') + 'Отправить клиенту</button>', { wide: true });
   }
   function openXls() {
     const m = S().finModel || D().refModel; const r = WS.finance.compute(m);
@@ -12712,7 +12712,7 @@
     const ph = WS.photos && (WS.photos[o.id] || WS.photos.o_creekline);
     const perMsg = 15, recips = (typeof PARTNERS !== 'undefined' ? PARTNERS : []).length || 4;
     const cost = perMsg * recips;
-    const msg = 'Эксклюзив · ' + o.area + ': ' + o.name + ', ' + o.br + ', ' + o.size + ' м². ' + WS.AED(o.price) + ' (' + WS.AED(Math.round(o.price / o.size)) + '/м²). Проверенная доступность, комиссия по договорённости. Детали и бронь — в ответ.';
+    const msg = 'Эксклюзив · ' + o.area + ': ' + o.name + ', ' + o.br + ', ' + WS.area(o.size) + '. ' + WS.AED(o.price) + ' (' + WS.AED(Math.round(o.price / o.size)) + '/м²). Проверенная доступность, комиссия по договорённости. Детали и бронь — в ответ.';
     const creatives = [ph, WS.photos && WS.photos.o_interior, WS.photos && WS.photos.o_marina].filter(Boolean).slice(0, 3)
       .map((src) => '<div style="width:92px;height:66px;border-radius:8px;border:1px solid var(--line);background:#eee url(' + src + ') center/cover"></div>').join('');
     const recipRows = (typeof PARTNERS !== 'undefined' ? PARTNERS : []).map((p) => '<label class="feed-row" style="cursor:pointer"><input type="checkbox" checked style="margin:0 10px 0 0;accent-color:var(--acc)"><div class="ft"><div class="t">' + p.name + '</div><div class="m">' + p.focus + '</div></div></label>').join('');
@@ -12740,7 +12740,7 @@
       (ph ? '<div class="promo-strip-img" style="background-image:url(' + ph + ')"></div>' : '') +
       '<div class="promo-strip-info">' +
       '<div class="promo-strip-name">' + o.name + '</div>' +
-      '<div class="promo-strip-sub">' + I('building') + o.area + ' · ' + o.br + ' · ' + o.size + ' м² · <b>' + WS.AED(o.price) + '</b></div>' +
+      '<div class="promo-strip-sub">' + I('building') + o.area + ' · ' + o.br + ' · ' + WS.areaHtml(o.size) + ' · <b>' + WS.AED(o.price) + '</b></div>' +
       '</div>' +
       '<span class="badge ok promo-strip-src">' + I('check') + o.sourceLabel + '</span>' +
       '</div>';
@@ -12781,7 +12781,7 @@
     const list = objs.map((o) => {
       const perM2 = WS.AED(Math.round(o.price / o.size)) + '/м²';
       return '<div class="feed-row"><div class="fi i-acc">' + I('building') + '</div>' +
-        '<div class="ft"><div class="t">' + o.name + '</div><div class="m">' + o.area + ' · ' + o.br + ' · ' + o.size + ' м² · ' + WS.AED(o.price) + ' · ' + perM2 + '</div></div>' +
+        '<div class="ft"><div class="t">' + o.name + '</div><div class="m">' + o.area + ' · ' + o.br + ' · ' + WS.areaHtml(o.size) + ' · ' + WS.AED(o.price) + ' · ' + perM2 + '</div></div>' +
         '<button class="btn sm primary" data-promo="' + o.id + '">' + I('send') + 'Продвигать</button></div>';
     }).join('');
     const steps = [
