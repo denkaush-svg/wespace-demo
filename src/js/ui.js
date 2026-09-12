@@ -7696,7 +7696,12 @@
 
     // 5. Что мешает — одна причина, самая дорогая. Счётчики сюда не попадают.
     if (!dealClosed(d)) {
-      const cf = (D().conflicts || {})[d.id];
+      // conflicts хранится по id владеющей записи (заявки), не по id сделки — тот же адрес
+      // поиска, что чинил conflictBlock (см. комментарий у conflictSource): прямой lookup по
+      // d.id молча не находил унаследованный конфликт, и приоритет «самая дорогая причина»
+      // решался так, будто конфликта нет.
+      const cfSrc = conflictSource(d);
+      const cf = cfSrc ? cfSrc.cf : null;
       const nextGate = gatesFor(d).filter((k) => !gateDone(d, k))[0];
       const overdue = tasksOfDeal(d).filter((t) => t.status !== 'done' && t.when === 'overdue').length;
       let block = '';

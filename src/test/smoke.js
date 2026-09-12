@@ -11244,6 +11244,23 @@ setTimeout(async () => {
       WS.storeApi.resetAll();
     }
 
+    // Строка «Мешает» в справке по сделке (dealBriefSentences, ui.js) подозревалась в том же
+    // дефекте, что раньше был у conflictBlock: конфликт ищется по (D().conflicts||{})[d.id], а
+    // conflicts хранится по requestId владеющей заявки. d_karim_cross выросла из r_karim_cross,
+    // а сам конфликт числится на r_karim (более раннем запросе того же клиента) — ключ по d.id
+    // никогда не совпадает, и «Мешает» решает свой приоритет («одна причина, самая дорогая»)
+    // так, будто конфликта нет вовсе, хотя conflictSource(d) его находит.
+    {
+      WS.storeApi.resetAll();
+      const cf = (dd().conflicts || {})['r_karim'];
+      const brief = WS.ui.dealBrief('d_karim_cross');
+      const blockLine = brief.find((s) => s.indexOf('Мешает:') === 0) || '';
+      check('справка по сделке · «Мешает» видит конфликт заявки, а не молчит про него / не подменяет более дешёвой причиной',
+        !!cf && blockLine.indexOf('Бюджет') >= 0,
+        'conflict=' + JSON.stringify(cf) + ' строка_Мешает="' + blockLine + '"');
+      WS.storeApi.resetAll();
+    }
+
     // Пункт 4 — пользовательские подписи не содержат сырых id / значений перечислений. Смотрим
     // только textContent (видимый текст), не innerHTML — data-атрибуты с внутренними id законны.
     {
