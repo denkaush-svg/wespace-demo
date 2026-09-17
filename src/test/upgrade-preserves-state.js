@@ -57,6 +57,20 @@ setTimeout(() => {
   const old = JSON.parse(snapshot);
   delete old.data.approvals;      // коллекции, добавленной новой сборкой, у него нет
   delete old.signals;             // старая сборка их не сохраняла вовсе
+
+  /* ФОРМА ЗАПИСИ у него тоже старая, и это отдельный случай от отсутствующей
+     коллекции: у лота нет назначения, а готовность записана прозой. И самих
+     лотов у него меньше — инвентарь наполняли после того, как он снял снимок. */
+  const OLD_KEPT = 3;
+  old.data.objects = old.data.objects.slice(0, OLD_KEPT).map((o, i) => {
+    const c = Object.assign({}, o);
+    delete c.deal;
+    c.segment = i === 0 ? 'off-plan' : 'готовое · вторичка';
+    return c;
+  });
+  old.data.objects[1].нота_брокера = 'торгуется, готов скинуть 3%';
+  old.data.objects[1].price = 1;   // брокер сам правил цену — фикстура не имеет права её вернуть
+  const OLD_IDS = old.data.objects.map((o) => o.id);
   const oldSnapshot = JSON.stringify(old);
   console.log('\u0421\u0422\u0410\u0420\u042b\u0419 \u0421\u041d\u0418\u041c\u041e\u041a: \u0431\u0435\u0437 approvals, \u0431\u0435\u0437 signals \u2014 \u043a\u0430\u043a \u0443 \u0431\u0440\u043e\u043a\u0435\u0440\u0430 \u0441\u0435\u0439\u0447\u0430\u0441\n');
 
@@ -72,6 +86,47 @@ setTimeout(() => {
   setTimeout(() => {
     const W2 = dom2.window, WS2 = W2.WS, doc2 = W2.document;
     console.log('=== \u0427\u0422\u041e \u0421 \u041d\u0410\u041a\u041e\u041f\u041b\u0415\u041d\u041d\u042b\u041c \u041f\u041e\u0421\u041b\u0415 \u0420\u0410\u0421\u041a\u0410\u0422\u041a\u0418 ===');
+
+    /* Самое важное в обновлении: работа брокера цела, а новое доехало.
+
+       До миграции записей весь инвентарь брался из снимка целиком: брокер
+
+       оставался со старыми тремя лотами и никогда не видел ни одного нового. */
+
+    const OBJ = (WS2.store.data.objects || []);
+
+    check('обновление · новый инвентарь доехал до брокера',
+
+      OBJ.length > OLD_KEPT && OBJ.some((o) => o.id === 'o_beachfront2br'),
+
+      'лотов: ' + OBJ.length + ' было ' + OLD_KEPT);
+
+    check('обновление · форма старой записи дозаполнена',
+
+      OBJ.every((o) => (o.deal === 'sale' || o.deal === 'rent') &&
+
+        (o.segment === 'off-plan' || o.segment === 'resale')),
+
+      OBJ.filter((o) => !o.deal).map((o) => o.id).join(', '));
+
+    check('обновление · готовность выведена из старой прозы, а не назначена вслепую',
+
+      (OBJ.find((o) => o.id === OLD_IDS[0]) || {}).segment === 'off-plan' &&
+
+      (OBJ.find((o) => o.id === OLD_IDS[1]) || {}).segment === 'resale',
+
+      OLD_IDS.map((id) => id + '=' + (OBJ.find((o) => o.id === id) || {}).segment).join(', '));
+
+    /* Правки брокера важнее свежести фикстуры: миграция дозаполняет, но не переписывает. */
+
+    const edited = OBJ.find((o) => o.id === OLD_IDS[1]) || {};
+
+    check('обновление · правка брокера в записи не затёрта',
+
+      edited.нота_брокера === 'торгуется, готов скинуть 3%' && edited.price === 1,
+
+      'заметка: ' + edited.нота_брокера + ' · цена: ' + edited.price);
+
 
     check('\u0441\u043d\u0438\u043c\u043e\u043a \u043f\u0440\u0438\u043d\u044f\u0442, \u0430 \u043d\u0435 \u043e\u0442\u0431\u0440\u043e\u0448\u0435\u043d \u043a\u0430\u043a \u043d\u0435\u0441\u043e\u0432\u043c\u0435\u0441\u0442\u0438\u043c\u044b\u0439',
       WS2.store.incompatible !== true, 'incompatible=' + WS2.store.incompatible);

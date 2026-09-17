@@ -9677,6 +9677,41 @@ setTimeout(async () => {
       badRent.map((o) => o.id + ': ' + (o.rentYear / o.price * 100).toFixed(1) + '% против ' +
         idx[o.area].доходностьПроцент + '%').join(', ') || 'арендных: ' + rented.length);
 
+    /* Арендный лот нельзя предложить покупателю — его не продают.
+       Проверяется дифференциально: ОДИН и тот же лот сначала как продажный,
+       потом как арендный. Просто «его нет в подборке» ничего бы не доказало. */
+    const rentProbe = objs.find((o) => o.deal === 'rent' && o.area === 'JVC');
+    const jvcBuyer = { id: 'c_rentprobe', areas: ['JVC'], budget: 1500000, objTypes: ['apart'], consent: true };
+    rentProbe.deal = 'sale';
+    const asSale = (WS.ui.replyPicks(jvcBuyer) || []).map((o) => o.id);
+    rentProbe.deal = 'rent';
+    const asRent = (WS.ui.replyPicks(jvcBuyer) || []).map((o) => o.id);
+
+    check('аренда · зонд годен: как продажный лот в подборку попадает',
+      asSale.indexOf(rentProbe.id) >= 0, 'подобрано: ' + asSale.join(', '));
+
+    check('аренда · тот же лот в аренде покупателю не предлагается',
+      asRent.indexOf(rentProbe.id) < 0, 'подобрано: ' + asRent.join(', '));
+
+    /* Сумма сделки у аренды — годовая ставка, а не стоимость квартиры.
+       Пять процентов от актива вместо пяти от ставки — завышение восемнадцать раз. */
+    check('аренда · комиссия считается от годовой ставки, а не от цены актива',
+      WS.ui.oppComm(rentProbe) === Math.round(rentProbe.rentYear * rentProbe.commissionPct / 100) &&
+      WS.ui.oppDealValue(rentProbe) === rentProbe.rentYear,
+      WS.ui.oppComm(rentProbe) + ' при ставке ' + rentProbe.rentYear +
+        ' · от актива было бы ' + Math.round(rentProbe.price * rentProbe.commissionPct / 100));
+
+    /* Главное число арендного лота на экране — ставка, а не цена актива. */
+    const money = WS.ui.objMoney(rentProbe);
+    check('аренда · на экране ведёт ставка, актив рядом',
+      /\/год/.test(money) && money.indexOf('актив') > 0 &&
+      money.indexOf(String(rentProbe.rentYear).slice(0, 2)) < money.indexOf('актив'),
+      money.replace(/<[^>]+>/g, ' '));
+
+    check('аренда · у продажного лота деньги не меняются',
+      WS.ui.objMoney(objs.find((o) => o.deal === 'sale')).indexOf('актив') < 0,
+      WS.ui.objMoney(objs.find((o) => o.deal === 'sale')));
+
     /* Три вещи, которых живой брокер просил и не получил — поимённо. */
     check('инвентарь · Emaar Beachfront есть и в базе, и в срезе',
       objs.some((o) => o.area === 'Emaar Beachfront') && !!idx['Emaar Beachfront'],

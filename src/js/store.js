@@ -207,7 +207,49 @@
     Object.keys(fresh).forEach((k) => {
       if (store.data[k] === undefined || store.data[k] === null) { store.data[k] = fresh[k]; filled.push(k); }
     });
+
+    /* ДО-ЗАПОЛНЕНИЕ НА УРОВНЕ ЗАПИСЕЙ.
+
+       Дозаполнения коллекций выше хватало, пока менялись только целые
+       коллекции. Но у брокера с накопленным состоянием весь список объектов
+       берётся из его снимка целиком — и новый инвентарь до него не доезжает
+       вообще, а старые записи читаются по-старому.
+
+       Поднять SCHEMA нельзя: она выбрасывает ВСЁ, включая переписку, которая
+       существует в единственном экземпляре у него в браузере.
+
+       Два правила, оба консервативные:
+         — каталожные коллекции (что агентство держит, а не что брокер ведёт)
+           пополняются НОВЫМИ записями по id; существующие не трогаются
+           совсем — правки брокера важнее свежести фикстуры;
+         — у объекта дозаполняются две оси, которых раньше не было в форме записи.
+           Назначение и готовность выводятся из старой прозы, которая их и несла. */
+    const CATALOGUE = ['objects', 'market'];
+    const added = [];
+    CATALOGUE.forEach((k) => {
+      if (!Array.isArray(store.data[k]) || !Array.isArray(fresh[k])) return;
+      const have = {};
+      store.data[k].forEach((r) => { if (r && r.id) have[r.id] = 1; });
+      fresh[k].forEach((r) => { if (r && r.id && !have[r.id]) { store.data[k].push(r); added.push(k + ':' + r.id); } });
+    });
+
+    let reshaped = 0;
+    (Array.isArray(store.data.objects) ? store.data.objects : []).forEach((o) => {
+      if (!o || typeof o !== 'object') return;
+      const seg = String(o.segment || '');
+      if (o.deal !== 'sale' && o.deal !== 'rent') {
+        o.deal = /аренд/i.test(seg) ? 'rent' : 'sale';
+        reshaped += 1;
+      }
+      if (seg !== 'off-plan' && seg !== 'resale') {
+        o.segment = /off-?plan|оффплан/i.test(seg) ? 'off-plan' : 'resale';
+        reshaped += 1;
+      }
+    });
+
     if (filled.length) store.migratedKeys = filled;
+    if (added.length) store.migratedRecords = added;
+    if (reshaped) store.migratedShapes = reshaped;
     return true;
   }
 

@@ -1757,7 +1757,7 @@
       escAttr(act) + '" data-obj="' + escAttr(o.id) + '">' +
       '<div class="fi i-acc">' + I('building') + '</div>' +
       '<div class="ft"><div class="t">' + escAttr(o.name) + '</div>' +
-      '<div class="m">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + WS.AED(o.price) + '</div></div>' +
+      '<div class="m">' + escAttr(o.area) + ' · ' + escAttr(o.br) + ' · ' + objMoney(o) + '</div></div>' +
       I('arrowRight') + '</button>').join('');
     openModal(title || 'По какому объекту?',
       '<div class="feed">' + rows + '</div>',
@@ -2483,14 +2483,22 @@
   function oppMarketOf(area) { return oppMarket().find((m) => m.район === area) || null; }
   function oppClient(id) { return (D().clients || []).find((x) => x.id === id) || null; }
   function oppObject(id) { return (D().objects || []).find((x) => x.id === id) || null; }
+  /* Сумма сделки у продажи и у аренды — разные величины. Комиссия по аренде
+     считается от ГОДОВОЙ СТАВКИ, а не от стоимости квартиры: пять процентов
+     от актива вместо пяти от ставки — это завышение восемнадцать раз. */
+  function oppDealValue(o) {
+    if (!o) return 0;
+    return objPurpose(o) === 'rent' ? (o.rentYear || 0) : (o.price || 0);
+  }
   function oppComm(o) {
     if (!o) return 0;
     const pct = o.commissionPct != null ? o.commissionPct : DEFAULT_COMM_PCT;
-    return Math.round((o.price || 0) * pct / 100);
+    return Math.round(oppDealValue(o) * pct / 100);
   }
   function oppCommNote(o) {
     const pct = o && o.commissionPct != null ? o.commissionPct : DEFAULT_COMM_PCT;
-    return pct + '% от ' + WS.AED(o ? o.price : 0);
+    return pct + '% от ' + WS.AED(oppDealValue(o)) +
+      (o && objPurpose(o) === 'rent' ? ' в год' : '');
   }
   /* Занят ли объект — предлагать его второму клиенту нельзя.
 
@@ -2523,6 +2531,11 @@
      с одним и тем же условием — это восемь возможностей забыть его в девятом. */
   function oppFreeObjects(claimed) {
     return (D().objects || []).filter((o) => o.availability === 'available' &&
+      /* Лот, предложенный В АРЕНДУ, нельзя предложить покупателю — его не продают.
+         До этой строки новый арендный фонд вставал в подборку покупателю наравне
+         с продажными: классификация была, а спрашивали её только в фильтре каталога.
+         Когда появится подбор под АРЕНДУ, у него будет своя точка входа. */
+      objPurpose(o) === 'sale' &&
       objSendable(o) && !oppObjectBusy(o.id) && claimed.indexOf(o.id) < 0);
   }
   function oppDays(n) { return n + ' ' + plural(n, 'день', 'дня', 'дней'); }
@@ -2783,7 +2796,7 @@
               pick.occupancy ? ['Заполненность', pick.occupancy] : null,
               pick.usp ? ['Чем интересен', pick.usp] : null,
             ].filter(Boolean),
-            offer: pick.name + ' целиком — ' + pick.size + ' м², ' + (pick.segment || ''),
+            offer: pick.name + ' целиком — ' + pick.size + ' м², ' + objSegLabel(pick),
             act: 'Назначить осмотр и запросить рент-ролл по действующим арендаторам',
             value: oppComm(pick), valueNote: oppCommNote(pick),
             title: 'Показать ' + cDat(c) + ' ' + oppShort(pick) + ' целиком',
@@ -9440,7 +9453,6 @@
   function inPriceBucket(p, b) {
     return b === 'all' || (b === 'lo' && p < 1700000) || (b === 'mid' && p >= 1700000 && p <= 2200000) || (b === 'hi' && p > 2200000);
   }
-  // Listing intent (demo classification, no persisted field): purchase vs rental inventory.
   /* Назначение лота жило списком из трёх id прямо здесь — и было перепутано:
      арендным числился off-plan лот со сдачей в 2027 и оплаченной бронью в сделке,
      а единственный арендный лот считался продажей. Фильтр «Аренда» показывал не тот лот. */
@@ -9693,6 +9705,14 @@
   function objIsOff(o) { return /off-plan|оффплан/i.test(o.segment || ''); }
   function objPerM2(o) { return o.size ? Math.round(o.price / o.size) : null; }
   function objPerSqft(o) { return o.size ? Math.round(o.price / WS.sqft(o.size)) : null; }
+  /* Главное число лота зависит от того, для чего он предложен. У арендного
+     это годовая ставка; стоимость актива остаётся рядом и приглушённой — она
+     нужна для доходности, но ценой сделки не является. */
+  function objMoney(o) {
+    if (!o) return '';
+    if (objPurpose(o) !== 'rent') return WS.AED(o.price);
+    return WS.AED(o.rentYear || 0) + '/год<span class="u2">актив ' + WS.AED(o.price) + '</span>';
+  }
   function objMarket(o) { return (WS.AREAS || {})[o.area] || null; }
   // Отклонение цены объекта от средней по району, в процентах. Знак несёт смысл: минус — аргумент,
   // плюс — возражение, которое всё равно прозвучит, поэтому ответ на него готовится заранее.
@@ -9884,7 +9904,7 @@
   }
   function objPriceAnchor(o) {
     const perM2 = o.size ? WS.AED(Math.round(o.price / o.size)) : '—';
-    return '<div class="obj-priceanchor"><div class="pa-price">' + WS.AED(o.price) + '<span class="pa-m2">' + perM2 + ' / м²</span></div>' + objCommission(o) + objPublish(o) + '</div>';
+    return '<div class="obj-priceanchor"><div class="pa-price">' + objMoney(o) + '<span class="pa-m2">' + perM2 + ' / м²</span></div>' + objCommission(o) + objPublish(o) + '</div>';
   }
   function objPhotos(o) { const P = WS.photos || {}; return [P[o.id], P.o_interior, P.o_marina].filter(Boolean); }
   let _objGal = null;
@@ -13617,7 +13637,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pitchPermits, pitchMissing, pitchAdvertisable, pitchBlockReason, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, objPurpose, objSegLabel, objPerM2, objPerSqft, objPriceGap, objServiceYear, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pitchPermits, pitchMissing, pitchAdvertisable, pitchBlockReason, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, objPurpose, objSegLabel, objMoney, oppComm, oppDealValue, objPerM2, objPerSqft, objPriceGap, objServiceYear, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

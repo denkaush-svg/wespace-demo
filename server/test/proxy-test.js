@@ -213,7 +213,12 @@ function pureChecks() {
 
     // Through the prompt builder, not the helper: testing fitDigest on its own
     // left the call site free to go back to clipping a string.
-    const huge = { сделки: many(400, 'd'), ревизия: 3 };
+    /* Размер входа был прибит числом и перестал превышать потолок, когда
+       потолок подняли: проверка про урезание перестала проверять урезание.
+       Теперь вход строится ОТ НАСТОЯЩЕГО потолка и перерастёт вместе с ним. */
+    const perRec = JSON.stringify(many(1, 'd')[0]).length + 1;
+    const total = Math.ceil(CFG.maxDigestChars / perRec) + 200;
+    const huge = { сделки: many(total, 'd'), ревизия: 3 };
     const prompt = buildPrompt({ text: 'вопрос', digest: huge });
     // Everything between the two markers, and nothing else: the rules above
     // contain example objects, so «every line that looks like JSON» swept them
@@ -224,7 +229,8 @@ function pureChecks() {
     try { inPrompt = JSON.parse(block); } catch (e) { inPrompt = null; }
     ok('the data block in the prompt is parseable JSON', !!inPrompt, block.slice(-70));
     ok('and it admits the list was shortened',
-      !!inPrompt && !!inPrompt._обрезано && inPrompt._обрезано.сделки.всего === 400);
+      !!inPrompt && !!inPrompt._обрезано && inPrompt._обрезано.сделки.всего === total &&
+      inPrompt._обрезано.сделки.показано < total);
   }
 
   // Экраны и операции, которые модель называет, должны существовать в стенде.
