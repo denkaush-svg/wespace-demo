@@ -9712,6 +9712,25 @@ setTimeout(async () => {
       WS.ui.objMoney(objs.find((o) => o.deal === 'sale')).indexOf('актив') < 0,
       WS.ui.objMoney(objs.find((o) => o.deal === 'sale')));
 
+    /* Отклонение от района на КАРТОЧКЕ обязано спрашивать индекс своего
+       сегмента так же, как это делают разборы Пульса. До этого карточка брала
+       индекс района как есть, и офис сравнивался с квартирами. */
+    const offices = objs.filter((o) => /Офис/i.test(o.br || ''));
+    const crossSeg = offices.filter((o) => {
+      const m = idx[o.area];
+      return m && m.сегмент !== 'офисы' && WS.ui.objPriceGap(o) !== null;
+    });
+    check('инвентарь · офис не сравнивается с квартирным индексом',
+      offices.length > 0 && !crossSeg.length,
+      crossSeg.map((o) => o.id + ' в ' + o.area + ': ' + WS.ui.objPriceGap(o) + '%').join(', ') || 'офисов: ' + offices.length);
+
+    /* А там, где индекс ПО ОФИСАМ есть, отклонение обязано считаться —
+       иначе заслон превратился бы в молчание про все офисы сразу. */
+    const difcOffice = offices.find((o) => (idx[o.area] || {}).сегмент === 'офисы');
+    check('инвентарь · где индекс по офисам есть, отклонение считается',
+      !!difcOffice && WS.ui.objPriceGap(difcOffice) !== null,
+      difcOffice ? difcOffice.id + ': ' + WS.ui.objPriceGap(difcOffice) + '%' : 'нет офиса с индексом');
+
     /* Три вещи, которых живой брокер просил и не получил — поимённо. */
     check('инвентарь · Emaar Beachfront есть и в базе, и в срезе',
       objs.some((o) => o.area === 'Emaar Beachfront') && !!idx['Emaar Beachfront'],
