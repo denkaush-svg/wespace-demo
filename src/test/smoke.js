@@ -8455,8 +8455,12 @@ setTimeout(async () => {
         if (idx) {
           const wasP = idx.ценаЗаМетр; idx.ценаЗаМетр = Math.round(named.price / named.size * 1.2);
           const after = ins(); idx.ценаЗаМетр = wasP;
+          /* Раньше здесь стояло «список стал короче на одно» — верно только пока
+             кандидат единственный. На полном инвентаре место выбывшего занимает следующий,
+             и длина ничего не говорит. Проверять надо ИМЕННО названный объект. */
           check('Пульс · наблюдение о цене держится на самом отклонении',
-            after.length === list0.length - 1, after.length + ' против ' + list0.length);
+            !after.some((x) => String(x[1]).indexOf(WS.ui.oppShort(named)) >= 0),
+            'названный объект ' + (after.some((x) => String(x[1]).indexOf(WS.ui.oppShort(named)) >= 0) ? 'остался' : 'ушёл'));
         }
         /* Нагрузка на сам запрет межсегментного сравнения. На готовых данных он не виден:
            единственный офис в районе с индексом квартир стоит НИЖЕ индекса, а правило ловит
@@ -9618,6 +9622,136 @@ setTimeout(async () => {
       gaps.length > 0, gaps.map(([a]) => a).join(', ') || 'ни одного — co-broking нечем показать');
   }
 
+  /* ---- Инвентарь не спорит сам с собой ----
+
+     Из 29 диалогов живого брокера восемь ответов были «этого у нас нет», и ни
+     один не был ошибкой рассуждения — инвентаря действительно не было. Но наполнить
+     его мало: набросанные на глаз цифры порождают противоречия, которые Консьерж
+     найдёт и произнесёт вслух — он уже ловил расхождение вида между карточкой
+     и описанием. Поэтому здесь проверяются не количества, а СОГЛАСИЕ данных. */
+  {
+    WS.storeApi.resetAll();
+    const objs = dd().objects || [];
+    const mkt = dd().market || [];
+    const idx = {}; mkt.forEach((m) => { idx[m.район] = m; });
+
+    /* Срез рынка называет цену метра в районе. Если лотов там ноль, стенд
+       рассказывает про рынок, на котором ему нечего предложить. */
+    /* Первая версия этой проверки требовала лоты В КАЖДОМ районе среза и была
+       неверна по сути: агентство законно знает цены там, где ничего не держит,
+       и именно это даёт повод для co-broking. Проверять надо другое: что такой
+       район не расплодился — три пустых района из девяти это уже не стратегия. */
+    const empty = mkt.filter((m) => !objs.some((o) => o.area === m.район)).map((m) => m.район);
+    check('инвентарь · непокрытый район один, и это повод для co-broking',
+      empty.length === 1, empty.join(', ') || 'непокрытых нет — разбору про co-broking не из чего собраться');
+
+    /* «Сравни с другими вариантами в нашем инвентаре» — живой вопрос брокера.
+       С одним лотом в районе ответ на него невозможен. */
+    const thin = mkt.filter((m) => {
+      const n = objs.filter((o) => o.area === m.район).length;
+      return n === 1;   // ноль — это co-broking выше, а не тонкий инвентарь
+    }).map((m) => m.район);
+    check('инвентарь · в каждом районе есть с чем сравнить',
+      !thin.length, thin.join(', ') || 'везде два и больше');
+
+    /* Цена лота и индекс района — два экрана об одном и том же метре.
+       Расхождение вдвое — не «выгодное предложение», а опечатка в данных. */
+    const wild = objs.filter((o) => {
+      const m = idx[o.area]; if (!m || !o.size || !m.ценаЗаМетр) return false;
+      return Math.abs((o.price / o.size) / m.ценаЗаМетр - 1) > 0.25;
+    });
+    check('инвентарь · цена метра держится рядом с индексом района',
+      !wild.length,
+      wild.map((o) => o.id + ': ' + Math.round(o.price / o.size) + ' против ' + idx[o.area].ценаЗаМетр).join(', ') || 'все в полосе');
+
+    /* Арендная ставка против доходности района: ставка, обещающая вдвое
+       больше, чем даёт район, — обещание, за которое отвечать брокеру. */
+    const rented = objs.filter((o) => o.deal === 'rent');
+    const badRent = rented.filter((o) => {
+      const m = idx[o.area]; if (!m || !m.доходностьПроцент || !o.price) return false;
+      const got = o.rentYear / o.price * 100;
+      return Math.abs(got / m.доходностьПроцент - 1) > 0.2;
+    });
+    check('инвентарь · арендная ставка согласна доходности района',
+      rented.length >= 3 && !badRent.length,
+      badRent.map((o) => o.id + ': ' + (o.rentYear / o.price * 100).toFixed(1) + '% против ' +
+        idx[o.area].доходностьПроцент + '%').join(', ') || 'арендных: ' + rented.length);
+
+    /* Три вещи, которых живой брокер просил и не получил — поимённо. */
+    check('инвентарь · Emaar Beachfront есть и в базе, и в срезе',
+      objs.some((o) => o.area === 'Emaar Beachfront') && !!idx['Emaar Beachfront'],
+      objs.filter((o) => o.area === 'Emaar Beachfront').map((o) => o.name).join(', '));
+
+    check('инвентарь · есть метраж около 1200 фт² с видом на море',
+      objs.some((o) => o.size >= 105 && o.size <= 120 && /sea/i.test((o.attrs || {}).view || '')),
+      objs.filter((o) => /sea/i.test((o.attrs || {}).view || '')).map((o) => o.name + ' ' + o.size + 'м²').join(', '));
+
+    WS.storeApi.resetAll();
+  }
+
+  /* ---- Две оси лота: для чего предложен и в какой готовности ----
+
+     Назначение лота жило списком из трёх id в интерфейсе и было перепутано:
+     арендным числился off-plan лот с оплаченной бронью. А готовность приходила
+     к модели прозой («готовое · вторичка»), хотя решение про 2% комиссии привязано
+     к точным словам off-plan / resale. */
+  {
+    WS.storeApi.resetAll();
+    const objs = dd().objects || [];
+
+    check('оси лота · готовность замкнута словарём',
+      objs.length > 0 && objs.every((o) => o.segment === 'off-plan' || o.segment === 'resale'),
+      objs.filter((o) => o.segment !== 'off-plan' && o.segment !== 'resale')
+        .map((o) => o.id + '=' + o.segment).join(', ') || 'все в словаре');
+
+    check('оси лота · назначение замкнуто и лежит в ДАННЫХ',
+      objs.every((o) => o.deal === 'sale' || o.deal === 'rent'),
+      objs.filter((o) => o.deal !== 'sale' && o.deal !== 'rent').map((o) => o.id).join(', ') || 'все в словаре');
+
+    /* Главное — не наличие поля, а то, что фильтр читает его, а не список в коде.
+       Проверяется дифференциально: ОДИН лот переводится в аренду и обратно. */
+    const probe = objs.find((o) => o.id === 'o_creekline');
+    const was = WS.ui.objPurpose(probe);
+    probe.deal = 'rent';
+    const now = WS.ui.objPurpose(probe);
+    probe.deal = 'sale';
+    check('оси лота · назначение следует за данными, а не за списком id',
+      was === 'sale' && now === 'rent' && WS.ui.objPurpose(probe) === 'sale',
+      was + ' → ' + now);
+
+    /* Тот самый перепутанный лот: off-plan с оплаченной бронью — это покупка. */
+    const bayline = objs.find((o) => o.id === 'o_bayline');
+    check('оси лота · off-plan с бронью числится продажей, а не арендой',
+      !!bayline && WS.ui.objPurpose(bayline) === 'sale' && bayline.segment === 'off-plan',
+      bayline ? bayline.deal + ' / ' + bayline.segment : 'нет лота');
+
+    /* Арендный лот называет ставку: без неё «аренда» — ярлык без условий. */
+    const rented = objs.filter((o) => o.deal === 'rent');
+    check('оси лота · арендный лот называет годовую ставку',
+      rented.length > 0 && rented.every((o) => Number(o.rentYear) > 0),
+      rented.map((o) => o.id + '=' + o.rentYear).join(', '));
+
+    /* Подпись на экране — по-русски и выведена из осей, а не хранится рядом с ними. */
+    check('оси лота · подпись выводится и различает случаи',
+      WS.ui.objSegLabel({ deal: 'sale', segment: 'off-plan' }) === 'строится · off-plan' &&
+      WS.ui.objSegLabel({ deal: 'rent', segment: 'resale' }) === 'готовое · аренда' &&
+      WS.ui.objSegLabel({ deal: 'sale', segment: 'resale' }) === 'готовое · вторичка',
+      WS.ui.objSegLabel({ deal: 'rent', segment: 'resale' }));
+
+    /* И модель получает обе оси раздельно — именно по ним она решает про комиссию. */
+    const dgo = WS.live.digest().объекты || [];
+    check('оси лота · модель видит готовность ключом, а не прозой',
+      dgo.length > 0 && dgo.every((o) => o.тип === 'off-plan' || o.тип === 'resale'),
+      dgo.filter((o) => o.тип !== 'off-plan' && o.тип !== 'resale').map((o) => o.id).join(', ') || 'все ключом');
+
+    check('оси лота · модель видит назначение отдельно от готовности',
+      dgo.every((o) => o.назначение === 'продажа' || o.назначение === 'аренда') &&
+      dgo.some((o) => o.назначение === 'аренда'),
+      dgo.filter((o) => o.назначение === 'аренда').map((o) => o.id).join(', '));
+
+    WS.storeApi.resetAll();
+  }
+
   /* ---- Питч как форма разрешений ----
 
      Живой брокер трижды просил «собери питч для рассылки инвесторам». Питч
@@ -9898,16 +10032,16 @@ setTimeout(async () => {
     /* Поиск по инвентарю, вернувший ноль, — вторая дорога к той же дыре. */
     dd().requests = (dd().requests || []).filter((r) => r.id !== 'r_probe_gap');
     dd().objects = (dd().objects || []).filter((o) => o.id !== 'o_probe_palm');
-    WS.store.objArea = 'Palm Jumeirah'; WS.store.objSearch = '';
+    WS.store.objArea = 'all'; WS.store.objSearch = 'Пентхаус на Марсе';
     WS.router.go('objects');
     const zeroHtml = doc.getElementById('app').innerHTML;
     check('нет инвентаря · пустой поиск предлагает записать нехватку',
       /Найдено: 0/.test(zeroHtml) && /data-act="gapRecord"/.test(zeroHtml) &&
-      zeroHtml.indexOf('Palm Jumeirah') >= 0, 'пустой поиск');
+      zeroHtml.indexOf('Марсе') >= 0, 'пустой поиск');
 
     WS.ui.gapRecord();
     check('нет инвентаря · нехватка записана с условиями поиска',
-      (WS.store.gaps || []).length === 1 && /Palm Jumeirah/.test((WS.store.gaps[0] || {}).line || ''),
+      (WS.store.gaps || []).length === 1 && /Марсе/.test((WS.store.gaps[0] || {}).line || ''),
       JSON.stringify((WS.store.gaps || [])[0] || null));
 
     /* Два нажатия подряд не должны давать две одинаковые строки у руководителя. */
@@ -9920,7 +10054,7 @@ setTimeout(async () => {
     WS.router.go('start'); WS.ui.render();
     const mgrHtml = doc.getElementById('app').innerHTML;
     check('нет инвентаря · руководитель видит записанную нехватку',
-      /Нет инвентаря/.test(mgrHtml) && mgrHtml.indexOf('Palm Jumeirah') >= 0,
+      /Нет инвентаря/.test(mgrHtml) && mgrHtml.indexOf('Марсе') >= 0,
       'раздел руководителя');
 
     WS.store.role = 'agent'; WS.store.objArea = 'all'; WS.storeApi.resetAll();
@@ -10015,8 +10149,15 @@ setTimeout(async () => {
       (dd().objects || []).every((o) => !!WS.ui.objOrigin(o).label),
       (dd().objects || []).filter((o) => !WS.ui.objOrigin(o).label).map((o) => o.id).join(', '));
 
-    check('происхождение · всё, что сейчас в базе, — наше и отправляемое',
-      (dd().objects || []).every((o) => WS.ui.objOurs(o) && WS.ui.objSendable(o)),
+    /* Партнёрский лот в базе — норма, на то и соглашение: показать клиенту
+       можно, рекламировать от своего имени нельзя. Слитые в одно условие, эти
+       два разных разрешения запрещали бы держать партнёрский лот вообще. */
+    check('происхождение · всё, что в базе, можно показать клиенту',
+      (dd().objects || []).every((o) => WS.ui.objSendable(o)),
+      (dd().objects || []).filter((o) => !WS.ui.objSendable(o)).map((o) => o.id).join(', ') || 'все отправляемы');
+
+    check('происхождение · не всё в базе наше, и это видно',
+      (dd().objects || []).some((o) => !WS.ui.objOurs(o)),
       (dd().objects || []).filter((o) => !WS.ui.objOurs(o)).map((o) => o.id).join(', '));
 
     /* Главное: чужой лот не просачивается в то, что увидит клиент.

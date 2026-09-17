@@ -56,7 +56,7 @@ const CFG = {
 
   // Дайджест едет в теле запроса, поэтому потолок тела обязан быть выше его собственного:
   // иначе поднятый дайджест будет отбит на входе и никто не поймёт почему.
-  maxBody: 256 * 1024,
+  maxBody: 384 * 1024,
   bodyTimeoutMs: Number(process.env.WESPACE_PROXY_BODY_TIMEOUT_MS || 8000),
   maxText: 1000,
   // Совпадает с тем, сколько отдаёт страница: раньше здесь стояло больше,
@@ -74,7 +74,7 @@ const CFG = {
      Потолок взят с запасом вчетверо: инвентарь собираются наполнять, и порог,
      выставленный вплотную к сегодняшнему размеру, сломается снова и так же тихо.
      Для модели это порядка 40 тысяч токенов при окне в 200 тысяч. */
-  maxDigestChars: 160 * 1024,
+  maxDigestChars: 256 * 1024,
 
   /* Wall-clock is the WRONG primary guard for this, and the old numbers proved
      it: 75s base / 150s ceiling killed three of twelve hard scenarios at exactly

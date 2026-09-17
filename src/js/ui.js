@@ -9441,8 +9441,17 @@
     return b === 'all' || (b === 'lo' && p < 1700000) || (b === 'mid' && p >= 1700000 && p <= 2200000) || (b === 'hi' && p > 2200000);
   }
   // Listing intent (demo classification, no persisted field): purchase vs rental inventory.
-  const OBJ_PURPOSE = { o_creekline: 'sale', o_palmcourt: 'sale', o_bayline: 'rent' };
-  function objPurpose(o) { return OBJ_PURPOSE[o.id] || 'sale'; }
+  /* Назначение лота жило списком из трёх id прямо здесь — и было перепутано:
+     арендным числился off-plan лот со сдачей в 2027 и оплаченной бронью в сделке,
+     а единственный арендный лот считался продажей. Фильтр «Аренда» показывал не тот лот. */
+  function objPurpose(o) { return (o && o.deal) === 'rent' ? 'rent' : 'sale'; }
+  /* Готовность хранится ключом, а на экран идёт по-русски: одно и то же
+     слово в данных и в интерфейсе обязательно расходится, когда одно из них поменяют. */
+  function objSegLabel(o) {
+    const rent = objPurpose(o) === 'rent';
+    if ((o && o.segment) === 'off-plan') return rent ? 'строится · под аренду' : 'строится · off-plan';
+    return rent ? 'готовое · аренда' : 'готовое · вторичка';
+  }
   function filteredObjects() {
     const st = S(); const filt = st.objFilter || 'all'; const area = st.objArea || 'all';
     const q = (st.objSearch || '').toLowerCase(); const sort = st.objSort || 'default';
@@ -10038,7 +10047,7 @@
     const isOff = /off-plan/i.test(o.segment || '');
     const rows = [
       ['Класс', o.br],
-      ['Сегмент', o.segment || (isOff ? 'off-plan' : 'готовое')],
+      ['Сегмент', objSegLabel(o)],
       [isOff ? 'Срок сдачи' : 'Заселение', isOff ? (o.handover || '—') : (o.occupancy || 'Готов к заселению')],
       ['Комиссия агенту', o.commissionPct ? o.commissionPct + '%' : '—'],
     ];
@@ -10059,7 +10068,7 @@
     }
     if (o.serviceCharge) rows.push(['Service charge', o.serviceCharge]);
     if (!rows.length) return '';
-    const seg = o.segment || (isOff ? 'off-plan' : 'готовое');
+    const seg = objSegLabel(o);
     return dxSec('briefcase', 'Условия сделки · ' + seg, '', '<div class="dfields">' + rows.map((r) => dfPair(r[0], r[1])).join('') + '</div>');
   }
   function objHero(o) {
@@ -13608,7 +13617,7 @@
     openReassign, openNewTask, createTaskFromForm, dealCard, taskCard, moveDealDir, showCard, saveEvent, openNewThread,
     openPsychForm, savePsychForm, openDealForm, createDeal, openContactForm, createContact, openObjectForm, createObject, openCgFeature,
     openDealEdit, saveDealEdit, saveDealField, dealChatPanel, openDealChat, closeDealChat,
-    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pitchPermits, pitchMissing, pitchAdvertisable, pitchBlockReason, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, objPerM2, objPerSqft, objPriceGap, objServiceYear, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
+    cDat, cGen, oppShort, pulseAlerts, consentDaysLeft, consentLine, consentLineShort, consentState, movedCounts, pulseSection, PULSE_SECTIONS, pulseMoved, openOwnerReport, sendOwnerReport, ownerSecondObject, dayBucket, dayOnsite, dayTime, pulseDayItems, openReplyDraft, openSelection, openShowForm, createShow, openShowOutcome, saveShowOutcome, showNextStep, showHasOutcome, selectionMeaning, selectionObjects, sendSelection, replyDraft, replyPicks, sendReply, dealBrief, dealNext, dealWon, goalDrill, inboxWaiting, inboxWaitMin, oppObjectBusy, prospectRulesFired, pulseInsights, restoreScroll, reqNow, screenContext, screenContextLabel, toggleCgDock, openInboxTriage, inboxTriageCard, inboxDupCandidate, inboxDupDecide, openDealShowForm, createDealShow, dealShowObjects, openCalendarShowPicker, openRequestSelectionConfirm, saveRequestSelection, reqKpDrift, reqSelectedFree, resolveApproval, openInboxAssign, openRequestOffer, sendRequestOffer, openFloorplan, copyFloorplan, openPitch, pitchLines, pitchPermits, pitchMissing, pitchAdvertisable, pitchBlockReason, pickObjectFor, pickRequestFor, pulseSectionList, wantsOf, wantFit, wantLine, reqMatches, unmetRequests, reqGapLine, reqNeedsInventory, objQueryLine, gapRecord, objOrigin, objSendable, objOurs, originBadge, objPurpose, objSegLabel, objPerM2, objPerSqft, objPriceGap, objServiceYear, promoClients, promoAttachments, openDealShowForm, selectionCard, clientValue, clientValueWhy, sendFromCard, sendFromDock, prospectCard, moveInboxStage, inboxKanban, inboxStageLabel, nextTaskOfDeal, dealArchived, dealClosed, dealTermsAgreed, dealTabsFor, pulseProspects, pulseProspectList, pulseDayItems, marketingSpend, contactRoles, reqStage, contactsReach, contactsSelectionLabel, openContactsChat, closeContactsChat, contactsSearchList, archiveToggle, archiveDeal, saveArchive, unarchiveDeal, duplicateDeal, BOARD_MIN, dfieldAllowed, dealLots, dfieldParse, dealPlannedEventsCard, toggleGate, contractCard, contractAct, contractDocOpen, openGoalEdit, saveGoal, toggleGoalPin, deleteGoal, confirmDeleteGoal, addGoal, createGoal, openEventForm, setFeedType, saveEventEntry,
     // headless seams for the Concierge — no DOM, safe to drive programmatically
     addEventEntry, clientSpec, calendarActivities, threadGroup: getThreadGroup,
     outcomesFor, addOutcomeDraft, confirmOutcome, rejectOutcome,

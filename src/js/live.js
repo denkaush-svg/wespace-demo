@@ -164,7 +164,12 @@
         сервисный_сбор_в_год: WS.ui.objServiceYear(o),
         спален: o.br, комиссия_процент: o.commissionPct, доступность: o.availability,
         проверка: o.verified, проверено_когда: o.checkedAt,
-        тип: o.segment, проект: o.project, застройщик: o.developer, сдача: o.handover,
+        /* Две оси раздельно и замкнутым словарём. Раньше сюда шла проза
+           («готовое · вторичка», «офисы»), а в требованиях модели стоит развилка по точным
+           словам off-plan / resale — и решение про 2% комиссии принималось догадкой. */
+        тип: o.segment, назначение: WS.ui.objPurpose(o) === 'rent' ? 'аренда' : 'продажа',
+        аренда_в_год: o.rentYear || null,
+        проект: o.project, застройщик: o.developer, сдача: o.handover,
         план_оплаты: o.paymentPlan, сервисный_сбор: o.serviceCharge, эскроу: o.escrow,
         занятость: o.occupancy, чем_подходит: o.match,
         характеристики: o.attrs || null,
