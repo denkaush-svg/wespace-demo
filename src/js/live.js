@@ -101,8 +101,27 @@
          on. It was on the card, on screen, in the search index, and not here:
          the Concierge composed for a client without knowing which language
          reaches them. */
+      /* Раньше отсюда уходили имя, метка, бюджет, согласие и язык — и всё.
+         Бюджет был единственным квалифицирующим фактом, поэтому на вопрос
+         «кому отправить этот объект» модель честно отвечала разбором по бюджетам:
+         больше ей сравнивать было НЕЧЕГО.
+
+         Психопрофиль — это наблюдаемые сигналы стиля, записанные брокером,
+         а не оценка личности. Он помогает вести разговор и НИКОГДА не уходит
+         клиенту — это сказано модели отдельным правилом. */
       контакты: take('clients', (c) => ({ id: c.id, имя: c.name, метка: c.tag, бюджет: c.budget,
-        согласие_на_переписку: c.consent !== false, язык: c.lang || null })),
+        согласие_на_переписку: c.consent !== false, язык: c.lang || null,
+        районы: c.areas || null, цель: c.goal || null, срок: c.horizon || null,
+        интерес: c.interest || null, форма_оплаты: c.payment || null,
+        резидентство: c.residency || null, идёт_за_визой: !!c.visaGoal,
+        канал: c.channel || null, тип: c.ctype || null,
+        пожелания: (WS.ui.wantsOf ? WS.ui.wantsOf(c) : []).length ? c.wants : null,
+        как_вести_разговор: c.psych && c.psych.filled ? {
+          как_решает: c.psych.decision, что_ценит: c.psych.values,
+          темп: c.psych.pace, отношение_к_риску: c.psych.risk,
+          тон: c.psych.tone, что_цепляет: c.psych.triggers,
+          когда_писать: c.psych.bestTime,
+        } : null })),
       компании: take('companies', (c) => ({ id: c.id, имя: c.name })),
       // Both the label and the code: the label is what a reply should say out
       // loud, the code is what a stage change has to be written with. Sending
