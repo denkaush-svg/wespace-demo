@@ -139,7 +139,7 @@
         '</nav>' +
         '<main class="main" id="main"></main>' +
         '<div class="tabbar">' + MOB_TABS.map((id) => { const n = NAV.find((x) => x.id === id); return '<button data-nav="' + id + '" class="' + (st.view === id ? 'on' : '') + '" aria-label="' + n.label + '">' + I(n.icon) + n.label.split(' ')[0] + '</button>'; }).join('') +
-          '<button data-act="sections" class="' + (['objects', 'calc', 'shows', 'docs'].includes(st.view) ? 'on' : '') + '" aria-label="Все разделы">' + I('menu') + 'Ещё</button>' +
+          '<button data-act="sections" class="' + (['objects', 'calc', 'shows', 'docs', 'services'].includes(st.view) ? 'on' : '') + '" aria-label="Все разделы">' + I('menu') + 'Ещё</button>' +
           '<button data-act="navigator" aria-label="Навигатор демо">' + I('compass') + 'Демо</button></div>' +
       '</div>' +
       '<div class="scrim" id="scrim"></div>' +
@@ -734,7 +734,7 @@
   function pulseAlerts() {
     const out = [];
     // 1. Отправленное не дошло. Клиент считает, что мы молчим, — и это худший вид молчания.
-    (D().inbox || []).filter((i) => i.stage === 'rejected').forEach((i) => {
+    (D().inbox || []).filter((i) => i.stage === 'rejected' && i.kind !== 'service').forEach((i) => {
       const c = i.clientId ? oppClient(i.clientId) : null;
       const hot = c && (D().requests || []).find((r) => r.clientId === c.id && r.temperature === 'hot');
       const late = c && (D().tasks || []).find((t) => t.clientId === c.id && t.when === 'overdue' && t.status !== 'done');
@@ -1284,7 +1284,7 @@
     if (!q.length) return '';
     const top = q[0], it = top.it;
     const c = it.clientId ? oppClient(it.clientId) : null;
-    const who = c ? c.name : 'Обращение без карточки контакта';
+    const who = c ? c.name : (it.senderName || 'Обращение без карточки контакта');
     const meta = [chanMeta(it.channel)[1] + ', ' + escAttr(it.at),
       c && c.budget ? WS.AED(c.budget) : null,
       c && (c.areas || []).length ? escAttr((c.areas || [])[0]) : null].filter(Boolean).join(' · ');
@@ -5493,6 +5493,7 @@
       instagram: ['instagram', 'Instagram'],
       email: ['mail', 'Email'],
       call: ['phone', 'Телефон'],
+      service_form: ['grid', 'Каталог услуг'],
     })[ch] || ['whatsapp', 'WhatsApp'];
   }
   function prefChannel(c) {
@@ -10642,7 +10643,9 @@
     D().inbox.forEach((i) => {
       push({ id: i.id, type: 'сообщение', when: 'сегодня ' + i.at, dir: 'incoming',
         clientId: i.clientId, objectId: objOfClient(i.clientId),
-        title: (cn(i.clientId) || 'Клиент') + ' — входящее', sub: (i.channel || 'сообщение') + ' · ' + (i.text || '').slice(0, 42), open: { nav: 'concierge' } });
+        title: (cn(i.clientId) || i.senderName || 'Клиент') + ' — входящее',
+        sub: (i.kind === 'service' ? chanMeta(i.channel)[1] : (i.channel || 'сообщение')) + ' · ' + (i.text || '').slice(0, 42),
+        open: { nav: i.kind === 'service' ? 'requests' : 'concierge' } });
     });
     // Объект берётся у того, что строка открывает. У заявки объект не один — пусто; у задачи по сделке
     // Виктора это объект именно её, а не первой сделки клиента, у которого их две.
@@ -10661,8 +10664,8 @@
       : a.open.client ? '<button class="btn sm" data-client="' + a.open.client + '">' + I('eye') + 'К записи</button>'
       : '<button class="btn sm" data-nav="' + (a.open.nav || 'concierge') + '">' + I('arrowRight') + 'Открыть</button>';
     return '<div class="radar-row"><div class="sev"></div><div class="icon-tile ' + tone + '">' + I(ic) + '</div>' +
-      '<div class="rt"><div class="t">' + a.title + ' <span class="badge">' + a.type + '</span> <span class="badge">' + dirLabel + '</span></div>' +
-      '<div class="why">' + a.when + ' · ' + a.sub + '</div></div><div class="ra">' + openBtn + '</div></div>';
+      '<div class="rt"><div class="t">' + escAttr(a.title) + ' <span class="badge">' + a.type + '</span> <span class="badge">' + dirLabel + '</span></div>' +
+      '<div class="why">' + a.when + ' · ' + escAttr(a.sub) + '</div></div><div class="ra">' + openBtn + '</div></div>';
   }
   const CAL_WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const CAL_DATES = [11, 12, 13, 14, 15, 16, 17];
@@ -11560,11 +11563,10 @@
       appr.length ? '<button class="btn xs" data-nav="approvals">' + I('arrowRight') + 'Всё с подробностями</button>' : '',
       '<div class="appr-list">' + approvalRows(appr.slice(0, 3)) + '</div>');
     const leadRows = unassigned.map((it) => {
-      const c = (D().clients || []).find((x) => x.id === it.clientId);
-      const who = c ? c.name : 'Новый контакт';
+      const who = inboxSenderName(it);
       return '<div class="feed-row"><div class="fi i-acc">' + I('mail') + '</div>' +
         '<div class="ft"><div class="t">' + escAttr(who) + '</div>' +
-        '<div class="m">' + escAttr(it.channel || '') + ' · ' + escAttr(it.at || '') + ' · без агента</div></div>' +
+        '<div class="m">' + escAttr(inboxChannelLabel(it)) + ' · ' + escAttr(it.at || '') + ' · без агента</div></div>' +
         '<div class="fa"><button class="btn xs primary" data-act="inboxAssign" data-inbox="' + escAttr(it.id) + '">Назначить</button></div></div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:6px 0">все заявки распределены</div>';
     const leadBlock = dxSec('mail', 'Нераспределённые заявки · ' + unassigned.length,
@@ -11670,21 +11672,20 @@
   }
   function viewLeadsDistribution() {
     const suggest = ['u_ahmed', 'u_marina', 'u_lina'];
-    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
+    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat', service_form: 'grid' };
     /* Очередь распределения — это НЕназначенные обращения. Раньше здесь стоял весь массив,
        а «уменьшение очереди» достигалось удалением записи; теперь список сужается фильтром,
        и назначенное обращение остаётся в данных, в календаре и в истории контакта. */
     const inbox = (D().inbox || []).filter((x) => !x.assignee);
     const rows = inbox.map((it, i) => {
-      const c = (D().clients || []).find((x) => x.id === it.clientId);
-      const who = c ? c.name : 'Новый контакт';
+      const who = inboxSenderName(it);
       const sug = TEAM.find((x) => x.id === suggest[i % suggest.length]) || TEAM[0];
       /* Идентификаторы обеих сторон, а не позиция в списке и имя. Позиция ломается от любой
          пересортировки, а имя вообще не адресует сотрудника. */
       const btns = TEAM.map((x) => '<button class="btn xs' + (x.id === sug.id ? ' primary' : '') + '" data-leadassign="' + escAttr(it.id) + '~~' + escAttr(x.id) + '" title="Назначить: ' + escAttr(x.name) + '">' + mgrInitials(x.name) + '</button>').join('');
-      return '<div class="lead-row"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
-        '<div class="lead-main"><div class="t">' + who + ' · <span class="lead-wait">' + I('clock') + (it.at || 'сейчас') + '</span></div>' +
-        '<div class="m">' + it.text + '</div></div>' +
+      return '<div class="lead-row' + (it.kind === 'service' ? ' inbox-service' : '') + '"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
+        '<div class="lead-main"><div class="t">' + escAttr(who) + ' · <span class="lead-wait">' + I('clock') + escAttr(it.at || 'сейчас') + '</span></div>' +
+        '<div class="m">' + escAttr(it.text) + '</div></div>' +
         '<div class="lead-assign"><span class="lead-sug">' + I('sparkle') + 'AI: ' + sug.name.split(' ')[0] + '</span><div class="lead-btns">' + btns + '</div></div></div>';
     }).join('') || '<div style="font-size:12px;color:var(--faint);padding:10px 16px">все заявки распределены</div>';
     return head('Распределение заявок', 'Входящие лиды без назначенного агента. Консьерж предлагает исполнителя по фокусу и загрузке — назначайте в один клик. Время ожидания видно против норматива SLA.',
@@ -12095,7 +12096,8 @@
 
   // Mobile: reach all sections from a bottom sheet (spec §15.2 full nav).
   function openSections() {
-    const items = NAV.map((n) => '<button class="btn" style="width:100%;justify-content:flex-start;height:46px" data-nav="' + n.id + '">' + I(n.icon) + n.label + '</button>').join('');
+    const sections = S().role === 'manager' ? NAV : NAV.concat(NAV_MORE.filter((n) => n.id === 'services'));
+    const items = sections.map((n) => '<button class="btn" style="width:100%;justify-content:flex-start;height:46px" data-nav="' + n.id + '">' + I(n.icon) + n.label + '</button>').join('');
     openModal('Разделы', '<div style="display:flex;flex-direction:column;gap:8px">' + items + '</div>',
       '<button class="btn" data-act="closeModal">Закрыть</button>');
   }
@@ -12171,6 +12173,13 @@
     return '<button class="btn xs" data-act="inboxTriage" data-inbox="' + escAttr(it.id) + '">' +
       I('sparkle') + 'Разобрать</button>';
   }
+  function inboxSenderName(it) {
+    const client = D().clients.find((c) => c.id === it.clientId);
+    return it.senderName || (client ? client.name : 'Новый контакт');
+  }
+  function inboxChannelLabel(it) {
+    return it.kind === 'service' ? chanMeta(it.channel)[1] : (it.channel || '—');
+  }
   function inboxDupCandidate(it) {
     // Кандидат ищется по имени из текста обращения, но СВЯЗЫВАЕТСЯ по id — показанное имя
     // не адресует запись, а решение о слиянии должно быть привязано к конкретному контакту.
@@ -12184,17 +12193,16 @@
     }) || null;
   }
   function inboxTriageCard(it) {
-    const c = (D().clients || []).find((x) => x.id === it.clientId);
-    const who = c ? c.name : 'Новый контакт';
     const assignee = it.assignee ? ((D().roster || []).find((x) => x.id === it.assignee) || {}).name : null;
     const ex = INBOX_EX_LABEL[it.ex];
     const dup = it.ex === 'duplicate' ? inboxDupCandidate(it) : null;
     const rows = [
-      ['users', 'Кто', who],
-      ['chat', 'Канал', it.channel || '—'],
+      ['users', 'Кто', inboxSenderName(it)],
+      ['chat', 'Канал', inboxChannelLabel(it)],
       ['clock', 'Когда', it.at || '—'],
       ['check', 'Состояние', assignee ? 'назначено · ' + assignee : 'не назначено'],
-    ].map((r) => '<div class="field"><div class="k">' + I(r[0]) + ' ' + r[1] + '</div><div class="v">' + escAttr(r[2]) + '</div></div>').join('');
+    ].concat(it.senderContact ? [['phone', 'Контакт', it.senderContact]] : [])
+      .map((r) => '<div class="field"><div class="k">' + I(r[0]) + ' ' + r[1] + '</div><div class="v">' + escAttr(r[2]) + '</div></div>').join('');
     const dupBlock = dup
       ? '<div class="match" style="margin-top:10px">' + I('warn') +
         '<span>Похожий контакт в базе: <b>' + escAttr(dup.name) + '</b>' +
@@ -12267,12 +12275,14 @@
     if (!it) { WS.storeApi.toast('Обращение не найдено: ' + inboxId); return; }
     const c = (D().clients || []).find((x) => x.id === it.clientId);
     const tid = 'inbox:' + it.id;
-    WS.engine.bindThread(tid, (c ? c.name + ' · ' : '') + 'обращение ' + (it.at || ''), 'mail');
+    const label = it.kind === 'service' ? 'Заявка на услугу · ' + it.at
+      : (c ? c.name + ' · ' : '') + 'обращение ' + (it.at || '');
+    WS.engine.bindThread(tid, label, 'mail');
     const th = WS.engine.activeThread();
     // Исходное сообщение кладётся ОДИН раз: повторное открытие не должно задваивать переписку.
     if (th && !(th.items || []).length) {
       WS.engine.pushMsg('<div class="msg user fadeup"><div class="who">' +
-        escAttr(c ? c.name : 'Новый контакт') + ' · ' + escAttr(it.channel || '') + ' · ' + escAttr(it.at || '') +
+        escAttr(inboxSenderName(it)) + ' · ' + escAttr(inboxChannelLabel(it)) + ' · ' + escAttr(it.at || '') +
         '</div><div class="bubble">' + escAttr(it.text || '') + '</div></div>', tid);
     }
     S().cgDock = false;
@@ -12311,11 +12321,10 @@
       '<div class="in-act"><button class="btn xs" data-request="' + r.id + '">' + I('arrowRight') + 'Открыть заявку</button></div></div></div>';
   }
   function inboxKanban() {
-    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
+    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat', service_form: 'grid' };
     const stages = WS.INBOX_STAGES || [];
     const inboxCard = (it) => {
-      const c = (D().clients || []).find((x) => x.id === it.clientId);
-      const who = c ? c.name : 'Новый контакт';
+      const who = inboxSenderName(it);
       const ex = INBOX_EX_LABEL[it.ex] || ['Входящее', ''];
       const si = stages.indexOf(it.stage || 'new');
       // Обращение не режется в JS: обрезанная строка врёт о том, что написал клиент.
@@ -12323,10 +12332,10 @@
       const move = '<div class="dmove">' +
         '<button class="kmv" data-instage="' + it.id + '~prev" title="Назад по стадии"' + (si > 0 ? '' : ' disabled') + '>' + I('chevLeft') + '</button>' +
         '<button class="kmv" data-instage="' + it.id + '~next" title="Вперёд по стадии"' + (si >= 0 && si < stages.length - 1 ? '' : ' disabled') + '>' + I('chevRight') + '</button></div>';
-      return '<div class="deal">' +
-        '<div class="deal-body"><div class="dt">' + who + '</div>' +
-        '<div class="dm" style="font-size:11px">' + I(chanI[it.channel] || 'chat') + ' ' + it.at + '</div>' +
-        '<div class="dm in-txt" title="' + escAttr(it.text) + '">' + it.text + '</div>' +
+      return '<div class="deal' + (it.kind === 'service' ? ' inbox-service' : '') + '">' +
+        '<div class="deal-body"><div class="dt">' + escAttr(who) + '</div>' +
+        '<div class="dm" style="font-size:11px">' + I(chanI[it.channel] || 'chat') + ' ' + escAttr(it.at) + '</div>' +
+        '<div class="dm in-txt" title="' + escAttr(it.text) + '">' + escAttr(it.text) + '</div>' +
         '<div class="dfoot"><div class="dtag"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span></div>' + move + '</div>' +
         '<div class="in-act">' + inboxTriageBtn(it) + '</div></div></div>';
     };
@@ -12356,7 +12365,7 @@
   // ---------------- "ЕЩЁ" SECTIONS (v3 framework) ----------------
   // Заявки — incoming requests from all channels (night leads, voice, exceptions).
   function viewRequests() {
-    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat' };
+    const chanI = { whatsapp: 'whatsapp', email: 'mail', voice: 'mic', call: 'chat', service_form: 'grid' };
     // Раздел — ТОЛЬКО разбор входящего, как и просил партнёр. Отдельного списка «разобрано,
     // ждут подбора» здесь больше нет: заведённые заявки стоят в своей колонке той же доски,
     // а как только по заявке пошла сделка, работа идёт в «Сделках» одним сквозным путём.
@@ -12365,12 +12374,11 @@
       const g = inboxColumnItems(stage);
       const n = g.inbox.length + g.reqs.length;
       const body = (g.inbox.map((it) => {
-        const c = (D().clients || []).find((x) => x.id === it.clientId);
         const ex = INBOX_EX_LABEL[it.ex] || ['Входящее', ''];
-        return '<div class="feed-row"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
-          '<div class="ft"><div class="t">' + (c ? c.name : 'Новый контакт') + ' · <span style="color:var(--mut);font-weight:500">' + it.at + '</span></div>' +
-          '<div class="m">' + it.text + '</div></div>' +
-          '<div style="display:flex;gap:6px;align-items:center"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span>' +
+        return '<div class="feed-row' + (it.kind === 'service' ? ' inbox-service' : '') + '"><div class="fi i-acc">' + I(chanI[it.channel] || 'chat') + '</div>' +
+          '<div class="ft"><div class="t">' + escAttr(inboxSenderName(it)) + ' · <span style="color:var(--mut);font-weight:500">' + escAttr(it.at) + '</span></div>' +
+          '<div class="m" title="' + escAttr(it.text) + '">' + escAttr(it.text) + '</div></div>' +
+          '<div class="inbox-row-actions" style="display:flex;gap:6px;align-items:center"><span class="badge ' + ex[1] + '">' + I('warn') + ex[0] + '</span>' +
           inboxTriageBtn(it) + '</div></div>';
       }).join('') + g.reqs.map((r) => {
         const rc = D().clients.find((x) => x.id === r.clientId) || {};
@@ -12542,12 +12550,10 @@
       '<button class="btn sm primary" data-act="cgFeatureStub">' + I('plus') + 'Пригласить в сеть</button>') +
       tabBar + body;
   }
-  // Услуги — broker services catalogue with commission terms (public profile).
-  const SERVICES = [
-    { t: 'Брокеридж в коммерческой недвижимости', d: 'Подбор офисов, ритейла и складов под инвесторов и бизнес — аренда и продажа. Полное сопровождение сделки с юридической стороны.', terms: [['100%', 'сдача в аренду'], ['0%', 'поиск объекта'], ['от 3%', 'продажа объекта'], ['по запросу', 'фин. оценка']] },
-    { t: 'Управление недвижимостью', d: 'Сдача в аренду, контроль оплат и состояние объектов клиентов.', terms: [['8% / мес', 'управление']] },
-    { t: 'Консалтинг девелоперов', d: 'Эксклюзивное сопровождение застройщиков — от участка до последнего лота.', terms: [['по проекту', 'консалтинг']] },
-  ];
+  // Каталог общий для раздела «Услуги» и профиля брокера.
+  const brokerServices = () => D().services;
+  const serviceById = (id) => brokerServices().find((s) => s.id === id);
+  const SERVICE_TERMS_FALLBACK = 'Условия обсуждаются индивидуально';
   const PORTFOLIO = [
     ['Business Bay · офис 480 м²', 'Сдан за 3 недели', 'аренда · корпоративный клиент'],
     ['Palm Jumeirah · вилла', 'Продажа 12,5 млн AED', 'off-plan · частный инвестор'],
@@ -12558,37 +12564,154 @@
     ['Karim Aziz', 'Партнёр · co-broking', 'Быстрый отклик, честный сплит 50/50, документы всегда в порядке.'],
     ['STONE', 'Застройщик', 'Приводит проверенных клубных покупателей на ранние аллокации. Работаем эксклюзивно.'],
   ];
+  function serviceTerms(s) {
+    return '<div class="acc-terms">' + (s.terms.map(([value, label]) => '<div class="acc-term"><b>' +
+      escAttr(value) + '</b><span>' + escAttr(label) + '</span></div>').join('') || SERVICE_TERMS_FALLBACK) + '</div>';
+  }
+  function serviceOrderButton(s) {
+    return '<button class="btn sm primary" data-svcreq="' + escAttr(s.id) + '">' + I('send') + 'Заказать услугу</button>';
+  }
   function viewServices() {
-    const cards = SERVICES.map((s, i) => {
-      const terms = s.terms.map((tt) => '<div style="display:flex;flex-direction:column;gap:3px;min-width:120px"><span style="font-family:var(--font-disp);font-weight:800;font-size:20px;line-height:1;color:var(--ink);letter-spacing:-.01em">' + tt[0] + '</span><span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:700">' + tt[1] + '</span></div>').join('');
-      return '<div class="card pad" style="margin-bottom:12px"><div style="font-family:var(--font-disp);font-weight:800;font-size:20px;letter-spacing:-.01em;color:var(--ink)">' + s.t + '</div>' +
-        '<div style="font-size:13px;color:var(--mut);margin:7px 0 15px;max-width:70ch;line-height:1.5">' + s.d + '</div>' +
-        '<div style="display:flex;gap:28px;flex-wrap:wrap;padding-top:13px;border-top:1px solid var(--line)">' + terms + '</div>' +
-        '<div style="display:flex;gap:8px;margin-top:14px"><button class="btn sm primary" data-svcreq="' + i + '">' + I('send') + 'Заказать услугу</button><button class="btn sm" data-act="openKp">' + I('doc') + 'Пример КП</button></div></div>';
-    }).join('');
-    const stat = '<div class="fin-kpis" style="margin-bottom:14px">' +
-      '<div class="kpi"><div class="kv">' + (D().objects || []).length + '</div><div class="kk">Объектов в работе</div></div>' +
-      '<div class="kpi"><div class="kv">' + (D().deals || []).filter(dealWon).length + '</div><div class="kk">Закрыто · демо</div></div>' +
-      '<div class="kpi"><div class="kv">2–3%</div><div class="kk">Типовая комиссия</div></div></div>';
+    const services = brokerServices();
+    const cards = services.map((s) => '<article class="card pad svc-card">' +
+      '<h2 class="svc-title">' + escAttr(s.t) + '</h2><p class="svc-copy">' + escAttr(s.d) + '</p>' +
+      serviceTerms(s) + '<div class="svc-actions">' + serviceOrderButton(s) +
+      '<button class="btn sm" data-act="serviceProposal" data-svc="' + escAttr(s.id) + '">' + I('doc') + 'Пример КП</button>' +
+      '<button class="btn sm" data-act="serviceEdit" data-svc="' + escAttr(s.id) + '">' + I('pencil') + 'Редактировать</button></div></article>').join('');
     const portfolio = '<div class="card" style="margin:16px 0 12px"><div class="section-label" style="padding:12px 16px 4px">Портфолио · кейсы</div><div class="feed" style="padding:0 16px 8px">' +
       PORTFOLIO.map((c) => '<div class="feed-row"><div class="fi i-acc">' + I('briefcase') + '</div><div class="ft"><div class="t">' + c[0] + '</div><div class="m">' + c[2] + '</div></div><span class="badge ok" style="white-space:nowrap">' + I('check') + c[1] + '</span></div>').join('') + '</div></div>';
     const reviews = '<div class="card pad"><div class="section-label" style="margin:0 0 4px">Отзывы</div>' +
       REVIEWS.map((r) => '<div class="rev"><div class="rev-h"><b>' + r[0] + '</b><span>' + r[1] + '</span><span class="rev-stars">★★★★★</span></div><p class="rev-t">' + r[2] + '</p></div>').join('') + '</div>';
-    return head('Услуги', 'Каталог услуг брокера с условиями комиссии — публичная витрина. Заказ услуги, пример КП, портфолио и отзывы клиентов.',
-      '<button class="btn sm primary" data-act="cgFeatureStub">' + I('plus') + 'Добавить услугу</button>') + stat + cards + portfolio + reviews;
+    return head('Услуги', 'Каталог услуг брокера, условия работы и примеры предложений.',
+      '<button class="btn sm primary" data-act="serviceEdit">' + I('plus') + 'Добавить услугу</button>') +
+      '<div class="section-label">Каталог · ' + services.length + '</div>' + cards + portfolio + reviews;
   }
-  function openServiceRequest(idx) {
-    const s = SERVICES[idx] || SERVICES[0];
-    openModal('Заявка на услугу · ' + s.t,
-      '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Заявка уйдёт брокеру и появится в «Заявках». Демо — реальной отправки нет.</p>' +
-      '<div class="match-grid">' +
-      '<label class="fld"><span>Услуга</span><select id="sr_svc">' + SERVICES.map((x, i) => '<option' + (i === idx ? ' selected' : '') + '>' + x.t + '</option>').join('') + '</select></label>' +
-      '<label class="fld"><span>Как к вам обращаться</span><input id="sr_name" type="text" placeholder="Имя"></label>' +
-      '<label class="fld"><span>Контакт</span><input id="sr_contact" type="text" placeholder="WhatsApp / телефон / email"></label>' +
-      '<label class="fld"><span>Объект / бюджет</span><input id="sr_budget" type="text" placeholder="напр. офис 300 м², Business Bay"></label>' +
-      '</div>' +
-      '<label class="fld" style="margin-top:10px"><span>Комментарий</span><textarea id="sr_msg" rows="2" placeholder="Кратко о задаче и сроках"></textarea></label>',
-      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" data-act="svcReqSend">' + I('send') + 'Отправить заявку</button>');
+  function serviceTermFields(term = ['', '']) {
+    return '<div class="match-grid svc-term-fields"><label class="fld"><span>Стоимость или комиссия</span>' +
+      '<input name="value" maxlength="60" value="' + escAttr(term[0]) + '" placeholder="Например, 8% в месяц"></label>' +
+      '<label class="fld"><span>За что</span><input name="label" maxlength="100" value="' + escAttr(term[1]) +
+      '" placeholder="Например, управление арендой"></label>' +
+      '<button type="button" class="btn xs wide" data-act="serviceTermRemove">' + I('x') + 'Убрать условие</button></div>';
+  }
+  function openServiceEdit(id) {
+    const s = id && serviceById(id);
+    if (id && !s) return;
+    const body = '<form id="svc-form" data-svc="' + escAttr(id) + '">' +
+      '<label class="fld"><span>Название</span><input name="title" required maxlength="100" value="' + escAttr(s && s.t) + '"></label>' +
+      '<label class="fld"><span>Описание</span><textarea name="description" required maxlength="1200" rows="3">' +
+      escAttr(s && s.d) + '</textarea></label><div class="section-label">Условия работы</div>' +
+      '<div id="svc-terms">' + (s ? s.terms.map(serviceTermFields).join('') : serviceTermFields()) + '</div>' +
+      '<button type="button" class="btn sm" data-act="serviceTermAdd">' + I('plus') + 'Добавить условие</button></form>';
+    openModal(s ? 'Редактировать услугу' : 'Добавить услугу', body,
+      '<button class="btn" data-act="closeModal">Отмена</button>' +
+      '<button type="submit" form="svc-form" class="btn primary">' + I('check') + 'Сохранить</button>');
+    const form = document.getElementById('svc-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveService(form);
+    });
+    setTimeout(() => form.elements.namedItem('title').focus(), 0);
+  }
+  function addServiceTerm() {
+    const rows = document.getElementById('svc-terms');
+    rows.insertAdjacentHTML('beforeend', serviceTermFields());
+    rows.lastElementChild.querySelector('input').focus();
+  }
+  function saveService(form) {
+    if (!form.closest('#modal.show')) return;
+    const existing = form.dataset.svc && serviceById(form.dataset.svc);
+    if (form.dataset.svc && !existing) return;
+    const title = form.elements.namedItem('title');
+    const description = form.elements.namedItem('description');
+    const t = title.value.trim();
+    const d = description.value.trim();
+    if (!t || !d) {
+      (t ? description : title).focus();
+      return WS.storeApi.toast('Укажите название и описание услуги', 'warn');
+    }
+    const terms = [];
+    for (const row of form.querySelectorAll('.svc-term-fields')) {
+      const [value, label] = row.querySelectorAll('input');
+      const pair = [value.value.trim(), label.value.trim()];
+      if (!pair[0] && !pair[1]) continue;
+      if (!pair[0] || !pair[1]) {
+        (pair[0] ? label : value).focus();
+        return WS.storeApi.toast('Укажите стоимость и пояснение для каждого условия', 'warn');
+      }
+      terms.push(pair);
+    }
+    if (existing) Object.assign(existing, { t, d, terms });
+    else brokerServices().push({ id: 'service_' + WS.storeApi.nextTurnId(), t, d, terms });
+    WS.storeApi.touch({ render: false });
+    closeModal();
+    WS.storeApi.toast(existing ? 'Услуга обновлена' : 'Услуга добавлена в каталог', 'ok');
+  }
+  function openServiceProposal(id) {
+    const s = serviceById(id);
+    if (!s) return;
+    const terms = s.terms.length ? s.terms.map(([value, label]) => ({ k: escAttr(label), v: escAttr(value) })) :
+      [{ k: 'Стоимость', v: SERVICE_TERMS_FALLBACK }];
+    const body = wsDocHead('Пример коммерческого предложения', escAttr(s.t), escAttr(D().agency.name)) +
+      '<div class="section-label">Что входит в услугу</div><p class="svc-copy">' + escAttr(s.d) + '</p>' +
+      wsRows([{ h: 'Условия работы' }].concat(terms)) +
+      wsDocFoot('Демонстрационный документ · Итоговые условия брокер уточнит после получения заявки');
+    openModal('Пример КП', '<div class="svc-proposal">' + body + '</div>',
+      '<button class="btn" data-act="closeModal">Закрыть</button>' + serviceOrderButton(s), { wide: true });
+  }
+  function openServiceRequest(serviceId) {
+    const services = brokerServices();
+    if (!services.some((service) => service.id === serviceId)) return;
+    const options = services.map((service) => '<option value="' + escAttr(service.id) + '"' +
+      (service.id === serviceId ? ' selected' : '') + '>' + escAttr(service.t) + '</option>').join('');
+    openModal('Заявка на услугу',
+      '<p style="font-size:12.5px;color:var(--mut);margin-top:0">Заявка появится во «Входящих» этого демостенда. Укажите вымышленные данные.</p>' +
+      '<form id="sr_form" novalidate><div class="match-grid">' +
+      '<label class="fld wide"><span>Услуга</span><select id="sr_svc">' + options + '</select></label>' +
+      '<label class="fld"><span>Имя *</span><input id="sr_name" type="text" maxlength="120" required></label>' +
+      '<label class="fld"><span>Телефон или email *</span><input id="sr_contact" type="text" maxlength="160" required></label>' +
+      '<label class="fld wide"><span>Объект / бюджет</span><input id="sr_budget" type="text" maxlength="240" placeholder="Например, офис 300 м² в Business Bay"></label>' +
+      '<label class="fld wide"><span>Комментарий</span><textarea id="sr_msg" rows="3" maxlength="1000" placeholder="Кратко о задаче и сроках"></textarea></label>' +
+      '</div><p id="sr_error" role="alert" hidden style="color:var(--stop);font-size:12px;margin-bottom:0"></p></form>',
+      '<button class="btn" data-act="closeModal">Отмена</button><button class="btn primary" id="sr_submit" type="submit" form="sr_form">' + I('send') + 'Отправить заявку</button>');
+    document.getElementById('sr_form').addEventListener('submit', submitServiceRequest);
+  }
+  function serviceContactKey(value) {
+    const contact = String(value || '').trim().replace(/\s*\(DEMO\)$/i, '');
+    if (/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(contact)) return contact.toLowerCase();
+    const digits = contact.replace(/\D/g, '');
+    return /^\+?[\d\s().-]+$/.test(contact) && digits.length >= 7 && digits.length <= 15 ? digits : '';
+  }
+  function submitServiceRequest(event) {
+    event.preventDefault();
+    if (!document.querySelector('#modal.show #sr_form')) return;
+    const service = brokerServices().find((item) => item.id === _g('sr_svc'));
+    const senderName = _g('sr_name').trim();
+    const senderContact = _g('sr_contact').trim();
+    const contactKey = serviceContactKey(senderContact);
+    const error = !service ? ['sr_svc', 'Выберите услугу из каталога.']
+      : !senderName ? ['sr_name', 'Укажите имя.']
+      : !contactKey ? ['sr_contact', 'Укажите телефон или email.'] : null;
+    if (error) {
+      const hint = document.getElementById('sr_error');
+      hint.textContent = error[1];
+      hint.hidden = false;
+      document.getElementById(error[0]).focus();
+      return;
+    }
+    const budget = _g('sr_budget').trim();
+    const comment = _g('sr_msg').trim();
+    const matchingContacts = D().clients.filter((c) => [c.phone, c.email].some((value) => serviceContactKey(value) === contactKey));
+    D().inbox.unshift({
+      id: 'in_service_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10),
+      clientId: matchingContacts.length === 1 ? matchingContacts[0].id : null,
+      kind: 'service', ex: 'qualify', stage: 'new', serviceId: service.id, senderName, senderContact,
+      channel: 'service_form', at: WS.storeApi.clockLabel().time,
+      text: ['Заявка на услугу «' + service.t + '»', budget && 'Объект / бюджет: ' + budget,
+        comment && 'Комментарий: ' + comment].filter(Boolean).join(' · '),
+    });
+    WS.storeApi.touch({ render: false });
+    WS.router.go('requests');
+    WS.storeApi.toast('Заявка добавлена во «Входящие»', 'ok');
   }
 
   // ---------------- ПРОФИЛЬ (портал брокера — публичная витрина + приватные метрики) ----------------
@@ -12634,8 +12757,8 @@
     const objRows = myObjs.map((o) => '<div class="feed-row" data-obj="' + o.id + '" style="cursor:pointer"><div class="fi i-acc">' + I('building') + '</div><div class="ft"><div class="t">' + o.name + '</div><div class="m">' + o.area + ' · ' + o.br + ' · ' + WS.AED(o.price) + '</div></div>' + I('arrowRight') + '</div>').join('') || '<div style="font-size:12px;color:var(--faint);padding:8px 0">своих объектов пока нет</div>';
     const objectsCard = '<div class="card" style="margin-bottom:14px"><div class="section-label" style="padding:12px 16px 4px;display:flex;align-items:center">Мои объекты · ' + myObjs.length + '<button class="btn xs" style="margin-left:auto" data-nav="objects">' + I('arrowRight') + 'Все объекты</button></div><div class="feed" style="padding:0 16px 8px">' + objRows + '</div></div>';
     const svcAcc = '<div class="card pad" style="margin-bottom:14px"><div class="section-label" style="margin:0 0 6px">Мои услуги</div>' +
-      SERVICES.map((s) => '<details class="acc"><summary>' + s.t + '</summary><div class="acc-body">' + s.d +
-        '<div class="acc-terms">' + s.terms.map((tt) => '<div class="acc-term"><b>' + tt[0] + '</b><span>' + tt[1] + '</span></div>').join('') + '</div></div></details>').join('') +
+      brokerServices().map((s) => '<details class="acc"><summary>' + escAttr(s.t) + '</summary><div class="acc-body">' +
+        '<div class="svc-copy">' + escAttr(s.d) + '</div>' + serviceTerms(s) + '</div></details>').join('') +
       '</div>';
     const links = '<div class="prof-grid">' +
       '<button class="card pad prof-link" data-nav="services"><span class="icon-tile i-acc">' + I('grid') + '</span><span class="prof-lt"><b>Мои услуги</b><span class="prof-sub">Каталог с условиями комиссии</span></span>' + I('chevRight') + '</button>' +
@@ -13656,6 +13779,7 @@
     dealHasNextStep, dealsWithoutNextStep, pulseNoNextStep,
     dealTransferForm, saveTransfer, dealPartnerForm, savePartner,
     offersOf, newOffer, offerById, editOffer, openOfferForm, saveOffer, sendOffer, metricsSnapshot, feedOwner, userById, dealCommission, computeGoalProgress, openAgentEvidence, openDealContactForm, saveDealContact, removeDealContact, setEntityTab, entityCard, openAnalyticsDrill, resolveException, companyCard, openAuditLog,
+    openServiceEdit, addServiceTerm, openServiceProposal,
     openWallet, renderCgDock, valInput, valFromObj, openPromotion, objGalleryNav, openClubPost, openClubRequest, openServiceRequest, openWalletTopup, callClient, requestCard, reqObjState, reqAddObject, reqAddObjectDo, reqFormKp, reqCreateDeal, openRequestEdit, saveRequestEdit, openReqKp, openDealKp, setObjOrigin, refreshCommsTab, refreshCgRail, routeName, backBtn, fillContactObjTypesFromRequests };
   WS.partners = PARTNERS;
   // Инициализация интереса контактов при загрузке модуля ui.js (синхронно, без задержки)

@@ -2273,6 +2273,24 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
 .acc-term b { font-family: var(--font-name); font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: -.01em; display: block; line-height: 1; }
 .acc-term span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 700; display: block; margin-top: 3px; }
 
+/* Каталог услуг */
+.svc-card { margin-bottom: 12px; }
+.svc-title { margin: 0; font: 800 18px/1.35 var(--font-name); }
+.svc-copy { margin: 6px 0 0; max-width: 76ch; color: var(--mut); font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.svc-title, .svc-copy, .acc > summary, .acc-terms, .svc-proposal .wsdoc-title, .svc-proposal .field { overflow-wrap: anywhere; }
+.svc-card .acc-terms { border-top: 1px solid var(--hair); padding-top: 12px; color: var(--mut); font-size: 13px; }
+.svc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+#svc-form > .fld + .fld { margin-top: 10px; }
+#svc-form .section-label { margin-top: 14px; }
+.svc-term-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 0 12px; }
+.svc-term-fields .btn { justify-self: start; }
+.svc-proposal .wsdoc-brand { gap: 10px; }
+.svc-proposal .field .v { min-width: 0; }
+.svc-proposal .svc-copy { margin: 0 0 14px; }
+@media (max-width: 560px) {
+  .svc-term-fields { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Reviews (services page) */
 .rev { padding: 13px 0; border-top: 1px solid var(--line); }
 .rev:first-of-type { border-top: 0; }
@@ -2911,6 +2929,13 @@ label.fld textarea:focus { outline: none; border-color: var(--acc); }
    без него была бы витриной: разбор и есть то, ради чего раздел открывают. */
 .deal .in-txt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden; line-height: 1.35; }
+.deal.inbox-service .deal-body, .lead-row.inbox-service .lead-main,
+.feed-row.inbox-service .ft { overflow-wrap: anywhere; }
+.feed-row.inbox-service { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+.feed-row.inbox-service .inbox-row-actions { grid-column: 2; flex-wrap: wrap; }
+.feed-row.inbox-service .m { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+#sr_form .fld { min-width: 0; }
+#sr_svc { text-overflow: ellipsis; }
 .deal .in-act { margin-top: 8px; }
 .deal .in-act .btn { width: 100%; justify-content: center; }
 /* Кнопка звонка на карточке доски: набирает, номер не печатает. */

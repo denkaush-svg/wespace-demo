@@ -67,6 +67,7 @@
       market: clone(f.market),
       deals: clone(f.deals),
       requests: clone(f.requests),
+      services: clone(f.services),
       tasks: clone(f.tasks),
       events: clone(f.events),
       inbox: clone(f.inbox),

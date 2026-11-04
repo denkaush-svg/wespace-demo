@@ -245,7 +245,7 @@
     if (d.objfilter) { store.objFilter = d.objfilter; return api.emit(); }
     if (d.clubcomm) { store.clubComm = d.clubcomm; return api.emit(); }
     if (d.clubreq) return WS.ui.openClubRequest(d.clubreq);
-    if (d.svcreq) return WS.ui.openServiceRequest(+d.svcreq);
+    if (d.svcreq) return WS.ui.openServiceRequest(d.svcreq);
     if (d.dealbudget) { store.dealBudget = d.dealbudget; return api.emit(); }
     if (d.dealsrc) { store.dealSrc = d.dealsrc; return api.emit(); }
     if (d.objpurpose) { store.objPurpose = d.objpurpose; return api.emit(); }
@@ -647,7 +647,10 @@
         break;
       }
       case 'clubReqSend': WS.ui.closeModal(); api.toast('Заявка отправлена владельцу листинга в клубе (демо)', 'ok'); break;
-      case 'svcReqSend': WS.ui.closeModal(); api.toast('Заявка на услугу отправлена · появится во «Входящих» (демо)', 'ok'); break;
+      case 'serviceEdit': WS.ui.openServiceEdit(t.dataset.svc); break;
+      case 'serviceTermAdd': WS.ui.addServiceTerm(); break;
+      case 'serviceTermRemove': t.closest('.svc-term-fields').remove(); document.querySelector('[data-act="serviceTermAdd"]').focus(); break;
+      case 'serviceProposal': WS.ui.openServiceProposal(t.dataset.svc); break;
       case 'walletTopup': WS.ui.openWalletTopup(); break;
       case 'walletTopupSend': WS.ui.closeModal(); api.toast('Кошелёк пополнен (демо) · баланс обновлён', 'ok'); break;
       case 'anaTab': store.analyticsTab = t.dataset.anatab; api.emit(); break;

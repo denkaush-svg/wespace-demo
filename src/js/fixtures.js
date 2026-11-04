@@ -1620,10 +1620,20 @@
       text: 'Итог звонка: клиент согласен на рассрочку 60/40, просит зафиксировать цену до конца недели и прислать график платежей.' },
   ];
 
+  const services = [
+    { id: 'service_brokerage', t: 'Брокеридж в коммерческой недвижимости',
+      d: 'Подбор офисов, ритейла и складов под инвесторов и бизнес — аренда и продажа. Полное сопровождение сделки с юридической стороны.',
+      terms: [['100%', 'сдача в аренду'], ['0%', 'поиск объекта'], ['от 3%', 'продажа объекта'], ['по запросу', 'фин. оценка']] },
+    { id: 'service_management', t: 'Управление недвижимостью',
+      d: 'Сдача в аренду, контроль оплат и состояние объектов клиентов.', terms: [['8% / мес', 'управление']] },
+    { id: 'service_consulting', t: 'Консалтинг девелоперов',
+      d: 'Эксклюзивное сопровождение застройщиков — от участка до последнего лота.', terms: [['по проекту', 'консалтинг']] },
+  ];
+
   WS.fixtures = {
     version: 1, settings, outcomes,
     DEMO_NOW, tenant, FX, agency, users, roster, clients, objects, AREAS, refModel, market, TARIFFS,
-    deals, requests, tasks, events, inbox, approvals, analytics,
+    deals, requests, services, tasks, events, inbox, approvals, analytics,
     FUNNELS, STAGE_LABELS, REQ_STAGES, REQ_STAGE_LABELS, REQ_SIDE, INBOX_STAGES, INBOX_STAGE_LABELS, DEAL_STEPS, REG_LABELS, contractKindFor,
     contracts, CONTRACT_KINDS, companies, dealTimeline, requestTimeline, contactTimeline, companyTimeline, conflicts, attribution, clientSignals,
   };
